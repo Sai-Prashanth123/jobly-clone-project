@@ -1,4 +1,5 @@
 import { Facebook, Twitter, Instagram, Linkedin, MapPin, Phone, Mail } from 'lucide-react';
+import footerLogo from '@/assets/footer-logo.png';
 
 const Footer = () => {
   return (
@@ -6,9 +7,7 @@ const Footer = () => {
       <div className="px-4 lg:px-[60px] grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-12 mb-16">
         {/* Brand */}
         <div>
-          <div className="text-2xl font-extrabold mb-6">
-            JObLY <span className="text-jobly-blue block text-[10px] tracking-widest">SOLUTIONS</span>
-          </div>
+          <img src={footerLogo} alt="Jobly Solutions" className="h-12 mb-6 object-contain" />
           <p className="text-primary-foreground/60 text-[14px] leading-[1.8] mb-8">
             We genuinely have certainty that business elements develop and advance not just through the movement in their particular organizations additionally by designing a situation which consoles self-examination and enablement.
           </p>

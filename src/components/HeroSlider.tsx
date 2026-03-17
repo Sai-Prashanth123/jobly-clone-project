@@ -1,19 +1,23 @@
 import { useState, useEffect } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import bannerSlide1 from '@/assets/banner-slide-1.png';
+import bannerSlide2 from '@/assets/banner-slide-2.png';
+import bannerSlide3 from '@/assets/banner-slide-3.png';
 
 const slides = [
   {
-    image: 'https://images.unsplash.com/photo-1524178232363-1fb2b075b655?w=1600&q=80',
+    image: bannerSlide1,
     sub: 'Accelerate your Career Growth & Upskill Yourself',
     title: 'Software Training\nServices',
   },
   {
-    image: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=1600&q=80',
-    sub: 'Jobly offers a comprehensive range of IT consulting and staffing services',
+    image: bannerSlide2,
+    sub: 'Jobly offers a comprehensive range of',
+    subHighlight: 'IT consulting and staffing services',
     title: 'Staffing And Consulting\nServices',
   },
   {
-    image: 'https://images.unsplash.com/photo-1521791136064-7986c2920216?w=1600&q=80',
+    image: bannerSlide3,
     sub: 'To help you focus on your dream career',
     title: 'Career Guidance\nServices',
   },
@@ -39,12 +43,15 @@ const HeroSlider = () => {
           key={idx}
           className={`absolute inset-0 transition-opacity duration-1000 ease-in-out ${idx === current ? 'opacity-100' : 'opacity-0'}`}
         >
-          <div className="absolute inset-0 bg-jobly-navy/70 z-10" />
+          <div className="absolute inset-0 bg-jobly-navy/60 z-10" />
           <img src={slide.image} className="w-full h-full object-cover" alt="" />
 
           <div className="absolute inset-0 z-20 flex flex-col items-center justify-center text-center px-4">
             <p className="text-primary-foreground/70 uppercase tracking-widest text-sm mb-6 max-w-2xl">
               {slide.sub}
+              {slide.subHighlight && (
+                <span className="text-jobly-blue"> {slide.subHighlight}</span>
+              )}
             </p>
             <h1 className="text-primary-foreground text-4xl lg:text-[52px] font-bold leading-[1.2] whitespace-pre-line mb-10">
               {slide.title}
@@ -60,18 +67,20 @@ const HeroSlider = () => {
         </div>
       ))}
 
-      {/* Arrows */}
-      <div
-        onClick={prev}
-        className="absolute left-4 lg:left-8 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center cursor-pointer hover:bg-primary-foreground/30 transition-colors"
-      >
-        <ChevronLeft className="text-primary-foreground" size={20} />
-      </div>
-      <div
-        onClick={next}
-        className="absolute right-4 lg:right-8 top-1/2 -translate-y-1/2 z-30 w-10 h-10 rounded-full bg-primary-foreground/20 flex items-center justify-center cursor-pointer hover:bg-primary-foreground/30 transition-colors"
-      >
-        <ChevronRight className="text-primary-foreground" size={20} />
+      {/* Arrows - stacked vertically on left like reference */}
+      <div className="absolute left-4 lg:left-8 bottom-1/3 z-30 flex flex-col gap-4">
+        <div
+          onClick={prev}
+          className="w-12 h-12 rounded-full border-2 border-jobly-blue flex items-center justify-center cursor-pointer hover:bg-jobly-blue/20 transition-colors"
+        >
+          <ChevronLeft className="text-jobly-blue" size={20} />
+        </div>
+        <div
+          onClick={next}
+          className="w-12 h-12 rounded-full border-2 border-jobly-blue flex items-center justify-center cursor-pointer hover:bg-jobly-blue/20 transition-colors"
+        >
+          <ChevronRight className="text-jobly-blue" size={20} />
+        </div>
       </div>
 
       {/* Dots */}
