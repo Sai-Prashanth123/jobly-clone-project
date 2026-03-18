@@ -1,56 +1,67 @@
-import { Phone, Mail } from 'lucide-react';
-
-const GetInTouch = () => {
-  return (
-    <section className="bg-jobly-navy py-20 px-4 lg:px-[60px]">
-      <div className="grid grid-cols-1 lg:grid-cols-[1.2fr_1fr] gap-16">
-        <div className="text-primary-foreground">
-          <h2 className="text-[36px] font-bold mb-6">Get In Touch</h2>
-          <p className="text-primary-foreground/70 leading-[1.8] mb-12">
-            We genuinely have certainty that business elements develop and advance not just through the movement in their particular organizations additionally by designing a situation which consoles self-examination and enablement.
-          </p>
-
-          <div className="space-y-6">
-            <div className="flex items-center gap-4">
-              <div className="w-11 h-11 bg-jobly-blue rounded-full flex items-center justify-center shrink-0">
-                <Phone className="text-primary-foreground" size={18} />
+const GetInTouch = () => (
+  <section className="can-help can-help-home-1 pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
+      <div className="can-help-background" style={{ backgroundImage: 'url(/assets/img/home/can-help-background.png)' }}></div>
+      <div className="container">
+        <div className="row">
+          <div className="col-xl-7">
+            <div className="can-help__content mb-sm-40 mb-xs-40 mb-md-45 mb-lg-50">
+              <h2 className="title color-white mb-sm-15 mb-xs-10 mb-20">Get In Touch</h2>
+              <div className="description font-la mb-md-25 mb-sm-25 mb-xs-20 mb-lg-30 mb-40 color-white">
+                <p>We genuinely have certainty that business elements develop and advance not just through the movement in their particular organizations additionally by designing a situation which consoles self-examination and enablement.</p>
               </div>
-              <div>
-                <p className="text-[12px] text-primary-foreground/60">Call Us</p>
-                <p className="text-[18px] font-bold">+1 404-863-5745</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-11 h-11 bg-jobly-blue rounded-full flex items-center justify-center shrink-0">
-                <Mail className="text-primary-foreground" size={18} />
-              </div>
-              <div>
-                <p className="text-[12px] text-primary-foreground/60">Email Drop Us</p>
-                <p className="text-[16px] font-bold">info@joblysolutions.com</p>
+              <div className="can-help__content-btn-group d-flex flex-column flex-sm-row">
+                <a href="tel:+14048635745" className="theme-btn d-flex flex-column flex-md-row align-items-md-center">
+                  <div className="icon color-red"><i className="icon-call"></i></div>
+                  <div className="text">
+                    <span className="font-la mb-10 d-block fw-500 color-white">Call Us</span>
+                    <h5 className="fw-500 color-white">+1 404-863-5745</h5>
+                  </div>
+                </a>
+                <a href="mailto:info@joblysolutions.com" className="theme-btn d-flex flex-column flex-md-row align-items-md-center">
+                  <div className="icon color-red"><i className="icon-email-1"></i></div>
+                  <div className="text">
+                    <span className="font-la mb-10 d-block fw-500 color-white">Email Drop Us</span>
+                    <h5 className="fw-500 color-white">info@joblysolutions.com</h5>
+                  </div>
+                </a>
               </div>
             </div>
           </div>
-        </div>
-
-        <div className="bg-background p-10 rounded-xl shadow-2xl">
-          <div className="section-label">GET IN TOUCH</div>
-          <h3 className="text-[26px] font-bold text-jobly-navy mb-8">Free Consultation</h3>
-          <div className="space-y-4">
-            <input type="text" placeholder="Full Name" className="w-full border border-border p-3 rounded focus:border-jobly-blue outline-none text-sm" />
-            <input type="email" placeholder="Enter Email" className="w-full border border-border p-3 rounded focus:border-jobly-blue outline-none text-sm" />
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <input type="text" placeholder="Phone No" className="w-full border border-border p-3 rounded focus:border-jobly-blue outline-none text-sm" />
-              <input type="text" placeholder="Subject" className="w-full border border-border p-3 rounded focus:border-jobly-blue outline-none text-sm" />
-            </div>
-            <textarea placeholder="Message" className="w-full border border-border p-3 rounded h-24 focus:border-jobly-blue outline-none text-sm resize-none" />
-            <div className="w-full bg-jobly-blue text-primary-foreground py-3.5 rounded font-semibold text-center cursor-pointer hover:brightness-90 transition-all">
-              Send Your Message
+          <div className="col-xl-5">
+            <div className="contact-form pt-md-30 pt-sm-25 pt-xs-20 pb-md-40 pb-sm-35 pb-xs-30 pt-xl-30 pb-xl-50 pt-45 pr-xl-50 pl-md-40 pl-sm-30 pl-xs-25 pr-md-40 pr-sm-30 pr-xs-25 pl-xl-50 pr-85 pb-60 pl-85">
+              <div className="contact-form__header mb-sm-35 mb-xs-30 mb-40">
+                <h6 className="sub-title fw-500 color-red text-uppercase mb-15">
+                  <img src="/assets/img/home/line.svg" className="img-fluid mr-10" alt="" /> Get In Touch
+                </h6>
+                <h3 className="title color-d_black">Free Consultation</h3>
+              </div>
+              <form className="hm_contact_form" onSubmit={e => e.preventDefault()}>
+                <div className="single-personal-info form_row clearfix">
+                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Full Name" required />
+                </div>
+                <div className="single-personal-info form_row clearfix">
+                  <input className="form_fill_fields hm_input_text form-control" type="email" placeholder="Enter Email" required />
+                </div>
+                <div className="single-personal-info form_row clearfix">
+                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Phone No" />
+                </div>
+                <div className="single-personal-info form_row clearfix">
+                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Subject" required />
+                </div>
+                <div className="single-personal-info form_row clearfix">
+                  <textarea className="form_fill_fields hm_textarea form-control" placeholder="Message" required></textarea>
+                </div>
+                <div className="form_row clearfix">
+                  <button type="submit" className="send_button full_button default-btn btn-two theme-btn btn-sm btn-red">
+                    <span>Send Your Message</span>
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
       </div>
     </section>
-  );
-};
+);
 
 export default GetInTouch;

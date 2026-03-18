@@ -1,84 +1,150 @@
-import { useState, useEffect } from 'react';
-import { ChevronDown, Menu, X } from 'lucide-react';
+import { useState } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 
-const Logo = () => (
-  <div className="flex flex-col leading-none">
-    <div className="flex items-center font-extrabold text-[28px] tracking-tight text-foreground">
-      J
-      <div className="relative mx-[1px] flex items-center justify-center">
-        <div className="w-7 h-7 rounded-full border-[3px] border-foreground flex items-center justify-center p-1">
-          <svg viewBox="0 0 24 24" className="w-full h-full text-jobly-blue" fill="currentColor">
-            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" />
-          </svg>
-        </div>
-        <div className="absolute -bottom-1 -right-1 w-3 h-[3px] bg-foreground rotate-45 rounded-full" />
-      </div>
-      bLY
-    </div>
-    <span className="text-jobly-blue text-[10px] font-bold tracking-[0.3em] mt-1">SOLUTIONS</span>
-  </div>
-);
-
-const navItems = ['Home', 'About', 'Services', 'Careers', 'Technology', 'Clients', 'Contact'];
-const servicesSub = ['Career Guidance Service', 'Staffing And Consulting Services', 'Software Training'];
+const servicesSub = [
+  { label: 'Career Guidance Service', path: '/career-guidance' },
+  { label: 'Staffing And Consulting Services', path: '/staffing-and-consulting' },
+  { label: 'Software Training', path: '/software-training' },
+];
 
 const Navbar = () => {
-  const [isScrolled, setIsScrolled] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-
-  useEffect(() => {
-    const handleScroll = () => setIsScrolled(window.scrollY > 50);
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const location = useLocation();
 
   return (
-    <nav className={`sticky top-0 z-[1000] bg-background w-full transition-shadow duration-300 ${isScrolled ? 'shadow-lg' : ''}`}>
-      <div className="px-4 lg:px-[60px] py-3 flex items-center justify-between">
-        <Logo />
-
-        {/* Desktop Nav */}
-        <div className="hidden lg:flex items-center gap-8">
-          {navItems.map((item) =>
-            item === 'Services' ? (
-              <div key={item} className="group relative py-4">
-                <div className="flex items-center gap-1 text-[15px] font-medium text-jobly-body hover:text-jobly-blue cursor-pointer transition-colors">
-                  Services <ChevronDown size={10} />
-                </div>
-                <div className="absolute top-full left-0 w-[280px] bg-background shadow-xl rounded-lg opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto transition-all duration-200 border border-border">
-                  {servicesSub.map((sub) => (
-                    <div key={sub} className="px-5 py-3 text-[14px] text-jobly-body hover:bg-jobly-stats-bg hover:text-jobly-blue cursor-pointer transition-colors first:rounded-t-lg last:rounded-b-lg">
-                      {sub}
+    <>
+      <header className="header header-1 header-3">
+        <TopBarInline />
+        <div className="main-header-wraper">
+          <div className="container">
+            <div className="row">
+              <div className="col-12">
+                <div className="d-flex align-items-center justify-content-between">
+                  <div className="header-logo">
+                    <div className="logo">
+                      <Link to="/"><img src="/assets/img/logo/logo-3.png" alt="Jobly Solutions" /></Link>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="header-menu d-none d-xl-block">
+                    <div className="main-menu">
+                      <ul>
+                        <li className={location.pathname === '/' ? 'active' : ''}><Link to="/">Home</Link></li>
+                        <li className={location.pathname === '/about' ? 'active' : ''}><Link to="/about">About</Link></li>
+                        <li className={`dropdown ${servicesSub.some(s => location.pathname === s.path) ? 'active' : ''}`}>
+                          <a>Services<i className="fas fa-caret-down"></i></a>
+                          <ul>
+                            {servicesSub.map(s => (
+                              <li key={s.path}><Link to={s.path}>{s.label}</Link></li>
+                            ))}
+                          </ul>
+                        </li>
+                        <li className={location.pathname === '/careers' ? 'active' : ''}><Link to="/careers">Careers</Link></li>
+                        <li className={location.pathname === '/technology' ? 'active' : ''}><Link to="/technology">Technology</Link></li>
+                        <li className={location.pathname === '/clients' ? 'active' : ''}><Link to="/clients">Clients</Link></li>
+                        <li className={location.pathname === '/contact' ? 'active' : ''}><Link to="/contact">Contact</Link></li>
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="header-right d-flex align-items-center">
+                    <div className="mobile-nav-bar d-block ml-3 ml-sm-5 d-xl-none">
+                      <div className="mobile-nav-wrap">
+                        <div id="hamburger" className="color-primary" onClick={() => setMobileOpen(true)}>
+                          <i className="fal fa-bars"></i>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <div key={item} className="text-[15px] font-medium text-jobly-body hover:text-jobly-blue cursor-pointer transition-colors">
-                {item}
-              </div>
-            )
-          )}
-        </div>
-
-        {/* Mobile hamburger */}
-        <div className="lg:hidden cursor-pointer" onClick={() => setMobileOpen(!mobileOpen)}>
-          {mobileOpen ? <X size={24} /> : <Menu size={24} />}
-        </div>
-      </div>
-
-      {/* Mobile drawer */}
-      {mobileOpen && (
-        <div className="lg:hidden bg-background border-t border-border px-4 py-4 space-y-4">
-          {navItems.map((item) => (
-            <div key={item} className="text-[15px] font-medium text-jobly-body hover:text-jobly-blue cursor-pointer">
-              {item}
             </div>
-          ))}
+          </div>
         </div>
-      )}
-    </nav>
+      </header>
+
+      {/* Mobile nav */}
+      <div className={`mobile-nav mobile-nav-red${mobileOpen ? ' nav-open' : ''}`}>
+        <button type="button" className="close-nav" onClick={() => setMobileOpen(false)}>
+          <i className="fal fa-times-circle"></i>
+        </button>
+        <nav className="sidebar-nav">
+          <div className="navigation">
+            <div className="consulter-mobile-nav">
+              <ul className="consulter-navbar-mobile">
+                <li><Link to="/" onClick={() => setMobileOpen(false)}>Home</Link></li>
+                <li><Link to="/about" onClick={() => setMobileOpen(false)}>About</Link></li>
+                <li className="dropdown">
+                  <a>Services</a>
+                  <ul className="dropdown-menu">
+                    {servicesSub.map(s => (
+                      <li key={s.path}><Link to={s.path} onClick={() => setMobileOpen(false)}>{s.label}</Link></li>
+                    ))}
+                  </ul>
+                </li>
+                <li><Link to="/careers" onClick={() => setMobileOpen(false)}>Careers</Link></li>
+                <li><Link to="/technology" onClick={() => setMobileOpen(false)}>Technology</Link></li>
+                <li><Link to="/clients" onClick={() => setMobileOpen(false)}>Clients</Link></li>
+                <li><Link to="/contact" onClick={() => setMobileOpen(false)}>Contact</Link></li>
+              </ul>
+            </div>
+            <div className="sidebar-nav__bottom mt-20">
+              <div className="sidebar-nav__bottom-contact-infos mb-20">
+                <h6 className="color-black mb-5">Contact Info</h6>
+                <ul>
+                  <li><a href="mailto:info@joblysolutions.com"><i className="icon-email"></i> info@joblysolutions.com</a></li>
+                  <li><a href="tel:+14048635745"><i className="icon-phone"></i> +1 404-863-5745</a></li>
+                </ul>
+              </div>
+              <div className="sidebar-nav__bottom-social">
+                <h6 className="color-black mb-5">Follow On:</h6>
+                <ul>
+                  <li><a href="https://www.facebook.com/people/Jobly-Solutions/100089951006079/?mibextid=ZbWKwL" target="_blank"><i className="fab fa-facebook-f"></i></a></li>
+                  <li><a href="https://twitter.com/JoblySolutions" target="_blank"><i className="fab fa-twitter"></i></a></li>
+                  <li><a href="#"><i className="fab fa-instagram"></i></a></li>
+                  <li><a href="https://www.linkedin.com/company/jobly-solutions/" target="_blank"><i className="fab fa-linkedin-in"></i></a></li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </nav>
+      </div>
+      {mobileOpen && <div className="offcanvas-overlay" onClick={() => setMobileOpen(false)}></div>}
+
+      <div className="header-gutter home"></div>
+    </>
   );
 };
+
+// Inline top bar (included inside header tag like original)
+const TopBarInline = () => (
+  <div className="top-header d-none d-xl-block">
+    <div className="container">
+      <div className="row align-items-center">
+        <div className="col-4">
+          <div className="header-right-socail d-flex align-items-center">
+            <h6 className="font-la color-white fw-normal">Follow On:</h6>
+            <div className="social-profile">
+              <ul>
+                <li><a href="https://www.facebook.com/people/Jobly-Solutions/100089951006079/?mibextid=ZbWKwL" target="_blank"><i className="fab fa-facebook-f"></i></a></li>
+                <li><a href="https://twitter.com/JoblySolutions" target="_blank"><i className="fab fa-twitter"></i></a></li>
+                <li><a href="#"><i className="fab fa-instagram"></i></a></li>
+                <li><a href="https://www.linkedin.com/company/jobly-solutions/" target="_blank"><i className="fab fa-linkedin-in"></i></a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+        <div className="col-8">
+          <div className="header-cta d-flex justify-content-end">
+            <ul>
+              <li><a href="tel:+14048635745"><i className="icon-phone"></i> +1 404-863-5745</a></li>
+              <li><a href="mailto:info@joblysolutions.com"><i className="icon-email"></i> info@joblysolutions.com</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
 
 export default Navbar;

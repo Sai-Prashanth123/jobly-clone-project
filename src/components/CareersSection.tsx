@@ -1,27 +1,29 @@
-const CareersSection = () => {
-  return (
-    <section className="bg-jobly-navy py-20 px-4 lg:px-[60px]">
-      <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-12 items-center">
-        <div className="text-primary-foreground">
-          <h2 className="text-[36px] font-bold mb-6">Careers</h2>
-          <p className="text-primary-foreground/75 text-[16px] leading-[1.8] mb-8">
-            Jobly offers flexible benefit packages to meet the personal needs of our employees and their families. We strive to be an employer of choice, and our Human Resources Department works hard to ensure that our benefit plans are competitive and comprehensive.
-          </p>
-          <div className="bg-jobly-blue text-primary-foreground px-7 py-3 rounded inline-flex items-center gap-2 font-semibold cursor-pointer hover:brightness-90 transition-all">
-            Read More <span>→</span>
+import { Link } from 'react-router-dom';
+
+const CareersSection = () => (
+  <section
+    className="planning-success pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-130 overflow-hidden"
+    style={{ backgroundImage: 'url(/assets/img/home/planning-success-bg.png)' }}
+  >
+    <div className="container">
+      <div className="row align-items-center">
+        <div className="col-md-8">
+          <div className="planning-success__content mb-xs-35">
+            <h2 className="title mb-20 mb-sm-15 mb-xs-10 color-white">Careers</h2>
+            <div className="description font-la color-white mb-40 mb-sm-30 mb-xs-20">
+              <p>Jobly offers flexible benefit packages to meet the personal needs of our employees and their families. We strive to be an employer of choice, and our Human Resources Department works hard to ensure that our benefit plans are competitive and comprehensive.</p>
+            </div>
+            <Link to="/careers" className="theme-btn btn-sm btn-red">
+              Read More <i className="far fa-chevron-double-right"></i>
+            </Link>
           </div>
         </div>
-
-        <div className="flex justify-center">
-          <img
-            src="https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=600&q=80"
-            alt="Team"
-            className="rounded-lg max-h-[350px] object-cover opacity-80"
-          />
+        <div className="col-md-4">
+          <img src="/assets/img/home/our1.png" className="img-fluid" alt="" />
         </div>
       </div>
-    </section>
-  );
-};
+    </div>
+  </section>
+);
 
 export default CareersSection;

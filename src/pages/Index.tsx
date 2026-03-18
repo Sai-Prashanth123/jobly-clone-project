@@ -1,4 +1,3 @@
-import TopBar from '@/components/TopBar';
 import Navbar from '@/components/Navbar';
 import HeroSlider from '@/components/HeroSlider';
 import StatsBar from '@/components/StatsBar';
@@ -12,19 +11,22 @@ import Footer from '@/components/Footer';
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-background">
-      <TopBar />
+    <div className="body-wrapper">
       <Navbar />
-      <main>
-        <HeroSlider />
+      <HeroSlider />
+      <div className="our-company-financial overflow-hidden">
+        <div className="overly"><div className="container"></div></div>
         <StatsBar />
         <AboutSection />
-        <CareersSection />
-        <OurCompany />
-        <OurServices />
+      </div>
+      <CareersSection />
+      <OurCompany />
+      <OurServices />
+      <div className="can-help-overly-home overflow-hidden">
+        <div className="can-help-overly"><div className="container"></div></div>
         <GetInTouch />
         <ClientsBar />
-      </main>
+      </div>
       <Footer />
     </div>
   );
