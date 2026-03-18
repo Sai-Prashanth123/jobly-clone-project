@@ -1,0 +1,38 @@
+/* Portal CSS Isolation — scoped to .portal-scope */
+
+.portal-scope h1,
+.portal-scope h2,
+.portal-scope h3,
+.portal-scope h4,
+.portal-scope h5,
+.portal-scope h6 {
+  font-size: revert;
+  line-height: revert;
+  font-weight: revert;
+  color: revert;
+  margin: revert;
+  padding: revert;
+}
+
+.portal-scope section {
+  padding-top: unset !important;
+  padding-bottom: unset !important;
+}
+
+.portal-scope * {
+  box-sizing: border-box;
+}
+
+/* Print styles for invoice */
+@media print {
+  .portal-no-print {
+    display: none !important;
+  }
+  .portal-print-only {
+    display: block !important;
+  }
+}
+
+.portal-print-only {
+  display: none;
+}
