@@ -1,12 +1,14 @@
+const stats = [
+  { icon: 'fas fa-chart-bar',  val: 5620, label: 'Successful Project'  },
+  { icon: 'fas fa-headset',    val: 150,  label: 'Expert Consulter'    },
+  { icon: 'fas fa-coffee',     val: 96,   label: 'Cup Of Cofee'        },
+  { icon: 'fas fa-users',      val: 3225, label: 'Client Satisfaction' },
+];
+
 const StatsBar = () => (
   <div className="container">
     <div className="row mb-minus-30">
-      {[
-        { icon: 'icon-process-1', val: 5620, label: 'Successful Project' },
-        { icon: 'icon-support-2', val: 150,  label: 'Expert Consulter' },
-        { icon: 'icon-coffee-2',  val: 96,   label: 'Cup Of Cofee' },
-        { icon: 'icon-teamwork-1',val: 3225, label: 'Client Satisfaction' },
-      ].map((s, i) => (
+      {stats.map((s, i) => (
         <div key={i} className="col-xl-3 col-lg-4 col-sm-6">
           <div className="counter-area__item d-flex align-items-center">
             <div className="icon color-primary">

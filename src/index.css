@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Pathway+Gothic+One&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -61,6 +61,91 @@
     scroll-behavior: smooth;
     @apply bg-background;
   }
+
+  /* Restore heading scale overridden by Tailwind Preflight.
+     style.css sets these but Preflight resets to font-size:inherit. */
+  h1 { font-size: 64px; line-height: 78px; font-weight: 600; color: #243342; }
+  h2 { font-size: 48px; line-height: 60px; font-weight: 600; color: #243342; }
+  h3 { font-size: 36px; line-height: 48px; font-weight: 600; color: #243342; }
+  h4 { font-size: 24px; line-height: 36px; font-weight: 600; color: #243342; }
+  h5 { font-size: 20px; line-height: 26px; font-weight: 600; color: #243342; }
+  h6 { font-size: 16px; line-height: 24px; font-weight: 600; color: #243342; }
+
+  @media (max-width: 1199px) { h2 { font-size: 42px; line-height: 54px; } }
+  @media (max-width: 991px)  { h2 { font-size: 36px; line-height: 48px; } }
+  @media (max-width: 767px)  { h2 { font-size: 32px; line-height: 44px; } }
+  @media (max-width: 575px)  { h2 { font-size: 28px; line-height: 38px; } }
+}
+
+/* ============================
+   Spacing utility overrides
+   Tailwind redefines mb-N/mt-N/pb-N/pt-N in rem units;
+   style.css expects them in px — restore pixel values here.
+   ============================ */
+@layer utilities {
+  .mb-5  { margin-bottom:  5px !important; }
+  .mb-10 { margin-bottom: 10px !important; }
+  .mb-15 { margin-bottom: 15px !important; }
+  .mb-20 { margin-bottom: 20px !important; }
+  .mb-25 { margin-bottom: 25px !important; }
+  .mb-30 { margin-bottom: 30px !important; }
+  .mb-35 { margin-bottom: 35px !important; }
+  .mb-40 { margin-bottom: 40px !important; }
+  .mb-45 { margin-bottom: 45px !important; }
+  .mb-50 { margin-bottom: 50px !important; }
+  .mb-55 { margin-bottom: 55px !important; }
+  .mb-60 { margin-bottom: 60px !important; }
+  .mb-65 { margin-bottom: 65px !important; }
+  .mb-70 { margin-bottom: 70px !important; }
+  .mb-75 { margin-bottom: 75px !important; }
+  .mb-80 { margin-bottom: 80px !important; }
+  .mb-90 { margin-bottom: 90px !important; }
+  .mb-95 { margin-bottom: 95px !important; }
+  .mb-100{ margin-bottom:100px !important; }
+
+  .mt-5  { margin-top:  5px !important; }
+  .mt-10 { margin-top: 10px !important; }
+  .mt-15 { margin-top: 15px !important; }
+  .mt-20 { margin-top: 20px !important; }
+  .mt-25 { margin-top: 25px !important; }
+  .mt-30 { margin-top: 30px !important; }
+  .mt-35 { margin-top: 35px !important; }
+  .mt-40 { margin-top: 40px !important; }
+  .mt-45 { margin-top: 45px !important; }
+  .mt-50 { margin-top: 50px !important; }
+  .mt-60 { margin-top: 60px !important; }
+  .mt-70 { margin-top: 70px !important; }
+  .mt-80 { margin-top: 80px !important; }
+  .mt-90 { margin-top: 90px !important; }
+  .mt-100{ margin-top:100px !important; }
+
+  .pb-5  { padding-bottom:  5px !important; }
+  .pb-10 { padding-bottom: 10px !important; }
+  .pb-15 { padding-bottom: 15px !important; }
+  .pb-20 { padding-bottom: 20px !important; }
+  .pb-25 { padding-bottom: 25px !important; }
+  .pb-30 { padding-bottom: 30px !important; }
+  .pb-40 { padding-bottom: 40px !important; }
+  .pb-50 { padding-bottom: 50px !important; }
+  .pb-60 { padding-bottom: 60px !important; }
+  .pb-70 { padding-bottom: 70px !important; }
+  .pb-80 { padding-bottom: 80px !important; }
+  .pb-90 { padding-bottom: 90px !important; }
+  .pb-100{ padding-bottom:100px !important; }
+
+  .pt-5  { padding-top:  5px !important; }
+  .pt-10 { padding-top: 10px !important; }
+  .pt-15 { padding-top: 15px !important; }
+  .pt-20 { padding-top: 20px !important; }
+  .pt-25 { padding-top: 25px !important; }
+  .pt-30 { padding-top: 30px !important; }
+  .pt-40 { padding-top: 40px !important; }
+  .pt-50 { padding-top: 50px !important; }
+  .pt-60 { padding-top: 60px !important; }
+  .pt-70 { padding-top: 70px !important; }
+  .pt-80 { padding-top: 80px !important; }
+  .pt-90 { padding-top: 90px !important; }
+  .pt-100{ padding-top:100px !important; }
 }
 
 @keyframes marquee {
@@ -278,44 +363,234 @@
 /* ============================
    counter-area
    ============================ */
+.mb-minus-30 {
+  margin-bottom: -30px;
+}
+
 .counter-area__item {
+  margin-bottom: 30px;
   background: #E2E9FF;
-  display: flex;
-  align-items: center;
-  gap: 0;
-  border-radius: 4px;
-  overflow: hidden;
+  height: calc(100% - 30px);
 }
 
 .counter-area__item .icon {
-  font-size: 60px;
-  min-height: 100%;
-  line-height: 120px;
-  background: rgba(64, 105, 255, 0.1);
-  padding: 28px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #4069FF;
+  min-height: 100%;
+  flex-shrink: 0;
+  background: rgba(64, 105, 255, 0.1);
+  font-size: 52px;
+  padding: 0 26px;
+  line-height: 1;
+}
+
+@media (max-width: 1299px) {
+  .counter-area__item .icon {
+    font-size: 42px;
+    padding: 0 18px;
+  }
+}
+
+.counter-area__item .icon i {
+  display: block;
+  line-height: 1;
 }
 
 .counter-area__item .text {
   width: 100%;
-  padding: 17px 16px 14px;
-  text-align: center;
+  padding: 17px 0 14px;
 }
 
 .counter-area__item .text .number {
   font-size: 32px;
   line-height: 42px;
-  font-weight: 600;
   margin-bottom: 10px;
   padding-bottom: 10px;
-  border-bottom: 1px solid rgba(64, 105, 255, 0.15);
-  color: #4069FF;
+  border-bottom: 1px solid rgba(64, 105, 255, 0.1);
 }
 
-.counter-area__item .text .description {
-  font-size: 14px;
-  color: #555;
+@media (max-width: 1299px) {
+  .counter-area__item .text .number {
+    font-size: 28px;
+    line-height: 35px;
+    margin-bottom: 5px;
+    padding-bottom: 5px;
+  }
+}
+
+/* ============================
+   banner-slider overrides
+   ============================ */
+
+/* 1. Wrapper clips everything — no overflow leaks */
+.banner-slider__wrapper {
+  overflow: hidden !important;
+  position: relative;
+}
+
+/* 2. Dark overlay via CSS (no PNG dependency) */
+.banner-slider__wrapper .slider-item::after {
+  background-color: rgba(0, 0, 0, 0.58);
+  background-image: none;
+}
+
+/* 3. Slide item — reset z-index so overlay clip works correctly */
+.banner-slider__wrapper .slider-item {
+  z-index: 0 !important;
+  isolation: auto !important; /* do NOT create extra stacking context */
+  overflow: hidden;           /* clip .number inside this slide only  */
+}
+
+/* 4. Content layers sit above the ::after overlay */
+.banner-slider__wrapper .slider-item .container {
+  position: relative;
+  z-index: 2;
+}
+
+/* 5. Slide number — RIGHT side only, outlined white */
+.banner-slider__wrapper .slider-item .number {
+  position: absolute;
+  right: 50px;
+  left: auto !important;       /* prevent any inherited left value */
+  top: calc(50% - 60px);
+  font-size: 160px;
+  line-height: 121px;
+  font-family: "Pathway Gothic One", sans-serif;
+  -webkit-text-fill-color: transparent !important;
+  -webkit-text-stroke-width: 2px !important;
+  -webkit-text-stroke-color: rgba(255, 255, 255, 0.5) !important;
+  z-index: 2;
+  pointer-events: none;
+  user-select: none;
+}
+@media (max-width: 767px) {
+  .banner-slider__wrapper .slider-item .number {
+    right: 20px;
+    font-size: 110px;
+    line-height: 90px;
+  }
+}
+
+/* 6. HIDE number on slick-cloned slides (infinite-loop duplicates) */
+.banner-slider .slick-cloned .number {
+  display: none !important;
+}
+
+/* 7. Title — large bold white */
+.banner-slider__wrapper .banner__content h1 {
+  font-size: 68px;
+  line-height: 80px;
+  font-weight: 700;
+  color: #fff;
+}
+@media (max-width: 1199px) {
+  .banner-slider__wrapper .banner__content h1 { font-size: 52px; line-height: 64px; }
+}
+@media (max-width: 991px) {
+  .banner-slider__wrapper .banner__content h1 { font-size: 40px; line-height: 52px; }
+}
+@media (max-width: 575px) {
+  .banner-slider__wrapper .banner__content h1 { font-size: 30px; line-height: 40px; }
+}
+
+/* 8. Arrows container — left side, vertically centred */
+.banner-slider__wrapper .slider-controls {
+  position: absolute;
+  left: 100px;
+  top: calc(50% - 58px);
+  z-index: 20;
+}
+@media (max-width: 1399px) { .banner-slider__wrapper .slider-controls { left: 50px; } }
+@media (max-width: 1199px) { .banner-slider__wrapper .slider-controls { left: 30px; } }
+@media (max-width: 767px)  { .banner-slider__wrapper .slider-controls { left: 15px; top: calc(50% - 48px); } }
+
+/* 9. Arrow buttons */
+.banner-slider__wrapper .slider-controls .banner-slider-arrows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.banner-slider__wrapper .slider-controls .banner-slider-arrows .slick-arrow {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.banner-slider__wrapper .slider-controls .banner-slider-arrows .slick-arrow.slick-prev {
+  color: #0066ff;
+  border-color: #0066ff;
+}
+.banner-slider__wrapper .slider-controls .banner-slider-arrows .slick-arrow:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+.banner-slider__wrapper .slider-controls .banner-slider-arrows .slick-arrow i {
+  font-size: 18px;
+  line-height: 1;
+}
+@media (max-width: 767px) {
+  .banner-slider__wrapper .slider-controls .banner-slider-arrows .slick-arrow {
+    width: 40px; height: 40px;
+  }
+}
+
+/* 10. Hide any stray slick arrows rendered outside slider-controls */
+.banner-slider .slick-prev,
+.banner-slider .slick-next {
+  display: none !important;
+}
+
+/* 11. Dots above overlay */
+.banner-slider__wrapper .slick-dots {
+  z-index: 10;
+}
+
+/* ============================
+   about-section overrides
+   ============================ */
+
+/* Stars — override style.css relative paths with absolute paths */
+.client-feedback__item-body .starts ul li span {
+  display: block;
+  width: 20px;
+  height: 20px;
+  background-size: cover;
+  background-repeat: no-repeat;
+  background-image: url('/assets/img/about/star.png');
+}
+
+/* Red stars for client-feedback__item-two variant */
+.client-feedback__item.client-feedback__item-two
+  .client-feedback__item-body .starts ul li span {
+  background-image: url('/assets/img/testimonial/star-red.png');
+}
+
+/* Stars list layout */
+.client-feedback__item-body .starts ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  gap: 2px;
+  display: flex;
+  justify-content: center;
+}
+
+/* Header background (the light-pink tab bg) */
+.client-feedback__item.client-feedback__item-two .client-feedback__item-header::after {
+  background: #FDF6F8;
+}
+
+/* Number size */
+.client-feedback__item-body .number {
+  font-size: 30px;
+  line-height: 36px;
+  font-weight: 600;
+  color: #04213F;
 }

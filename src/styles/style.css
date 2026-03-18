@@ -282,21 +282,21 @@ input, textarea, button {
 
 @font-face {
   font-family: "Gilroy";
-  src: url("assets/fonts/Gilroy-SemiBold.woff2") format("woff2"), url("assets/fonts/Gilroy-SemiBold.woff") format("woff");
+  src: url("/assets/fonts/Gilroy-SemiBold.woff2") format("woff2"), url("/assets/fonts/Gilroy-SemiBold.woff") format("woff");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Lato";
-  src: url("assets/fonts/Lato-Medium.woff2") format("woff2"), url("assets/fonts/Lato-Medium.woff") format("woff");
+  src: url("/assets/fonts/Lato-Medium.woff2") format("woff2"), url("/assets/fonts/Lato-Medium.woff") format("woff");
   font-weight: 500;
   font-style: normal;
   font-display: swap;
 }
 @font-face {
   font-family: "Lato";
-  src: url("assets/fonts/Lato-Semibold.woff2") format("woff2"), url("assets/fonts/Lato-Semibold.woff") format("woff");
+  src: url("/assets/fonts/Lato-Semibold.woff2") format("woff2"), url("/assets/fonts/Lato-Semibold.woff") format("woff");
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -574,7 +574,7 @@ p {
   left: 0%;
   width: 100%;
   height: 50%;
-  background-image: url(assets/img/home-5/bg_05.png) !important;
+  background-image: url(/assets/img/home-5/bg_05.png) !important;
   background-position: 0 0;
   background-size: cover;
   background-repeat: no-repeat;
@@ -617,7 +617,7 @@ p {
   background-size: auto;
   background-repeat: no-repeat;
   background-position: center;
-  background-image: url(../../assets/img/portfolio/our-portfolio-bg.html);
+  background-image: url(/assets/img/portfolio/our-portfolio-bg.html);
 }
 
 /* ----------------------------------
@@ -10392,7 +10392,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   bottom: -280px;
   height: 486.71px;
   position: absolute;
-  background-image: url("assets/img/page-banner/pattern.svg");
+  background-image: url("/assets/img/page-banner/pattern.svg");
 }
 @media (max-width: 767px) {
   .page-banner:before {
@@ -10523,7 +10523,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 100%;
   position: absolute;
   background-size: cover;
-  background-image: url(assets/img/page-banner/page-banner-overly.png);
+  background-image: url(/assets/img/page-banner/page-banner-overly.png);
 }
 .page-banner__media:before {
   content: "";
@@ -11033,7 +11033,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   content: "";
   height: 100%;
   position: absolute;
-  background-image: url(assets/img/banner/banner-slider-overly.png);
+  background-image: url(/assets/img/banner/banner-slider-overly.png);
 }
 .banner-slider__wrapper .slider-item .number {
   right: 50px;
@@ -11269,7 +11269,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 545.85px;
   position: absolute;
   background-repeat: no-repeat;
-  background-image: url(assets/img/banner/pattern.svg);
+  background-image: url(/assets/img/banner/pattern.svg);
 }
 @media (max-width: 1199px) {
   .banner-home:before {
@@ -11294,7 +11294,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 208px;
   position: absolute;
   background-repeat: no-repeat;
-  background-image: url(assets/img/banner/banner-overly.svg);
+  background-image: url(/assets/img/banner/banner-overly.svg);
 }
 .banner-home__content .sub-title {
   border-radius: 2px;
@@ -11398,7 +11398,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: contain;
   background-repeat: no-repeat;
-  background-image: url(assets/img/banner/banner-home-overly.png);
+  background-image: url(/assets/img/banner/banner-home-overly.png);
 }
 .banner-home__media:before {
   left: 1074px;
@@ -11643,7 +11643,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: auto;
   background-repeat: no-repeat;
-  background-image: url(assets/img/home-3/our-team-home-3.png);
+  background-image: url(/assets/img/home-3/our-team-home-3.png);
 }
 .our-team .mb-minus-30 {
   margin-bottom: -30px;
@@ -11661,7 +11661,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: auto;
   background-repeat: no-repeat;
-  background-image: url(assets/img/about/bg-team.png);
+  background-image: url(/assets/img/about/bg-team.png);
 }
 @media (max-width: 1199px) {
   .our-team__content .title {
@@ -11753,7 +11753,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-repeat: no-repeat;
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
-  background-image: url(assets/img/services/why-counter-overly-3.png);
+  background-image: url(/assets/img/services/why-counter-overly-3.png);
 }
 .our-company__meida {
   overflow: hidden;
@@ -11888,7 +11888,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background: #FDF6F8;
 }
 .client-feedback__item.client-feedback__item-two .client-feedback__item-body .starts ul li span {
-  background-image: url(assets/img/testimonial/star-red.png);
+  background-image: url(/assets/img/testimonial/star-red.png);
 }
 .client-feedback__item-header {
   position: relative;
@@ -11929,7 +11929,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 19.91px;
   background-size: cover;
   background-repeat: no-repeat;
-  background-image: url(assets/img/about/star.png);
+  background-image: url(/assets/img/about/star.png);
 }
 
 .company-skill .container {
@@ -11947,7 +11947,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-repeat: no-repeat;
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
-  background-image: url(assets/img/about/company-skill-bg.png);
+  background-image: url(/assets/img/about/company-skill-bg.png);
 }
 @media (min-width: 1200px) {
   .company-skill__content {
@@ -12976,7 +12976,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 19.91px;
   background-size: cover;
   background-repeat: no-repeat;
-  background-image: url(assets/img/testimonial/star-red.png);
+  background-image: url(/assets/img/testimonial/star-red.png);
 }
 .testimonial__item.testimonial-item-three .description {
   max-width: 308px;
@@ -13027,7 +13027,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 19.91px;
   background-size: cover;
   background-repeat: no-repeat;
-  background-image: url(../assets/img/testimonial/star.html);
+  background-image: url(/assets/img/testimonial/star.html);
 }
 .testimonial__item.testimonial .quote::after {
   display: none;
@@ -13110,7 +13110,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 19.91px;
   background-size: cover;
   background-repeat: no-repeat;
-  background-image: url(assets/img/testimonial/star.png);
+  background-image: url(/assets/img/testimonial/star.png);
 }
 .testimonial__item .description {
   max-width: 432px;
@@ -13294,13 +13294,13 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   bottom: #F3F3F2;
 }
 .pricing__card-yellow.standard-plan .pricing__card-body:after {
-  background-image: url(assets/img/price/standard-plan-2.svg) !important;
+  background-image: url(/assets/img/price/standard-plan-2.svg) !important;
 }
 .pricing__card-yellow.professional .pricing__card-body:after {
-  background-image: url(assets/img/price/professional-2.svg) !important;
+  background-image: url(/assets/img/price/professional-2.svg) !important;
 }
 .pricing__card-yellow .pricing__card-header:after {
-  background-image: url(assets/img/price/circle-2.svg);
+  background-image: url(/assets/img/price/circle-2.svg);
 }
 .pricing__card-yellow .pricing__card-header .title {
   color: #0E0A01 !important;
@@ -13309,7 +13309,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background: #0066ffd1;
 }
 .pricing__card-yellow .pricing__card-body:after {
-  background-image: url(assets/img/price/basic-plan-2.svg);
+  background-image: url(/assets/img/price/basic-plan-2.svg);
 }
 .pricing__card-yellow .pricing__card-body ul li i {
   color: #0066ffd1;
@@ -13334,7 +13334,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   right: -473px;
   width: 649.27px;
   height: 753.04px;
-  background-image: url(assets/img/price/standard-plan.svg);
+  background-image: url(/assets/img/price/standard-plan.svg);
   -webkit-animation-delay: 0s;
           animation-delay: 0s;
 }
@@ -13343,7 +13343,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   right: -470px;
   width: 644.51px;
   height: 715.97px;
-  background-image: url(assets/img/price/professional.svg);
+  background-image: url(/assets/img/price/professional.svg);
 }
 .pricing__card-header {
   position: relative;
@@ -13364,7 +13364,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: cover;
   background-repeat: no-repeat;
-  background-image: url(assets/img/price/circle.svg);
+  background-image: url(/assets/img/price/circle.svg);
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
 }
@@ -13407,7 +13407,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: cover;
   background-repeat: no-repeat;
-  background-image: url(assets/img/price/price-bg.svg);
+  background-image: url(/assets/img/price/price-bg.svg);
 }
 .pricing__card-header .price span {
   font-size: 16px;
@@ -13437,7 +13437,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: cover;
   background-repeat: no-repeat;
-  background-image: url(assets/img/price/basic-plan.svg);
+  background-image: url(/assets/img/price/basic-plan.svg);
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
   -webkit-animation-delay: 1s;
@@ -13555,7 +13555,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-position: center;
   background-repeat: no-repeat;
   border-radius: 0px 0px 20px 0px;
-  background-image: url(assets/img/services/map.png);
+  background-image: url(/assets/img/services/map.png);
 }
 @media (max-width: 767px) {
   .why-choose__media-wrapper .global-country {
@@ -13651,7 +13651,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: auto;
   background-repeat: no-repeat;
-  background-image: url(assets/img/home/why-choose__home-overly.png);
+  background-image: url(/assets/img/home/why-choose__home-overly.png);
 }
 .why-choose .why-choose__item-two-wrapper {
   gap: 30px 30px;
@@ -14164,7 +14164,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-repeat: no-repeat;
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
-  background-image: url(assets/img/services/why-counter-overly-1.png);
+  background-image: url(/assets/img/services/why-counter-overly-1.png);
 }
 .why-counter__overly .overly:before {
   top: 493px;
@@ -14177,7 +14177,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-repeat: no-repeat;
   -webkit-animation: move-bottom 3s linear infinite;
           animation: move-bottom 3s linear infinite;
-  background-image: url(assets/img/services/why-counter-overly-2.png);
+  background-image: url(/assets/img/services/why-counter-overly-2.png);
 }
 @media (max-width: 1199px) {
   .why-counter__overly .overly:before {
@@ -14362,7 +14362,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-repeat: no-repeat;
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
-  background-image: url(assets/img/services/why-counter-overly-3.png);
+  background-image: url(/assets/img/services/why-counter-overly-3.png);
 }
 .digital-area .why-choose__item {
   background: #FFF;
@@ -16219,7 +16219,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-size: auto;
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
-  background-image: url(assets/img/services/services-two-overly.png);
+  background-image: url(/assets/img/services/services-two-overly.png);
 }
 @media (max-width: 991px) {
   .can-help.services-two {
@@ -16262,7 +16262,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-size: auto;
   -webkit-animation: scale 3s linear infinite;
           animation: scale 3s linear infinite;
-  background-image: url(assets/img/home-3/can-help-home-3-bg.png);
+  background-image: url(/assets/img/home-3/can-help-home-3-bg.png);
 }
 @media (max-width: 1300px) {
   .can-help.can-help-home-3 {
@@ -16546,7 +16546,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   margin-left: -40px;
   background-size: contain;
   background-repeat: no-repeat;
-  background-image: url(assets/img/team-details/comment.png);
+  background-image: url(/assets/img/team-details/comment.png);
   opacity: 0;
   -webkit-animation: show 0.35s forwards ease-in-out 0.5s;
           animation: show 0.35s forwards ease-in-out 0.5s;
@@ -16576,7 +16576,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   width: 2552.29px;
   position: absolute;
   background-size: auto;
-  background-image: url(assets/img/home/can-overly-home.png);
+  background-image: url(/assets/img/home/can-overly-home.png);
 }
 
 .our-team-home-1 .container:after {
@@ -16597,7 +16597,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   width: 2479.27px;
   position: absolute;
   background-size: auto;
-  background-image: url(assets/img/home/our-portfolio-home-overly.png);
+  background-image: url(/assets/img/home/our-portfolio-home-overly.png);
 }
 .our-portfolio-home .mb-minus-30 {
   margin-bottom: -30px;
@@ -16672,7 +16672,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
 .our-portfolio-home__item .content .btn-link-share .theme-btn:hover, .our-portfolio-home__item .content .btn-link-share .theme-btn:focus {
   background-color: #0066ff;
   color: #FFF !important;
-  background-image: url(assets/img/home/theme-btn-overly-hover.png) !important;
+  background-image: url(/assets/img/home/theme-btn-overly-hover.png) !important;
 }
 .our-portfolio-home__item .content .btn-link-share .theme-btn i {
   margin: 0;
@@ -16827,7 +16827,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: auto;
   background-repeat: no-repeat;
-  background-image: url(assets/img/home/our-company-financial-overly.svg);
+  background-image: url(/assets/img/home/our-company-financial-overly.svg);
 }
 .our-company-financial .our-company .container:after {
   content: inherit;
@@ -16869,7 +16869,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   width: 1200px;
   height: 411.79px;
   position: absolute;
-  background-image: url(assets/img/home-2/work-process-bg.png);
+  background-image: url(/assets/img/home-2/work-process-bg.png);
 }
 .work-process .no_bullet .work-process__item-two:after {
   content: inherit;
@@ -16955,7 +16955,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   mix-blend-mode: screen;
   background-size: cover;
   background-position: center;
-  background-image: url(assets/img/home-2/our-member-bg.png);
+  background-image: url(/assets/img/home-2/our-member-bg.png);
 }
 .our-team.our-team-home-2 .container:after {
   content: inherit;
@@ -16977,7 +16977,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-repeat: no-repeat;
   background-position: center;
   background-color: #F3F3F2;
-  background-image: url(assets/img/portfolio/our-portfolio-bg.png);
+  background-image: url(/assets/img/portfolio/our-portfolio-bg.png);
 }
 @media (max-width: 991px) {
   .our-team.our-porfolio:after {
@@ -17975,7 +17975,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   content: "";
   width: 100%;
   height: 50%;
-  background-image: url(assets/img/home-5/bg_04.png);
+  background-image: url(/assets/img/home-5/bg_04.png);
   background-position: 0 0;
   top: 0;
   left: 0;
@@ -18225,7 +18225,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   height: 187.32px;
   position: absolute;
   background-repeat: no-repeat;
-  background-image: url(assets/img/cta/cta-arrow.png);
+  background-image: url(/assets/img/cta/cta-arrow.png);
   -webkit-animation-duration: 3s;
           animation-duration: 3s;
   -webkit-animation-name: movebounce;
@@ -18300,7 +18300,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   position: absolute;
   background-size: auto;
   background-repeat: no-repeat;
-  background-image: url(assets/img/table/why-choose-cta-banner-overly.png);
+  background-image: url(/assets/img/table/why-choose-cta-banner-overly.png);
 }
 .why-choose-cta-banner .cta-banner {
   z-index: 2;
@@ -18319,7 +18319,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-size: cover;
   background-position: center;
   background-color: #000000;
-  background-image: url("assets/img/footer/footer-bg.png");
+  background-image: url("/assets/img/footer/footer-bg.png");
 }
 .footer-1.footer_wrapper {
   z-index: -1;
@@ -18327,7 +18327,7 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   background-size: cover;
   background-position: center;
   background-color: #000000;
-  background-image: url("assets/img/home-5/footer_bg.png");
+  background-image: url("/assets/img/home-5/footer_bg.png");
   position: relative;
 }
 .footer-1.footer_wrapper:before {
@@ -19091,14 +19091,14 @@ header.hover-color-green .main-header-wraper .header-right .header-search .searc
   width: 228px;
   height: 229px;
   bottom: -835px;
-  background-image: url(assets/img/footer/spot-1.png);
+  background-image: url(/assets/img/footer/spot-1.png);
 }
 .footer-3 .overly .container:before {
   top: -66px;
   height: 270px;
   right: -268px;
   width: 264.01px;
-  background-image: url(assets/img/footer/spot-2.png);
+  background-image: url(/assets/img/footer/spot-2.png);
 }
 
 .footer-1 .newsletter_widget .newsletter_box_2 form input {
