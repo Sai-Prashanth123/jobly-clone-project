@@ -335,7 +335,7 @@ Author: RRDevs
 			]
 		});
 
-		$('.our-porfolio__slider__2').slick({
+		if ($('.our-porfolio__slider__2').length) $('.our-porfolio__slider__2').slick({
 			dots: false, 
 			arrows: false,
 			autoplay: true,
@@ -371,7 +371,7 @@ Author: RRDevs
 			]
 		});
 		
-		$('.testimonial_element').slick({
+		if ($('.testimonial_element').length) $('.testimonial_element').slick({
 			dots: true, 
 			arrows: false,
 			autoplay: true,
@@ -401,7 +401,7 @@ Author: RRDevs
 			]
 		});
 
-		$('.testimonial-slider-home-2').slick({
+		if ($('.testimonial-slider-home-2').length) $('.testimonial-slider-home-2').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -428,7 +428,7 @@ Author: RRDevs
 			]
 		});
 
-		$('.testimonial-slider-home-1').slick({
+		if ($('.testimonial-slider-home-1').length) $('.testimonial-slider-home-1').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -455,7 +455,7 @@ Author: RRDevs
 			]
 		});
 
-		$('.employee-friendly__slider').slick({
+		if ($('.employee-friendly__slider').length) $('.employee-friendly__slider').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -482,20 +482,9 @@ Author: RRDevs
 			]
 		});
 
-		$('.banner-slider').slick({
-			dots: true, 
-			arrows: true,
-			autoplay: true,
-			slidesToShow: 1,
-			infinite: true,
-			slidesToScroll: 1,
-			autoplaySpeed: 1500,
-			appendArrows: $('.slider-controls .banner-slider-arrows'),
-			prevArrow:"<button type='button' class='slick-prev pull-left'><i class='fas fa-long-arrow-alt-left' aria-hidden='true'></i></button>",
-            nextArrow:"<button type='button' class='slick-next pull-right'><i class='fas fa-long-arrow-alt-right' aria-hidden='true'></i></button>"
-		});
-		
-		$('.banner-slider_2').slick({
+		// .banner-slider is initialized by the HeroSlider React component (useEffect)
+
+		if ($('.banner-slider_2').length) $('.banner-slider_2').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -597,10 +586,12 @@ Author: RRDevs
             preloader.delay(600).fadeOut();
 			
 			/*** Number Counter */
-			$('.counter').counterUp({
-				delay: 10,
-				time: 1000
-			});
+			if ($('.counter').length) {
+				$('.counter').counterUp({
+					delay: 10,
+					time: 1000
+				});
+			}
         });
     }
     loader();

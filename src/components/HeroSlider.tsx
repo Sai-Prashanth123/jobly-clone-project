@@ -39,7 +39,7 @@ const HeroSlider = () => {
         return;
       }
       const $el = $('.banner-slider');
-      if ($el.hasClass('slick-initialized')) return; // already done by active.js
+      if ($el.hasClass('slick-initialized')) return;
       $el.slick({
         dots: true,
         arrows: true,
