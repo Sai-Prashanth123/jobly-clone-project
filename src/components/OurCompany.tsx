@@ -34,7 +34,7 @@ const OurCompany = () => (
 
       <div className="row">
         {cards.map(c => (
-          <div key={c.title} className="col-4">
+          <div key={c.title} className="col-xl-4 col-md-6 col-12 mb-30">
             <div className="why-choose__item why-choose__item-two" style={{ backgroundImage: 'url(/assets/img/home/why-choose__item-two-overly.png)' }}>
               <div className="icon mb-30 mb-lg-20 mb-md-10 mb-xs-5 color-red">
                 <img src={c.img} alt={c.title} />

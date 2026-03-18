@@ -11,39 +11,17 @@ const Clients = () => {
         breadcrumb="Clients"
       />
 
-      <br /><br /><br />
-      <div className="container">
-        <div className="row">
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7a.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7b.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7c.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7d.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7e.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7f.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7g.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/clients/client7h.jpg" alt="" />
+      <section className="pt-xs-60 pt-sm-80 pt-100 pb-xs-60 pb-sm-80 pb-100">
+        <div className="container">
+          <div className="row g-4">
+            {['client7a.jpg','client7b.jpg','client7c.jpg','client7d.jpg','client7e.jpg','client7f.jpg','client7.jpg','client7g.jpg','client7h.jpg'].map((f, i) => (
+              <div key={i} className="col-lg-4 col-md-6 col-6">
+                <img src={`/assets/img/clients/${f}`} alt="" className="img-fluid" />
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-      <br /><br />
+      </section>
     </PageLayout>
   );
 };

@@ -594,3 +594,296 @@
   font-weight: 600;
   color: #04213F;
 }
+
+/* ==========================================================================
+   FULL SITE RESPONSIVENESS
+   Breakpoints (Bootstrap-aligned):
+     xxl ≥ 1400px  |  xl 1200–1399px  |  lg 992–1199px
+     md  768–991px |  sm 576–767px    |  xs < 576px
+   ========================================================================== */
+
+/* ─── NAVBAR ─────────────────────────────────────────────────────────────── */
+
+/* Logo sizing */
+.header-logo .logo img {
+  max-height: 60px;
+  width: auto;
+}
+@media (max-width: 1199px) {
+  .header-logo .logo img { max-height: 50px; }
+}
+@media (max-width: 575px) {
+  .header-logo .logo img { max-height: 42px; }
+}
+
+/* Main header wrapper padding */
+.main-header-wraper {
+  padding: 16px 0;
+}
+@media (max-width: 991px) {
+  .main-header-wraper { padding: 12px 0; }
+}
+@media (max-width: 575px) {
+  .main-header-wraper { padding: 10px 0; }
+}
+
+/* Top bar — hide below xl (already uses d-none d-xl-block) */
+.top-header { font-size: 14px; }
+
+/* ─── MOBILE NAV ─────────────────────────────────────────────────────────── */
+.mobile-nav {
+  width: 300px;
+  max-width: 85vw;
+}
+@media (max-width: 400px) {
+  .mobile-nav { width: 260px; }
+}
+
+/* ─── HERO SLIDER ────────────────────────────────────────────────────────── */
+.slider-item {
+  min-height: 580px;
+}
+@media (max-width: 1199px) {
+  .slider-item { min-height: 500px; }
+}
+@media (max-width: 991px)  {
+  .slider-item { min-height: 440px; }
+}
+@media (max-width: 767px)  {
+  .slider-item { min-height: 370px; }
+}
+@media (max-width: 575px)  {
+  .slider-item { min-height: 300px; }
+}
+
+.banner__content { padding: 0 15px; }
+
+.banner__content .sub-title {
+  font-size: 16px;
+}
+@media (max-width: 767px) {
+  .banner__content .sub-title { font-size: 13px; }
+}
+@media (max-width: 575px) {
+  .banner__content .sub-title { font-size: 12px; }
+}
+
+/* Dots position */
+.banner-slider .slick-dots {
+  bottom: 16px;
+}
+@media (max-width: 575px) {
+  .banner-slider .slick-dots { bottom: 10px; }
+  .banner-slider .slick-dots li button:before { font-size: 8px; }
+}
+
+/* ─── STATS BAR ──────────────────────────────────────────────────────────── */
+@media (max-width: 575px) {
+  .counter-area__item .text .number { font-size: 22px; line-height: 28px; }
+  .counter-area__item .icon { font-size: 34px; padding: 0 14px; }
+}
+
+/* ─── ABOUT SECTION ──────────────────────────────────────────────────────── */
+.our-company__meida {
+  margin-bottom: 20px;
+}
+@media (max-width: 991px) {
+  .our-company__content { margin-top: 30px; }
+}
+
+/* client-feedback boxes side-by-side on xs */
+@media (max-width: 399px) {
+  .client-feedback { flex-direction: column !important; }
+  .client-feedback__item { margin-bottom: 16px; }
+}
+
+/* ─── OUR COMPANY (Mission / Vision / Culture) ───────────────────────────── */
+.why-choose__item {
+  margin-bottom: 0;
+}
+@media (max-width: 767px) {
+  .why-choose__item {
+    padding: 28px 20px !important;
+  }
+}
+
+/* ─── OUR SERVICES ───────────────────────────────────────────────────────── */
+@media (max-width: 575px) {
+  .our-portfolio-home__item .content {
+    flex-direction: column !important;
+  }
+  .our-portfolio-home__item .content .btn-link-share {
+    margin-top: 12px;
+  }
+}
+
+/* ─── CAREERS SECTION ────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .planning-success .col-md-4 {
+    text-align: center;
+  }
+  .planning-success .col-md-4 img {
+    max-width: 220px;
+  }
+}
+@media (max-width: 575px) {
+  .planning-success__content .theme-btn {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+/* ─── GET IN TOUCH ───────────────────────────────────────────────────────── */
+/* Reduce giant padding on contact-form box at smaller screens */
+@media (max-width: 1399px) {
+  .contact-form { padding: 40px 50px !important; }
+}
+@media (max-width: 1199px) {
+  .contact-form { padding: 35px 40px !important; }
+}
+@media (max-width: 991px) {
+  .contact-form { padding: 30px 30px !important; margin-top: 30px; }
+}
+@media (max-width: 575px) {
+  .contact-form { padding: 24px 20px !important; }
+}
+
+/* CTA buttons in Get In Touch */
+@media (max-width: 575px) {
+  .can-help__content-btn-group .theme-btn {
+    width: 100%;
+    margin-bottom: 12px;
+  }
+  .can-help__content-btn-group .theme-btn:last-child { margin-bottom: 0; }
+}
+
+/* ─── CLIENT BRAND SLIDER ────────────────────────────────────────────────── */
+@media (max-width: 575px) {
+  .client-brand__item-media img { max-height: 50px; object-fit: contain; }
+}
+
+/* ─── FOOTER ─────────────────────────────────────────────────────────────── */
+.single-footer-wid, .single-footer-wid2 {
+  margin-bottom: 30px;
+}
+@media (max-width: 1199px) {
+  .single-footer-wid  { padding-left: 0 !important; }
+  .single-footer-wid2 { padding-left: 0 !important; }
+}
+@media (max-width: 767px) {
+  .footer-bottom-content { gap: 10px; }
+  .footer-bottom-list ul { padding: 0; }
+}
+
+/* ─── PAGE BANNER ────────────────────────────────────────────────────────── */
+.page-banner { background: #04213F; }
+
+.page-banner .transparent-text {
+  font-size: clamp(42px, 8vw, 100px);
+  line-height: 1;
+}
+
+.page-banner .page-title h1 {
+  font-size: clamp(28px, 5vw, 60px);
+  line-height: 1.2;
+}
+
+.page-banner__media img { max-width: 100%; height: auto; }
+
+@media (max-width: 767px) {
+  .page-banner__media { text-align: center; }
+  .page-banner__media .start { display: none; }
+}
+@media (max-width: 575px) {
+  .page-banner { padding-top: 40px !important; padding-bottom: 30px; }
+  .page-banner__media { margin-top: 20px; }
+}
+
+/* ─── SERVICE DETAIL PAGES ───────────────────────────────────────────────── */
+/* Sidebar stacks below the content on < xl */
+@media (max-width: 1199px) {
+  .services-details .col-xl-4 {
+    margin-top: 40px;
+  }
+}
+@media (max-width: 575px) {
+  .services-details__content h2 { font-size: 26px !important; }
+  .services-details__content h5 { font-size: 17px !important; }
+}
+
+/* Sidebar */
+.main-sidebar .single-sidebar-widget {
+  padding: 24px !important;
+}
+
+/* ─── TECHNOLOGY & CLIENTS GRID ──────────────────────────────────────────── */
+/* col-6 on xs keeps two per row — images need to fill the cell */
+.col-6 img.img-fluid,
+.col-md-6 img.img-fluid {
+  width: 100%;
+  height: auto;
+}
+
+/* ─── ABOUT / CAREERS INNER PAGE ─────────────────────────────────────────── */
+/* Two portrait images side-by-side stacking on xs */
+@media (max-width: 575px) {
+  .our-company .col-sm-6 {
+    margin-bottom: 16px;
+  }
+}
+
+/* company-skill media */
+@media (max-width: 1199px) {
+  .company-skill__media-wrapper { margin-top: 40px; }
+}
+
+/* ─── CONTACT PAGE ───────────────────────────────────────────────────────── */
+@media (max-width: 991px) {
+  .contact-us__content h2 { font-size: 30px !important; }
+}
+@media (max-width: 575px) {
+  .contact-us__item-wrapper .col-sm-6 { width: 100%; }
+}
+
+/* ─── GLOBAL SECTION PADDING (xs/sm overrides for style.css pt/pb-120) ─── */
+/* style.css already has pt-xs-80 / pb-xs-80 etc. as classes, these cover
+   anything that missed those classes */
+@media (max-width: 575px) {
+  section { padding-top: 60px !important; padding-bottom: 60px !important; }
+  /* Exceptions — hero slider has its own min-height, no padding override */
+  .banner-slider__wrapper,
+  .banner-slider__wrapper section { padding: 0 !important; }
+}
+
+/* ─── TYPOGRAPHY SCALE ───────────────────────────────────────────────────── */
+@media (max-width: 575px) {
+  h1 { font-size: 36px !important; line-height: 46px !important; }
+  h3 { font-size: 26px !important; line-height: 34px !important; }
+  h4 { font-size: 20px !important; line-height: 28px !important; }
+  h5 { font-size: 17px !important; line-height: 23px !important; }
+}
+@media (max-width: 399px) {
+  h1 { font-size: 30px !important; line-height: 40px !important; }
+  h2 { font-size: 24px !important; line-height: 32px !important; }
+}
+
+/* ─── UTILITY: prevent horizontal overflow everywhere ────────────────────── */
+body { overflow-x: hidden; }
+.container { max-width: 100%; }
+
+/* ─── HAMBURGER / CLOSE ICON sizing ─────────────────────────────────────── */
+#hamburger { font-size: 26px; cursor: pointer; }
+@media (max-width: 575px) { #hamburger { font-size: 22px; } }
+
+/* ─── HEADER GUTTER: shrink on mobile so content doesn't get buried ──────── */
+@media (max-width: 767px) {
+  .header-gutter.home { height: 70px !important; }
+}
+@media (max-width: 575px) {
+  .header-gutter.home { height: 60px !important; }
+}
+
+/* ─── why-choose__item-two bottom row equal height ───────────────────────── */
+@media (max-width: 991px) {
+  .why-choose .row:last-child { row-gap: 24px; }
+}

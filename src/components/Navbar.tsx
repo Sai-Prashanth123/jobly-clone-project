@@ -9,6 +9,7 @@ const servicesSub = [
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [servicesOpen, setServicesOpen] = useState(false);
   const location = useLocation();
 
   return (
@@ -74,13 +75,17 @@ const Navbar = () => {
               <ul className="consulter-navbar-mobile">
                 <li><Link to="/" onClick={() => setMobileOpen(false)}>Home</Link></li>
                 <li><Link to="/about" onClick={() => setMobileOpen(false)}>About</Link></li>
-                <li className="dropdown">
-                  <a>Services</a>
-                  <ul className="dropdown-menu">
-                    {servicesSub.map(s => (
-                      <li key={s.path}><Link to={s.path} onClick={() => setMobileOpen(false)}>{s.label}</Link></li>
-                    ))}
-                  </ul>
+                <li className={`dropdown${servicesOpen ? ' open' : ''}`}>
+                  <a onClick={() => setServicesOpen(v => !v)} style={{ cursor: 'pointer' }}>
+                    Services <i className={`fas fa-caret-${servicesOpen ? 'up' : 'down'}`}></i>
+                  </a>
+                  {servicesOpen && (
+                    <ul className="dropdown-menu" style={{ display: 'block', position: 'static', boxShadow: 'none', border: 'none', padding: '0 0 0 16px' }}>
+                      {servicesSub.map(s => (
+                        <li key={s.path}><Link to={s.path} onClick={() => { setMobileOpen(false); setServicesOpen(false); }}>{s.label}</Link></li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
                 <li><Link to="/careers" onClick={() => setMobileOpen(false)}>Careers</Link></li>
                 <li><Link to="/technology" onClick={() => setMobileOpen(false)}>Technology</Link></li>

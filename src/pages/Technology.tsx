@@ -11,45 +11,17 @@ const Technology = () => {
         breadcrumb="Technology"
       />
 
-      <br /><br /><br />
-      <div className="container">
-        <div className="row">
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1b.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1c.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1d.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1e.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/salesforce.png" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1g.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1f.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1h.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1i.jpg" alt="" />
-          </div>
-          <div className="col-lg-4">
-            <img src="/assets/img/technologies/1j.jpg" alt="" />
+      <section className="pt-xs-60 pt-sm-80 pt-100 pb-xs-60 pb-sm-80 pb-100">
+        <div className="container">
+          <div className="row g-4">
+            {['1.jpg','1b.jpg','1c.jpg','1d.jpg','1e.jpg','salesforce.png','1g.jpg','1f.jpg','1h.jpg','1i.jpg','1j.jpg'].map((f, i) => (
+              <div key={i} className="col-lg-4 col-md-6 col-6">
+                <img src={`/assets/img/technologies/${f}`} alt="" className="img-fluid" />
+              </div>
+            ))}
           </div>
         </div>
-      </div>
-      <br /><br />
+      </section>
     </PageLayout>
   );
 };

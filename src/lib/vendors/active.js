@@ -219,11 +219,10 @@ Author: RRDevs
 		});
 
 		/*** slick slider  */
-		if ($('.client-brand__slider').length) {
-			$('.client-brand__slider').slick();
-		}
+		// .client-brand__slider is initialized by the ClientsBar React component — skip here
+		// if ($('.client-brand__slider').length) { ... }
 
-		if ($('.testimonial-slider').length) {
+		if ($('.testimonial-slider').length && !$('.testimonial-slider').hasClass('slick-initialized')) {
 			$('.testimonial-slider').slick({
 				dots: false,
 				arrows: false,
@@ -249,7 +248,7 @@ Author: RRDevs
 			});
 		}
 
-		if ($('.our-porfolio__slider').length) $('.our-porfolio__slider').slick({
+		if ($('.our-porfolio__slider').length && !$('.our-porfolio__slider').hasClass('slick-initialized')) $('.our-porfolio__slider').slick({
 			dots: false, 
 			arrows: false,
 			// autoplay: true,
@@ -335,7 +334,7 @@ Author: RRDevs
 			]
 		});
 
-		if ($('.our-porfolio__slider__2').length) $('.our-porfolio__slider__2').slick({
+		if ($('.our-porfolio__slider__2').length && !$('.our-porfolio__slider__2').hasClass('slick-initialized')) $('.our-porfolio__slider__2').slick({
 			dots: false, 
 			arrows: false,
 			autoplay: true,
@@ -371,7 +370,7 @@ Author: RRDevs
 			]
 		});
 		
-		if ($('.testimonial_element').length) $('.testimonial_element').slick({
+		if ($('.testimonial_element').length && !$('.testimonial_element').hasClass('slick-initialized')) $('.testimonial_element').slick({
 			dots: true, 
 			arrows: false,
 			autoplay: true,
@@ -401,7 +400,7 @@ Author: RRDevs
 			]
 		});
 
-		if ($('.testimonial-slider-home-2').length) $('.testimonial-slider-home-2').slick({
+		if ($('.testimonial-slider-home-2').length && !$('.testimonial-slider-home-2').hasClass('slick-initialized')) $('.testimonial-slider-home-2').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -428,7 +427,7 @@ Author: RRDevs
 			]
 		});
 
-		if ($('.testimonial-slider-home-1').length) $('.testimonial-slider-home-1').slick({
+		if ($('.testimonial-slider-home-1').length && !$('.testimonial-slider-home-1').hasClass('slick-initialized')) $('.testimonial-slider-home-1').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -455,7 +454,7 @@ Author: RRDevs
 			]
 		});
 
-		if ($('.employee-friendly__slider').length) $('.employee-friendly__slider').slick({
+		if ($('.employee-friendly__slider').length && !$('.employee-friendly__slider').hasClass('slick-initialized')) $('.employee-friendly__slider').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -484,7 +483,7 @@ Author: RRDevs
 
 		// .banner-slider is initialized by the HeroSlider React component (useEffect)
 
-		if ($('.banner-slider_2').length) $('.banner-slider_2').slick({
+		if ($('.banner-slider_2').length && !$('.banner-slider_2').hasClass('slick-initialized')) $('.banner-slider_2').slick({
 			dots: false, 
 			arrows: true,
 			autoplay: true,
@@ -542,8 +541,8 @@ Author: RRDevs
 		pricingMonthly = document.getElementById("monthly"),
 		pricingYearly = document.getElementById("yearly");
 
-		if ( pricingMonthlyBtn, pricingYearlyBtn ) {
-			pricingMonthlyBtn.addEventListener("click", function(){ 
+		if ( pricingMonthlyBtn && pricingYearlyBtn ) {
+			pricingMonthlyBtn.addEventListener("click", function(){
 				pricingYearly.classList.add("hide");
 				pricingMonthly.classList.remove("hide");
 				pricingYearlyBtn.classList.remove("active");
@@ -587,10 +586,18 @@ Author: RRDevs
 			
 			/*** Number Counter */
 			if ($('.counter').length) {
-				$('.counter').counterUp({
-					delay: 10,
-					time: 1000
+				// Filter to only elements that are actually attached to the document
+				// (detached elements after HMR cause elem.getClientRects errors in waypoints)
+				var $attached = $('.counter').filter(function() {
+					return document.body.contains(this);
 				});
+				if ($attached.length) {
+					try {
+						$attached.counterUp({ delay: 10, time: 1000 });
+					} catch(e) {
+						// counterUp/waypoints can fail on HMR reloads with stale elements — ignore
+					}
+				}
 			}
         });
     }
