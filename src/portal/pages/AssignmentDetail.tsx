@@ -2,13 +2,16 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Edit, Trash2, ArrowLeft } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Edit, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { AssignmentForm } from '../components/assignments/AssignmentForm';
-import { usePortalData } from '../hooks/usePortalData';
+import { useAssignment, useUpdateAssignment, useDeleteAssignment } from '../hooks/useAssignments';
+import { useEmployee } from '../hooks/useEmployees';
+import { useClient } from '../hooks/useClients';
+import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
 
@@ -16,12 +19,20 @@ export default function AssignmentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { assignments, updateAssignment, deleteAssignment, employees, clients, timesheets } = usePortalData();
+  const { data: assignment, isLoading } = useAssignment(id);
+  const { data: employee } = useEmployee(assignment?.employeeId);
+  const { data: client } = useClient(assignment?.clientId);
+  const { data: timesheetsData } = useTimesheets({ employeeId: assignment?.employeeId, limit: 100 });
+  const updateAssignment = useUpdateAssignment(id!);
+  const deleteAssignment = useDeleteAssignment();
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const assignment = assignments.find(a => a.id === id);
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
   if (!assignment) {
     return (
       <div className="text-center py-20">
@@ -31,12 +42,9 @@ export default function AssignmentDetail() {
     );
   }
 
-  const employee = employees.find(e => e.id === assignment.employeeId);
-  const client = clients.find(c => c.id === assignment.clientId);
-  const asnTimesheets = timesheets.filter(t => t.assignmentId === id);
+  const asnTimesheets = (timesheetsData?.data ?? []).filter(t => t.assignmentId === id);
   const totalHours = asnTimesheets.reduce((s, t) => s + t.totalHours, 0);
   const totalBilled = totalHours * assignment.billRate;
-
   const canEdit = user?.role === 'admin' || user?.role === 'operations';
 
   const Field = ({ label, value }: { label: string; value?: string | null }) => (
@@ -57,7 +65,7 @@ export default function AssignmentDetail() {
           <div>
             <h1 className="text-2xl font-semibold">{assignment.projectName}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs font-mono text-blue-600">{assignment.id}</span>
+              <span className="text-xs font-mono text-blue-600">{assignment.displayId ?? assignment.id.slice(0,8)}</span>
               <StatusBadge status={assignment.status} />
             </div>
           </div>
@@ -77,12 +85,12 @@ export default function AssignmentDetail() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-base">Assignment Details</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
-            <Field label="Employee" value={employee ? `${employee.firstName} ${employee.lastName}` : assignment.employeeId} />
-            <Field label="Client" value={client?.companyName ?? assignment.clientId} />
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            <Field label="Employee" value={employee ? `${employee.firstName} ${employee.lastName}` : assignment.employeeId.slice(0,8)} />
+            <Field label="Client" value={client?.companyName ?? assignment.clientId.slice(0,8)} />
             <Field label="Project" value={assignment.projectName} />
             <Field label="Role" value={assignment.role} />
             <Field label="Start Date" value={formatDate(assignment.startDate)} />
@@ -98,7 +106,7 @@ export default function AssignmentDetail() {
               <p className="text-2xl font-bold text-blue-700">{formatCurrency(totalBilled)}</p>
               <p className="text-xs text-blue-600">Total Billable</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="text-center p-3 bg-gray-50 rounded-lg">
                 <p className="text-lg font-bold">{totalHours}</p>
                 <p className="text-xs text-muted-foreground">Total Hours</p>
@@ -115,7 +123,6 @@ export default function AssignmentDetail() {
           </CardContent>
         </Card>
 
-        {/* Timesheets */}
         <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle className="text-base">Timesheets ({asnTimesheets.length})</CardTitle>
@@ -126,9 +133,7 @@ export default function AssignmentDetail() {
                 <div key={ts.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
                     <p className="text-sm font-medium">Week of {ts.weekStartDate}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {ts.weekStartDate} – {ts.weekEndDate}
-                    </p>
+                    <p className="text-xs text-muted-foreground">{ts.weekStartDate} – {ts.weekEndDate}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="text-sm font-semibold">{ts.totalHours} hrs</span>
@@ -145,17 +150,22 @@ export default function AssignmentDetail() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Assignment — {assignment.id}</DialogTitle>
+            <DialogTitle>Edit Assignment — {assignment.displayId ?? assignment.id.slice(0,8)}</DialogTitle>
+            <DialogDescription className="sr-only">Update assignment details.</DialogDescription>
           </DialogHeader>
           <AssignmentForm
             initial={assignment}
             isEdit
-            onSubmit={data => {
-              updateAssignment(assignment.id, data);
-              toast.success('Assignment updated');
-              setEditOpen(false);
+            onSubmit={async data => {
+              try {
+                await updateAssignment.mutateAsync(data as any);
+                toast.success('Assignment updated');
+                setEditOpen(false);
+              } catch (err: any) {
+                toast.error(err?.response?.data?.error ?? 'Failed to update assignment');
+              }
             }}
             onCancel={() => setEditOpen(false)}
           />
@@ -168,10 +178,14 @@ export default function AssignmentDetail() {
         title="Delete Assignment?"
         description="This will permanently remove this assignment."
         confirmLabel="Delete"
-        onConfirm={() => {
-          deleteAssignment(assignment.id);
-          toast.success('Assignment deleted');
-          navigate('/portal/assignments');
+        onConfirm={async () => {
+          try {
+            await deleteAssignment.mutateAsync(assignment.id);
+            toast.success('Assignment deleted');
+            navigate('/portal/assignments');
+          } catch (err: any) {
+            toast.error(err?.response?.data?.error ?? 'Failed to delete assignment');
+          }
         }}
       />
     </div>

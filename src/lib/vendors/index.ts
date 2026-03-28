@@ -11,7 +11,6 @@ import './popper.min';              // required by bootstrap dropdowns
 import './bootstrap.min';           // bootstrap JS components
 import './slick.min';               // slick carousel / slider
 import './scrollUp.min';            // scroll-to-top button
-import './counterup.min';           // number counter animation
 import './jquery.sticky-kit';       // sticky sidebar
 import './magnific-popup.min';      // lightbox / popup
 import './jquery.easypiechart.min'; // pie chart animation

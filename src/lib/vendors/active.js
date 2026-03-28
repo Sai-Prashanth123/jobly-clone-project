@@ -55,7 +55,7 @@ Author: RRDevs
             $('.consulter-mobile-nav ul')[0].classList.add("consulter-navbar-mobile");
 
             var $nav = $(".consulter-navbar-mobile"),
-                $back_btn = $nav.find(" > li.dropdown > ul.dropdown-menu").prepend("<li class='dropdown-back d-flex flex-wrap align-items-center justify-content-between'><div class='control ml-auto d-flex align-items-center' style='white-space: nowrap'>Back<i style='font-size: 20px; font-weight: 500; margin-left: 5px;' class='fal fa-long-arrow-left'></i></div></li>");
+                $back_btn = $nav.find(" > li.dropdown > ul.dropdown-menu").prepend("<li class='dropdown-back d-flex flex-wrap align-items-center justify-content-between'><div class='control ml-auto d-flex align-items-center' style='white-space: nowrap'>Back<i style='font-size: 20px; font-weight: 500; margin-left: 5px;' class='fas fa-long-arrow-alt-left'></i></div></li>");
 
 
             // For Title
@@ -118,7 +118,7 @@ Author: RRDevs
             animation: 'slide', // Fade, slide, none
             animationInSpeed: 300, // Animation in speed (ms)
             animationOutSpeed: 300, // Animation out speed (ms)
-            scrollText: '<i class="fal fa-angle-up"></i>', // Text for element
+            scrollText: '<i class="fas fa-angle-up"></i>', // Text for element
             activeOverlay: false, // Set CSS color to display scrollUp active point, e.g '#00FFFF'
         });
 
@@ -436,8 +436,8 @@ Author: RRDevs
 			slidesToScroll: 1,
 			autoplaySpeed: 800,
 			appendArrows: $('.slider-controls .testimonial-slider-arrows'),
-			prevArrow:"<button type='button' class='slick-prev pull-left'><i class='icon-left-3' aria-hidden='true'></i></button>",
-            nextArrow:"<button type='button' class='slick-next pull-right'><i class='icon-right-3' aria-hidden='true'></i></button>",
+			prevArrow:"<button type='button' class='slick-prev pull-left'><i class='fas fa-long-arrow-alt-left' aria-hidden='true'></i></button>",
+            nextArrow:"<button type='button' class='slick-next pull-right'><i class='fas fa-long-arrow-alt-right' aria-hidden='true'></i></button>",
 			responsive: [
 				{
 					breakpoint: 1300,
@@ -463,8 +463,8 @@ Author: RRDevs
 			slidesToScroll: 1,
 			autoplaySpeed: 800,
 			appendArrows: $('.slider-controls .slider-arrows'),
-			prevArrow:"<button type='button' class='slick-prev pull-left'><i class='icon-left-3' aria-hidden='true'></i></button>",
-            nextArrow:"<button type='button' class='slick-next pull-right'><i class='icon-right-3' aria-hidden='true'></i></button>",
+			prevArrow:"<button type='button' class='slick-prev pull-left'><i class='fas fa-long-arrow-alt-left' aria-hidden='true'></i></button>",
+            nextArrow:"<button type='button' class='slick-next pull-right'><i class='fas fa-long-arrow-alt-right' aria-hidden='true'></i></button>",
 			responsive: [
 				{
 					breakpoint: 1300,

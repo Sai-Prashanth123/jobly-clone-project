@@ -1,14 +1,16 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { StatusBadge } from '../shared/StatusBadge';
-import { usePortalData } from '../../hooks/usePortalData';
+import { useTimesheets } from '../../hooks/useTimesheets';
+import { useEmployees } from '../../hooks/useEmployees';
 
 export function TimesheetSummaryTable() {
-  const { timesheets, employees } = usePortalData();
+  const { data: tsData } = useTimesheets({ limit: 500 });
+  const { data: empData } = useEmployees({ limit: 200, status: 'active' });
 
-  // Group by employee, show counts by status
+  const timesheets = tsData?.data ?? [];
+  const employees = empData?.data ?? [];
+
   const summary = employees
-    .filter(e => e.status === 'active')
     .map(emp => {
       const empTS = timesheets.filter(t => t.employeeId === emp.id);
       const totalHours = empTS.reduce((s, t) => s + t.totalHours, 0);

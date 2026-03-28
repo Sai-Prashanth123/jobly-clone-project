@@ -8173,13 +8173,7 @@
 
 /* Font Awesome @font-face removed — FA loaded via CDN in index.html */
 
-@font-face {
-    font-family: "flaticon";
-    src: url("/assets/fonts/flaticon4c3d.html?981789d1bcb9da89ed2289dbea268937") format("truetype"),
-    url("/assets/fonts/flaticon4c3d-2.html?981789d1bcb9da89ed2289dbea268937") format("woff"),
-    url("/assets/fonts/flaticon4c3d-3.html?981789d1bcb9da89ed2289dbea268937") format("woff2"),
-    url("/assets/fonts/flaticon4c3d-4.html?981789d1bcb9da89ed2289dbea268937#iefix") format("embedded-opentype");
-}
+/* flaticon @font-face removed — font files not present in repo */
 
 i[class^="flaticon-"]:before, i[class*=" flaticon-"]:before {
     font-family: flaticon !important;
@@ -8247,17 +8241,7 @@ i[class^="flaticon-"]:before, i[class*=" flaticon-"]:before {
     content: "\f112";
 }
 
-@font-face {
-  font-family: 'consulter';
-  src: url('../fonts/consulter85dd.eot?73576486');
-  src: url('../fonts/consulter85dd.eot?73576486#iefix') format('embedded-opentype'),
-       url('../fonts/consulter85dd.woff2?73576486') format('woff2'),
-       url('../fonts/consulter85dd.woff?73576486') format('woff'),
-       url('../fonts/consulter85dd.ttf?73576486') format('truetype'),
-       url('../fonts/consulter85dd.svg?73576486#consulter') format('svg');
-  font-weight: normal;
-  font-style: normal;
-}
+/* consulter @font-face removed — font files not present in repo */
 
 [class^="icon-"]:before, [class*=" icon-"]:before {
   font-family: "consulter";

@@ -44,10 +44,10 @@ const Footer = () => (
           <div className="single-footer-wid2 pl-xl-10 pl-50">
             <h4 className="wid-title mb-30 color-white">Contact</h4><br />
             <ul>
-              <li><a><i className="icon-location"></i> 110 Samaritan Dr Suite#211, Cumming, GA, 30040, USA</a></li>
-              <li><a href="tel:+14048635745"><i className="icon-phone"></i> +1 404-863-5745</a></li>
-              <li><a><i className="fa fa-fax"></i> +1 470 660 5973</a></li>
-              <li><a href="mailto:info@joblysolutions.com"><i className="icon-email"></i> info@joblysolutions.com</a></li>
+              <li><a><i className="fas fa-map-marker-alt"></i> 110 Samaritan Dr Suite#211, Cumming, GA, 30040, USA</a></li>
+              <li><a href="tel:+14048635745"><i className="fas fa-phone"></i> +1 404-863-5745</a></li>
+              <li><a><i className="fas fa-fax"></i> +1 470 660 5973</a></li>
+              <li><a href="mailto:info@joblysolutions.com"><i className="fas fa-envelope"></i> info@joblysolutions.com</a></li>
             </ul>
           </div>
         </div>

@@ -1,43 +1,65 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { AuthSession, PortalUser } from '../types';
-import { DEMO_USERS } from '../lib/mockData';
-import { storageGet, storageRemove, storageSet, STORAGE_KEYS } from '../lib/storage';
+import { apiClient } from '../lib/apiClient';
 
 interface AuthContextValue {
   session: AuthSession | null;
   isAuthenticated: boolean;
   user: PortalUser | null;
-  login: (email: string, password: string) => { success: boolean; error?: string };
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const SESSION_KEY = 'jobly_session';
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(() => {
+    try {
+      const raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  });
 
   useEffect(() => {
-    const stored = storageGet<AuthSession>(STORAGE_KEYS.SESSION);
-    if (stored) setSession(stored);
-  }, []);
+    if (session) {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+      sessionStorage.setItem('access_token', (session as AuthSession & { token?: string }).token ?? '');
+    }
+  }, [session]);
 
-  const login = (email: string, password: string): { success: boolean; error?: string } => {
-    const found = DEMO_USERS.find(
-      u => u.email.toLowerCase() === email.toLowerCase() && u.password === password
-    );
-    if (!found) return { success: false, error: 'Invalid email or password.' };
+  const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const { data } = await apiClient.post('/auth/login', { email, password });
+      const { token, user } = data.data;
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password: _pw, ...user } = found;
-    const newSession: AuthSession = { user, loginTime: new Date().toISOString() };
-    setSession(newSession);
-    storageSet(STORAGE_KEYS.SESSION, newSession);
-    return { success: true };
+      // Store token for interceptor
+      sessionStorage.setItem('access_token', token);
+
+      const newSession: AuthSession & { token: string } = {
+        user,
+        loginTime: new Date().toISOString(),
+        token,
+      };
+      setSession(newSession);
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
+
+      return { success: true };
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+        ?? 'Invalid credentials. Please try again.';
+      return { success: false, error: msg };
+    }
   };
 
   const logout = () => {
+    apiClient.post('/auth/logout').catch(() => {});
     setSession(null);
-    storageRemove(STORAGE_KEYS.SESSION);
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem('access_token');
   };
 
   return (

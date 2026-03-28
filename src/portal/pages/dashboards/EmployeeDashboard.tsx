@@ -1,53 +1,80 @@
-import { Clock, CheckCircle, Send, XCircle, Briefcase } from 'lucide-react';
+import { Clock, CheckCircle, Send, XCircle, Building2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { formatDate } from '../../lib/utils';
-import { usePortalData } from '../../hooks/usePortalData';
 import { useAuth } from '../../hooks/useAuth';
+import { useTimesheets } from '../../hooks/useTimesheets';
+import { useAssignments } from '../../hooks/useAssignments';
+import { useClients } from '../../hooks/useClients';
 
 export function EmployeeDashboard() {
   const { user } = useAuth();
-  const { timesheets, assignments, clients } = usePortalData();
+  const { data: tsData } = useTimesheets({ limit: 100, employeeId: user?.employeeId });
+  const { data: assignData } = useAssignments({ limit: 50, employeeId: user?.employeeId, status: 'active' });
+  const { data: clientData } = useClients({ limit: 100 });
 
-  const myTimesheets = timesheets.filter(t => t.employeeId === user?.employeeId);
-  const myAssignments = assignments.filter(a => a.employeeId === user?.employeeId && a.status === 'active');
+  const timesheets = tsData?.data ?? [];
+  const myAssignments = assignData?.data ?? [];
+  const clients = clientData?.data ?? [];
 
-  const draft = myTimesheets.filter(t => t.status === 'draft').length;
-  const submitted = myTimesheets.filter(t => t.status === 'submitted').length;
-  const approved = myTimesheets.filter(t => t.status === 'client_approved').length;
-  const rejected = myTimesheets.filter(t => t.status === 'rejected');
+  // KPI: Assigned Client — take the first active assignment's client
+  const primaryAssignment = myAssignments[0] ?? null;
+  const assignedClientName = primaryAssignment
+    ? (clients.find(c => c.id === primaryAssignment.clientId)?.companyName ?? 'Loading…')
+    : 'None assigned';
 
-  const totalHoursThisMonth = (() => {
-    const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-    return myTimesheets
-      .filter(t => t.weekStartDate >= monthStart)
-      .reduce((s, t) => s + t.totalHours, 0);
-  })();
+  // KPI: Pending Timesheets — draft + submitted (not yet fully approved)
+  const pendingTimesheets = timesheets.filter(
+    t => t.status === 'draft' || t.status === 'submitted' || t.status === 'manager_approved'
+  ).length;
 
-  const recentTimesheets = [...myTimesheets]
+  // KPI: Approved Hours — total hours on client_approved timesheets
+  const approvedHours = timesheets
+    .filter(t => t.status === 'client_approved')
+    .reduce((s, t) => s + t.totalHours, 0);
+
+  const rejected = timesheets.filter(t => t.status === 'rejected');
+
+  const recentTimesheets = [...timesheets]
     .sort((a, b) => new Date(b.weekStartDate).getTime() - new Date(a.weekStartDate).getTime())
     .slice(0, 6);
 
-  const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id;
+  const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Welcome, {user?.name?.split(' ')[0]}</h1>
+        <h1 className="text-2xl font-bold portal-gradient-text">Welcome, {user?.name?.split(' ')[0]}</h1>
         <p className="text-sm text-gray-500 mt-1">Your work summary</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Hours This Month" value={totalHoursThisMonth} icon={<Clock className="h-5 w-5" />} />
-        <StatCard title="Active Assignments" value={myAssignments.length} icon={<Briefcase className="h-5 w-5" />} />
-        <StatCard title="Approved Timesheets" value={approved} icon={<CheckCircle className="h-5 w-5" />} />
-        <StatCard title="Pending Submission" value={draft} icon={<Send className="h-5 w-5" />}
-          description="Draft timesheets" />
+      {/* Primary KPI cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <StatCard
+          title="Assigned Client"
+          value={assignedClientName}
+          icon={<Building2 className="h-5 w-5" />}
+          variant="cyan"
+          description={myAssignments.length > 1 ? `+${myAssignments.length - 1} more assignment${myAssignments.length > 2 ? 's' : ''}` : primaryAssignment?.projectName ?? 'No active project'}
+        />
+        <StatCard
+          title="Pending Timesheets"
+          value={pendingTimesheets}
+          icon={<Clock className="h-5 w-5" />}
+          variant={pendingTimesheets > 0 ? 'orange' : 'green'}
+          description={pendingTimesheets > 0 ? 'Awaiting approval' : 'All up to date'}
+        />
+        <StatCard
+          title="Approved Hours"
+          value={`${approvedHours} hrs`}
+          icon={<CheckCircle className="h-5 w-5" />}
+          variant="green"
+          description="Client-approved timesheets"
+        />
       </div>
 
-      {/* Rejected alerts */}
+      {/* Rejected timesheets alert */}
       {rejected.length > 0 && (
         <Card className="border-red-200 bg-red-50">
           <CardHeader className="pb-2">
@@ -60,7 +87,7 @@ export function EmployeeDashboard() {
             <div className="space-y-2">
               {rejected.map(ts => (
                 <div key={ts.id} className="text-sm">
-                  <p className="font-medium text-red-800">Week of {ts.weekStartDate}</p>
+                  <p className="font-medium text-red-800">Week of {formatDate(ts.weekStartDate)}</p>
                   {ts.rejectionReason && (
                     <p className="text-red-600 text-xs mt-0.5">"{ts.rejectionReason}"</p>
                   )}
@@ -71,7 +98,7 @@ export function EmployeeDashboard() {
         </Card>
       )}
 
-      {/* My Assignments */}
+      {/* Active assignments */}
       {myAssignments.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">My Active Assignments</CardTitle></CardHeader>
@@ -96,7 +123,7 @@ export function EmployeeDashboard() {
         </Card>
       )}
 
-      {/* Recent Timesheets */}
+      {/* Recent timesheets */}
       <Card>
         <CardHeader><CardTitle className="text-base">My Recent Timesheets</CardTitle></CardHeader>
         <CardContent>
@@ -107,12 +134,17 @@ export function EmployeeDashboard() {
               {recentTimesheets.map(ts => (
                 <div key={ts.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
-                    <p className="text-sm font-medium">Week of {ts.weekStartDate}</p>
+                    <p className="text-sm font-medium">Week of {formatDate(ts.weekStartDate)}</p>
                     <p className="text-xs text-muted-foreground">
                       {getClientName(ts.clientId)} • {ts.totalHours} hrs
                     </p>
                   </div>
-                  <StatusBadge status={ts.status} />
+                  <div className="flex items-center gap-3">
+                    {(ts.status === 'draft' || ts.status === 'rejected') && (
+                      <Send className="h-3.5 w-3.5 text-gray-400" />
+                    )}
+                    <StatusBadge status={ts.status} />
+                  </div>
                 </div>
               ))}
             </div>

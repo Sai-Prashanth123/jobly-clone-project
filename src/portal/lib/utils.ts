@@ -35,10 +35,10 @@ export function addDays(dateStr: string, days: number): string {
 }
 
 export function getMondayOfWeek(date: Date): Date {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(d.setDate(diff));
+  // Use UTC day-of-week so the result is consistent across all client timezones
+  const utcDay = date.getUTCDay(); // 0=Sun … 6=Sat
+  const daysToMonday = utcDay === 0 ? -6 : 1 - utcDay;
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + daysToMonday));
 }
 
 export function getWeekDates(mondayStr: string): string[] {

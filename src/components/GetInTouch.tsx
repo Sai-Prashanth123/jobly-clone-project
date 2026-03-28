@@ -1,5 +1,9 @@
-const GetInTouch = () => (
-  <section className="can-help can-help-home-1 pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
+import { useScrollReveal } from '@/hooks/useScrollReveal';
+
+const GetInTouch = () => {
+  const sectionRef = useScrollReveal<HTMLDivElement>('animate__fadeIn', 0.15, '0s');
+  return (
+  <section ref={sectionRef} className="can-help can-help-home-1 pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
       <div className="can-help-background" style={{ backgroundImage: 'url(/assets/img/home/can-help-background.png)' }}></div>
       <div className="container">
         <div className="row">
@@ -11,14 +15,14 @@ const GetInTouch = () => (
               </div>
               <div className="can-help__content-btn-group d-flex flex-column flex-sm-row">
                 <a href="tel:+14048635745" className="theme-btn d-flex flex-column flex-md-row align-items-md-center">
-                  <div className="icon color-red"><i className="icon-call"></i></div>
+                  <div className="icon color-red"><i className="fas fa-phone-alt"></i></div>
                   <div className="text">
                     <span className="font-la mb-10 d-block fw-500 color-white">Call Us</span>
                     <h5 className="fw-500 color-white">+1 404-863-5745</h5>
                   </div>
                 </a>
                 <a href="mailto:info@joblysolutions.com" className="theme-btn d-flex flex-column flex-md-row align-items-md-center">
-                  <div className="icon color-red"><i className="icon-email-1"></i></div>
+                  <div className="icon color-red"><i className="fas fa-envelope"></i></div>
                   <div className="text">
                     <span className="font-la mb-10 d-block fw-500 color-white">Email Drop Us</span>
                     <h5 className="fw-500 color-white">info@joblysolutions.com</h5>
@@ -62,6 +66,7 @@ const GetInTouch = () => (
         </div>
       </div>
     </section>
-);
+  );
+};
 
 export default GetInTouch;

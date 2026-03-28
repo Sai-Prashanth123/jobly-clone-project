@@ -30,7 +30,7 @@ const Contact = () => {
                   <div className="contact-us__item mb-40">
                     <div className="contact-us__item-header mb-25 mb-md-20 mb-sm-15 mb-xs-10 d-flex align-items-center">
                       <div className="icon mr-10 color-primary">
-                        <i className="fal fa-map-marker-alt"></i>
+                        <i className="fas fa-map-marker-alt"></i>
                       </div>
                       <h5 className="title color-d_black">Office</h5>
                     </div>
@@ -44,7 +44,7 @@ const Contact = () => {
                   <div className="contact-us__item mb-40">
                     <div className="contact-us__item-header mb-25 mb-md-20 mb-sm-15 mb-xs-10 d-flex align-items-center">
                       <div className="icon mr-10 color-primary">
-                        <i className="icon-phone"></i>
+                        <i className="fas fa-phone"></i>
                       </div>
                       <h5 className="title color-d_black">Call Us</h5>
                     </div>
@@ -60,7 +60,7 @@ const Contact = () => {
                   <div className="contact-us__item mb-40">
                     <div className="contact-us__item-header mb-25 mb-md-20 mb-sm-15 mb-xs-10 d-flex align-items-center">
                       <div className="icon mr-10 color-primary">
-                        <i className="icon-phone"></i>
+                        <i className="fas fa-phone"></i>
                       </div>
                       <h5 className="title color-d_black">Fax</h5>
                     </div>
@@ -76,7 +76,7 @@ const Contact = () => {
                   <div className="contact-us__item mb-40">
                     <div className="contact-us__item-header mb-25 mb-md-20 mb-sm-15 mb-xs-10 d-flex align-items-center">
                       <div className="icon mr-10 color-primary">
-                        <i className="icon-email"></i>
+                        <i className="fas fa-envelope"></i>
                       </div>
                       <h5 className="title color-d_black">Email Us</h5>
                     </div>

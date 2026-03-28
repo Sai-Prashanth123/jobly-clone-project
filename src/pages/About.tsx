@@ -1,7 +1,9 @@
 import PageLayout from '@/components/PageLayout';
 import PageBanner from '@/components/PageBanner';
+import { useCounterUp } from '@/hooks/useCounterUp';
 
 const About = () => {
+  useCounterUp();
   return (
     <PageLayout>
       <PageBanner

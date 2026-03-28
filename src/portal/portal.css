@@ -1,5 +1,9 @@
-/* Portal CSS Isolation — scoped to .portal-scope */
+/* ═══════════════════════════════════════════════════════════════
+   Portal CSS — scoped to .portal-scope
+   Premium light/white theme + glassmorphism + animations
+   ═══════════════════════════════════════════════════════════════ */
 
+/* ── Reset global landing-page overrides ──────────────────────── */
 .portal-scope h1,
 .portal-scope h2,
 .portal-scope h3,
@@ -23,7 +27,171 @@
   box-sizing: border-box;
 }
 
-/* Print styles for invoice */
+.portal-scope ul,
+.portal-scope ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.portal-scope li {
+  list-style: none;
+  position: static;
+}
+
+.portal-scope a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.portal-scope a:hover {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Remove Bootstrap form-control global styles from portal */
+.portal-scope .form-control:focus {
+  border-color: inherit;
+  box-shadow: none;
+}
+
+/* Ensure Bootstrap table styles don't affect portal */
+.portal-scope table {
+  border-collapse: separate;
+}
+
+/* ── Light theme CSS variables (restore shadcn defaults) ─────────
+   Keep standard light variables so all shadcn components
+   render normally on white backgrounds.
+   ──────────────────────────────────────────────────────────────── */
+.portal-scope {
+  --background:           0 0% 100%;
+  --foreground:           222 47% 11%;
+  --card:                 0 0% 100%;
+  --card-foreground:      222 47% 11%;
+  --popover:              0 0% 100%;
+  --popover-foreground:   222 47% 11%;
+  --primary:              216 98% 52%;
+  --primary-foreground:   0 0% 100%;
+  --secondary:            214 32% 91%;
+  --secondary-foreground: 222 47% 11%;
+  --muted:                214 32% 95%;
+  --muted-foreground:     215 16% 47%;
+  --accent:               214 32% 95%;
+  --accent-foreground:    222 47% 11%;
+  --destructive:          0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border:               214 32% 91%;
+  --input:                214 32% 91%;
+  --ring:                 216 98% 52%;
+  --radius:               0.75rem;
+
+  /* sidebar tokens */
+  --sidebar-background:         0 0% 100%;
+  --sidebar-foreground:         222 47% 11%;
+  --sidebar-primary:            216 98% 52%;
+  --sidebar-primary-foreground: 0 0% 100%;
+  --sidebar-accent:             214 32% 95%;
+  --sidebar-accent-foreground:  222 47% 11%;
+  --sidebar-border:             214 32% 91%;
+  --sidebar-ring:               216 98% 52%;
+}
+
+/* ── Keyframe Animations ─────────────────────────────────────── */
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes floatOrb {
+  0%, 100% { transform: translateY(0px)   scale(1); }
+  50%       { transform: translateY(-20px) scale(1.05); }
+}
+
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 0px  rgba(64,105,255,0); }
+  50%       { box-shadow: 0 0 14px rgba(64,105,255,0.35); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+
+@keyframes sidebarIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ── Utility Classes ─────────────────────────────────────────── */
+
+/* Light glass card — white frosted surface */
+.portal-glass-card {
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(64, 105, 255, 0.06), 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* Entrance animation */
+.portal-animate-in {
+  animation: fadeSlideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Sidebar nav item entrance */
+.portal-nav-item {
+  animation: sidebarIn 0.3s ease-out both;
+}
+
+/* Dark gradient text (blue-to-navy for light bg) */
+.portal-gradient-text {
+  background: linear-gradient(135deg, #04213F 0%, #4069FF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Gradient button (blue → cyan) */
+.portal-btn-gradient {
+  background: linear-gradient(135deg, #4069FF 0%, #32CDDC 100%) !important;
+  background-size: 200% auto !important;
+  color: #fff !important;
+  border: none !important;
+  transition: background-position 0.4s ease, box-shadow 0.3s ease, transform 0.15s ease !important;
+}
+.portal-btn-gradient:hover:not(:disabled) {
+  background-position: right center !important;
+  box-shadow: 0 6px 24px rgba(64, 105, 255, 0.35) !important;
+  transform: translateY(-1px) !important;
+}
+.portal-btn-gradient:active:not(:disabled) {
+  transform: translateY(0) !important;
+}
+
+/* Active nav glow */
+.portal-nav-active {
+  animation: glowPulse 2.5s ease-in-out infinite;
+}
+
+/* Scrollbar styling */
+.portal-scope ::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+.portal-scope ::-webkit-scrollbar-track {
+  background: rgba(64,105,255,0.04);
+}
+.portal-scope ::-webkit-scrollbar-thumb {
+  background: rgba(64,105,255,0.18);
+  border-radius: 3px;
+}
+.portal-scope ::-webkit-scrollbar-thumb:hover {
+  background: rgba(64,105,255,0.32);
+}
+
+/* ── Print styles for invoice ────────────────────────────────── */
 @media print {
   .portal-no-print {
     display: none !important;

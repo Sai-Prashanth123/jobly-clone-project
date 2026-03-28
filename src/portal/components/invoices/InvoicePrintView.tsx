@@ -100,7 +100,7 @@ export function InvoicePrintView({ invoice, client }: InvoicePrintViewProps) {
             </div>
             {invoice.taxRate > 0 && (
               <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Tax ({(invoice.taxRate * 100).toFixed(0)}%)</span>
+                <span className="text-gray-500">Tax ({invoice.taxRate.toFixed(1)}%)</span>
                 <span>{formatCurrency(invoice.taxAmount)}</span>
               </div>
             )}

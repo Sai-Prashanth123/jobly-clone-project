@@ -1,12 +1,13 @@
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { usePortalData } from '../../hooks/usePortalData';
+import { useInvoices } from '../../hooks/useInvoices';
 import { formatCurrency } from '../../lib/utils';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function FinancialChart() {
-  const { invoices } = usePortalData();
+  const { data: invData } = useInvoices({ limit: 500 });
+  const invoices = invData?.data ?? [];
 
   const now = new Date();
   const months: string[] = [];

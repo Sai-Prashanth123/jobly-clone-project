@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const servicesSub = [
@@ -11,6 +11,12 @@ const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const location = useLocation();
+
+  useEffect(() => {
+    const handleScroll = () => { if (window.scrollY > 0) setMobileOpen(false); };
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
     <>
@@ -33,7 +39,7 @@ const Navbar = () => {
                         <li className={location.pathname === '/' ? 'active' : ''}><Link to="/">Home</Link></li>
                         <li className={location.pathname === '/about' ? 'active' : ''}><Link to="/about">About</Link></li>
                         <li className={`dropdown ${servicesSub.some(s => location.pathname === s.path) ? 'active' : ''}`}>
-                          <a>Services<i className="fas fa-caret-down"></i></a>
+                          <a>Services</a>
                           <ul>
                             {servicesSub.map(s => (
                               <li key={s.path}><Link to={s.path}>{s.label}</Link></li>
@@ -52,7 +58,7 @@ const Navbar = () => {
                     <div className="mobile-nav-bar d-block ml-3 ml-sm-5 d-xl-none">
                       <div className="mobile-nav-wrap">
                         <div id="hamburger" className="color-primary" onClick={() => setMobileOpen(true)}>
-                          <i className="fal fa-bars"></i>
+                          <i className="fas fa-bars"></i>
                         </div>
                       </div>
                     </div>
@@ -65,9 +71,9 @@ const Navbar = () => {
       </header>
 
       {/* Mobile nav */}
-      <div className={`mobile-nav mobile-nav-red${mobileOpen ? ' nav-open' : ''}`}>
+      <div className={`mobile-nav mobile-nav-red${mobileOpen ? ' show' : ''}`}>
         <button type="button" className="close-nav" onClick={() => setMobileOpen(false)}>
-          <i className="fal fa-times-circle"></i>
+          <i className="fas fa-times-circle"></i>
         </button>
         <nav className="sidebar-nav">
           <div className="navigation">
@@ -80,7 +86,7 @@ const Navbar = () => {
                     Services <i className={`fas fa-caret-${servicesOpen ? 'up' : 'down'}`}></i>
                   </a>
                   {servicesOpen && (
-                    <ul className="dropdown-menu" style={{ display: 'block', position: 'static', boxShadow: 'none', border: 'none', padding: '0 0 0 16px' }}>
+                    <ul className="mobile-sub-menu">
                       {servicesSub.map(s => (
                         <li key={s.path}><Link to={s.path} onClick={() => { setMobileOpen(false); setServicesOpen(false); }}>{s.label}</Link></li>
                       ))}
@@ -97,8 +103,8 @@ const Navbar = () => {
               <div className="sidebar-nav__bottom-contact-infos mb-20">
                 <h6 className="color-black mb-5">Contact Info</h6>
                 <ul>
-                  <li><a href="mailto:info@joblysolutions.com"><i className="icon-email"></i> info@joblysolutions.com</a></li>
-                  <li><a href="tel:+14048635745"><i className="icon-phone"></i> +1 404-863-5745</a></li>
+                  <li><a href="mailto:info@joblysolutions.com"><i className="fas fa-envelope"></i> info@joblysolutions.com</a></li>
+                  <li><a href="tel:+14048635745"><i className="fas fa-phone"></i> +1 404-863-5745</a></li>
                 </ul>
               </div>
               <div className="sidebar-nav__bottom-social">
@@ -114,7 +120,7 @@ const Navbar = () => {
           </div>
         </nav>
       </div>
-      {mobileOpen && <div className="offcanvas-overlay" onClick={() => setMobileOpen(false)}></div>}
+      <div className={`offcanvas-overlay${mobileOpen ? ' overlay-open' : ''}`} onClick={() => setMobileOpen(false)} />
 
       <div className="header-gutter home"></div>
     </>
@@ -142,8 +148,8 @@ const TopBarInline = () => (
         <div className="col-8">
           <div className="header-cta d-flex justify-content-end">
             <ul>
-              <li><a href="tel:+14048635745"><i className="icon-phone"></i> +1 404-863-5745</a></li>
-              <li><a href="mailto:info@joblysolutions.com"><i className="icon-email"></i> info@joblysolutions.com</a></li>
+              <li><a href="tel:+14048635745"><i className="fas fa-phone"></i> +1 404-863-5745</a></li>
+              <li><a href="mailto:info@joblysolutions.com"><i className="fas fa-envelope"></i> info@joblysolutions.com</a></li>
             </ul>
           </div>
         </div>

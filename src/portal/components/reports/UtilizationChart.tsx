@@ -1,16 +1,19 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { usePortalData } from '../../hooks/usePortalData';
+import { useEmployees } from '../../hooks/useEmployees';
+import { useTimesheets } from '../../hooks/useTimesheets';
 
 export function UtilizationChart() {
-  const { employees, timesheets } = usePortalData();
+  const { data: empData } = useEmployees({ limit: 200, status: 'active' });
+  const { data: tsData } = useTimesheets({ limit: 500 });
 
-  // Aggregate hours by employee for the current month
+  const employees = empData?.data ?? [];
+  const timesheets = tsData?.data ?? [];
+
   const now = new Date();
   const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
 
   const data = employees
-    .filter(e => e.status === 'active')
     .map(emp => {
       const empTimesheets = timesheets.filter(
         t => t.employeeId === emp.id && t.weekStartDate >= monthStart
@@ -19,7 +22,6 @@ export function UtilizationChart() {
       return {
         name: `${emp.firstName} ${emp.lastName.slice(0, 1)}.`,
         hours: totalHours,
-        capacity: 160, // ~40hrs/week × 4 weeks
       };
     })
     .filter(d => d.hours > 0)

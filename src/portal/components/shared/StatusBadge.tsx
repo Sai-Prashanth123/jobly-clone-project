@@ -1,34 +1,39 @@
-import { Badge } from '@/components/ui/badge';
 import type { TimesheetStatus, InvoiceStatus, AssignmentStatus, EmployeeStatus } from '../../types';
 
 type AnyStatus = TimesheetStatus | InvoiceStatus | AssignmentStatus | EmployeeStatus | string;
 
-const STATUS_MAP: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; className: string }> = {
+const STATUS_MAP: Record<string, { label: string; className: string }> = {
   // Employee
-  active: { label: 'Active', variant: 'default', className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-  inactive: { label: 'Inactive', variant: 'secondary', className: 'bg-gray-100 text-gray-600 hover:bg-gray-100' },
-  onboarding: { label: 'Onboarding', variant: 'outline', className: 'bg-blue-100 text-blue-700 hover:bg-blue-100' },
+  active:           { label: 'Active',      className: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+  inactive:         { label: 'Inactive',    className: 'bg-gray-100   text-gray-600    border border-gray-200' },
+  onboarding:       { label: 'Onboarding',  className: 'bg-blue-100   text-blue-700    border border-blue-200' },
   // Timesheet
-  draft: { label: 'Draft', variant: 'secondary', className: 'bg-gray-100 text-gray-600 hover:bg-gray-100' },
-  submitted: { label: 'Submitted', variant: 'outline', className: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100' },
-  manager_approved: { label: 'Mgr Approved', variant: 'default', className: 'bg-blue-100 text-blue-700 hover:bg-blue-100' },
-  client_approved: { label: 'Approved', variant: 'default', className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-  rejected: { label: 'Rejected', variant: 'destructive', className: 'bg-red-100 text-red-700 hover:bg-red-100' },
+  draft:            { label: 'Draft',       className: 'bg-gray-100   text-gray-600    border border-gray-200' },
+  submitted:        { label: 'Submitted',   className: 'bg-amber-100  text-amber-700   border border-amber-200' },
+  manager_approved: { label: 'Mgr Approved',className: 'bg-violet-100 text-violet-700  border border-violet-200' },
+  client_approved:  { label: 'Approved',    className: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+  rejected:         { label: 'Rejected',    className: 'bg-red-100    text-red-700     border border-red-200' },
   // Invoice
-  sent: { label: 'Sent', variant: 'outline', className: 'bg-blue-100 text-blue-700 hover:bg-blue-100' },
-  paid: { label: 'Paid', variant: 'default', className: 'bg-green-100 text-green-800 hover:bg-green-100' },
-  overdue: { label: 'Overdue', variant: 'destructive', className: 'bg-red-100 text-red-700 hover:bg-red-100' },
+  sent:             { label: 'Sent',        className: 'bg-blue-100   text-blue-700    border border-blue-200' },
+  paid:             { label: 'Paid',        className: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+  overdue:          { label: 'Overdue',     className: 'bg-red-100    text-red-700     border border-red-200' },
   // Assignment
-  completed: { label: 'Completed', variant: 'secondary', className: 'bg-purple-100 text-purple-700 hover:bg-purple-100' },
-  pending: { label: 'Pending', variant: 'outline', className: 'bg-yellow-100 text-yellow-700 hover:bg-yellow-100' },
-  terminated: { label: 'Terminated', variant: 'destructive', className: 'bg-red-100 text-red-700 hover:bg-red-100' },
+  completed:        { label: 'Completed',   className: 'bg-violet-100 text-violet-700  border border-violet-200' },
+  pending:          { label: 'Pending',     className: 'bg-amber-100  text-amber-700   border border-amber-200' },
+  terminated:       { label: 'Terminated',  className: 'bg-red-100    text-red-700     border border-red-200' },
+  // I-9
+  complete:         { label: 'Complete',    className: 'bg-emerald-100 text-emerald-700 border border-emerald-200' },
+  expired:          { label: 'Expired',     className: 'bg-red-100    text-red-700     border border-red-200' },
 };
 
 export function StatusBadge({ status }: { status: AnyStatus }) {
-  const config = STATUS_MAP[status] ?? { label: status, variant: 'secondary' as const, className: '' };
+  const config = STATUS_MAP[status] ?? {
+    label: status,
+    className: 'bg-gray-100 text-gray-600 border border-gray-200',
+  };
   return (
-    <Badge variant={config.variant} className={`text-xs font-medium border-0 ${config.className}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.className}`}>
       {config.label}
-    </Badge>
+    </span>
   );
 }

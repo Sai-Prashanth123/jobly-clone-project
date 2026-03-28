@@ -1,24 +1,43 @@
+import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { SidebarProvider } from '@/components/ui/sidebar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { PortalSidebar } from './PortalSidebar';
-import { PortalHeader } from './PortalHeader';
+import { ErrorBoundary } from '../shared/ErrorBoundary';
+import { CommandPalette } from '../shared/CommandPalette';
 import '../../portal.css';
 
 export function PortalLayout() {
+  const [cmdOpen, setCmdOpen] = useState(false);
+
+  useEffect(() => {
+    const handleKeydown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setCmdOpen(v => !v);
+      }
+    };
+    const handleCustom = () => setCmdOpen(v => !v);
+    window.addEventListener('keydown', handleKeydown);
+    window.addEventListener('portal:open-command', handleCustom);
+    return () => {
+      window.removeEventListener('keydown', handleKeydown);
+      window.removeEventListener('portal:open-command', handleCustom);
+    };
+  }, []);
+
   return (
-    // Fixed to viewport — prevents body scroll so only <main> scrolls
-    <div className="portal-scope" style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
-      {/* Override SidebarProvider's min-h-svh so it fills our fixed container */}
-      <SidebarProvider style={{ height: '100%', minHeight: 0 }}>
+    <div className="portal-scope min-h-screen bg-gray-50">
+      <SidebarProvider>
         <PortalSidebar />
-        {/* min-h-0 is required: flex-1 children don't shrink below content by default */}
-        <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-gray-50">
-          <PortalHeader />
-          <main className="flex-1 overflow-y-auto p-6 pb-16 pr-8">
-            <Outlet />
+        <SidebarInset className="bg-gray-50">
+          <main className="p-3 sm:p-4 md:p-6 pb-16">
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
           </main>
-        </div>
+        </SidebarInset>
       </SidebarProvider>
+      <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </div>
   );
 }

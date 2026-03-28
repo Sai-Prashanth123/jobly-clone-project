@@ -1,12 +1,17 @@
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { usePortalData } from '../../hooks/usePortalData';
+import { useInvoices } from '../../hooks/useInvoices';
+import { useClients } from '../../hooks/useClients';
 import { formatCurrency } from '../../lib/utils';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function BillingChart() {
-  const { invoices, clients } = usePortalData();
+  const { data: invData } = useInvoices({ limit: 500 });
+  const { data: clientData } = useClients({ limit: 200 });
+
+  const invoices = invData?.data ?? [];
+  const clients = clientData?.data ?? [];
 
   const now = new Date();
   const months: string[] = [];

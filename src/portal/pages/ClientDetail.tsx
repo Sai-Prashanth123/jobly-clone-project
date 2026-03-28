@@ -2,24 +2,35 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Edit, Trash2, ArrowLeft } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Edit, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { ClientForm } from '../components/clients/ClientForm';
-import { usePortalData } from '../hooks/usePortalData';
+import { useClient, useUpdateClient, useDeleteClient } from '../hooks/useClients';
+import { useAssignments } from '../hooks/useAssignments';
+import { useInvoices } from '../hooks/useInvoices';
+import { useEmployees } from '../hooks/useEmployees';
 import { formatDate, formatCurrency } from '../lib/utils';
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { clients, updateClient, deleteClient, assignments, invoices, employees } = usePortalData();
+  const { data: client, isLoading } = useClient(id);
+  const { data: assignmentsData } = useAssignments({ clientId: id, limit: 100 });
+  const { data: invoicesData } = useInvoices({ clientId: id, limit: 100 });
+  const { data: employeesData } = useEmployees({ limit: 200 });
+  const updateClient = useUpdateClient(id!);
+  const deleteClient = useDeleteClient();
 
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const client = clients.find(c => c.id === id);
+  if (isLoading) {
+    return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
   if (!client) {
     return (
       <div className="text-center py-20">
@@ -29,8 +40,9 @@ export default function ClientDetail() {
     );
   }
 
-  const clientAssignments = assignments.filter(a => a.clientId === id);
-  const clientInvoices = invoices.filter(i => i.clientId === id);
+  const clientAssignments = assignmentsData?.data ?? [];
+  const clientInvoices = invoicesData?.data ?? [];
+  const employees = employeesData?.data ?? [];
   const totalInvoiced = clientInvoices.reduce((s, i) => s + i.totalAmount, 0);
   const totalPaid = clientInvoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0);
 
@@ -43,7 +55,7 @@ export default function ClientDetail() {
 
   const getEmpName = (empId: string) => {
     const e = employees.find(emp => emp.id === empId);
-    return e ? `${e.firstName} ${e.lastName}` : empId;
+    return e ? `${e.firstName} ${e.lastName}` : empId.slice(0, 8);
   };
 
   return (
@@ -57,7 +69,7 @@ export default function ClientDetail() {
           <div>
             <h1 className="text-2xl font-semibold">{client.companyName}</h1>
             <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs font-mono text-blue-600">{client.id}</span>
+              <span className="text-xs font-mono text-blue-600">{client.displayId ?? client.id.slice(0, 8)}</span>
               <StatusBadge status={client.status} />
             </div>
           </div>
@@ -75,10 +87,10 @@ export default function ClientDetail() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-base">Client Information</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Contact" value={client.contactName} />
             <Field label="Email" value={client.contactEmail} />
             <Field label="Phone" value={client.contactPhone} />
@@ -103,9 +115,10 @@ export default function ClientDetail() {
 
         <Card>
           <CardHeader><CardTitle className="text-base">Contract</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-2 gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Start Date" value={formatDate(client.contractStartDate)} />
             <Field label="End Date" value={client.contractEndDate ? formatDate(client.contractEndDate) : 'Ongoing'} />
+            <Field label="Billing Type" value={client.billingType ? client.billingType.charAt(0).toUpperCase() + client.billingType.slice(1) : '—'} />
             <Field label="Net Payment" value={`Net ${client.netPaymentDays} days`} />
             <Field label="Default Bill Rate" value={`${formatCurrency(client.defaultBillRate)}/hr`} />
             <Field label="Currency" value={client.currency} />
@@ -138,17 +151,22 @@ export default function ClientDetail() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Client — {client.id}</DialogTitle>
+            <DialogTitle>Edit Client — {client.displayId ?? client.id.slice(0,8)}</DialogTitle>
+            <DialogDescription className="sr-only">Update client information.</DialogDescription>
           </DialogHeader>
           <ClientForm
             initial={client}
             isEdit
-            onSubmit={data => {
-              updateClient(client.id, data);
-              toast.success('Client updated successfully');
-              setEditOpen(false);
+            onSubmit={async (data, _pendingFiles) => {
+              try {
+                await updateClient.mutateAsync(data as any);
+                toast.success('Client updated successfully');
+                setEditOpen(false);
+              } catch (err: any) {
+                toast.error(err?.response?.data?.error ?? 'Failed to update client');
+              }
             }}
             onCancel={() => setEditOpen(false)}
           />
@@ -161,10 +179,14 @@ export default function ClientDetail() {
         title={`Delete ${client.companyName}?`}
         description="This will permanently remove this client and cannot be undone."
         confirmLabel="Delete Client"
-        onConfirm={() => {
-          deleteClient(client.id);
-          toast.success('Client deleted');
-          navigate('/portal/clients');
+        onConfirm={async () => {
+          try {
+            await deleteClient.mutateAsync(client.id);
+            toast.success('Client deleted');
+            navigate('/portal/clients');
+          } catch (err: any) {
+            toast.error(err?.response?.data?.error ?? 'Failed to delete client');
+          }
         }}
       />
     </div>

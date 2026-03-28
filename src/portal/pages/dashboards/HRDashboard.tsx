@@ -1,18 +1,18 @@
-import { Users, UserPlus, UserCheck, AlertCircle } from 'lucide-react';
+import { Users, UserPlus, UserCheck, AlertCircle, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { formatDate } from '../../lib/utils';
-import { usePortalData } from '../../hooks/usePortalData';
+import { useEmployees } from '../../hooks/useEmployees';
 
 export function HRDashboard() {
-  const { employees } = usePortalData();
+  const { data } = useEmployees({ limit: 500 });
+  const employees = data?.data ?? [];
 
   const active = employees.filter(e => e.status === 'active');
   const onboarding = employees.filter(e => e.status === 'onboarding');
   const inactive = employees.filter(e => e.status === 'inactive');
 
-  // Visa expiry within 90 days
   const today = new Date();
   const in90Days = new Date(today);
   in90Days.setDate(today.getDate() + 90);
@@ -22,6 +22,10 @@ export function HRDashboard() {
     return exp >= today && exp <= in90Days;
   });
 
+  const i9NonCompliant = employees.filter(
+    e => e.i9Status === 'pending' || e.i9Status === 'expired'
+  );
+
   const recentHires = [...employees]
     .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
     .slice(0, 5);
@@ -29,26 +33,51 @@ export function HRDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">HR Dashboard</h1>
+        <h1 className="text-2xl font-bold portal-gradient-text">HR Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Workforce overview & compliance</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Active Employees" value={active.length} icon={<Users className="h-5 w-5" />} />
-        <StatCard title="Onboarding" value={onboarding.length} icon={<UserPlus className="h-5 w-5" />}
+      <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+        <StatCard title="Active Employees" value={active.length} icon={<Users className="h-5 w-5" />} variant="blue" />
+        <StatCard title="Onboarding" value={onboarding.length} icon={<UserPlus className="h-5 w-5" />} variant="purple"
           description="In progress" />
-        <StatCard title="Inactive" value={inactive.length} icon={<UserCheck className="h-5 w-5" />} />
-        <StatCard title="Visa Expiring Soon" value={expiringVisa.length}
+        <StatCard title="Inactive" value={inactive.length} icon={<UserCheck className="h-5 w-5" />} variant="cyan" />
+        <StatCard title="Visa Expiring Soon" value={expiringVisa.length} variant="orange"
           icon={<AlertCircle className="h-5 w-5" />} description="Within 90 days" />
+        <StatCard title="I-9 Issues" value={i9NonCompliant.length} variant="red"
+          icon={<ShieldAlert className="h-5 w-5" />} description="Pending or expired" />
       </div>
 
-      {/* Visa alerts */}
+      {i9NonCompliant.length > 0 && (
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-red-700 flex items-center gap-2">
+              <ShieldAlert className="h-4 w-4" />
+              I-9 Compliance Issues ({i9NonCompliant.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {i9NonCompliant.map(emp => (
+                <div key={emp.id} className="flex items-center justify-between text-sm">
+                  <div>
+                    <span className="font-medium text-red-800">{emp.firstName} {emp.lastName}</span>
+                    <span className="text-xs text-red-600 ml-2">{emp.jobTitle}</span>
+                  </div>
+                  <StatusBadge status={emp.i9Status ?? 'pending'} />
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {expiringVisa.length > 0 && (
         <Card className="border-yellow-200 bg-yellow-50">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-yellow-800 flex items-center gap-2">
               <AlertCircle className="h-4 w-4" />
-              Visa Expiration Alerts
+              Visa / Work Authorization Expiring Soon
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -66,7 +95,6 @@ export function HRDashboard() {
         </Card>
       )}
 
-      {/* Recent Hires */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Recent Hires</CardTitle>
@@ -97,7 +125,6 @@ export function HRDashboard() {
         </CardContent>
       </Card>
 
-      {/* Department breakdown */}
       <Card>
         <CardHeader><CardTitle className="text-base">Employees by Department</CardTitle></CardHeader>
         <CardContent>

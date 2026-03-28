@@ -5,7 +5,8 @@ export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 export type AssignmentStatus = 'active' | 'completed' | 'pending' | 'terminated';
 export type PayType = 'hourly' | 'salary';
 export type PayFrequency = 'weekly' | 'biweekly' | 'monthly';
-export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'w2' | '1099';
+export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'w2' | '1099' | 'c2c' | 'vendor';
+export type BillingType = 'hourly' | 'monthly' | 'milestone';
 export type VisaType = 'h1b' | 'l1' | 'opt' | 'stem_opt' | 'tn' | 'gc' | 'citizen' | 'other';
 export type I9Status = 'pending' | 'complete' | 'expired';
 
@@ -17,6 +18,8 @@ export interface PortalUser {
   employeeId?: string;
   avatarInitials: string;
 }
+
+// Added for real backend: UUID is the primary id, displayId is human-readable (EMP-0001)
 
 export interface AuthSession {
   user: PortalUser;
@@ -40,7 +43,8 @@ export interface ClientDocument {
 }
 
 export interface Employee {
-  id: string; // EMP-XXXX
+  id: string; // UUID (primary key for API calls)
+  displayId?: string; // EMP-XXXX (human-readable)
   firstName: string;
   lastName: string;
   email: string;
@@ -65,13 +69,22 @@ export interface Employee {
   payRate: number;
   payType: PayType;
   payFrequency: PayFrequency;
+  workLocation?: string;
+  ssn?: string;
+  paymentType?: 'w2' | '1099' | 'c2c';
+  bankName?: string;
+  bankRoutingNumber?: string;
+  bankAccountNumber?: string;
+  taxFormType?: 'w4' | 'w9';
+  reportingManagerId?: string;
   documents: EmployeeDocument[];
   createdAt: string;
   updatedAt: string;
 }
 
 export interface Client {
-  id: string; // CLT-XXXX
+  id: string; // UUID
+  displayId?: string; // CLT-XXXX
   companyName: string;
   contactName: string;
   contactEmail: string;
@@ -89,6 +102,16 @@ export interface Client {
   netPaymentDays: number;
   defaultBillRate: number;
   currency: string;
+  billingType?: BillingType;
+  billingContactName?: string;
+  billingContactEmail?: string;
+  billingContactPhone?: string;
+  billingStreet?: string;
+  billingCity?: string;
+  billingState?: string;
+  billingZip?: string;
+  billingCountry?: string;
+  taxId?: string;
   documents: ClientDocument[];
   status: 'active' | 'inactive';
   createdAt: string;
@@ -96,7 +119,8 @@ export interface Client {
 }
 
 export interface Assignment {
-  id: string; // ASN-XXXX
+  id: string; // UUID
+  displayId?: string; // ASN-XXXX
   employeeId: string;
   clientId: string;
   projectName: string;
@@ -107,6 +131,9 @@ export interface Assignment {
   payRate: number;
   maxHoursPerWeek: number;
   status: AssignmentStatus;
+  billingType?: BillingType;
+  workLocation?: string;
+  reportingManagerId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -119,7 +146,8 @@ export interface TimesheetEntry {
 }
 
 export interface Timesheet {
-  id: string; // TS-XXXX
+  id: string; // UUID
+  displayId?: string; // TS-XXXX
   employeeId: string;
   assignmentId: string;
   clientId: string;
@@ -132,6 +160,7 @@ export interface Timesheet {
   managerApprovedAt?: string;
   clientApprovedAt?: string;
   rejectionReason?: string;
+  notes?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -158,8 +187,11 @@ export interface Invoice {
   totalAmount: number;
   status: InvoiceStatus;
   timesheetIds: string[];
+  pdfUrl?: string;
   paidAt?: string;
   notes?: string;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,11 +1,23 @@
-import { Briefcase, Clock, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { Briefcase, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
-import { usePortalData } from '../../hooks/usePortalData';
+import { formatDate } from '../../lib/utils';
+import { useAssignments } from '../../hooks/useAssignments';
+import { useTimesheets } from '../../hooks/useTimesheets';
+import { useEmployees } from '../../hooks/useEmployees';
+import { useClients } from '../../hooks/useClients';
 
 export function OperationsDashboard() {
-  const { assignments, timesheets, employees, clients } = usePortalData();
+  const { data: assignData } = useAssignments({ limit: 200 });
+  const { data: tsData } = useTimesheets({ limit: 500 });
+  const { data: empData } = useEmployees({ limit: 500 });
+  const { data: clientData } = useClients({ limit: 200 });
+
+  const assignments = assignData?.data ?? [];
+  const timesheets = tsData?.data ?? [];
+  const employees = empData?.data ?? [];
+  const clients = clientData?.data ?? [];
 
   const activeAssignments = assignments.filter(a => a.status === 'active');
   const pendingTimesheets = timesheets.filter(t => t.status === 'submitted');
@@ -14,28 +26,27 @@ export function OperationsDashboard() {
 
   const getEmpName = (id: string) => {
     const e = employees.find(emp => emp.id === id);
-    return e ? `${e.firstName} ${e.lastName}` : id;
+    return e ? `${e.firstName} ${e.lastName}` : id.slice(0, 8);
   };
-  const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id;
+  const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold text-gray-900">Operations Dashboard</h1>
+        <h1 className="text-2xl font-bold portal-gradient-text">Operations Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Assignment & timesheet management</p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard title="Active Assignments" value={activeAssignments.length} icon={<Briefcase className="h-5 w-5" />} />
-        <StatCard title="Awaiting Approval" value={pendingTimesheets.length} icon={<Clock className="h-5 w-5" />}
+        <StatCard title="Active Assignments" value={activeAssignments.length} icon={<Briefcase className="h-5 w-5" />} variant="blue" />
+        <StatCard title="Awaiting Approval" value={pendingTimesheets.length} icon={<Clock className="h-5 w-5" />} variant="orange"
           description="Submitted timesheets" />
-        <StatCard title="Manager Approved" value={approvedThisWeek.length} icon={<CheckCircle className="h-5 w-5" />}
+        <StatCard title="Manager Approved" value={approvedThisWeek.length} icon={<CheckCircle className="h-5 w-5" />} variant="green"
           description="Awaiting client approval" />
-        <StatCard title="Rejected" value={rejectedTimesheets.length} icon={<XCircle className="h-5 w-5" />}
+        <StatCard title="Rejected" value={rejectedTimesheets.length} icon={<XCircle className="h-5 w-5" />} variant="red"
           description="Need resubmission" />
       </div>
 
-      {/* Pending Timesheets */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
@@ -53,7 +64,7 @@ export function OperationsDashboard() {
                   <div>
                     <p className="text-sm font-medium">{getEmpName(ts.employeeId)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {getClientName(ts.clientId)} • Week of {ts.weekStartDate}
+                      {getClientName(ts.clientId)} • Week of {formatDate(ts.weekStartDate)}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -67,7 +78,6 @@ export function OperationsDashboard() {
         </CardContent>
       </Card>
 
-      {/* Active assignments */}
       <Card>
         <CardHeader><CardTitle className="text-base">Active Assignments</CardTitle></CardHeader>
         <CardContent>

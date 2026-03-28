@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&family=Pathway+Gothic+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700;800&family=Pathway+Gothic+One&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -606,14 +606,17 @@
 
 /* Logo sizing */
 .header-logo .logo img {
-  max-height: 60px;
+  max-height: 70px;
   width: auto;
 }
 @media (max-width: 1199px) {
-  .header-logo .logo img { max-height: 50px; }
+  .header-logo .logo img { max-height: 60px; }
+}
+@media (max-width: 767px) {
+  .header-logo .logo img { max-height: 52px; }
 }
 @media (max-width: 575px) {
-  .header-logo .logo img { max-height: 42px; }
+  .header-logo .logo img { max-height: 48px; }
 }
 
 /* Main header wrapper padding */
@@ -627,8 +630,11 @@
   .main-header-wraper { padding: 10px 0; }
 }
 
-/* Top bar — hide below xl (already uses d-none d-xl-block) */
+/* Top bar — hide below xl. Bootstrap d-none handles it but add explicit safety. */
 .top-header { font-size: 14px; }
+@media (max-width: 1199px) {
+  .top-header { display: none !important; }
+}
 
 /* ─── MOBILE NAV ─────────────────────────────────────────────────────────── */
 .mobile-nav {
@@ -638,6 +644,28 @@
 @media (max-width: 400px) {
   .mobile-nav { width: 260px; }
 }
+
+/* Mobile sub-menu (Services dropdown) — transparent, matches nav styling */
+.mobile-sub-menu {
+  list-style: none;
+  margin: 0;
+  padding: 6px 0 6px 16px;
+  background: transparent;
+}
+.mobile-sub-menu li {
+  border-bottom: 1px solid rgba(255,255,255,0.2) !important;
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+}
+.mobile-sub-menu li:last-child { border-bottom: none; }
+.mobile-sub-menu li a {
+  display: block;
+  padding: 8px 0;
+  font-size: 14px;
+  color: #fff !important;
+  text-decoration: none;
+}
+.mobile-sub-menu li a:hover { color: rgba(255,255,255,0.75) !important; }
 
 /* ─── HERO SLIDER ────────────────────────────────────────────────────────── */
 .slider-item {
@@ -875,12 +903,23 @@ body { overflow-x: hidden; }
 #hamburger { font-size: 26px; cursor: pointer; }
 @media (max-width: 575px) { #hamburger { font-size: 22px; } }
 
-/* ─── HEADER GUTTER: shrink on mobile so content doesn't get buried ──────── */
+/* ─── HEADER GUTTER: calculated from actual header height per breakpoint ──── */
+/* formula: top-padding + logo max-height + bottom-padding (no top-bar below xl) */
+@media (max-width: 1199px) {
+  /* 16px + 60px + 16px = 92px */
+  .header-gutter, .header-gutter.home { min-height: 92px !important; top: 92px; }
+}
+@media (max-width: 991px) {
+  /* 12px + 60px + 12px = 84px */
+  .header-gutter, .header-gutter.home { min-height: 84px !important; top: 84px; }
+}
 @media (max-width: 767px) {
-  .header-gutter.home { height: 70px !important; }
+  /* 12px + 52px + 12px = 76px */
+  .header-gutter, .header-gutter.home { min-height: 76px !important; top: 76px; }
 }
 @media (max-width: 575px) {
-  .header-gutter.home { height: 60px !important; }
+  /* 10px + 48px + 10px = 68px */
+  .header-gutter, .header-gutter.home { min-height: 68px !important; top: 68px; }
 }
 
 /* ─── why-choose__item-two bottom row equal height ───────────────────────── */

@@ -4,8 +4,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
-import type { Assignment, AssignmentStatus } from '../../types';
-import { usePortalData } from '../../hooks/usePortalData';
+import type { Assignment, AssignmentStatus, BillingType } from '../../types';
+import { useEmployees } from '../../hooks/useEmployees';
+import { useClients } from '../../hooks/useClients';
 
 type AssignmentFormData = Omit<Assignment, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -22,9 +23,13 @@ const defaultForm: AssignmentFormData = {
 };
 
 export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false }: AssignmentFormProps) {
-  const { employees, clients } = usePortalData();
+  const { data: empData } = useEmployees({ limit: 500 });
+  const { data: clientData } = useClients({ limit: 200 });
   const [form, setForm] = useState<AssignmentFormData>({ ...defaultForm, ...initial });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const employees = empData?.data ?? [];
+  const clients = clientData?.data ?? [];
 
   const set = (field: string, value: unknown) => {
     setForm(prev => ({ ...prev, [field]: value }));
@@ -54,7 +59,7 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false }: 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
-        <CardContent className="pt-6 grid grid-cols-2 gap-4">
+        <CardContent className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Employee *</Label>
             <Select value={form.employeeId} onValueChange={v => set('employeeId', v)}>
@@ -64,7 +69,7 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false }: 
               <SelectContent>
                 {activeEmployees.map(e => (
                   <SelectItem key={e.id} value={e.id}>
-                    {e.firstName} {e.lastName} ({e.id})
+                    {e.firstName} {e.lastName} {e.displayId ? `(${e.displayId})` : ''}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -149,6 +154,42 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false }: 
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
                 <SelectItem value="terminated">Terminated</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Billing Type</Label>
+            <Select value={form.billingType ?? ''} onValueChange={v => set('billingType', v as BillingType || undefined)}>
+              <SelectTrigger><SelectValue placeholder="Select billing type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hourly">Hourly</SelectItem>
+                <SelectItem value="monthly">Monthly</SelectItem>
+                <SelectItem value="milestone">Milestone</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Work Location</Label>
+            <Input
+              value={form.workLocation ?? ''}
+              onChange={e => set('workLocation', e.target.value)}
+              placeholder="e.g. Remote, Onsite, Hybrid"
+            />
+          </div>
+
+          <div className="col-span-1 sm:col-span-2 space-y-2">
+            <Label>Reporting Manager</Label>
+            <Select value={form.reportingManagerId ?? '__none__'} onValueChange={v => set('reportingManagerId', v === '__none__' ? undefined : v)}>
+              <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {employees.filter(e => e.status === 'active').map(e => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.firstName} {e.lastName} {e.displayId ? `(${e.displayId})` : ''}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
