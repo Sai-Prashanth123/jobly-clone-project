@@ -39,6 +39,7 @@ function mapEmployee(raw: any): Employee {
     bankAccountNumber: raw.bank_account_number ?? undefined,
     taxFormType: raw.tax_form_type ?? undefined,
     reportingManagerId: raw.reporting_manager_id ?? undefined,
+    workEmail: raw.work_email ?? undefined,
     documents: (raw.documents ?? []).map((d: any) => ({
       id: d.id,
       name: d.name,
@@ -161,5 +162,6 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.bankAccountNumber !== undefined && { bankAccountNumber: e.bankAccountNumber }),
     ...(e.taxFormType !== undefined && { taxFormType: e.taxFormType }),
     ...(e.reportingManagerId !== undefined && { reportingManagerId: e.reportingManagerId }),
+    ...(e.workEmail !== undefined && { workEmail: e.workEmail }),
   };
 }

@@ -33,6 +33,7 @@ export const createEmployeeSchema = z.object({
   bankAccountNumber: z.string().optional().nullable(),
   taxFormType: z.enum(['w4','w9']).optional().nullable(),
   reportingManagerId: z.string().uuid().optional().nullable(),
+  workEmail: z.string().email().optional().nullable(),
 });
 
 export const updateEmployeeSchema = createEmployeeSchema.partial();

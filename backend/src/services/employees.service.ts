@@ -62,61 +62,81 @@ export async function getEmployee(id: string) {
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 async function issueCredentials(empId: string, emp: any, input: CreateEmployeeInput) {
+  // workEmail = portal login credential; email = personal email to receive credentials
+  const portalLoginEmail = input.workEmail ?? input.email;
   const tempPassword = 'Jobly@' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  let credentialsReady = false;
+
   try {
-    // Check if an auth user already exists for this email
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingAuthUser = existingUsers?.users?.find((u: any) => u.email === input.email);
+    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    const existingAuthUser = existingUsers?.users?.find((u: any) => u.email === portalLoginEmail);
 
     if (existingAuthUser) {
-      // Reset password for existing auth user
-      await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, { password: tempPassword });
-      // Update portal_users record
+      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
+        existingAuthUser.id, { password: tempPassword }
+      );
+      if (updateErr) throw updateErr;
+
       await supabaseAdmin.from('portal_users').upsert({
         id: existingAuthUser.id,
-        email: input.email,
+        email: portalLoginEmail,
         name: `${input.firstName} ${input.lastName}`,
         role: 'employee',
         employee_id: empId,
         avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
       }, { onConflict: 'id' });
+
+      credentialsReady = true;
     } else {
-      // Create new auth user
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: input.email,
+        email: portalLoginEmail,
         password: tempPassword,
         email_confirm: true,
         user_metadata: { role: 'employee' },
       });
-      if (!authError && authData?.user) {
+      if (authError) throw authError;
+
+      if (authData?.user) {
         await supabaseAdmin.from('portal_users').insert({
           id: authData.user.id,
-          email: input.email,
+          email: portalLoginEmail,
           name: `${input.firstName} ${input.lastName}`,
           role: 'employee',
           employee_id: empId,
           avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
         });
+        credentialsReady = true;
       }
     }
-  } catch (_) {
-    // Auth failure must not block employee record creation
+  } catch (err) {
+    console.error('[issueCredentials] auth setup failed for', portalLoginEmail, err);
   }
 
-  sendWelcomeEmail({
-    to: input.email,
-    firstName: input.firstName,
-    lastName:  input.lastName,
-    displayId: emp.display_id ?? emp.id.slice(0, 8),
-    jobTitle:       input.jobTitle,
-    department:     input.department,
-    startDate:      input.startDate,
-    workLocation:   input.workLocation ?? undefined,
-    employmentType: input.employmentType,
-    paymentType:    input.paymentType ?? undefined,
-    loginEmail:     input.email,
-    tempPassword,
-  }).catch(err => console.error('[mailer] welcome email failed:', err));
+  if (!credentialsReady) {
+    console.error('[mailer] skipping welcome email — credentials were not set for', portalLoginEmail);
+    return;
+  }
+
+  try {
+    // Send credentials to personal email (input.email), login is portalLoginEmail
+    await sendWelcomeEmail({
+      to: input.email,
+      firstName: input.firstName,
+      lastName: input.lastName,
+      displayId: emp.display_id ?? emp.id?.slice(0, 8) ?? empId.slice(0, 8),
+      jobTitle: input.jobTitle,
+      department: input.department,
+      startDate: input.startDate,
+      workLocation: input.workLocation ?? undefined,
+      employmentType: input.employmentType,
+      paymentType: input.paymentType ?? undefined,
+      loginEmail: portalLoginEmail,
+      tempPassword,
+    });
+    console.log('[mailer] credentials email sent to', input.email, '(login:', portalLoginEmail, ')');
+  } catch (err) {
+    console.error('[mailer] credentials email failed for', input.email, err);
+  }
 }
 
 // ── create ───────────────────────────────────────────────────────────────────
@@ -176,6 +196,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
       bank_account_number: input.bankAccountNumber ?? null,
       tax_form_type:     input.taxFormType ?? null,
       reporting_manager_id: input.reportingManagerId ?? null,
+      work_email:        input.workEmail ?? null,
     })
     .select()
     .single();
@@ -242,6 +263,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.bankAccountNumber !== undefined) patch.bank_account_number = input.bankAccountNumber;
   if (input.taxFormType !== undefined) patch.tax_form_type  = input.taxFormType;
   if (input.reportingManagerId !== undefined) patch.reporting_manager_id = input.reportingManagerId;
+  if (input.workEmail !== undefined) patch.work_email = input.workEmail;
   if (input.address !== undefined) {
     patch.address_street  = input.address.street ?? '';
     patch.address_city    = input.address.city ?? '';

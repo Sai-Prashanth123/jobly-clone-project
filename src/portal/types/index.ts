@@ -77,6 +77,7 @@ export interface Employee {
   bankAccountNumber?: string;
   taxFormType?: 'w4' | 'w9';
   reportingManagerId?: string;
+  workEmail?: string;
   documents: EmployeeDocument[];
   createdAt: string;
   updatedAt: string;

@@ -12,6 +12,9 @@ import { router } from './routes';
 
 const app = express();
 
+// Trust Azure / reverse-proxy X-Forwarded-For headers (fixes express-rate-limit warning)
+app.set('trust proxy', 1);
+
 // Request ID (must be first)
 app.use(requestId);
 

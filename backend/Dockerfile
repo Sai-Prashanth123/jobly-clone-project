@@ -46,6 +46,7 @@ ENV SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 ENV DATABASE_URL=postgresql://postgres:FoBzMXdZOegCid8H@db.knwrmyprxclakidqlaqt.supabase.co:5432/postgres
 ENV DIRECT_URL=postgresql://postgres:FoBzMXdZOegCid8H@db.knwrmyprxclakidqlaqt.supabase.co:5432/postgres
 ENV RESEND_API_KEY=re_7uw1BMiH_DHCZeibxG2VjoVGobpUw2x72
+ENV RESEND_FROM="Jobly HR <onboarding@resend.dev>"
 
 EXPOSE 3001
 

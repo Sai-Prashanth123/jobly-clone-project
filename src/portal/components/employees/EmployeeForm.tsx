@@ -23,7 +23,7 @@ interface EmployeeFormProps {
 }
 
 const defaultForm: EmployeeFormData = {
-  firstName: '', lastName: '', email: '', phone: '', dob: '',
+  firstName: '', lastName: '', email: '', workEmail: '', phone: '', dob: '',
   address: { street: '', city: '', state: '', zip: '', country: 'USA' },
   department: '', jobTitle: '', employmentType: 'w2', startDate: '',
   status: 'active', payRate: 0, payType: 'hourly', payFrequency: 'biweekly',
@@ -56,7 +56,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false }: Em
 
   // Maps each field to which tab it lives on
   const FIELD_TAB: Record<string, string> = {
-    firstName: 'personal', lastName: 'personal', email: 'personal',
+    firstName: 'personal', lastName: 'personal', email: 'personal', workEmail: 'personal',
     startDate: 'employment',
     payRate: 'payroll',
   };
@@ -165,9 +165,19 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false }: Em
               {errors.lastName && <p className="text-xs text-red-500">{errors.lastName}</p>}
             </div>
             <div className="space-y-2">
-              <Label>Email *</Label>
-              <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} />
+              <Label>Personal Email * <span className="text-xs font-normal text-muted-foreground">(credentials will be sent here)</span></Label>
+              <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="john.doe@gmail.com" />
               {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
+            </div>
+            <div className="space-y-2">
+              <Label>Work Email <span className="text-xs font-normal text-muted-foreground">(portal login — assigned by HR)</span></Label>
+              <Input
+                type="email"
+                value={form.workEmail ?? ''}
+                onChange={e => set('workEmail', e.target.value)}
+                placeholder="john.doe@joblysolutions.com"
+              />
+              <p className="text-xs text-muted-foreground">If left blank, personal email is used as the portal login.</p>
             </div>
             <div className="space-y-2">
               <Label>Phone</Label>

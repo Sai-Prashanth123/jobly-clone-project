@@ -2,10 +2,10 @@ import { Resend } from 'resend';
 
 const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Resend requires a verified sender domain. During development/testing
-// we fall back to the sandbox address they provide.
-const FROM = 'Jobly HR <onboarding@resend.dev>';
-const PORTAL_URL = process.env.FRONTEND_URL ?? 'http://localhost:8080';
+// RESEND_FROM must be set to a verified sender domain (e.g. hr@joblysolutions.com).
+// onboarding@resend.dev is the Resend sandbox — it only delivers to your own verified email.
+const FROM = process.env.RESEND_FROM ?? 'Jobly HR <onboarding@resend.dev>';
+const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
 
 export interface WelcomeEmailPayload {
   to: string;
