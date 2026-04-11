@@ -43,12 +43,17 @@ export default function TimesheetDetail() {
     if (timesheet?.notes !== undefined) setNotes(timesheet.notes ?? '');
   }, [timesheet?.id, timesheet?.notes]);
 
-  // Sync localEntries when timesheet loads
+  // Sync localEntries when timesheet loads. Only re-run when the id changes —
+  // if we re-ran on every `timesheet.entries` change (e.g. after an autosave
+  // refetch) we'd clobber what the user is actively typing.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (timesheet?.entries) setLocalEntries(timesheet.entries);
   }, [timesheet?.id]);
 
-  // Debounced auto-save
+  // Debounced auto-save. `updateEntries.mutateAsync` is stable across renders
+  // (TanStack Query guarantees this), so omitting it from deps is safe.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (!canEdit || localEntries.length === 0 || !hasUserEdited.current) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
@@ -250,10 +255,12 @@ export default function TimesheetDetail() {
         title="Delete Timesheet?"
         description="This will permanently remove this timesheet."
         confirmLabel="Delete"
+        loading={deleteTimesheet.isPending}
         onConfirm={async () => {
           try {
             await deleteTimesheet.mutateAsync(timesheet.id);
             toast.success('Timesheet deleted');
+            setDeleteOpen(false);
             navigate('/portal/timesheets');
           } catch (err: any) {
             toast.error(err?.response?.data?.error ?? 'Failed to delete timesheet');

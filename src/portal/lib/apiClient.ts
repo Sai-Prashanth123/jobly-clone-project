@@ -1,6 +1,11 @@
 import axios from 'axios';
 
-const API_URL = 'https://prashanthreddy-hndndtdfhkdjhwft.eastasia-01.azurewebsites.net/api/v1';
+// Base URL comes from VITE_API_URL in .env.local (see CLAUDE.md).
+// Falls back to the Azure deployment if the env var is missing so that
+// static hosting environments without a build-time env still work.
+const API_URL =
+  import.meta.env.VITE_API_URL ??
+  'https://prashanthreddy-hndndtdfhkdjhwft.eastasia-01.azurewebsites.net/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_URL,

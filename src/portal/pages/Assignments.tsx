@@ -126,6 +126,7 @@ export default function Assignments() {
                 }
               }}
               onCancel={() => setShowForm(false)}
+              isPending={createAssignment.isPending}
             />
           </DialogContent>
         </Dialog>

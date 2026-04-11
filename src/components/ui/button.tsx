@@ -1,6 +1,7 @@
 import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
+import { Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -34,12 +35,59 @@ export interface ButtonProps
   extends React.ButtonHTMLAttributes<HTMLButtonElement>,
     VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  /**
+   * When true, the button auto-disables, sets aria-busy, and prepends a
+   * spinning <Loader2 /> icon. Use `loadingText` to swap the label while
+   * the button is busy.
+   *
+   * Note: when `asChild` is true the spinner is NOT injected (Radix Slot
+   * requires a single child). `disabled` and `aria-busy` still apply.
+   */
+  loading?: boolean;
+  loadingText?: React.ReactNode;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant, size, asChild = false, ...props }, ref) => {
+  (
+    {
+      className,
+      variant,
+      size,
+      asChild = false,
+      loading = false,
+      loadingText,
+      disabled,
+      children,
+      ...props
+    },
+    ref,
+  ) => {
     const Comp = asChild ? Slot : "button";
-    return <Comp className={cn(buttonVariants({ variant, size, className }))} ref={ref} {...props} />;
+    const effectiveDisabled = disabled || loading;
+
+    const content =
+      asChild || !loading
+        ? loading && loadingText
+          ? loadingText
+          : children
+        : (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              {loadingText ?? children}
+            </>
+          );
+
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        disabled={effectiveDisabled}
+        aria-busy={loading || undefined}
+        {...props}
+      >
+        {content}
+      </Comp>
+    );
   },
 );
 Button.displayName = "Button";

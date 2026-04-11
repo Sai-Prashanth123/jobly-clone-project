@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError } from '../lib/errors';
-import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId } from './notifications.service';
+import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import type {
   CreateTimesheetInput, UpdateTimesheetInput,
@@ -184,35 +184,79 @@ export async function patchTimesheetStatus(
   const label = ts.display_id ?? id.slice(0, 8);
   logActivity(actorId ?? null, 'status_changed', 'timesheet', id, label, { from: ts.status, to: input.status });
 
-  // Fire-and-forget notifications (non-blocking)
+  await notifyTimesheetStatusChange(
+    { id, employeeId: ts.employee_id, label },
+    input.status,
+    input.rejectionReason,
+  );
+
+  return data;
+}
+
+/**
+ * Fire-and-forget notification dispatcher for timesheet status transitions.
+ * Wraps everything in a try/catch so notification failures never break the
+ * main state-change flow.  Called by both `patchTimesheetStatus` and
+ * `bulkPatchTimesheetStatus`.
+ */
+async function notifyTimesheetStatusChange(
+  ts: { id: string; employeeId: string; label: string },
+  newStatus: string,
+  rejectionReason?: string,
+): Promise<void> {
   try {
-    if (input.status === 'submitted') {
+    if (newStatus === 'submitted') {
+      // Spec: the reporting manager gets a direct, targeted notification.
+      const managerPortalId = await getReportingManagerPortalUserId(ts.employeeId);
+      if (managerPortalId) {
+        await createNotification(
+          managerPortalId,
+          'Timesheet Pending Your Approval',
+          `Timesheet ${ts.label} from one of your direct reports is awaiting approval.`,
+          'info', 'timesheet', ts.id,
+        );
+      }
+      // Safety-net broadcast to operations + admin, de-duped against the manager.
       const opIds = await getUserIdsByRole('operations');
       const adminIds = await getUserIdsByRole('admin');
-      for (const uid of [...new Set([...opIds, ...adminIds])]) {
-        await createNotification(uid, 'Timesheet Submitted', `Timesheet ${label} is awaiting your approval.`, 'info', 'timesheet', id);
+      const broadcast = [...new Set([...opIds, ...adminIds])].filter(uid => uid !== managerPortalId);
+      for (const uid of broadcast) {
+        await createNotification(uid, 'Timesheet Submitted', `Timesheet ${ts.label} is awaiting your approval.`, 'info', 'timesheet', ts.id);
       }
-    } else if (input.status === 'manager_approved') {
+    } else if (newStatus === 'manager_approved') {
       const financeIds = await getUserIdsByRole('finance');
       const adminIds = await getUserIdsByRole('admin');
       for (const uid of [...new Set([...financeIds, ...adminIds])]) {
-        await createNotification(uid, 'Timesheet Ready for Client Approval', `Timesheet ${label} has been manager-approved.`, 'info', 'timesheet', id);
+        await createNotification(uid, 'Timesheet Ready for Client Approval', `Timesheet ${ts.label} has been manager-approved.`, 'info', 'timesheet', ts.id);
       }
-    } else if (input.status === 'rejected') {
-      const ownerPortalId = await getPortalUserByEmployeeId(ts.employee_id);
+    } else if (newStatus === 'rejected') {
+      const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
       if (ownerPortalId) {
-        const reason = input.rejectionReason ? `: "${input.rejectionReason}"` : '';
-        await createNotification(ownerPortalId, 'Timesheet Rejected', `Timesheet ${label} was rejected${reason}.`, 'error', 'timesheet', id);
+        const reason = rejectionReason ? `: "${rejectionReason}"` : '';
+        await createNotification(ownerPortalId, 'Timesheet Rejected', `Timesheet ${ts.label} was rejected${reason}.`, 'error', 'timesheet', ts.id);
       }
-    } else if (input.status === 'client_approved') {
-      const ownerPortalId = await getPortalUserByEmployeeId(ts.employee_id);
+    } else if (newStatus === 'client_approved') {
+      // Notify the employee who owns the timesheet
+      const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
       if (ownerPortalId) {
-        await createNotification(ownerPortalId, 'Timesheet Approved', `Timesheet ${label} has been fully approved.`, 'success', 'timesheet', id);
+        await createNotification(ownerPortalId, 'Timesheet Approved', `Timesheet ${ts.label} has been fully approved.`, 'success', 'timesheet', ts.id);
+      }
+      // Spec: finance users get realtime heads-up that this is ready to invoice.
+      const financeIds = await getUserIdsByRole('finance');
+      for (const uid of financeIds) {
+        await createNotification(
+          uid,
+          'Timesheet Ready to Invoice',
+          `Timesheet ${ts.label} is fully approved and ready to be invoiced.`,
+          'info', 'timesheet', ts.id,
+        );
       }
     }
-  } catch (_) { /* notification failure must not affect main flow */ }
-
-  return data;
+  } catch (err) {
+    // Notification failure must not affect the main state-change flow, but log
+    // it so operators can see that an expected alert was dropped.
+    console.error('[timesheets.service] notification dispatch failed', { timesheetId: ts.id, newStatus, err });
+  }
 }
 
 export async function deleteTimesheet(id: string, userRole: string, userId: string) {
@@ -272,10 +316,15 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
   };
   if (!allowed[status]) throw new Error(`Invalid target status: ${status}`);
 
-  const { data, error } = await supabaseAdmin.from('timesheets').select('id, status').in('id', ids);
+  // Fetch current rows including the fields we need for notifications
+  const { data, error } = await supabaseAdmin
+    .from('timesheets')
+    .select('id, status, employee_id, display_id')
+    .in('id', ids);
   if (error) throw error;
 
-  const eligible = (data ?? []).filter(t => allowed[status].includes(t.status)).map(t => t.id);
+  const eligibleRows = (data ?? []).filter(t => allowed[status].includes(t.status));
+  const eligible = eligibleRows.map(t => t.id);
   const failed = ids.filter(id => !eligible.includes(id));
 
   if (eligible.length > 0) {
@@ -287,6 +336,15 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
     const updateData: Record<string, unknown> = { status };
     if (tsField[status]) updateData[tsField[status]] = new Date().toISOString();
     await supabaseAdmin.from('timesheets').update(updateData).in('id', eligible);
+
+    // Fire per-row notifications. Each call is wrapped inside the helper's
+    // own try/catch so one failure cannot abort the batch.
+    for (const row of eligibleRows) {
+      await notifyTimesheetStatusChange(
+        { id: row.id, employeeId: row.employee_id, label: row.display_id ?? row.id.slice(0, 8) },
+        status,
+      );
+    }
   }
 
   return { updated: eligible.length, failed };

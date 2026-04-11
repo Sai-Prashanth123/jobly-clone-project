@@ -168,6 +168,7 @@ export default function AssignmentDetail() {
               }
             }}
             onCancel={() => setEditOpen(false)}
+            isPending={updateAssignment.isPending}
           />
         </DialogContent>
       </Dialog>
@@ -178,10 +179,12 @@ export default function AssignmentDetail() {
         title="Delete Assignment?"
         description="This will permanently remove this assignment."
         confirmLabel="Delete"
+        loading={deleteAssignment.isPending}
         onConfirm={async () => {
           try {
             await deleteAssignment.mutateAsync(assignment.id);
             toast.success('Assignment deleted');
+            setDeleteOpen(false);
             navigate('/portal/assignments');
           } catch (err: any) {
             toast.error(err?.response?.data?.error ?? 'Failed to delete assignment');

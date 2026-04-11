@@ -144,6 +144,7 @@ export default function PortalClients() {
               }
             }}
             onCancel={() => setShowForm(false)}
+            isPending={createClient.isPending}
           />
         </DialogContent>
       </Dialog>

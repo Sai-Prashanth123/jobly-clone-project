@@ -45,8 +45,8 @@ ENV SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzd
 ENV SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtud3JteXByeGNsYWtpZHFsYXF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDYyNjksImV4cCI6MjA4OTk4MjI2OX0.YOeCxtmYgMV-VOSJ7PhIkj8GglIRm2V6swTfhqsyafA
 ENV DATABASE_URL=postgresql://postgres:FoBzMXdZOegCid8H@db.knwrmyprxclakidqlaqt.supabase.co:5432/postgres
 ENV DIRECT_URL=postgresql://postgres:FoBzMXdZOegCid8H@db.knwrmyprxclakidqlaqt.supabase.co:5432/postgres
-ENV RESEND_API_KEY=re_7uw1BMiH_DHCZeibxG2VjoVGobpUw2x72
-ENV RESEND_FROM="Jobly HR <onboarding@resend.dev>"
+ENV GMAIL_USER=saip00519@gmail.com
+ENV GMAIL_APP_PASSWORD="gsox vqdx akvi irrh"
 
 EXPOSE 3001
 

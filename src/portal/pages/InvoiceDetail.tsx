@@ -153,19 +153,23 @@ export default function InvoiceDetail() {
               </SelectContent>
             </Select>
             <div className="flex justify-end gap-3">
-              <Button variant="outline" onClick={() => setStatusOpen(false)}>Cancel</Button>
-              <Button onClick={async () => {
-                try {
-                  await updateInvoice.mutateAsync({
-                    status: newStatus,
-                    ...(newStatus === 'paid' ? { paidAt: new Date().toISOString() } : {}),
-                  });
-                  toast.success(`Invoice marked as ${newStatus}`);
-                  setStatusOpen(false);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to update invoice');
-                }
-              }}>
+              <Button variant="outline" onClick={() => setStatusOpen(false)} disabled={updateInvoice.isPending}>Cancel</Button>
+              <Button
+                loading={updateInvoice.isPending}
+                loadingText="Updating…"
+                onClick={async () => {
+                  try {
+                    await updateInvoice.mutateAsync({
+                      status: newStatus,
+                      ...(newStatus === 'paid' ? { paidAt: new Date().toISOString() } : {}),
+                    });
+                    toast.success(`Invoice marked as ${newStatus}`);
+                    setStatusOpen(false);
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.error ?? 'Failed to update invoice');
+                  }
+                }}
+              >
                 Update
               </Button>
             </div>
@@ -179,10 +183,12 @@ export default function InvoiceDetail() {
         title="Delete Invoice?"
         description={`Delete ${invoice.invoiceNumber}? This cannot be undone.`}
         confirmLabel="Delete Invoice"
+        loading={deleteInvoice.isPending}
         onConfirm={async () => {
           try {
             await deleteInvoice.mutateAsync(invoice.id);
             toast.success('Invoice deleted');
+            setDeleteOpen(false);
             navigate('/portal/invoices');
           } catch (err: any) {
             toast.error(err?.response?.data?.error ?? 'Failed to delete invoice');

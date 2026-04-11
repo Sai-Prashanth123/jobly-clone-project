@@ -1,0 +1,344 @@
+Key Users
+
+Admin
+HR Team
+Operations/Project Manager
+Finance Team
+Employees/Consultants
+ 
+
+Employee Onboarding
+
+Objective
+
+To onboard new employees or consultants into the system with all necessary details, documentation, and system access.
+
+Key Data Fields
+
+Employee Profile includes:
+
+Personal Information
+
+Full Name
+Employee ID (Auto Generated)
+Email Address
+Phone Number
+Address
+Date of Birth
+Employment Details
+
+Employment Type (Full-time / Contract / Vendor)
+Job Title
+Department
+Joining Date
+Reporting Manager
+Work Location
+Immigration / Compliance (Optional)
+
+Visa Status
+Work Authorization Expiry
+SSN / Last 4 digits
+I-9 Documents
+Payroll Information
+
+Payment Type (W2 / 1099 / C2C)
+Hourly Rate / Salary
+Bank Details (ACH)
+Tax Forms (W9 / W4)
+Documents Upload
+
+Resume
+Offer Letter
+ID Proof
+Compliance Documents
+Workflow
+
+HR logs into the portal.
+Navigate to Employee Management → Add New Employee.
+Enter employee details.
+Upload required documents.
+System generates Employee ID.
+Employee receives portal login credentials via email.
+Employee logs in and completes profile.
+HR approves onboarding.
+Employee becomes Active in the system.
+ 
+
+Client Onboarding
+
+Objective
+
+To register new clients and maintain contract information for billing and employee assignments.
+
+Client Profile Fields
+
+Basic Information
+
+Client Name
+Client ID (Auto Generated)
+Industry
+Client Address
+Country
+Contact Person
+Email
+Phone
+Contract Details
+
+Contract Start Date
+Contract End Date
+Billing Type
+Hourly
+Monthly
+Milestone
+Payment Terms
+Net 15
+Net 30
+Net 45
+Billing Details
+
+Billing Contact
+Billing Address
+Currency
+Tax Details
+Documents
+
+Client Agreement
+NDA
+MSA/SOW
+Workflow
+
+Admin/Operations creates a Client Profile.
+Enter client details.
+Upload contract documents.
+Set billing terms and payment cycle.
+Client is marked Active in the system.
+Client becomes available for employee assignments.
+ 
+
+Employee Tagging to Client (Project Assignment)
+
+Objective
+
+To assign employees to clients/projects for time tracking and billing.
+
+Assignment Fields
+
+Employee Name
+Client Name
+Project Name
+Role
+Start Date
+End Date
+Bill Rate
+Pay Rate
+Billing Type
+Work Location
+Reporting Manager
+Workflow
+
+Operations Manager navigates to Assignments → Create Assignment.
+Select Employee.
+Select Client.
+Enter project details.
+Enter billing rate and pay rate.
+Define assignment duration.
+Save assignment.
+System Actions
+
+Employee is now tagged to the client.
+Employee can submit timesheets against this project.
+Billing will be generated based on this assignment.
+ 
+
+Timesheet Management
+
+Objective
+
+To capture employee work hours for payroll and client billing.
+
+Timesheet Fields
+
+Employee Name
+Client Name
+Project Name
+Week Start Date
+Week End Date
+Daily Hours
+Total Hours
+Comments
+Status
+Status Types
+
+Draft
+Submitted
+Manager Approved
+Client Approved
+Rejected
+Workflow
+
+Employee
+
+Employee logs into portal.
+Navigate to Timesheets.
+Select week.
+Enter daily hours.
+Submit timesheet.
+Manager Approval
+
+Manager receives notification.
+Reviews hours.
+Approves or rejects.
+Final Status
+
+Approved timesheets move to Billing & Payroll.
+
+ 
+
+Invoicing Module
+
+Objective
+
+To generate invoices for clients based on approved timesheets.
+
+Invoice Fields
+
+Invoice Number (Auto Generated)
+Client Name
+Billing Period
+Employee Name
+Hours Worked
+Bill Rate
+Total Amount
+Taxes
+Payment Terms
+Invoice Date
+Due Date
+Workflow
+
+Finance navigates to Billing → Generate Invoice.
+Select Client.
+System pulls approved timesheets.
+System calculates invoice amount.
+Calculation Example
+
+Hours Worked × Bill Rate = Invoice Amount
+
+Example
+160 hours × $80/hr = $12,800
+
+System generates invoice PDF.
+Invoice sent to client via email.
+Invoice status updated.
+Status Types
+
+Draft
+Sent
+Paid
+Overdue
+ 
+
+Reports & Analytics
+
+Objective
+
+To provide insights into employee utilization, billing, and revenue.
+
+Report Types
+
+Employee Reports
+
+Active Employees
+Employee Utilization
+Employee Assignment Report
+Visa Expiry Report
+Client Reports
+
+Client Billing Summary
+Active Clients
+Revenue by Client
+Timesheet Reports
+
+Missing Timesheets
+Approved Timesheets
+Timesheet Summary
+Financial Reports
+
+Monthly Revenue
+Outstanding Invoices
+Payments Received
+Profitability Report
+ 
+
+Notifications & Alerts
+
+System should automatically notify users for important actions.
+
+Examples
+
+Employee
+
+Timesheet submission reminders
+Manager
+
+Pending approvals
+Finance
+
+Invoice generation reminders
+Admin
+
+Contract expiration alerts
+User Roles & Permissions
+
+Admin
+
+Full system access
+HR
+
+Employee onboarding
+Document management
+Operations Manager
+
+Assign employees
+Manage projects
+Finance
+
+Generate invoices
+Manage payments
+Employee
+
+Submit timesheets
+View assignments
+Security & Compliance
+
+Security Features
+
+Role-based access control
+Data encryption
+Compliance
+
+Document storage for audits
+Data retention policies
+Activity logs
+ 
+
+Dashboard
+
+System dashboard should show:
+
+Admin Dashboard
+
+Total Employees
+Active Clients
+Active Projects
+Revenue This Month
+Pending Approvals
+Employee Dashboard
+
+Assigned Client
+Pending Timesheets
+Approved Hours
+Finance Dashboard
+
+Pending Invoices
+Outstanding Payments
+Revenue Reports

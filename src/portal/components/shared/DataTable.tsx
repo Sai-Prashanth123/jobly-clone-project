@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -69,13 +69,25 @@ export function DataTable<T>({
   // Clear selection on data/filter change
   useEffect(() => { setSelected(new Set()); }, [query, page]);
 
-  // Notify parent of selection changes
+  // Notify parent of selection changes — use refs for data/getRowKey/callback
+  // so we only re-run when the selection itself changes. This prevents parent
+  // re-renders (parents rarely memoize onSelectionChange) from causing an
+  // effect loop, while still seeing the latest data at notify-time.
+  const onSelectionChangeRef = useRef(onSelectionChange);
+  const dataRef = useRef(data);
+  const getRowKeyRef = useRef(getRowKey);
   useEffect(() => {
-    if (onSelectionChange) {
-      const items = data.filter(item => selected.has(getRowKey(item)));
-      onSelectionChange(items);
+    onSelectionChangeRef.current = onSelectionChange;
+    dataRef.current = data;
+    getRowKeyRef.current = getRowKey;
+  });
+  useEffect(() => {
+    const cb = onSelectionChangeRef.current;
+    if (cb) {
+      const items = dataRef.current.filter(item => selected.has(getRowKeyRef.current(item)));
+      cb(items);
     }
-  }, [selected]); // intentionally only selected in deps
+  }, [selected]);
 
   const handleSort = (key: string) => {
     if (sortKey !== key) {

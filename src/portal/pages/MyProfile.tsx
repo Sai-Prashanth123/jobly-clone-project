@@ -84,7 +84,6 @@ export default function MyProfile() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Pay Rate" value={formatCurrency(employee.payRate)} />
             <Field label="Pay Type" value={employee.payType} />
-            <Field label="Pay Frequency" value={employee.payFrequency} />
             <Field label="Payment Type" value={employee.paymentType?.toUpperCase()} />
             <Field label="Tax Form" value={employee.taxFormType?.toUpperCase()} />
             {employee.bankName && <Field label="Bank Name" value={employee.bankName} />}

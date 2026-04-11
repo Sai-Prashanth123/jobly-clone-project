@@ -66,7 +66,7 @@ async function seed() {
     employment_type: 'w2', start_date: '2024-01-15',
     status: 'active', visa_type: 'h1b', visa_expiry: '2027-01-14',
     i9_status: 'complete', pay_rate: 85.00, pay_type: 'hourly',
-    pay_frequency: 'biweekly', work_location: 'Remote',
+    work_location: 'Remote',
   }).select().single();
 
   const { data: emp2 } = await supabase.from('employees').insert({
@@ -75,7 +75,7 @@ async function seed() {
     department: 'Engineering', job_title: 'Senior Developer',
     employment_type: 'w2', start_date: '2023-06-01',
     status: 'active', pay_rate: 95.00, pay_type: 'hourly',
-    pay_frequency: 'biweekly', work_location: 'On-site',
+    work_location: 'On-site',
   }).select().single();
 
   const { data: emp3 } = await supabase.from('employees').insert({
@@ -85,7 +85,7 @@ async function seed() {
     employment_type: '1099', start_date: '2024-03-01',
     status: 'active', visa_type: 'opt', visa_expiry: '2025-12-31',
     i9_status: 'complete', pay_rate: 70.00, pay_type: 'hourly',
-    pay_frequency: 'weekly', work_location: 'Hybrid',
+    work_location: 'Hybrid',
   }).select().single();
 
   console.log(`  ✓ Created 3 employees`);

@@ -138,6 +138,7 @@ export default function Employees() {
                 }
               }}
               onCancel={() => setShowForm(false)}
+              isPending={createEmployee.isPending}
             />
           </DialogContent>
         </Dialog>

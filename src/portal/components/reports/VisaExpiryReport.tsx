@@ -8,21 +8,28 @@ export function VisaExpiryReport() {
   const { data } = useEmployees({ limit: 500 });
   const employees = data?.data ?? [];
 
-  const today = new Date();
-  const in180Days = new Date(today);
-  in180Days.setDate(today.getDate() + 180);
+  // UTC-safe date math — parsing a bare 'YYYY-MM-DD' with new Date() would
+  // interpret it as local midnight, shifting the computed day by up to ±1 in
+  // timezones east/west of UTC. Anchor everything to UTC midnight.
+  const now = new Date();
+  const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  const cutoffMs = todayMs + 180 * 24 * 60 * 60 * 1000;
+
+  const parseExpiry = (s: string) => {
+    // 'YYYY-MM-DD' → UTC midnight
+    const [y, m, d] = s.split('-').map(Number);
+    return Date.UTC(y, (m ?? 1) - 1, d ?? 1);
+  };
 
   const expiring = employees
     .filter(e => {
       if (!e.visaExpiry) return false;
-      const exp = new Date(e.visaExpiry);
-      return exp >= today && exp <= in180Days;
+      const expMs = parseExpiry(e.visaExpiry);
+      return expMs >= todayMs && expMs <= cutoffMs;
     })
-    .sort((a, b) => new Date(a.visaExpiry!).getTime() - new Date(b.visaExpiry!).getTime())
+    .sort((a, b) => parseExpiry(a.visaExpiry!) - parseExpiry(b.visaExpiry!))
     .map(e => {
-      const daysRemaining = Math.ceil(
-        (new Date(e.visaExpiry!).getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
-      );
+      const daysRemaining = Math.round((parseExpiry(e.visaExpiry!) - todayMs) / (24 * 60 * 60 * 1000));
       return { ...e, daysRemaining };
     });
 

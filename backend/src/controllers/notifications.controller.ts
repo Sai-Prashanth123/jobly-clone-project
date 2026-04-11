@@ -43,3 +43,10 @@ export async function triggerContractExpiry(req: Request, res: Response, next: N
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
+
+export async function triggerInvoiceReadiness(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await svc.triggerInvoiceReadinessReminders();
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}

@@ -81,6 +81,17 @@ export async function getPortalUserByEmployeeId(employeeId: string): Promise<str
   return data?.id ?? null;
 }
 
+/** Find the portal_user id for the reporting manager of the given employee. */
+export async function getReportingManagerPortalUserId(employeeId: string): Promise<string | null> {
+  const { data: emp } = await supabaseAdmin
+    .from('employees')
+    .select('reporting_manager_id')
+    .eq('id', employeeId)
+    .maybeSingle();
+  if (!emp?.reporting_manager_id) return null;
+  return getPortalUserByEmployeeId(emp.reporting_manager_id);
+}
+
 /**
  * Timesheet submission reminder — call weekly (e.g. every Monday).
  * Finds all active assignments that have NO timesheet for the current week
@@ -181,6 +192,73 @@ export async function triggerContractExpiryAlerts(): Promise<{ sent: number }> {
       );
     }
     sent += recipients.length;
+  }
+
+  return { sent };
+}
+
+/**
+ * Invoice readiness reminder — call when finance users need to be nudged
+ * about timesheets that are fully approved but not yet invoiced.
+ * Groups pending timesheets by client for a single summary notification per client
+ * per finance user.
+ */
+export async function triggerInvoiceReadinessReminders(): Promise<{ sent: number }> {
+  // Fetch all client-approved timesheets
+  const { data: approved } = await supabaseAdmin
+    .from('timesheets')
+    .select('id, display_id, client_id, total_hours, week_start_date, week_end_date')
+    .eq('status', 'client_approved');
+
+  const approvedList = approved ?? [];
+  if (approvedList.length === 0) return { sent: 0 };
+
+  // Filter out any already linked to an invoice via the junction table
+  const approvedIds = approvedList.map(t => t.id);
+  const { data: linked } = await supabaseAdmin
+    .from('invoice_timesheets')
+    .select('timesheet_id')
+    .in('timesheet_id', approvedIds);
+  const linkedSet = new Set((linked ?? []).map(r => r.timesheet_id));
+
+  const pending = approvedList.filter(t => !linkedSet.has(t.id));
+  if (pending.length === 0) return { sent: 0 };
+
+  // Group by client
+  const byClient = new Map<string, typeof pending>();
+  for (const t of pending) {
+    const arr = byClient.get(t.client_id) ?? [];
+    arr.push(t);
+    byClient.set(t.client_id, arr);
+  }
+
+  // Fetch client names
+  const clientIds = [...byClient.keys()];
+  const { data: clients } = await supabaseAdmin
+    .from('clients')
+    .select('id, company_name')
+    .in('id', clientIds);
+  const clientMap = new Map((clients ?? []).map(c => [c.id, c.company_name]));
+
+  const financeIds = await getUserIdsByRole('finance');
+  if (financeIds.length === 0) return { sent: 0 };
+
+  let sent = 0;
+  for (const [clientId, list] of byClient.entries()) {
+    const clientName = clientMap.get(clientId) ?? 'a client';
+    const totalHours = list.reduce((s, t) => s + Number(t.total_hours ?? 0), 0);
+    const msg = `${list.length} approved timesheet${list.length === 1 ? '' : 's'} (${totalHours.toFixed(1)}h) for ${clientName} are ready to invoice.`;
+    for (const uid of financeIds) {
+      await createNotification(
+        uid,
+        'Invoices Ready to Generate',
+        msg,
+        'info',
+        'client',
+        clientId,
+      );
+      sent++;
+    }
   }
 
   return { sent };

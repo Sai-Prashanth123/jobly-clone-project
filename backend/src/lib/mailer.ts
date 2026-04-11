@@ -1,10 +1,16 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Gmail SMTP — set GMAIL_USER and GMAIL_APP_PASSWORD in env
+// Generate an App Password at: myaccount.google.com → Security → 2-Step Verification → App passwords
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.GMAIL_USER,
+    pass: process.env.GMAIL_APP_PASSWORD,
+  },
+});
 
-// RESEND_FROM must be set to a verified sender domain (e.g. hr@joblysolutions.com).
-// onboarding@resend.dev is the Resend sandbox — it only delivers to your own verified email.
-const FROM = process.env.RESEND_FROM ?? 'Jobly HR <onboarding@resend.dev>';
+const FROM = process.env.GMAIL_USER ? `Jobly HR <${process.env.GMAIL_USER}>` : 'Jobly HR <noreply@jobly.com>';
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
 
 export interface WelcomeEmailPayload {
@@ -148,7 +154,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
 </body>
 </html>`;
 
-  await resend.emails.send({
+  await transporter.sendMail({
     from: FROM,
     to,
     subject: `Welcome to Jobly Portal — ${displayId}`,
@@ -278,7 +284,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
 </body>
 </html>`;
 
-  await resend.emails.send({
+  await transporter.sendMail({
     from: FROM,
     to,
     subject: `Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`,

@@ -169,6 +169,7 @@ export default function ClientDetail() {
               }
             }}
             onCancel={() => setEditOpen(false)}
+            isPending={updateClient.isPending}
           />
         </DialogContent>
       </Dialog>
@@ -179,10 +180,12 @@ export default function ClientDetail() {
         title={`Delete ${client.companyName}?`}
         description="This will permanently remove this client and cannot be undone."
         confirmLabel="Delete Client"
+        loading={deleteClient.isPending}
         onConfirm={async () => {
           try {
             await deleteClient.mutateAsync(client.id);
             toast.success('Client deleted');
+            setDeleteOpen(false);
             navigate('/portal/clients');
           } catch (err: any) {
             toast.error(err?.response?.data?.error ?? 'Failed to delete client');

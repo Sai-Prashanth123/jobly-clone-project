@@ -4,6 +4,7 @@ import { generateInvoicePDF } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
+import { addDaysToDate } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
 
 export async function listInvoices(query: ListInvoicesQuery) {
@@ -96,7 +97,6 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
   const billingPeriodEnd   = weekEnds[weekEnds.length - 1] ?? input.issueDate;
 
   // Calculate due date from client net payment days (UTC-safe)
-  const { addDaysToDate, todayUTC } = await import('../lib/dateUtils');
   const dueDate = addDaysToDate(input.issueDate, client?.net_payment_days ?? 30);
 
   // Generate invoice number

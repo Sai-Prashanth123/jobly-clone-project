@@ -34,6 +34,10 @@ export function useNotifications() {
       return (data.data as any[]).map(mapNotification);
     },
     refetchInterval: 60_000, // poll every 60s
+    // Treat data as fresh for almost the full polling window so tab re-focus
+    // or route re-mount doesn't trigger an immediate extra refetch on top of
+    // the interval poll.
+    staleTime: 55_000,
   });
 }
 
@@ -45,6 +49,7 @@ export function useUnreadNotificationCount() {
       return data.data.count as number;
     },
     refetchInterval: 60_000,
+    staleTime: 55_000,
   });
 }
 
@@ -84,6 +89,17 @@ export function useTriggerContractExpiry() {
   return useMutation({
     mutationFn: async () => {
       const { data } = await apiClient.post('/notifications/trigger/contract-expiry');
+      return data.data as { sent: number };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}
+
+export function useTriggerInvoiceReadiness() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post('/notifications/trigger/invoice-ready');
       return data.data as { sent: number };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),

@@ -26,6 +26,7 @@ interface ClientFormProps {
   onSubmit: (data: ClientFormData, pendingFiles: Map<string, PendingDoc>) => void;
   onCancel: () => void;
   isEdit?: boolean;
+  isPending?: boolean;
 }
 
 const defaultForm: ClientFormData = {
@@ -37,7 +38,7 @@ const defaultForm: ClientFormData = {
 
 const DOC_TYPES = ['Client Agreement', 'NDA', 'MSA/SOW', 'Other'];
 
-export function ClientForm({ initial, onSubmit, onCancel, isEdit = false }: ClientFormProps) {
+export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: ClientFormProps) {
   const uploadDoc = useUploadClientDocument(initial?.id ?? '');
   const [form, setForm] = useState<ClientFormData>({ ...defaultForm, ...initial, documents: initial?.documents ?? [] });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -426,8 +427,14 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false }: Clie
       </Tabs>
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">{isEdit ? 'Save Changes' : 'Create Client'}</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+        <Button
+          type="submit"
+          loading={isPending}
+          loadingText={isEdit ? 'Saving…' : 'Creating…'}
+        >
+          {isEdit ? 'Save Changes' : 'Create Client'}
+        </Button>
       </div>
     </form>
   );

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, CheckCheck, Clock, AlertTriangle, Loader2 } from 'lucide-react';
+import { Bell, CheckCheck, Clock, AlertTriangle, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import {
@@ -10,6 +10,7 @@ import {
   useMarkAllNotificationsRead,
   useTriggerTimesheetReminders,
   useTriggerContractExpiry,
+  useTriggerInvoiceReadiness,
 } from '../hooks/useNotifications';
 import { useAuth } from '../hooks/useAuth';
 import type { Notification } from '../hooks/useNotifications';
@@ -71,6 +72,7 @@ export default function Notifications() {
   const markAllRead = useMarkAllNotificationsRead();
   const triggerReminders = useTriggerTimesheetReminders();
   const triggerContractExpiry = useTriggerContractExpiry();
+  const triggerInvoiceReadiness = useTriggerInvoiceReadiness();
 
   const [filter, setFilter] = useState<FilterType>('all');
 
@@ -168,6 +170,29 @@ export default function Notifications() {
                   ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
                   : <AlertTriangle className="h-3.5 w-3.5" />}
                 Check Contract Expiry
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2 text-xs border-amber-200 hover:bg-amber-100"
+                disabled={triggerInvoiceReadiness.isPending}
+                onClick={async () => {
+                  try {
+                    const res = await triggerInvoiceReadiness.mutateAsync();
+                    toast.success(
+                      res.sent > 0
+                        ? `Invoice readiness alerts sent (${res.sent} notifications)`
+                        : 'No timesheets ready to invoice'
+                    );
+                  } catch {
+                    toast.error('Failed to check invoice readiness');
+                  }
+                }}
+              >
+                {triggerInvoiceReadiness.isPending
+                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  : <FileText className="h-3.5 w-3.5" />}
+                Check Invoices Ready
               </Button>
             </div>
             <p className="text-[11px] text-amber-600 mt-2">

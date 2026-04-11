@@ -4,7 +4,6 @@ export type TimesheetStatus = 'draft' | 'submitted' | 'manager_approved' | 'clie
 export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
 export type AssignmentStatus = 'active' | 'completed' | 'pending' | 'terminated';
 export type PayType = 'hourly' | 'salary';
-export type PayFrequency = 'weekly' | 'biweekly' | 'monthly';
 export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'w2' | '1099' | 'c2c' | 'vendor';
 export type BillingType = 'hourly' | 'monthly' | 'milestone';
 export type VisaType = 'h1b' | 'l1' | 'opt' | 'stem_opt' | 'tn' | 'gc' | 'citizen' | 'other';
@@ -61,14 +60,12 @@ export interface Employee {
   jobTitle: string;
   employmentType: EmploymentType;
   startDate: string;
-  managerId?: string;
   status: EmployeeStatus;
   visaType?: VisaType;
   visaExpiry?: string;
   i9Status?: I9Status;
   payRate: number;
   payType: PayType;
-  payFrequency: PayFrequency;
   workLocation?: string;
   ssn?: string;
   paymentType?: 'w2' | '1099' | 'c2c';

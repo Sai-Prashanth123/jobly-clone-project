@@ -10,7 +10,7 @@ export async function getEmployeeUtilization() {
     .from('timesheets')
     .select('employee_id, total_hours, week_start_date')
     .in('status', ['submitted', 'manager_approved', 'client_approved'])
-    .gte('week_start_date', getWeekStart(new Date(), -4));
+    .gte('week_start_date', getWeekStartOffset(-4));
 
   const { data: employees } = await supabaseAdmin
     .from('employees')
@@ -24,11 +24,16 @@ export async function getEmployeeUtilization() {
     hoursMap.set(ts.employee_id, (hoursMap.get(ts.employee_id) ?? 0) + ts.total_hours);
   }
 
-  const result = [...new Set((assignments ?? []).map(a => a.employee_id))].map(empId => {
+  // Pre-aggregate assignment capacity per employee in a single pass (O(n)
+  // instead of the previous O(n × m) filter-per-employee).
+  const capacityMap = new Map<string, number>();
+  for (const a of assignments ?? []) {
+    capacityMap.set(a.employee_id, (capacityMap.get(a.employee_id) ?? 0) + a.max_hours_per_week);
+  }
+
+  const result = [...capacityMap.keys()].map(empId => {
     const emp = empMap.get(empId);
-    const maxHours = (assignments ?? [])
-      .filter(a => a.employee_id === empId)
-      .reduce((sum, a) => sum + a.max_hours_per_week, 0);
+    const maxHours = capacityMap.get(empId) ?? 0;
     const loggedHours = hoursMap.get(empId) ?? 0;
     return {
       employeeId: empId,
@@ -176,15 +181,21 @@ export async function getProfitability() {
     .from('clients')
     .select('id, company_name');
 
-  const asnMap = new Map((assignments ?? []).map(a => [a.id, a]));
   const clientMap = new Map((clients ?? []).map(c => [c.id, c.company_name]));
+
+  // Pre-index assignments by (client_id, employee_id) so the inner lookup is
+  // O(1). Previously a `.find()` per timesheet made this O(n × m) — a large
+  // tenant with thousands of approved timesheets would spike the request.
+  type AssignmentRow = { id: string; client_id: string; employee_id: string; bill_rate: number; pay_rate: number };
+  const assignmentIndex = new Map<string, AssignmentRow>();
+  for (const a of (assignments ?? []) as AssignmentRow[]) {
+    assignmentIndex.set(`${a.client_id}:${a.employee_id}`, a);
+  }
 
   const profitMap = new Map<string, { clientId: string; clientName: string; revenue: number; cost: number }>();
 
   for (const ts of timesheets ?? []) {
-    const asgn = (assignments ?? []).find(a =>
-      a.client_id === ts.client_id && a.employee_id === ts.employee_id
-    );
+    const asgn = assignmentIndex.get(`${ts.client_id}:${ts.employee_id}`);
     if (!asgn) continue;
 
     const revenue = ts.total_hours * asgn.bill_rate;
@@ -240,11 +251,16 @@ export async function getBillingByClient() {
     .sort((a, b) => b.totalBilled - a.totalBilled);
 }
 
-function getWeekStart(_date: Date, weeksOffset: number): string {
-  // UTC-safe: use getUTCDay() so the result is consistent across all server timezones
+/**
+ * Returns the ISO date string of the Monday that is `weeksOffset` weeks away
+ * from the current week's Monday (UTC).
+ */
+function getWeekStartOffset(weeksOffset: number): string {
   const now = new Date();
   const utcDay = now.getUTCDay(); // 0=Sun … 6=Sat
   const daysToMonday = utcDay === 0 ? -6 : 1 - utcDay;
-  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysToMonday + weeksOffset * 7));
+  const monday = new Date(
+    Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysToMonday + weeksOffset * 7),
+  );
   return monday.toISOString().split('T')[0];
 }

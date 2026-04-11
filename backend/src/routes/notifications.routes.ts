@@ -15,5 +15,6 @@ router.patch('/read-all',                 ctrl.markAllRead);
 // Admin-only trigger endpoints (can be called by cron or manually)
 router.post('/trigger/timesheet-reminders', requireRole('admin'), ctrl.triggerTimesheetReminders);
 router.post('/trigger/contract-expiry',     requireRole('admin'), ctrl.triggerContractExpiry);
+router.post('/trigger/invoice-ready',       requireRole('admin'), ctrl.triggerInvoiceReadiness);
 
 export default router;

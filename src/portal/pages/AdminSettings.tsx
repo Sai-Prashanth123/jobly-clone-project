@@ -143,6 +143,7 @@ function UsersTab() {
                       {u.id !== currentUser?.id ? (
                         <Select
                           value={u.role}
+                          disabled={updateRole.isPending}
                           onValueChange={async (role) => {
                             try {
                               await updateRole.mutateAsync({ userId: u.id, role });
@@ -152,7 +153,7 @@ function UsersTab() {
                             }
                           }}
                         >
-                          <SelectTrigger className="w-36 h-7 text-xs">
+                          <SelectTrigger className="w-36 h-7 text-xs" aria-busy={updateRole.isPending || undefined}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
@@ -215,6 +216,7 @@ function UsersTab() {
         title="Remove Portal User?"
         description="This will permanently remove the user's login access. Their employee record will remain intact."
         confirmLabel="Remove Access"
+        loading={deactivate.isPending}
         onConfirm={async () => {
           if (!deactivateTarget) return;
           try {

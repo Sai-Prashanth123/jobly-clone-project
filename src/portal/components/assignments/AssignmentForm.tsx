@@ -15,6 +15,7 @@ interface AssignmentFormProps {
   onSubmit: (data: AssignmentFormData) => void;
   onCancel: () => void;
   isEdit?: boolean;
+  isPending?: boolean;
 }
 
 const defaultForm: AssignmentFormData = {
@@ -22,7 +23,7 @@ const defaultForm: AssignmentFormData = {
   startDate: '', billRate: 0, payRate: 0, maxHoursPerWeek: 40, status: 'active',
 };
 
-export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false }: AssignmentFormProps) {
+export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: AssignmentFormProps) {
   const { data: empData } = useEmployees({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
   const [form, setForm] = useState<AssignmentFormData>({ ...defaultForm, ...initial });
@@ -197,8 +198,14 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false }: 
       </Card>
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">{isEdit ? 'Save Changes' : 'Create Assignment'}</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+        <Button
+          type="submit"
+          loading={isPending}
+          loadingText={isEdit ? 'Saving…' : 'Creating…'}
+        >
+          {isEdit ? 'Save Changes' : 'Create Assignment'}
+        </Button>
       </div>
     </form>
   );

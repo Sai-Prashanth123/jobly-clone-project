@@ -25,14 +25,12 @@ model Employee {
   jobTitle           String    @db.Text          @map("job_title")
   employmentType     String    @db.Text          @map("employment_type")
   startDate          DateTime  @db.Date          @map("start_date")
-  managerId          String?   @db.Uuid          @map("manager_id")
   status             String    @default("onboarding") @db.Text
   visaType           String?   @db.Text          @map("visa_type")
   visaExpiry         DateTime? @db.Date          @map("visa_expiry")
   i9Status           String?   @db.Text          @map("i9_status")
   payRate            Decimal   @default(0)       @db.Decimal(10, 2) @map("pay_rate")
   payType            String    @default("hourly") @db.Text @map("pay_type")
-  payFrequency       String    @default("biweekly") @db.Text @map("pay_frequency")
   workLocation       String?   @db.Text          @map("work_location")
   ssn                String?   @db.Text
   paymentType        String?   @db.Text          @map("payment_type")

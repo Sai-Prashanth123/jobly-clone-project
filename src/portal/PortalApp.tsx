@@ -1,30 +1,46 @@
+import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { Loader2 } from 'lucide-react';
 import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './context/AuthContext';
 import { PortalLayout } from './components/layout/PortalLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+// Eager — small pages that are the first landing targets per area
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
-import EmployeeDetail from './pages/EmployeeDetail';
 import PortalClients from './pages/Clients';
-import ClientDetail from './pages/ClientDetail';
 import Assignments from './pages/Assignments';
-import AssignmentDetail from './pages/AssignmentDetail';
 import Timesheets from './pages/Timesheets';
-import TimesheetDetail from './pages/TimesheetDetail';
 import Invoices from './pages/Invoices';
-import InvoiceDetail from './pages/InvoiceDetail';
-import Reports from './pages/Reports';
 import NotificationsPage from './pages/Notifications';
-import AdminSettings from './pages/AdminSettings';
 import MyProfile from './pages/MyProfile';
+
+// Lazy — heavy or rarely-visited pages. This keeps them out of the initial
+// PortalApp chunk. The biggest wins are Reports (Recharts + 16 report
+// components) and all the detail pages (each pulls in the matching form).
+const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'));
+const ClientDetail = lazy(() => import('./pages/ClientDetail'));
+const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
+const TimesheetDetail = lazy(() => import('./pages/TimesheetDetail'));
+const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
+const Reports = lazy(() => import('./pages/Reports'));
+const AdminSettings = lazy(() => import('./pages/AdminSettings'));
+
+function RouteFallback() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
 
 export default function PortalApp() {
   return (
     <QueryClientProvider client={queryClient}>
     <AuthProvider>
+        <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Public */}
           <Route path="login" element={<Login />} />
@@ -160,6 +176,7 @@ export default function PortalApp() {
           {/* Catch-all redirect to login */}
           <Route path="*" element={<Navigate to="/portal/login" replace />} />
         </Routes>
+        </Suspense>
     </AuthProvider>
     </QueryClientProvider>
   );

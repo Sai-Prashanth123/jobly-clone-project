@@ -3,7 +3,10 @@
     "allow": [
       "Bash(find D:/jobly/joblysolutions-mirror/www.joblysolutions.com/assets -type f \\\\\\(-iname *.svg -o -iname *.png -o -iname *.jpg -o -iname *.woff -o -iname *.ttf -o -iname *.eot \\\\\\))",
       "Bash(wc -l \"D:/jobly/jobly-clone-project/public/assets/css/\"*.css)",
-      "Bash(find /d/jobly/jobly-clone-project/src/components/ui -type f -name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js)"
+      "Bash(find /d/jobly/jobly-clone-project/src/components/ui -type f -name *.tsx -o -name *.ts -o -name *.jsx -o -name *.js)",
+      "Bash(ls -la \"D:\\\\\\\\jobly\\\\\\\\jobly-clone-project\\\\\\\\\")",
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

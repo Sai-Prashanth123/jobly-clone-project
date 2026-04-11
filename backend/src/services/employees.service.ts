@@ -68,17 +68,23 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
   let credentialsReady = false;
 
   try {
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
-    const existingAuthUser = existingUsers?.users?.find((u: any) => u.email === portalLoginEmail);
+    // First check portal_users by email — this is an indexed lookup and
+    // avoids the O(N)-in-all-auth-users `listUsers({ perPage: 1000 })` call
+    // that used to run on every employee create.
+    const { data: existingPortal } = await supabaseAdmin
+      .from('portal_users')
+      .select('id')
+      .eq('email', portalLoginEmail)
+      .maybeSingle();
 
-    if (existingAuthUser) {
+    if (existingPortal?.id) {
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
-        existingAuthUser.id, { password: tempPassword }
+        existingPortal.id, { password: tempPassword }
       );
       if (updateErr) throw updateErr;
 
       await supabaseAdmin.from('portal_users').upsert({
-        id: existingAuthUser.id,
+        id: existingPortal.id,
         email: portalLoginEmail,
         name: `${input.firstName} ${input.lastName}`,
         role: 'employee',
@@ -180,14 +186,12 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
       job_title:         input.jobTitle ?? '',
       employment_type:   input.employmentType,
       start_date:        input.startDate,
-      manager_id:        input.managerId ?? null,
       status:            input.status ?? 'onboarding',
       visa_type:         input.visaType ?? null,
       visa_expiry:       input.visaExpiry || null,
       i9_status:         input.i9Status ?? null,
       pay_rate:          input.payRate,
       pay_type:          input.payType,
-      pay_frequency:     input.payFrequency,
       work_location:     input.workLocation ?? null,
       ssn:               input.ssn ?? null,
       payment_type:      input.paymentType ?? null,
@@ -221,7 +225,12 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
         'info', 'employee', emp.id,
       );
     }
-  } catch (_) { /* non-blocking */ }
+  } catch (err) {
+    // Non-blocking, but surface the failure in logs so silent drops are visible
+    // to operators. We deliberately do NOT rethrow — onboarding must succeed
+    // even when the notification pipeline is degraded.
+    console.error('[employees.service] onboarding notification failed', err);
+  }
 
   return serializeEmployee(emp);
 }
@@ -247,14 +256,12 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.jobTitle !== undefined)   patch.job_title       = input.jobTitle;
   if (input.employmentType !== undefined) patch.employment_type = input.employmentType;
   if (input.startDate !== undefined)  patch.start_date      = input.startDate;
-  if (input.managerId !== undefined)  patch.manager_id      = input.managerId;
   if (input.status !== undefined)     patch.status          = input.status;
   if (input.visaType !== undefined)   patch.visa_type       = input.visaType;
   if (input.visaExpiry !== undefined) patch.visa_expiry     = input.visaExpiry || null;
   if (input.i9Status !== undefined)   patch.i9_status       = input.i9Status;
   if (input.payRate !== undefined)    patch.pay_rate        = input.payRate;
   if (input.payType !== undefined)    patch.pay_type        = input.payType;
-  if (input.payFrequency !== undefined) patch.pay_frequency = input.payFrequency;
   if (input.workLocation !== undefined) patch.work_location = input.workLocation;
   if (input.ssn !== undefined)        patch.ssn             = input.ssn;
   if (input.paymentType !== undefined) patch.payment_type   = input.paymentType;
@@ -331,20 +338,20 @@ export async function getEmployeeTimesheets(employeeId: string) {
 export async function exportEmployeesCSV(query: { status?: string; department?: string }): Promise<string> {
   let q = supabaseAdmin
     .from('employees')
-    .select('display_id,first_name,last_name,email,phone,department,job_title,employment_type,start_date,status,visa_type,visa_expiry,pay_rate,pay_type,pay_frequency,work_location')
+    .select('display_id,first_name,last_name,email,phone,department,job_title,employment_type,start_date,status,visa_type,visa_expiry,pay_rate,pay_type,work_location')
     .order('display_id');
   if (query.status) q = q.eq('status', query.status);
   if (query.department) q = q.eq('department', query.department);
   const { data, error } = await q;
   if (error) throw error;
 
-  const headers = ['ID','First Name','Last Name','Email','Phone','Department','Job Title','Employment Type','Start Date','Status','Visa Type','Visa Expiry','Pay Rate','Pay Type','Pay Frequency','Work Location'];
+  const headers = ['ID','First Name','Last Name','Email','Phone','Department','Job Title','Employment Type','Start Date','Status','Visa Type','Visa Expiry','Pay Rate','Pay Type','Work Location'];
   const rows = (data ?? []).map(e => [
     e.display_id ?? '',
     e.first_name, e.last_name, e.email, e.phone ?? '',
     e.department, e.job_title, e.employment_type, e.start_date, e.status,
     e.visa_type ?? '', e.visa_expiry ?? '',
-    e.pay_rate, e.pay_type, e.pay_frequency, e.work_location ?? '',
+    e.pay_rate, e.pay_type, e.work_location ?? '',
   ]);
   return [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
 }

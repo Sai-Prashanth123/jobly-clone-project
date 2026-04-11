@@ -156,7 +156,6 @@ export default function EmployeeDetail() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Pay Rate" value={formatCurrency(employee.payRate)} />
             <Field label="Pay Type" value={employee.payType} />
-            <Field label="Pay Frequency" value={employee.payFrequency} />
             <Field label="Payment Type" value={employee.paymentType?.toUpperCase()} />
             <Field label="Tax Form" value={employee.taxFormType?.toUpperCase()} />
             {employee.bankName && <Field label="Bank Name" value={employee.bankName} />}
@@ -238,6 +237,7 @@ export default function EmployeeDetail() {
               }
             }}
             onCancel={() => setEditOpen(false)}
+            isPending={updateEmployee.isPending}
           />
         </DialogContent>
       </Dialog>
@@ -248,10 +248,12 @@ export default function EmployeeDetail() {
         title={`Delete ${employee.firstName} ${employee.lastName}?`}
         description="This will permanently remove this employee and cannot be undone."
         confirmLabel="Delete Employee"
+        loading={deleteEmployee.isPending}
         onConfirm={async () => {
           try {
             await deleteEmployee.mutateAsync(employee.id);
             toast.success('Employee deleted');
+            setDeleteOpen(false);
             navigate('/portal/employees');
           } catch (err: any) {
             toast.error(err?.response?.data?.error ?? 'Failed to delete employee');

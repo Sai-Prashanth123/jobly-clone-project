@@ -13,6 +13,8 @@ npm run build        # Production build
 npm run lint         # ESLint
 npm run test         # Run Vitest tests once
 npm run test:watch   # Vitest in watch mode
+npm run test -- src/test/example.test.ts   # Run a single test file
+npm run test -- -t "name of test"          # Filter by test name
 ```
 
 ### Backend (`backend/` directory)
@@ -55,7 +57,7 @@ Express + TypeScript REST API at `http://localhost:3001/api/v1`.
 - **Request flow**: `authenticate` middleware → `requireRole` middleware → controller → service → Supabase.
 - **Validation**: Zod schemas in `backend/src/schemas/` validate request bodies. `validate(schema)` middleware runs before controllers.
 - **PDF generation**: pdfkit writes to a buffer, uploads to Supabase Storage, returns a signed URL.
-- **Email**: Resend SDK in `backend/src/lib/mailer.ts`.
+- **Email**: `backend/src/lib/mailer.ts` uses **nodemailer + Gmail SMTP** (requires `GMAIL_USER` and `GMAIL_APP_PASSWORD` env vars — generate an App Password in the Google account security settings). The `resend` package is still installed but is no longer the active transport.
 - **Activity logging**: `backend/src/lib/activityLogger.ts` — call `logActivity()` in services for audit trail.
 
 ---

@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
-import type { Employee, EmployeeStatus, EmploymentType, PayFrequency, PayType, VisaType, I9Status, EmployeeDocument } from '../../types';
+import type { Employee, EmployeeStatus, EmploymentType, PayType, VisaType, I9Status, EmployeeDocument } from '../../types';
 import { useEmployees, useUploadEmployeeDocument } from '../../hooks/useEmployees';
 import { generateId } from '../../lib/idGenerators';
 import { formatDate } from '../../lib/utils';
@@ -20,17 +20,18 @@ interface EmployeeFormProps {
   onSubmit: (data: EmployeeFormData, pendingFiles: Map<string, File>) => void;
   onCancel: () => void;
   isEdit?: boolean;
+  isPending?: boolean;
 }
 
 const defaultForm: EmployeeFormData = {
   firstName: '', lastName: '', email: '', workEmail: '', phone: '', dob: '',
   address: { street: '', city: '', state: '', zip: '', country: 'USA' },
   department: '', jobTitle: '', employmentType: 'w2', startDate: '',
-  status: 'active', payRate: 0, payType: 'hourly', payFrequency: 'biweekly',
+  status: 'active', payRate: 0, payType: 'hourly',
   documents: [],
 };
 
-export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false }: EmployeeFormProps) {
+export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: EmployeeFormProps) {
   const { data: empData } = useEmployees({ limit: 500 });
   const employees = empData?.data ?? [];
   const uploadDoc = useUploadEmployeeDocument(initial?.id ?? '');
@@ -346,17 +347,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false }: Em
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Pay Frequency</Label>
-              <Select value={form.payFrequency} onValueChange={v => set('payFrequency', v as PayFrequency)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="weekly">Weekly</SelectItem>
-                  <SelectItem value="biweekly">Bi-Weekly</SelectItem>
-                  <SelectItem value="monthly">Monthly</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
               <Label>Payment Type</Label>
               <Select value={form.paymentType ?? ''} onValueChange={v => set('paymentType', v || undefined)}>
                 <SelectTrigger><SelectValue placeholder="Select payment type" /></SelectTrigger>
@@ -493,8 +483,14 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false }: Em
       </Tabs>
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">{isEdit ? 'Save Changes' : 'Create Employee'}</Button>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+        <Button
+          type="submit"
+          loading={isPending}
+          loadingText={isEdit ? 'Saving…' : 'Creating…'}
+        >
+          {isEdit ? 'Save Changes' : 'Create Employee'}
+        </Button>
       </div>
     </form>
   );
