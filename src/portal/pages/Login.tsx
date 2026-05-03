@@ -86,18 +86,27 @@ export default function Login() {
 
         {/* Centre copy */}
         <div className="relative z-10">
-          <p className="text-xs font-semibold tracking-[0.2em] uppercase text-cyan-400 mb-4">
+          <p className="text-[11px] font-semibold tracking-[0.22em] uppercase text-cyan-300/90 mb-5">
             Workforce Platform
           </p>
-          <h1 className="text-[2.6rem] font-black text-white leading-[1.15] mb-5">
-            Manage your<br />
-            <span style={{ color: '#32CDDC' }}>entire team</span><br />
-            from one place.
+          <h1 className="text-[2.5rem] font-semibold text-white leading-[1.1] tracking-tight mb-6">
+            Manage your <span style={{ color: '#32CDDC' }}>entire team</span> from one place.
           </h1>
-          <p className="text-sm text-slate-400 leading-relaxed max-w-[280px]">
+          <p className="text-[13px] text-slate-400 leading-relaxed max-w-[300px]">
             Employees, clients, timesheets, approvals, and invoicing — streamlined for staffing agencies.
           </p>
 
+          {/* Inline trust strip */}
+          <div className="mt-10 flex items-center gap-6 text-[11px] text-slate-500">
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+              SOC&nbsp;2 ready
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400" />
+              SSO via Supabase
+            </span>
+          </div>
         </div>
 
         {/* Footer */}
@@ -132,8 +141,8 @@ export default function Login() {
 
           {/* Heading */}
           <div className="mb-9">
-            <h2 className="text-[1.85rem] font-black text-gray-900 tracking-tight">Sign in</h2>
-            <p className="text-sm text-gray-400 mt-1">Access your Jobly workspace</p>
+            <h2 className="text-[1.65rem] font-semibold text-gray-900 tracking-tight">Sign in</h2>
+            <p className="text-[13px] text-gray-500 mt-1.5">Access your Jobly workspace</p>
           </div>
 
           {/* Form */}
@@ -200,12 +209,16 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Account switcher */}
-          <div className="mt-9">
-            <p className="text-[11px] text-gray-300 uppercase tracking-widest font-semibold text-center mb-4">
-              Quick access
-            </p>
-            <div className="flex gap-2 justify-center flex-wrap">
+          {/* Account switcher — demo helper, kept understated */}
+          <div className="mt-10">
+            <div className="flex items-center gap-3 mb-4">
+              <span className="h-px flex-1 bg-gray-100" />
+              <p className="text-[10px] text-gray-400 uppercase tracking-[0.16em] font-semibold">
+                Demo accounts
+              </p>
+              <span className="h-px flex-1 bg-gray-100" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
               {ACCOUNTS.map(a => {
                 const isActive = active === a.role;
                 return (
@@ -213,20 +226,24 @@ export default function Login() {
                     key={a.role}
                     type="button"
                     onClick={() => quickFill(a)}
-                    className="px-4 py-2 rounded-full text-xs font-semibold transition-all duration-150 hover:shadow-sm"
+                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-medium text-left transition-colors"
                     style={{
-                      background: isActive ? a.color : 'transparent',
-                      color: isActive ? '#fff' : a.color,
-                      border: `1.5px solid ${a.color}${isActive ? 'ff' : '40'}`,
+                      background: isActive ? `${a.color}10` : '#fafafa',
+                      color: isActive ? a.color : '#475569',
+                      border: `1px solid ${isActive ? `${a.color}55` : '#e5e7eb'}`,
                     }}
                   >
+                    <span
+                      className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                      style={{ background: a.color }}
+                    />
                     {a.role}
                   </button>
                 );
               })}
             </div>
-            <p className="text-[11px] text-gray-300 text-center mt-3">
-              Click to auto-fill credentials, then sign in
+            <p className="text-[11px] text-gray-400 text-center mt-3">
+              Click a role to auto-fill credentials, then sign in.
             </p>
           </div>
 

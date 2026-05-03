@@ -203,16 +203,11 @@ export function PortalSidebar() {
       </SidebarHeader>
 
       {/* ── Navigation ── */}
-      <SidebarContent className="px-3 py-4">
-        {/* Role chip */}
-        <div className="mb-4 px-1">
-          <span
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium text-gray-600 border border-gray-200 bg-gray-50"
-          >
-            <span className={`w-1.5 h-1.5 rounded-full bg-gradient-to-r ${roleGradient}`} />
-            {user?.name ?? 'User'}
-          </span>
-        </div>
+      <SidebarContent className="px-3 py-3">
+        {/* Section label */}
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+          Workspace
+        </p>
 
         <SidebarMenu className="space-y-0.5">
           {visibleItems.map((item, i) => {
@@ -229,18 +224,18 @@ export function PortalSidebar() {
                 <SidebarMenuButton
                   asChild
                   isActive={isActive}
-                  className="w-full rounded-xl"
+                  className="w-full rounded-lg"
                   style={{
-                    background: isActive ? 'rgba(64,105,255,0.08)' : 'transparent',
+                    background: isActive ? 'rgba(64,105,255,0.07)' : 'transparent',
                     borderLeft: isActive ? '2px solid #4069FF' : '2px solid transparent',
                   }}
                 >
                   <Link
                     to={item.path}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 ${
+                    className={`flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${
                       isActive
-                        ? 'text-[#4069FF] font-semibold portal-nav-active'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/70'
+                        ? 'text-[#4069FF] font-semibold'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/60'
                     }`}
                   >
                     <span className={isActive ? 'text-[#4069FF]' : 'text-gray-400'}>
@@ -256,28 +251,34 @@ export function PortalSidebar() {
       </SidebarContent>
 
       {/* ── Footer / Sign out ── */}
-      <SidebarFooter className="px-3 py-4 border-t border-gray-100">
-        {/* User info */}
-        <div className="px-3 py-2 mb-2">
+      <SidebarFooter className="px-3 py-3 border-t border-gray-100">
+        {/* User identity card */}
+        <div className="flex items-center gap-3 px-2 py-2 mb-1 rounded-lg">
           <div
-            className={`w-8 h-8 rounded-full bg-gradient-to-br ${roleGradient} flex items-center justify-center mb-2`}
+            className={`w-9 h-9 rounded-full bg-gradient-to-br ${roleGradient} flex items-center justify-center flex-shrink-0 ring-1 ring-white shadow-sm`}
           >
-            <span className="text-white text-xs font-bold">
+            <span className="text-white text-[11px] font-semibold tracking-wide">
               {user?.avatarInitials ?? '?'}
             </span>
           </div>
-          <p className="text-xs font-medium text-gray-700 truncate">{user?.name}</p>
-          <p className="text-xs text-gray-400 truncate">{user?.email}</p>
+          <div className="min-w-0 flex-1">
+            <p className="text-[13px] font-medium text-gray-900 truncate leading-tight">
+              {user?.name ?? 'User'}
+            </p>
+            <p className="text-[11px] text-gray-400 truncate capitalize mt-0.5">
+              {user?.role ?? 'member'} · {user?.email}
+            </p>
+          </div>
         </div>
 
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={logout}
-              className="w-full rounded-xl text-gray-500 hover:text-red-600 transition-all duration-200 cursor-pointer"
+              className="w-full rounded-lg text-gray-500 hover:text-red-600 transition-colors duration-150 cursor-pointer"
               style={{ background: 'transparent' }}
             >
-              <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm w-full hover:bg-red-50 transition-all duration-200">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] w-full hover:bg-red-50/70 transition-colors duration-150">
                 <LogOut className="h-4 w-4" />
                 Sign out
               </div>
