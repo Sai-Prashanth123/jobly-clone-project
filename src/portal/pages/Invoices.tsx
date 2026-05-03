@@ -1,24 +1,48 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { InvoiceForm } from '../components/invoices/InvoiceForm';
-import { useInvoices, useGenerateInvoice } from '../hooks/useInvoices';
+import { useInvoices, useGenerateInvoice, useUpdateInvoice } from '../hooks/useInvoices';
 import { useClients } from '../hooks/useClients';
+import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
-import type { Invoice } from '../types';
+import type { Invoice, InvoiceStatus } from '../types';
 
 export default function Invoices() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data, isLoading } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
   const generateInvoice = useGenerateInvoice();
   const [showForm, setShowForm] = useState(false);
+  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
+  const updateInvoice = useUpdateInvoice(editInvoice?.id ?? '');
+  const canEdit = user?.role === 'admin' || user?.role === 'finance';
+
+  // Local edit form state
+  const [editStatus, setEditStatus] = useState<InvoiceStatus>('draft');
+  const [editPaidAt, setEditPaidAt] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editTaxRate, setEditTaxRate] = useState(0);
+
+  // Sync the edit dialog state from the selected invoice each time it opens.
+  useEffect(() => {
+    if (!editInvoice) return;
+    setEditStatus(editInvoice.status);
+    setEditPaidAt(editInvoice.paidAt?.slice(0, 10) ?? '');
+    setEditNotes(editInvoice.notes ?? '');
+    setEditTaxRate(editInvoice.taxRate ?? 0);
+  }, [editInvoice]);
 
   const invoices = data?.data ?? [];
   const clients = clientsData?.data ?? [];
@@ -75,6 +99,22 @@ export default function Invoices() {
       render: i => <StatusBadge status={i.status} />,
       getValue: i => i.status,
     },
+    ...(canEdit ? [{
+      key: 'actions',
+      header: '',
+      getValue: () => '',
+      render: (i: Invoice) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+          onClick={(e) => { e.stopPropagation(); setEditInvoice(i); }}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+      ),
+    }] : []),
   ];
 
   return (
@@ -132,6 +172,79 @@ export default function Invoices() {
             }}
             onCancel={() => setShowForm(false)}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editInvoice} onOpenChange={(open) => { if (!open) setEditInvoice(null); }}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Invoice {editInvoice?.invoiceNumber}</DialogTitle>
+            <DialogDescription>
+              Line items and amounts are locked once an invoice is issued. You can update status, paid-at date, notes, and tax rate.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={editStatus} onValueChange={(v) => setEditStatus(v as InvoiceStatus)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="sent">Sent</SelectItem>
+                  <SelectItem value="paid">Paid</SelectItem>
+                  <SelectItem value="overdue">Overdue</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editStatus === 'paid' && (
+              <div className="space-y-2">
+                <Label>Paid At</Label>
+                <Input type="date" value={editPaidAt} onChange={(e) => setEditPaidAt(e.target.value)} />
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>Tax Rate (%)</Label>
+              <Input
+                type="number" min={0} max={100} step={0.01}
+                value={editTaxRate}
+                onChange={(e) => setEditTaxRate(parseFloat(e.target.value) || 0)}
+              />
+              <p className="text-xs text-muted-foreground">Updating the rate recalculates the total on save.</p>
+            </div>
+            <div className="space-y-2">
+              <Label>Notes</Label>
+              <Textarea
+                rows={3}
+                value={editNotes}
+                onChange={(e) => setEditNotes(e.target.value)}
+                placeholder="Internal notes for this invoice…"
+              />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setEditInvoice(null)} disabled={updateInvoice.isPending}>Cancel</Button>
+            <Button
+              loading={updateInvoice.isPending}
+              loadingText="Saving…"
+              onClick={async () => {
+                if (!editInvoice) return;
+                try {
+                  await updateInvoice.mutateAsync({
+                    status: editStatus,
+                    paidAt: editStatus === 'paid' ? (editPaidAt || null) : null,
+                    notes: editNotes || null,
+                    taxRate: editTaxRate,
+                  });
+                  toast.success(`Invoice ${editInvoice.invoiceNumber} updated`);
+                  setEditInvoice(null);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error ?? 'Failed to update invoice');
+                }
+              }}
+            >
+              Save Changes
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
