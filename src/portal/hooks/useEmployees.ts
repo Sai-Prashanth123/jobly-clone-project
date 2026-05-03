@@ -170,6 +170,7 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.payRate !== undefined && { payRate: e.payRate }),
     ...(e.payType !== undefined && { payType: e.payType }),
     ...(e.workLocation !== undefined && { workLocation: e.workLocation }),
+    ...(e.ssn !== undefined && { ssn: e.ssn }),
     ...(e.paymentType !== undefined && { paymentType: e.paymentType }),
     ...(e.bankName !== undefined && { bankName: e.bankName }),
     ...(e.bankRoutingNumber !== undefined && { bankRoutingNumber: e.bankRoutingNumber }),
