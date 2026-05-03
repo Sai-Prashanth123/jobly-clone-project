@@ -95,10 +95,14 @@ export async function createTimesheet(input: CreateTimesheetInput) {
   return getTimesheet(ts.id);
 }
 
-export async function updateTimesheet(id: string, input: UpdateTimesheetInput) {
+export async function updateTimesheet(id: string, input: UpdateTimesheetInput, userRole?: string) {
   const ts = await getTimesheet(id);
 
-  if (!['draft', 'rejected'].includes(ts.status)) {
+  // Admin gets god-mode (can edit any status). Everyone else is bound by the
+  // status machine — once a timesheet is submitted/approved, only admin can
+  // silently rewrite hours. This trades audit safety for operational
+  // flexibility; document it clearly to any auditor.
+  if (userRole !== 'admin' && !['draft', 'rejected'].includes(ts.status)) {
     throw new ForbiddenError('Can only edit draft or rejected timesheets');
   }
 

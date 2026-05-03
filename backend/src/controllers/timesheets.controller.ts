@@ -33,7 +33,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.updateTimesheet(req.params.id, req.body as UpdateTimesheetInput);
+    const data = await svc.updateTimesheet(req.params.id, req.body as UpdateTimesheetInput, req.user?.role);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

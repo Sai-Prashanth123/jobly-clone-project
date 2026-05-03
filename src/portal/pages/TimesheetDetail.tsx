@@ -37,16 +37,20 @@ export default function TimesheetDetail() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOwner = user?.employeeId === timesheet?.employeeId;
-  const isPrivileged = user?.role === 'admin' || user?.role === 'operations';
+  const isAdmin = user?.role === 'admin';
+  const isOps = user?.role === 'operations';
   const editableStatus = timesheet?.status === 'draft' || timesheet?.status === 'rejected';
-  const canEdit = (isOwner || isPrivileged) && editableStatus;
+  // Admin can edit any status; ops + owner are bound to draft/rejected.
+  const canEdit = isAdmin || ((isOwner || isOps) && editableStatus);
   const lockReason = !timesheet
     ? null
-    : !editableStatus
-      ? `Locked — this timesheet is in "${timesheet.status.replace(/_/g, ' ')}" status. Edits are only allowed in draft or rejected status.`
-      : !isOwner && !isPrivileged
-        ? 'Read-only — only the timesheet owner, admin, or operations can edit hours.'
-        : null;
+    : isAdmin
+      ? null
+      : !editableStatus
+        ? `Locked — this timesheet is in "${timesheet.status.replace(/_/g, ' ')}" status. Edits are only allowed in draft or rejected status.`
+        : !isOwner && !isOps
+          ? 'Read-only — only the timesheet owner, admin, or operations can edit hours.'
+          : null;
 
   // Sync notes from loaded timesheet
   useEffect(() => {

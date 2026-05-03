@@ -136,9 +136,11 @@ export default function Timesheets() {
   const canEditAny = user?.role === 'admin' || user?.role === 'operations' || user?.role === 'employee';
 
   const isEditable = (t: Timesheet) => {
+    // Admin gets god-mode (all statuses). Others are bound by status machine.
+    if (user?.role === 'admin') return true;
     const editableStatus = t.status === 'draft' || t.status === 'rejected';
     if (!editableStatus) return false;
-    if (user?.role === 'admin' || user?.role === 'operations') return true;
+    if (user?.role === 'operations') return true;
     if (user?.role === 'employee') return t.employeeId === user.employeeId;
     return false;
   };
