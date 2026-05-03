@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
@@ -101,10 +101,12 @@ export default function Timesheets() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [showForm, setShowForm] = useState(false);
 
   const { data, isLoading } = useTimesheets({
     status: statusFilter !== 'all' ? statusFilter : undefined,
+    employeeId: employeeFilter !== 'all' ? employeeFilter : undefined,
     limit: 100,
   });
   const { data: employeesData } = useEmployees({ limit: 200 });
@@ -121,7 +123,25 @@ export default function Timesheets() {
   };
   const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
 
+  const timesheetsWithLookup = useMemo(
+    () => timesheets.map(t => ({
+      ...t,
+      employeeName: getEmpName(t.employeeId),
+      clientName: getClientName(t.clientId),
+    })),
+    [timesheets, employees, clients],
+  );
+
   const canCreate = user?.role === 'employee' || user?.role === 'admin' || user?.role === 'operations';
+  const canEditAny = user?.role === 'admin' || user?.role === 'operations' || user?.role === 'employee';
+
+  const isEditable = (t: Timesheet) => {
+    const editableStatus = t.status === 'draft' || t.status === 'rejected';
+    if (!editableStatus) return false;
+    if (user?.role === 'admin' || user?.role === 'operations') return true;
+    if (user?.role === 'employee') return t.employeeId === user.employeeId;
+    return false;
+  };
 
   const columns: Column<Timesheet>[] = [
     {
@@ -168,6 +188,24 @@ export default function Timesheets() {
       render: t => <StatusBadge status={t.status} />,
       getValue: t => t.status,
     },
+    ...(canEditAny ? [{
+      key: 'actions',
+      header: '',
+      getValue: () => '',
+      render: (t: Timesheet) => isEditable(t) ? (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+          onClick={(e) => { e.stopPropagation(); navigate(`/portal/timesheets/${t.id}`); }}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+      ) : (
+        <span className="text-xs text-muted-foreground italic">Locked</span>
+      ),
+    }] : []),
   ];
 
   return (
@@ -191,28 +229,45 @@ export default function Timesheets() {
         </div>
       ) : (
         <DataTable
-          data={timesheets}
-          columns={columns}
-          searchPlaceholder="Search timesheets..."
-          searchKeys={['weekStartDate']}
+          data={timesheetsWithLookup}
+          columns={columns as Column<typeof timesheetsWithLookup[number]>[]}
+          searchPlaceholder={user?.role === 'employee' ? 'Search by client or week…' : 'Search by employee, client, or week…'}
+          searchKeys={user?.role === 'employee' ? ['clientName', 'weekStartDate'] : ['employeeName', 'clientName', 'weekStartDate']}
           getRowKey={t => t.id}
           onRowClick={t => navigate(`/portal/timesheets/${t.id}`)}
           emptyTitle="No timesheets found"
           exportFilename="timesheets"
           filterNode={
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="draft">Draft</SelectItem>
-                <SelectItem value="submitted">Submitted</SelectItem>
-                <SelectItem value="manager_approved">Mgr Approved</SelectItem>
-                <SelectItem value="client_approved">Client Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {user?.role !== 'employee' && (
+                <Select value={employeeFilter} onValueChange={setEmployeeFilter}>
+                  <SelectTrigger className="w-full sm:w-56">
+                    <SelectValue placeholder="Filter by employee" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Employees</SelectItem>
+                    {employees.map(e => (
+                      <SelectItem key={e.id} value={e.id}>
+                        {e.firstName} {e.lastName}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-44">
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="draft">Draft</SelectItem>
+                  <SelectItem value="submitted">Submitted</SelectItem>
+                  <SelectItem value="manager_approved">Mgr Approved</SelectItem>
+                  <SelectItem value="client_approved">Client Approved</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           }
         />
       )}

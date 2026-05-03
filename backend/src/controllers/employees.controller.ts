@@ -20,8 +20,31 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.createEmployee(req.body as CreateEmployeeInput, req.user?.id);
-    res.status(201).json({ success: true, data });
+    const result = await svc.createEmployee(req.body as CreateEmployeeInput, req.user?.id);
+    // Pull off the internal _credentials channel before responding so we can
+    // surface email/login status to HR without leaking the temp password.
+    const { _credentials, ...data } = result as any;
+    res.status(201).json({
+      success: true,
+      data,
+      welcomeEmailSent: _credentials?.emailSent ?? false,
+      warning: _credentials?.warning,
+    });
+  } catch (err) { next(err); }
+}
+
+export async function resendCredentials(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await svc.resendCredentials(req.params.id, req.user?.id);
+    res.json({
+      success: true,
+      welcomeEmailSent: result.emailSent,
+      warning: result.warning,
+      // Include the temp password ONLY when the email failed, so HR can copy it
+      // and pass it to the user out-of-band (no point hiding it — they need it).
+      tempPassword: result.emailSent ? undefined : result.tempPassword,
+      loginEmail: result.loginEmail,
+    });
   } catch (err) { next(err); }
 }
 

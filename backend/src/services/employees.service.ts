@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
-import { sendWelcomeEmail } from '../lib/mailer';
+import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
 
@@ -61,11 +61,20 @@ export async function getEmployee(id: string) {
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
-async function issueCredentials(empId: string, emp: any, input: CreateEmployeeInput) {
+export interface CredentialsResult {
+  credentialsReady: boolean;
+  emailSent: boolean;
+  warning?: string;        // operator-friendly message
+  loginEmail: string;
+  tempPassword?: string;   // only when freshly issued
+}
+
+async function issueCredentials(empId: string, emp: any, input: CreateEmployeeInput): Promise<CredentialsResult> {
   // workEmail = portal login credential; email = personal email to receive credentials
   const portalLoginEmail = input.workEmail ?? input.email;
   const tempPassword = 'Jobly@' + Math.random().toString(36).slice(2, 8).toUpperCase();
   let credentialsReady = false;
+  let credentialsError: any = null;
 
   try {
     // First check portal_users by email — this is an indexed lookup and
@@ -115,12 +124,28 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       }
     }
   } catch (err) {
+    credentialsError = err;
     console.error('[issueCredentials] auth setup failed for', portalLoginEmail, err);
   }
 
   if (!credentialsReady) {
     console.error('[mailer] skipping welcome email — credentials were not set for', portalLoginEmail);
-    return;
+    return {
+      credentialsReady: false,
+      emailSent: false,
+      warning: `Could not create login for ${portalLoginEmail}: ${(credentialsError as any)?.message ?? 'auth setup failed'}`,
+      loginEmail: portalLoginEmail,
+    };
+  }
+
+  if (!mailerConfigured) {
+    return {
+      credentialsReady: true,
+      emailSent: false,
+      warning: 'Login was created but the welcome email was not sent: mailer is not configured (GMAIL_USER / GMAIL_APP_PASSWORD missing on the server). Share these credentials manually.',
+      loginEmail: portalLoginEmail,
+      tempPassword,
+    };
   }
 
   try {
@@ -140,8 +165,16 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       tempPassword,
     });
     console.log('[mailer] credentials email sent to', input.email, '(login:', portalLoginEmail, ')');
-  } catch (err) {
+    return { credentialsReady: true, emailSent: true, loginEmail: portalLoginEmail };
+  } catch (err: any) {
     console.error('[mailer] credentials email failed for', input.email, err);
+    return {
+      credentialsReady: true,
+      emailSent: false,
+      warning: `Login was created but the welcome email could not be sent (${err?.code ?? ''} ${err?.message ?? 'send failed'}). Share these credentials manually.`,
+      loginEmail: portalLoginEmail,
+      tempPassword,
+    };
   }
 }
 
@@ -164,9 +197,9 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
       existingEmp.deleted_at = null;
     }
     // Re-issue new login credentials and send welcome email
-    await issueCredentials(existingEmp.id, existingEmp, input);
+    const credsResult = await issueCredentials(existingEmp.id, existingEmp, input);
     logActivity(actorId ?? null, 'updated', 'employee', existingEmp.id, existingEmp.display_id ?? input.email);
-    return serializeEmployee(existingEmp);
+    return { ...serializeEmployee(existingEmp), _credentials: credsResult };
   }
 
   const { data: emp, error } = await supabaseAdmin
@@ -209,8 +242,9 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
 
   logActivity(actorId ?? null, 'created', 'employee', emp.id, emp.display_id ?? `${input.firstName} ${input.lastName}`);
 
-  // Issue credentials and send welcome email
-  await issueCredentials(emp.id, emp, input);
+  // Issue credentials and send welcome email — capture status so the controller
+  // can surface email failures back to the HR user instead of silently dropping them.
+  const credsResult = await issueCredentials(emp.id, emp, input);
 
   // Notify HR about new onboarding employee (fire-and-forget)
   try {
@@ -232,7 +266,59 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     console.error('[employees.service] onboarding notification failed', err);
   }
 
-  return serializeEmployee(emp);
+  return { ...serializeEmployee(emp), _credentials: credsResult };
+}
+
+// ── resend credentials ───────────────────────────────────────────────────────
+// Lets HR re-trigger the welcome email (and rotate the temp password) without
+// having to delete/recreate the employee.
+export async function resendCredentials(employeeId: string, actorId?: string): Promise<CredentialsResult> {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees')
+    .select('*')
+    .eq('id', employeeId)
+    .is('deleted_at', null)
+    .single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+
+  // Build a CreateEmployeeInput-shaped object from the stored row to reuse
+  // issueCredentials. The fields not strictly needed for the email are set to
+  // safe defaults — issueCredentials only reads the email/name/work fields.
+  const input: CreateEmployeeInput = {
+    firstName: emp.first_name,
+    lastName: emp.last_name,
+    email: emp.email,
+    workEmail: emp.work_email ?? undefined,
+    phone: emp.phone ?? '',
+    dob: emp.dob ?? '',
+    address: {
+      street: emp.address_street ?? '', city: emp.address_city ?? '',
+      state: emp.address_state ?? '', zip: emp.address_zip ?? '',
+      country: emp.address_country ?? 'US',
+    },
+    department: emp.department ?? '',
+    jobTitle: emp.job_title ?? '',
+    employmentType: emp.employment_type,
+    startDate: emp.start_date,
+    status: emp.status,
+    visaType: emp.visa_type,
+    visaExpiry: emp.visa_expiry ?? '',
+    i9Status: emp.i9_status,
+    payRate: Number(emp.pay_rate),
+    payType: emp.pay_type,
+    workLocation: emp.work_location ?? null,
+    ssn: emp.ssn ?? '',
+    paymentType: emp.payment_type ?? null,
+    bankName: emp.bank_name ?? null,
+    bankRoutingNumber: emp.bank_routing_number ?? null,
+    bankAccountNumber: emp.bank_account_number ?? null,
+    taxFormType: emp.tax_form_type ?? null,
+    reportingManagerId: emp.reporting_manager_id ?? null,
+  };
+
+  const result = await issueCredentials(emp.id, emp, input);
+  logActivity(actorId ?? null, 'updated', 'employee', emp.id, emp.display_id ?? `${emp.first_name} ${emp.last_name}`, { event: 'resent_credentials' });
+  return result;
 }
 
 // ── update ───────────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -33,6 +33,15 @@ export default function Assignments() {
     return e ? `${e.firstName} ${e.lastName}` : id.slice(0, 8);
   };
   const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
+
+  const assignmentsWithLookup = useMemo(
+    () => assignments.map(a => ({
+      ...a,
+      clientName: getClientName(a.clientId),
+      employeeName: getEmpName(a.employeeId),
+    })),
+    [assignments, clients, employees],
+  );
 
   const canCreate = user?.role === 'admin' || user?.role === 'operations';
 
@@ -98,10 +107,10 @@ export default function Assignments() {
         </div>
       ) : (
         <DataTable
-          data={assignments}
-          columns={columns}
-          searchPlaceholder="Search by project, role..."
-          searchKeys={['projectName', 'role']}
+          data={assignmentsWithLookup}
+          columns={columns as Column<typeof assignmentsWithLookup[number]>[]}
+          searchPlaceholder="Search by employee, client, project, or role…"
+          searchKeys={['employeeName', 'clientName', 'projectName', 'role']}
           getRowKey={a => a.id}
           onRowClick={a => navigate(`/portal/assignments/${a.id}`)}
           emptyTitle="No assignments found"

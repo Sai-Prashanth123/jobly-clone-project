@@ -3,12 +3,12 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Edit, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { EmployeeForm } from '../components/employees/EmployeeForm';
-import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees } from '../hooks/useEmployees';
+import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials } from '../hooks/useEmployees';
 import { useAssignments } from '../hooks/useAssignments';
 import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
@@ -23,6 +23,7 @@ export default function EmployeeDetail() {
   const { data: allEmployeesData } = useEmployees({ limit: 500 });
   const updateEmployee = useUpdateEmployee(id!);
   const deleteEmployee = useDeleteEmployee();
+  const resendCreds = useResendEmployeeCredentials();
 
   const { user } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
@@ -94,6 +95,32 @@ export default function EmployeeDetail() {
           )}
           {(user?.role === 'admin' || user?.role === 'hr') && (
             <>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={resendCreds.isPending}
+                onClick={async () => {
+                  try {
+                    const r = await resendCreds.mutateAsync(employee.id);
+                    if (r.welcomeEmailSent) {
+                      toast.success(`Welcome email re-sent to ${employee.email}.`);
+                    } else if (r.tempPassword) {
+                      toast.warning(
+                        `${r.warning ?? 'Email could not be delivered.'} Login: ${r.loginEmail} · Temp password: ${r.tempPassword}`,
+                        { duration: 30000 },
+                      );
+                    } else {
+                      toast.error(r.warning ?? 'Resend failed.');
+                    }
+                  } catch (err: any) {
+                    toast.error(err?.response?.data?.error ?? 'Failed to resend credentials');
+                  }
+                }}
+              >
+                {resendCreds.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                Resend Welcome Email
+              </Button>
               <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
                 <Edit className="h-4 w-4" />
                 Edit

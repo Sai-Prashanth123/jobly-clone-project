@@ -1,6 +1,7 @@
 import { app } from './app';
 import { env } from './config/env';
 import { supabaseAdmin } from './config/supabase';
+import { verifyMailer } from './lib/mailer';
 
 async function startServer(): Promise<void> {
   // Test Supabase connection
@@ -15,6 +16,10 @@ async function startServer(): Promise<void> {
     console.error('❌ Failed to connect to Supabase:', err);
     process.exit(1);
   }
+
+  // Verify mailer at boot so SMTP misconfig is visible in logs immediately
+  // (otherwise auth errors only surface — and get swallowed — at send time).
+  await verifyMailer();
 
   const port = parseInt(env.PORT, 10);
   app.listen(port, () => {

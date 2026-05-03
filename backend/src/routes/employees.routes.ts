@@ -17,6 +17,7 @@ router.get('/export', requireRole('admin', 'hr', 'operations'), ctrl.exportEmplo
 router.get('/:id', requireRole('admin','hr','operations','finance','employee'), ctrl.getOne);
 router.put('/:id', requireRole('admin','hr'), validateBody(updateEmployeeSchema), ctrl.update);
 router.delete('/:id', requireRole('admin'), ctrl.remove);
+router.post('/:id/resend-credentials', requireRole('admin','hr'), ctrl.resendCredentials);
 
 router.get('/:id/assignments', requireRole('admin','hr','operations'), ctrl.assignments);
 router.get('/:id/timesheets', requireRole('admin','hr','operations'), ctrl.timesheets);

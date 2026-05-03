@@ -115,7 +115,8 @@ export default function Employees() {
             <EmployeeForm
               onSubmit={async (data, pendingFiles) => {
                 try {
-                  const emp = await createEmployee.mutateAsync(data as Partial<Employee>);
+                  const result = await createEmployee.mutateAsync(data as Partial<Employee>);
+                  const emp = result.employee;
                   if (pendingFiles.size > 0) {
                     const docMeta = new Map(data.documents.map(d => [d.id, d]));
                     await Promise.all(
@@ -131,7 +132,15 @@ export default function Employees() {
                       })
                     );
                   }
-                  toast.success(`Employee ${emp.displayId ?? emp.id} created successfully`);
+                  if (result.welcomeEmailSent) {
+                    toast.success(`Employee ${emp.displayId ?? emp.id} created — welcome email sent.`);
+                  } else {
+                    toast.warning(
+                      result.warning
+                        ?? `Employee ${emp.displayId ?? emp.id} created, but the welcome email was not delivered. Use the Resend Welcome Email button on the employee detail page.`,
+                      { duration: 12000 },
+                    );
+                  }
                   setShowForm(false);
                 } catch (err: any) {
                   toast.error(err?.response?.data?.error ?? 'Failed to create employee');

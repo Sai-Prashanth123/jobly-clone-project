@@ -49,9 +49,11 @@ export async function getEmployeeUtilization() {
 }
 
 export async function getVisaExpiry(daysAhead = 90) {
-  // UTC-safe: build cutoff by adding days to today's UTC date string
+  // UTC-safe: build cutoff by adding days to today's UTC date string. We
+  // intentionally do NOT filter by `>= today` so that already-expired visas
+  // remain visible — admins need to see them so the expired authorization
+  // gets followed up on, not hidden.
   const now = new Date();
-  const todayStr = now.toISOString().split('T')[0];
   const cutoffDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + daysAhead));
   const cutoffStr = cutoffDate.toISOString().split('T')[0];
 
@@ -59,7 +61,6 @@ export async function getVisaExpiry(daysAhead = 90) {
     .from('employees')
     .select('id, first_name, last_name, email, visa_type, visa_expiry, i9_status')
     .not('visa_expiry', 'is', null)
-    .gte('visa_expiry', todayStr)
     .lte('visa_expiry', cutoffStr)
     .eq('status', 'active')
     .order('visa_expiry', { ascending: true });

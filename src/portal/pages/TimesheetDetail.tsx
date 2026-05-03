@@ -1,7 +1,8 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeft, Trash2, Loader2, Check, AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { ArrowLeft, Trash2, Loader2, Check, AlertCircle, Pencil, Lock } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
@@ -36,7 +37,15 @@ export default function TimesheetDetail() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOwner = user?.employeeId === timesheet?.employeeId;
-  const canEdit = isOwner && (timesheet?.status === 'draft' || timesheet?.status === 'rejected');
+  const editableStatus = timesheet?.status === 'draft' || timesheet?.status === 'rejected';
+  const canEdit = isOwner && editableStatus;
+  const lockReason = !timesheet
+    ? null
+    : !isOwner
+      ? 'Read-only — only the timesheet owner can edit hours.'
+      : !editableStatus
+        ? `Locked — this timesheet is in "${timesheet.status.replace(/_/g, ' ')}" status. Edits are only allowed in draft or rejected status.`
+        : null;
 
   // Sync notes from loaded timesheet
   useEffect(() => {
@@ -167,14 +176,34 @@ export default function TimesheetDetail() {
         </Card>
       )}
 
+      {canEdit && (
+        <Alert className="border-emerald-200 bg-emerald-50">
+          <Pencil className="h-4 w-4 text-emerald-600" />
+          <AlertTitle className="text-emerald-800">Edit mode enabled</AlertTitle>
+          <AlertDescription className="text-emerald-700">
+            Type hours into the grid below and add notes — changes are saved automatically.
+          </AlertDescription>
+        </Alert>
+      )}
+      {lockReason && (
+        <Alert className="border-amber-200 bg-amber-50">
+          <Lock className="h-4 w-4 text-amber-600" />
+          <AlertTitle className="text-amber-800">Timesheet locked</AlertTitle>
+          <AlertDescription className="text-amber-700">{lockReason}</AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Weekly Hours Entry</CardTitle>
             {canEdit && (
               <div className="flex items-center gap-1.5 text-xs">
+                {saveState === 'idle' && (
+                  <span className="text-emerald-600 font-medium">● Editing</span>
+                )}
                 {saveState === 'saving' && (
-                  <><Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" /><span className="text-gray-400">Saving...</span></>
+                  <><Loader2 className="h-3.5 w-3.5 animate-spin text-gray-400" /><span className="text-gray-400">Saving…</span></>
                 )}
                 {saveState === 'saved' && (
                   <><Check className="h-3.5 w-3.5 text-emerald-500" /><span className="text-emerald-600">Saved</span></>

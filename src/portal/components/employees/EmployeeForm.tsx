@@ -58,7 +58,9 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
   // Maps each field to which tab it lives on
   const FIELD_TAB: Record<string, string> = {
     firstName: 'personal', lastName: 'personal', email: 'personal', workEmail: 'personal',
+    dob: 'personal', addrStreet: 'personal', addrCity: 'personal', addrState: 'personal', addrZip: 'personal',
     startDate: 'employment',
+    visaType: 'immigration', visaExpiry: 'immigration', i9Status: 'immigration', ssn: 'immigration',
     payRate: 'payroll',
   };
 
@@ -67,7 +69,16 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
     if (!form.firstName.trim()) errs.firstName = 'First name is required';
     if (!form.lastName.trim()) errs.lastName = 'Last name is required';
     if (!form.email.trim()) errs.email = 'Email is required';
+    if (!form.dob) errs.dob = 'Date of birth is required';
+    if (!form.address.street.trim()) errs.addrStreet = 'Street address is required';
+    if (!form.address.city.trim()) errs.addrCity = 'City is required';
+    if (!form.address.state.trim()) errs.addrState = 'State is required';
+    if (!form.address.zip.trim()) errs.addrZip = 'ZIP code is required';
     if (!form.startDate) errs.startDate = 'Start date (Joining Date) is required';
+    if (!form.visaType) errs.visaType = 'Visa type is required';
+    if (!form.visaExpiry) errs.visaExpiry = 'Work authorization expiry is required';
+    if (!form.i9Status) errs.i9Status = 'I-9 status is required';
+    if (!form.ssn || !/^\d{4}$/.test(form.ssn)) errs.ssn = 'SSN must be exactly 4 digits';
     if (form.payRate <= 0) errs.payRate = 'Pay rate must be greater than 0';
     setErrors(errs);
 
@@ -136,7 +147,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
         <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
           <TabsTrigger value="personal" className="relative">
             Personal
-            {(errors.firstName || errors.lastName || errors.email) && (
+            {(errors.firstName || errors.lastName || errors.email || errors.dob || errors.addrStreet || errors.addrCity || errors.addrState || errors.addrZip) && (
               <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
             )}
           </TabsTrigger>
@@ -144,7 +155,12 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
             Employment
             {errors.startDate && <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />}
           </TabsTrigger>
-          <TabsTrigger value="immigration">Immigration</TabsTrigger>
+          <TabsTrigger value="immigration" className="relative">
+            Immigration
+            {(errors.visaType || errors.visaExpiry || errors.i9Status || errors.ssn) && (
+              <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />
+            )}
+          </TabsTrigger>
           <TabsTrigger value="payroll" className="relative">
             Payroll
             {errors.payRate && <span className="absolute top-1 right-1 h-2 w-2 rounded-full bg-red-500" />}
@@ -185,24 +201,29 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
               <Input value={form.phone} onChange={e => set('phone', e.target.value)} />
             </div>
             <div className="space-y-2">
-              <Label>Date of Birth</Label>
-              <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
+              <Label>Date of Birth *</Label>
+              <Input type="date" value={form.dob} onChange={e => { set('dob', e.target.value); setErrors(p => ({ ...p, dob: '' })); }} />
+              {errors.dob && <p className="text-xs text-red-500">{errors.dob}</p>}
             </div>
             <div className="col-span-1 sm:col-span-2 space-y-2">
-              <Label>Street Address</Label>
-              <Input value={form.address.street} onChange={e => setAddr('street', e.target.value)} />
+              <Label>Street Address *</Label>
+              <Input value={form.address.street} onChange={e => { setAddr('street', e.target.value); setErrors(p => ({ ...p, addrStreet: '' })); }} />
+              {errors.addrStreet && <p className="text-xs text-red-500">{errors.addrStreet}</p>}
             </div>
             <div className="space-y-2">
-              <Label>City</Label>
-              <Input value={form.address.city} onChange={e => setAddr('city', e.target.value)} />
+              <Label>City *</Label>
+              <Input value={form.address.city} onChange={e => { setAddr('city', e.target.value); setErrors(p => ({ ...p, addrCity: '' })); }} />
+              {errors.addrCity && <p className="text-xs text-red-500">{errors.addrCity}</p>}
             </div>
             <div className="space-y-2">
-              <Label>State</Label>
-              <Input value={form.address.state} onChange={e => setAddr('state', e.target.value)} />
+              <Label>State *</Label>
+              <Input value={form.address.state} onChange={e => { setAddr('state', e.target.value); setErrors(p => ({ ...p, addrState: '' })); }} />
+              {errors.addrState && <p className="text-xs text-red-500">{errors.addrState}</p>}
             </div>
             <div className="space-y-2">
-              <Label>ZIP Code</Label>
-              <Input value={form.address.zip} onChange={e => setAddr('zip', e.target.value)} />
+              <Label>ZIP Code *</Label>
+              <Input value={form.address.zip} onChange={e => { setAddr('zip', e.target.value); setErrors(p => ({ ...p, addrZip: '' })); }} />
+              {errors.addrZip && <p className="text-xs text-red-500">{errors.addrZip}</p>}
             </div>
             <div className="space-y-2">
               <Label>Country</Label>
@@ -282,7 +303,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
         <TabsContent value="immigration">
           <Card><CardContent className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Visa Type</Label>
+              <Label>Visa Type *</Label>
               <Select value={form.visaType ?? ''} onValueChange={v => set('visaType', v as VisaType)}>
                 <SelectTrigger><SelectValue placeholder="Select visa type" /></SelectTrigger>
                 <SelectContent>
@@ -296,13 +317,15 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.visaType && <p className="text-xs text-red-500">{errors.visaType}</p>}
             </div>
             <div className="space-y-2">
-              <Label>Work Authorization Expiry</Label>
-              <Input type="date" value={form.visaExpiry ?? ''} onChange={e => set('visaExpiry', e.target.value)} />
+              <Label>Work Authorization Expiry *</Label>
+              <Input type="date" value={form.visaExpiry ?? ''} onChange={e => { set('visaExpiry', e.target.value); setErrors(p => ({ ...p, visaExpiry: '' })); }} />
+              {errors.visaExpiry && <p className="text-xs text-red-500">{errors.visaExpiry}</p>}
             </div>
             <div className="space-y-2">
-              <Label>I-9 Status</Label>
+              <Label>I-9 Status *</Label>
               <Select value={form.i9Status ?? ''} onValueChange={v => set('i9Status', v as I9Status)}>
                 <SelectTrigger><SelectValue placeholder="Select I-9 status" /></SelectTrigger>
                 <SelectContent>
@@ -311,15 +334,17 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
                   <SelectItem value="expired">Expired</SelectItem>
                 </SelectContent>
               </Select>
+              {errors.i9Status && <p className="text-xs text-red-500">{errors.i9Status}</p>}
             </div>
             <div className="space-y-2">
-              <Label>SSN (Last 4 Digits)</Label>
+              <Label>SSN (Last 4 Digits) *</Label>
               <Input
                 value={form.ssn ?? ''}
-                onChange={e => set('ssn', e.target.value.replace(/\D/g, '').slice(0, 4))}
+                onChange={e => { set('ssn', e.target.value.replace(/\D/g, '').slice(0, 4)); setErrors(p => ({ ...p, ssn: '' })); }}
                 placeholder="XXXX"
                 maxLength={4}
               />
+              {errors.ssn && <p className="text-xs text-red-500">{errors.ssn}</p>}
             </div>
           </CardContent></Card>
         </TabsContent>

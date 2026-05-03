@@ -87,9 +87,27 @@ export function useCreateEmployee() {
   return useMutation({
     mutationFn: async (body: Partial<Employee>) => {
       const { data } = await apiClient.post('/employees', toSnake(body));
-      return mapEmployee(data.data);
+      return {
+        employee: mapEmployee(data.data),
+        welcomeEmailSent: data.welcomeEmailSent ?? false,
+        warning: data.warning as string | undefined,
+      };
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+  });
+}
+
+export function useResendEmployeeCredentials() {
+  return useMutation({
+    mutationFn: async (employeeId: string) => {
+      const { data } = await apiClient.post(`/employees/${employeeId}/resend-credentials`);
+      return {
+        welcomeEmailSent: data.welcomeEmailSent as boolean,
+        warning: data.warning as string | undefined,
+        tempPassword: data.tempPassword as string | undefined,
+        loginEmail: data.loginEmail as string,
+      };
+    },
   });
 }
 

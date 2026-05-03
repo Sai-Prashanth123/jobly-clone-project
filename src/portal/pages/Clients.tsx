@@ -2,22 +2,27 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ClientForm } from '../components/clients/ClientForm';
-import { useClients, useCreateClient } from '../hooks/useClients';
+import { useClients, useCreateClient, useUpdateClient } from '../hooks/useClients';
+import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { formatDate, formatCurrency } from '../lib/utils';
 import type { Client } from '../types';
 
 export default function PortalClients() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data, isLoading } = useClients({ limit: 100 });
   const createClient = useCreateClient();
   const [showForm, setShowForm] = useState(false);
+  const [editClient, setEditClient] = useState<Client | null>(null);
+  const updateClient = useUpdateClient(editClient?.id ?? '');
+  const canEdit = user?.role === 'admin' || user?.role === 'operations';
 
   const clients = data?.data ?? [];
 
@@ -80,6 +85,22 @@ export default function PortalClients() {
       getValue: c => c.status,
       sortable: true,
     },
+    ...(canEdit ? [{
+      key: 'actions',
+      header: '',
+      getValue: () => '',
+      render: (c: Client) => (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+          onClick={(e) => { e.stopPropagation(); setEditClient(c); }}
+        >
+          <Pencil className="h-3.5 w-3.5" />
+          Edit
+        </Button>
+      ),
+    }] : []),
   ];
 
   return (
@@ -146,6 +167,32 @@ export default function PortalClients() {
             onCancel={() => setShowForm(false)}
             isPending={createClient.isPending}
           />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!editClient} onOpenChange={(open) => { if (!open) setEditClient(null); }}>
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Client {editClient ? `— ${editClient.displayId ?? editClient.id.slice(0, 8)}` : ''}</DialogTitle>
+            <DialogDescription className="sr-only">Update client information.</DialogDescription>
+          </DialogHeader>
+          {editClient && (
+            <ClientForm
+              initial={editClient}
+              isEdit
+              onSubmit={async (data) => {
+                try {
+                  await updateClient.mutateAsync(data as Partial<Client>);
+                  toast.success('Client updated successfully');
+                  setEditClient(null);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error ?? 'Failed to update client');
+                }
+              }}
+              onCancel={() => setEditClient(null)}
+              isPending={updateClient.isPending}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

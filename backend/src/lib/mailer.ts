@@ -2,16 +2,35 @@ import nodemailer from 'nodemailer';
 
 // Gmail SMTP — set GMAIL_USER and GMAIL_APP_PASSWORD in env
 // Generate an App Password at: myaccount.google.com → Security → 2-Step Verification → App passwords
+// nodemailer accepts the app password with or without spaces, but we strip them defensively.
+const GMAIL_USER = process.env.GMAIL_USER?.trim();
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
+
+export const mailerConfigured = !!(GMAIL_USER && GMAIL_APP_PASSWORD);
+
 const transporter = nodemailer.createTransport({
   service: 'gmail',
-  auth: {
-    user: process.env.GMAIL_USER,
-    pass: process.env.GMAIL_APP_PASSWORD,
-  },
+  auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
 });
 
-const FROM = process.env.GMAIL_USER ? `Jobly HR <${process.env.GMAIL_USER}>` : 'Jobly HR <noreply@jobly.com>';
+const FROM = GMAIL_USER ? `Jobly HR <${GMAIL_USER}>` : 'Jobly HR <noreply@jobly.com>';
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
+
+// Run once at boot so operators see immediately whether SMTP works.
+// Gmail returns auth errors as code "EAUTH"; transient network failures as "ETIMEDOUT".
+export async function verifyMailer(): Promise<void> {
+  if (!mailerConfigured) {
+    console.warn('[mailer] GMAIL_USER or GMAIL_APP_PASSWORD not set — welcome/invoice emails will be disabled. Set both on your host environment.');
+    return;
+  }
+  try {
+    await transporter.verify();
+    console.log(`[mailer] ✓ Gmail SMTP authenticated as ${GMAIL_USER}`);
+  } catch (err: any) {
+    console.error(`[mailer] ✗ Gmail SMTP verification FAILED: ${err?.code ?? ''} ${err?.message ?? err}`);
+    console.error('[mailer]   → Check that GMAIL_USER is the full address and GMAIL_APP_PASSWORD is a current App Password (not the regular Google password).');
+  }
+}
 
 export interface WelcomeEmailPayload {
   to: string;
@@ -75,8 +94,8 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
           <td style="padding:32px 40px;">
             <p style="margin:0 0 24px;color:#374151;font-size:15px;">Hi <strong>${firstName} ${lastName}</strong>,</p>
             <p style="margin:0 0 24px;color:#374151;font-size:14px;line-height:1.6;">
-              Welcome aboard! HR has added you to the Jobly Workforce Portal. Below are your onboarding details.
-              You will receive a separate email with a link to set your password and log in.
+              Welcome aboard! HR has added you to the Jobly Workforce Portal. Below are your onboarding details
+              and your temporary login credentials &mdash; please log in and change your password right away.
             </p>
 
             <!-- Details table -->

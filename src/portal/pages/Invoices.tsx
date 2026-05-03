@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -24,6 +24,11 @@ export default function Invoices() {
   const clients = clientsData?.data ?? [];
 
   const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
+
+  const invoicesWithLookup = useMemo(
+    () => invoices.map(i => ({ ...i, clientName: getClientName(i.clientId) })),
+    [invoices, clients],
+  );
 
   const totalOutstanding = invoices
     .filter(i => i.status === 'sent' || i.status === 'overdue')
@@ -91,10 +96,10 @@ export default function Invoices() {
         </div>
       ) : (
         <DataTable
-          data={invoices}
-          columns={columns}
-          searchPlaceholder="Search by invoice number..."
-          searchKeys={['invoiceNumber']}
+          data={invoicesWithLookup}
+          columns={columns as Column<typeof invoicesWithLookup[number]>[]}
+          searchPlaceholder="Search by invoice #, issue date, or client…"
+          searchKeys={['invoiceNumber', 'issueDate', 'clientName']}
           getRowKey={i => i.id}
           onRowClick={i => navigate(`/portal/invoices/${i.id}`)}
           emptyTitle="No invoices yet"
