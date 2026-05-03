@@ -37,14 +37,15 @@ export default function TimesheetDetail() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isOwner = user?.employeeId === timesheet?.employeeId;
+  const isPrivileged = user?.role === 'admin' || user?.role === 'operations';
   const editableStatus = timesheet?.status === 'draft' || timesheet?.status === 'rejected';
-  const canEdit = isOwner && editableStatus;
+  const canEdit = (isOwner || isPrivileged) && editableStatus;
   const lockReason = !timesheet
     ? null
-    : !isOwner
-      ? 'Read-only — only the timesheet owner can edit hours.'
-      : !editableStatus
-        ? `Locked — this timesheet is in "${timesheet.status.replace(/_/g, ' ')}" status. Edits are only allowed in draft or rejected status.`
+    : !editableStatus
+      ? `Locked — this timesheet is in "${timesheet.status.replace(/_/g, ' ')}" status. Edits are only allowed in draft or rejected status.`
+      : !isOwner && !isPrivileged
+        ? 'Read-only — only the timesheet owner, admin, or operations can edit hours.'
         : null;
 
   // Sync notes from loaded timesheet
