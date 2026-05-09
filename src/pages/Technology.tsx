@@ -16,7 +16,7 @@ const Technology = () => {
           <div className="row g-4">
             {['1.jpg','1b.jpg','1c.jpg','1d.jpg','1e.jpg','salesforce.png','1g.jpg','1f.jpg','1h.jpg','1i.jpg','1j.jpg'].map((f, i) => (
               <div key={i} className="col-lg-4 col-md-6 col-6">
-                <img src={`/assets/img/technologies/${f}`} alt="" className="img-fluid" />
+                <img src={`/assets/img/technologies/${f}`} alt="" className="img-fluid" loading="lazy" decoding="async" />
               </div>
             ))}
           </div>

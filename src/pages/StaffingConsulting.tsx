@@ -21,7 +21,7 @@ const StaffingConsulting = () => {
                 <h2>Staffing And Consulting</h2>
                 <p>Staffing and consulting services have a major role in the functioning of an organization. A small startup, SME or a large enterprise, you need staff. Hiring and recruitment being a huge process that involves lot of costs, some startups and SMEs may choose short-term workers whom we provide with for their specific projects and tasks. This delivers benefits of reducing costs, access to quality labor, and regulating organizational functions.</p>
                 <div className="media mb-40 mb-md-35 mb-sm-30 mb-xs-25">
-                  <img src="/assets/img/project-details/1b.png" alt="" />
+                  <img src="/assets/img/project-details/1b.png" alt="" loading="lazy" decoding="async" />
                 </div>
                 <p>Consulting comes with a different responsibility. As a consultant we offer a unique perspective to our clients to guide them on specific issues. The structure and tenure of this service may last up to six months or less or sometimes remain part-time.</p>
                 <p>Jobly offers a comprehensive range of IT consulting and staffing services. With our exclusive IT consulting and staffing services, we help our clients to effectively create, manage, optimize and scale up their business.</p>
@@ -31,7 +31,6 @@ const StaffingConsulting = () => {
                 <h5>We offer flexible staffing services:</h5>
                 <ul>
                   <li>Contract Staffing</li>
-                  <li>Contract-to-hire</li>
                   <li>Staffing</li>
                   <li>Direct Hire Staffing</li>
                 </ul>

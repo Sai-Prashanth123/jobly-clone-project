@@ -21,7 +21,7 @@ router.post('/:id/resend-credentials', requireRole('admin','hr'), ctrl.resendCre
 
 router.get('/:id/assignments', requireRole('admin','hr','operations'), ctrl.assignments);
 router.get('/:id/timesheets', requireRole('admin','hr','operations'), ctrl.timesheets);
-router.post('/:id/documents', requireRole('admin','hr'), upload.single('file'), ctrl.uploadDoc);
-router.delete('/:id/documents/:docId', requireRole('admin','hr'), ctrl.deleteDoc);
+router.post('/:id/documents', requireRole('admin','hr','employee'), upload.single('file'), ctrl.uploadDoc);
+router.delete('/:id/documents/:docId', requireRole('admin','hr','employee'), ctrl.deleteDoc);
 
 export default router;

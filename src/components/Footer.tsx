@@ -8,7 +8,7 @@ const Footer = () => (
         <div className="col-md-6 col-xl-3">
           <div className="single-footer-wid widget-description">
             <Link to="/" className="d-block mb-30 mb-xs-20">
-              <img src="/assets/img/logo/footer-logo-3.png" alt="Jobly Solutions" />
+              <img src="/assets/img/logo/footer-logo-3.png" alt="Jobly Solutions" loading="lazy" decoding="async" />
             </Link>
             <div className="description font-la color-white mb-40 mb-sm-30 mb-xs-25">
               <p>We genuinely have certainty that business elements develop and advance not just through the movement in their particular organizations additionally by designing a situation which consoles self-examination and enablement.</p>
@@ -33,7 +33,7 @@ const Footer = () => (
           <div className="single-footer-wid pl-xl-10 pl-50">
             <h4 className="wid-title mb-30 color-white">Services</h4>
             <ul>
-              <li><Link to="/career-guidance">Career Guidance</Link></li>
+              <li><Link to="/career-guidance">Consulting Services</Link></li>
               <li><Link to="/staffing-and-consulting">Staffing And Consulting</Link></li>
               <li><Link to="/software-training">Software Training</Link></li>
             </ul>

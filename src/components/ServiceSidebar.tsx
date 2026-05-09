@@ -13,7 +13,7 @@ const ServiceSidebar = ({ active, haveAnyImg }: ServiceSidebarProps) => {
         <div className="widget_categories">
           <ul>
             <li className={active === '/career-guidance' ? 'active' : ''}>
-              <Link to="/career-guidance">Career Guidance<i className="fas fa-long-arrow-alt-right"></i></Link>
+              <Link to="/career-guidance">Consulting Services<i className="fas fa-long-arrow-alt-right"></i></Link>
             </li>
             <li className={active === '/staffing-and-consulting' ? 'active' : ''}>
               <Link to="/staffing-and-consulting">Staffing And Consulting <i className="fas fa-long-arrow-alt-right"></i></Link>
@@ -27,7 +27,7 @@ const ServiceSidebar = ({ active, haveAnyImg }: ServiceSidebarProps) => {
 
       <div className="single-sidebar-widget have-any mb-40 pt-30 pr-30 pb-40 pl-30 pl-xs-20 pr-xs-20">
         <div className="media">
-          <img src={haveAnyImg} alt="" />
+          <img src={haveAnyImg} alt="" loading="lazy" decoding="async" />
         </div>
         <div className="have-any__item text-center" style={{ backgroundImage: 'url(/assets/img/services-details/have-any-bottom.png)' }}>
           <h4 className="wid-title mb-20 mb-xs-15 color-white text-capitalize">Get In Touch</h4>

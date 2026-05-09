@@ -233,8 +233,8 @@ export default function Timesheets() {
         <DataTable
           data={timesheetsWithLookup}
           columns={columns as Column<typeof timesheetsWithLookup[number]>[]}
-          searchPlaceholder={user?.role === 'employee' ? 'Search by client or week…' : 'Search by employee, client, or week…'}
-          searchKeys={user?.role === 'employee' ? ['clientName', 'weekStartDate'] : ['employeeName', 'clientName', 'weekStartDate']}
+          searchPlaceholder={user?.role === 'employee' ? 'Search by ID, client, week, status…' : 'Search by ID, employee, client, week, status…'}
+          searchKeys={user?.role === 'employee' ? ['displayId', 'clientName', 'weekStartDate', 'status'] : ['displayId', 'employeeName', 'clientName', 'weekStartDate', 'status']}
           getRowKey={t => t.id}
           onRowClick={t => navigate(`/portal/timesheets/${t.id}`)}
           emptyTitle="No timesheets found"

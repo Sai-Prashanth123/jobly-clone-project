@@ -107,13 +107,28 @@ export function DataTable<T>({
     return <ChevronDown className="h-3.5 w-3.5 text-blue-600" />;
   };
 
+  // Case-insensitive search across (a) the explicit searchKeys (covers hidden
+  // fields like email/industry that have no column), and (b) every column's
+  // getValue output — falling back to item[col.key] when getValue is absent —
+  // so any value the user sees in the table is searchable, regardless of casing.
   const filtered = query
-    ? data.filter(item =>
-        searchKeys.some(key => {
-          const val = item[key];
-          return String(val ?? '').toLowerCase().includes(query.toLowerCase());
-        })
-      )
+    ? (() => {
+        const q = query.toLowerCase().trim();
+        const matches = (val: unknown) => String(val ?? '').toLowerCase().includes(q);
+        return data.filter(item => {
+          for (const key of searchKeys) {
+            if (matches(item[key])) return true;
+          }
+          for (const col of columns) {
+            if (col.key === 'actions' || col.key === '__select__') continue;
+            const v = col.getValue
+              ? col.getValue(item)
+              : (item as Record<string, unknown>)[col.key];
+            if (matches(v)) return true;
+          }
+          return false;
+        });
+      })()
     : data;
 
   const sorted = sortKey && sortDir

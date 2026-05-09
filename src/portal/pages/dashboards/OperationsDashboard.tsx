@@ -33,11 +33,11 @@ export function OperationsDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold portal-gradient-text">Operations Dashboard</h1>
+        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Operations Dashboard</h1>
         <p className="text-sm text-gray-500 mt-1">Assignment & timesheet management</p>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard title="Active Assignments" value={activeAssignments.length} icon={<Briefcase className="h-5 w-5" />} variant="blue" />
         <StatCard title="Awaiting Approval" value={pendingTimesheets.length} icon={<Clock className="h-5 w-5" />} variant="orange"
           description="Submitted timesheets" />

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const servicesSub = [
-  { label: 'Career Guidance Service', path: '/career-guidance' },
+  { label: 'Consulting Services', path: '/career-guidance' },
   { label: 'Staffing And Consulting Services', path: '/staffing-and-consulting' },
   { label: 'Software Training', path: '/software-training' },
 ];

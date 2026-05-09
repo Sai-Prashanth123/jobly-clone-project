@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
-import type { Plugin } from "vite";
+import type { Plugin, ViteDevServer } from "vite";
 
 // Injects `var $ = jQuery = <imported jQuery>` into every vendor plugin file
 // that uses jQuery as a bare global (non-UMD style plugins like easing, active.js…)
@@ -9,9 +9,20 @@ function injectJQueryGlobal(): Plugin {
   // Files that handle their own deps (proper UMD/CJS) or have no jQuery dep
   // slick is a proper UMD module — let Rollup resolve its require('jquery') natively
   const skip = /modernizr|bootstrap|popper|slick/i;
+  let devServer: ViteDevServer | undefined;
 
   return {
     name: "inject-jquery-global",
+    configureServer(server) {
+      devServer = server;
+      // Force a full page reload when any wrapped vendor file changes —
+      // these are not HMR-friendly (top-level side effects on `window`).
+      server.watcher.on("change", (file) => {
+        if (/src[/\\]lib[/\\]vendors[/\\]/.test(file) && !skip.test(file)) {
+          server.ws.send({ type: "full-reload" });
+        }
+      });
+    },
     transform(code, id) {
       if (/src[/\\]lib[/\\]vendors[/\\]/.test(id) && !id.endsWith("index.ts") && !skip.test(id)) {
         // 1. Import jQuery (top-level, ES-module compatible)
@@ -61,7 +72,7 @@ export default defineConfig(() => ({
     host: "::",
     port: 8080,
     hmr: {
-      overlay: false,
+      overlay: true,
     },
   },
   plugins: [react(), injectJQueryGlobal()],
@@ -69,6 +80,9 @@ export default defineConfig(() => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  optimizeDeps: {
+    exclude: ["jquery", "slick-carousel"],
   },
   build: {
     minify: false,

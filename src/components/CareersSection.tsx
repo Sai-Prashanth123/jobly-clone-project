@@ -22,7 +22,7 @@ const CareersSection = () => {
           </div>
         </div>
         <div className="col-md-4">
-          <img src="/assets/img/home/our1.png" className="img-fluid" alt="" />
+          <img src="/assets/img/home/our1.png" className="img-fluid" alt="" loading="lazy" decoding="async" />
         </div>
       </div>
     </div>

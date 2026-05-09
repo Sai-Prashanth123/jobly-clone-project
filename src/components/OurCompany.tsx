@@ -14,7 +14,7 @@ const OurCompany = () => (
           <div className="why-choose__content why-choose__content-home">
             <div className="why-choose__text">
               <span className="sub-title d-block fw-500 color-red text-uppercase mb-sm-10 mb-xs-5 mb-15">
-                <img src="/assets/img/home/line.svg" className="img-fluid mr-10" alt="" /> Jobly
+                <img src="/assets/img/home/line.svg" className="img-fluid mr-10" alt="" loading="lazy" decoding="async" /> Jobly
               </span>
               <h2 className="title color-pd_black">Our Company</h2>
             </div>
@@ -37,7 +37,7 @@ const OurCompany = () => (
           <div key={c.title} className="col-xl-4 col-md-6 col-12 mb-30">
             <div className="why-choose__item why-choose__item-two" style={{ backgroundImage: 'url(/assets/img/home/why-choose__item-two-overly.png)' }}>
               <div className="icon mb-30 mb-lg-20 mb-md-10 mb-xs-5 color-red">
-                <img src={c.img} alt={c.title} />
+                <img src={c.img} alt={c.title} loading="lazy" decoding="async" />
               </div>
               <h6 className="title color-pd_black fw-600 mb-15 mb-xs-10">{c.title}</h6>
               <div className="description font-la mb-20 mb-sm-15 mb-xs-10">

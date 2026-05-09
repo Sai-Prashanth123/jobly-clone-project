@@ -4,11 +4,11 @@ import PageBanner from '@/components/PageBanner';
 import ServiceSidebar from '@/components/ServiceSidebar';
 
 const faqs = [
-  { id: 'faq-1', q: 'High Predictive Accuracy', a: 'Our advanced assessments ensure accuracy and validity of results', defaultOpen: true },
-  { id: 'faq-2', q: 'Multi-Pronged Assessment', a: 'Gain a detailed understanding of yourself to get best-fit career options or recommendations, with personalized development plans to help you improve.', defaultOpen: false },
-  { id: 'faq-3', q: 'Unified Decision – Tree Framework', a: 'The assessments are based on a single framework and are linked to one another, leading to a consistent outcome across grades.', defaultOpen: false },
-  { id: 'faq-4', q: 'Advanced Algorithms', a: 'Our assessments run on advanced algorithms that keep evolving and improving over time as the user base keeps expanding.', defaultOpen: false },
-  { id: 'faq-5', q: 'High Success Rate', a: '96% students and professionals have had better academic scores, college admissions, and career advancement', defaultOpen: false },
+  { id: 'faq-1', q: 'Industry-Aligned Workforce Strategy', a: 'Our consultants build talent roadmaps tied directly to your business goals — from headcount planning to workforce mix modeling for full-time, contract, and vendor talent.', defaultOpen: true },
+  { id: 'faq-2', q: 'End-to-End Talent Acquisition Advisory', a: 'We help you stand up scalable hiring engines — sourcing channels, interview loops, employer branding, and recruiter enablement — so you fill critical roles faster without sacrificing quality.', defaultOpen: false },
+  { id: 'faq-3', q: 'Compliance & Visa Advisory', a: 'Our team supports H-1B, L-1, OPT/CPT, E-Verify and I-9 compliance workflows so your global workforce stays audit-ready and your contracts stay enforceable.', defaultOpen: false },
+  { id: 'faq-4', q: 'Process & Tooling Optimization', a: 'We audit your ATS, HRIS and timesheet/billing stack, eliminate friction across the hire-to-retire lifecycle, and roll out automations that cut admin overhead.', defaultOpen: false },
+  { id: 'faq-5', q: 'Proven Outcomes Across Engagements', a: 'Clients see measurable wins — shorter time-to-fill, lower attrition on contract benches, cleaner audit posture, and predictable monthly billing cycles.', defaultOpen: false },
 ];
 
 const AccordionItem = ({ id, q, a, defaultOpen }: { id: string; q: string; a: string; defaultOpen: boolean }) => {
@@ -39,8 +39,8 @@ const CareerGuidance = () => {
       <PageBanner
         bgImage="/assets/img/page-banner/page-banner1.jpg"
         transparentText="Services"
-        title={<>Career Guidance <span>Service</span></>}
-        breadcrumb="Career Guidance Service"
+        title={<>Consulting <span>Services</span></>}
+        breadcrumb="Consulting Services"
       />
 
       {/* services-details start */}
@@ -49,47 +49,48 @@ const CareerGuidance = () => {
           <div className="row">
             <div className="col-xl-8">
               <div className="services-details__content">
-                <h2>Career Guidance Service</h2>
-                <p>Why go for career guidance at Jobly?</p>
-                <p>We know seeking clarity on streams, college selection, overseas education, and career planning is extremely hard! Career counselling for students from the right place at the right time is the need of hour.</p>
+                <h2>Consulting Services</h2>
+                <p>Why choose Jobly for workforce consulting?</p>
+                <p>Building and scaling a high-performing workforce is hard. Hiring plans go sideways, contractors stretch into year-long engagements without governance, and compliance gaps surface only during an audit. Our consulting practice exists to bring structure, predictability and measurable ROI to every part of your talent operation.</p>
                 <div className="media mb-40 mb-md-35 mb-sm-30 mb-xs-25">
-                  <img src="/assets/img/project-details/1a.png" alt="" />
+                  <img src="/assets/img/project-details/1a.png" alt="Workforce consulting" loading="lazy" decoding="async" />
                 </div>
-                <p>That's where we come into the picture! To help you focus on your dream career. Wherever you are in your studies or career, we can help you make decisions with our career counseling. So, if you're deciding what to do next after 10th, intermediate, engineering, B. Com, B. Sc, B.A, or Post Graduation, we can assist you!</p>
-                <p>For all your career planning, please contact us. You won't be disappointed with the advice you get and will be confident that you're making the right choice in this important decision. Here at Jobly, we provide career guidance and counseling. Our services are available to students of all ages as well as working professionals.</p>
-                <h5>WHAT DO WE DO?</h5>
-                <p>There are many steps to our guidance processes. We make sure that we are thorough and are giving you only the best advice and guidance. Our service includes:</p>
+                <p>Jobly partners with growing technology companies, enterprise IT teams, and staffing firms to design talent strategies, optimize delivery operations, and stand up the systems that support sustainable growth. Whether you need a fractional talent leader for 90 days or a multi-year transformation roadmap, our advisors bring deep domain experience across staffing, vendor management, and software training.</p>
+                <p>Every engagement is outcome-driven. We start with the business problem — not a generic framework — and deliver crisp recommendations, hands-on execution support, and the operating cadences your team will continue to use long after we leave.</p>
+
+                <h5>WHAT WE DO</h5>
+                <p>Our consulting offerings span the full talent lifecycle:</p>
                 <ul>
-                  <li>A career assessment test</li>
-                  <li>A personalized comprehensive career report</li>
-                  <li>Guidance and counseling</li>
-                  <li>Suggestions of suitable career options</li>
-                  <li>Provision of details about suitable and preferable courses, streams, and majors</li>
-                  <li>Provision of information about entrance examinations</li>
-                  <li>Clarification of doubts and help in selecting the right stream for you</li>
+                  <li>Workforce planning and headcount strategy</li>
+                  <li>Talent acquisition operating-model design (sourcing, recruiting, employer brand)</li>
+                  <li>Contract and vendor management governance</li>
+                  <li>Compliance, visa and I-9 advisory (H-1B, L-1, OPT/CPT, E-Verify)</li>
+                  <li>HR technology evaluation and rollout (ATS, HRIS, timesheet and billing platforms)</li>
+                  <li>Custom software training program design for client teams</li>
+                  <li>Bench utilization and profitability optimization for staffing firms</li>
                 </ul>
 
-                <h5>WHO DO WE PROVIDE SERVICES FOR?</h5>
-                <p>We provide career guidance and counseling to:</p>
+                <h5>WHO WE WORK WITH</h5>
+                <p>Our clients fall into three groups:</p>
                 <ul>
-                  <li><h6>Students in the 9th or 10th class</h6></li>
+                  <li><h6>Enterprise IT and engineering teams</h6></li>
                 </ul>
-                <p>We help you select the right stream or subject and take you toward the most suitable career path.</p>
+                <p>We help large engineering organizations build hybrid workforce strategies that balance full-time hires, contractors and managed-service partners — with clear governance over cost, quality and compliance.</p>
                 <ul>
-                  <li><h6>Students of intermediate, plus 2, 11th and 12th</h6></li>
+                  <li><h6>Growth-stage technology companies</h6></li>
                 </ul>
-                <p>We relieve you of your college admissions &amp; processes stress; we know how lengthy and tiring it can be</p>
+                <p>We stand up your first formal talent function, design scalable hiring loops, and put the operating systems in place so your recruiting team can keep up with the next 18 months of growth.</p>
                 <ul>
-                  <li><h6>Students pursuing graduation and post-graduation courses</h6></li>
+                  <li><h6>Staffing and consulting firms</h6></li>
                 </ul>
-                <p>We keep you informed with the latest industry trends; what skills are best for you to learn &amp; how you can successfully transition from college to world of job and careers. In every aspect of your career journey, our guided exploration for over 550+ career options, psychometric career assessment test and counselling from experienced career advisor is all you need to make a perfect decision for your career!</p>
+                <p>We work alongside founders and operations leaders at staffing firms to optimize bench utilization, sharpen pricing models, tighten timesheet and billing cycles, and build the playbooks that move you from project-to-project survival into a repeatable engine. Our advisors have personally run staffing P&amp;Ls, so the recommendations are practical, not theoretical.</p>
 
                 <h5>Benefits</h5>
                 <ul>
-                  <li>Build awareness about available career options as per your interests &amp; academic choices.</li>
-                  <li>Recognize your overall aptitude, strengths, and weaknesses.</li>
-                  <li>Create a roadmap for your entire career.</li>
-                  <li>Take an informed decision to choose your career options.</li>
+                  <li>Faster time-to-fill on critical roles through better sourcing and interviewer enablement.</li>
+                  <li>Lower contractor attrition and stronger client satisfaction on long-running engagements.</li>
+                  <li>Audit-ready compliance posture across visa, I-9 and contract documentation.</li>
+                  <li>Predictable, on-time monthly billing cycles with reduced revenue leakage.</li>
                 </ul>
                 <h5>Key Features</h5>
               </div>

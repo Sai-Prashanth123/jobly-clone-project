@@ -17,13 +17,13 @@ const Careers = () => {
           <div className="row">
             <div className="col-lg-3 col-sm-6">
               <div className="our-company__meida">
-                <img src="/assets/img/about/2b.png" alt="" className="img-fluid" />
+                <img src="/assets/img/about/2b.png" alt="" className="img-fluid" loading="lazy" decoding="async" />
               </div>
             </div>
 
             <div className="col-lg-3 col-sm-6">
               <div className="our-company__meida border-radius">
-                <img src="/assets/img/about/2a.png" alt="" className="img-fluid" />
+                <img src="/assets/img/about/2a.png" alt="" className="img-fluid" loading="lazy" decoding="async" />
                 <div className="horizental-bar"></div>
               </div>
             </div>
@@ -31,7 +31,7 @@ const Careers = () => {
             <div className="col-lg-6">
               <div className="our-company__content mt-md-50 mt-sm-40 mt-xs-35">
                 <span className="sub-title fw-500 color-primary text-uppercase mb-sm-10 mb-xs-5 mb-20 d-block">
-                  <img src="/assets/img/team-details/badge-line.svg" className="img-fluid mr-10" alt="" /> Careers
+                  <img src="/assets/img/team-details/badge-line.svg" className="img-fluid mr-10" alt="" loading="lazy" decoding="async" /> Careers
                 </span>
 
                 <div className="descriiption font-la mb-30 mb-md-25 mb-sm-20 mb-xs-15">

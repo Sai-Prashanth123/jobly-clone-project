@@ -138,8 +138,8 @@ export default function Invoices() {
         <DataTable
           data={invoicesWithLookup}
           columns={columns as Column<typeof invoicesWithLookup[number]>[]}
-          searchPlaceholder="Search by invoice #, issue date, or client…"
-          searchKeys={['invoiceNumber', 'issueDate', 'clientName']}
+          searchPlaceholder="Search by invoice #, client, status, date, amount…"
+          searchKeys={['invoiceNumber', 'issueDate', 'dueDate', 'clientName', 'status']}
           getRowKey={i => i.id}
           onRowClick={i => navigate(`/portal/invoices/${i.id}`)}
           emptyTitle="No invoices yet"

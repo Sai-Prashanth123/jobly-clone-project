@@ -21,9 +21,9 @@ const slides = [
   {
     image: '/assets/img/banner/banne-slider-1c.png',
     num: '03',
-    sub: 'To help you focus on',
-    subSpan: 'your dream career',
-    title: 'Career Guidance<br/> Services',
+    sub: 'Outcome-driven workforce',
+    subSpan: 'strategy & advisory',
+    title: 'Consulting<br/> Services',
     href: '/career-guidance',
   },
 ];
@@ -47,10 +47,17 @@ const HeroSlider = () => {
         slidesToShow: 1,
         infinite: true,
         slidesToScroll: 1,
-        autoplaySpeed: 1500,
+        autoplaySpeed: 4000,
+        speed: 700,
+        adaptiveHeight: true,
         appendArrows: $('.slider-controls .banner-slider-arrows'),
         prevArrow: "<button type='button' class='slick-prev pull-left'><i class='fas fa-long-arrow-alt-left' aria-hidden='true'></i></button>",
         nextArrow: "<button type='button' class='slick-next pull-right'><i class='fas fa-long-arrow-alt-right' aria-hidden='true'></i></button>",
+        responsive: [
+          { breakpoint: 1200, settings: { slidesToShow: 1, arrows: true } },
+          { breakpoint: 992, settings: { slidesToShow: 1, arrows: false } },
+          { breakpoint: 768, settings: { slidesToShow: 1, arrows: false, dots: true } },
+        ],
       });
     };
 

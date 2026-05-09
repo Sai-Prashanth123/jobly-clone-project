@@ -149,6 +149,20 @@ export function useUploadEmployeeDocument(employeeId: string) {
   });
 }
 
+export function useDeleteEmployeeDocument(employeeId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (docId: string) => {
+      const { data } = await apiClient.delete(`/employees/${employeeId}/documents/${docId}`);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees', employeeId] });
+      qc.invalidateQueries({ queryKey: ['employees'] });
+    },
+  });
+}
+
 // Convert camelCase Employee fields to snake_case for API
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toSnake(e: Partial<Employee>): Record<string, any> {

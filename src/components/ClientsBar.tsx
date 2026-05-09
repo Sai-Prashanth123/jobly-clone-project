@@ -68,7 +68,7 @@ const ClientsBar = () => {
                 <div key={i} className="slider-item">
                   <a href="#" className="client-brand__item">
                     <div className="client-brand__item-media">
-                      <img src={src} className="img-fluid" alt={`Client ${i + 1}`} />
+                      <img src={src} className="img-fluid" alt={`Client ${i + 1}`} loading="lazy" decoding="async" />
                     </div>
                   </a>
                 </div>

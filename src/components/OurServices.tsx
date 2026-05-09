@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
 
 const services = [
-  { img: '/assets/img/home/our2.png', title: 'Career Guidance', desc: "For all your career planning, please contact us. You won't be disappointed with the advice", href: '/career-guidance' },
+  { img: '/assets/img/home/our2.png', title: 'Consulting Services', desc: 'Outcome-driven workforce strategy, talent operations and compliance advisory for growing teams.', href: '/career-guidance' },
   { img: '/assets/img/home/our-portfolio-home__item-2.png', title: 'Staffing And Consulting', desc: 'Staffing and consulting services have a major role in the functioning of an organization', href: '/staffing-and-consulting' },
   { img: '/assets/img/home/our-portfolio-home__item-3.png', title: 'Software Training', desc: 'Jobly empowers you to take your talent far and wide, build a dedicated community', href: '/software-training' },
 ];
@@ -19,7 +19,7 @@ const OurServices = () => {
         <div className="col-12">
           <div className="our-portfolio-home__content text-center mb-60 mb-sm-50 mb-xs-40">
             <span className="sub-title fw-500 text-uppercase mb-sm-10 mb-xs-5 mb-15 d-block color-red">
-              <img src="/assets/img/home/line.svg" className="img-fluid mr-10" alt="" /> Jobly
+              <img src="/assets/img/home/line.svg" className="img-fluid mr-10" alt="" loading="lazy" decoding="async" /> Jobly
             </span><br />
             <h2 className="title color-pd_black">Our Services</h2>
           </div>
@@ -31,7 +31,7 @@ const OurServices = () => {
             <div className="our-portfolio-home__item mb-30">
               <div className="featured-thumb">
                 <div className="media overflow-hidden">
-                  <img src={s.img} className="img-fluid" alt={s.title} />
+                  <img src={s.img} className="img-fluid" alt={s.title} loading="lazy" decoding="async" />
                 </div>
               </div>
               <div className="content d-flex flex-row">

@@ -89,7 +89,7 @@ export default function Login() {
           <p className="text-[11px] font-semibold tracking-[0.22em] uppercase text-cyan-300/90 mb-5">
             Workforce Platform
           </p>
-          <h1 className="text-[2.5rem] font-semibold text-white leading-[1.1] tracking-tight mb-6">
+          <h1 className="text-[2rem] xl:text-[2.5rem] font-semibold text-white leading-[1.1] tracking-tight mb-6">
             Manage your <span style={{ color: '#32CDDC' }}>entire team</span> from one place.
           </h1>
           <p className="text-[13px] text-slate-400 leading-relaxed max-w-[300px]">
@@ -117,11 +117,11 @@ export default function Login() {
 
       {/* ── Right — form panel ── */}
       <div
-        className="flex-1 flex flex-col items-center justify-center px-8 py-12 lg:px-20"
+        className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-20"
         style={{ background: '#ffffff' }}
       >
         {/* Back link */}
-        <div className="w-full max-w-[400px] mb-10">
+        <div className="w-full max-w-[400px] mb-6 sm:mb-10">
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 text-xs text-gray-400 hover:text-[#4069FF] transition-colors group"
@@ -218,7 +218,7 @@ export default function Login() {
               </p>
               <span className="h-px flex-1 bg-gray-100" />
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {ACCOUNTS.map(a => {
                 const isActive = active === a.role;
                 return (

@@ -109,8 +109,8 @@ export default function Assignments() {
         <DataTable
           data={assignmentsWithLookup}
           columns={columns as Column<typeof assignmentsWithLookup[number]>[]}
-          searchPlaceholder="Search by employee, client, project, or role…"
-          searchKeys={['employeeName', 'clientName', 'projectName', 'role']}
+          searchPlaceholder="Search by ID, employee, client, project, role, status…"
+          searchKeys={['displayId', 'employeeName', 'clientName', 'projectName', 'role', 'status']}
           getRowKey={a => a.id}
           onRowClick={a => navigate(`/portal/assignments/${a.id}`)}
           emptyTitle="No assignments found"

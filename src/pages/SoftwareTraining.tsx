@@ -22,7 +22,7 @@ const SoftwareTraining = () => {
                 <p>Accelerate your Career Growth &amp; Upskill Yourself</p>
                 <p>Whether you're a home-based teacher, a leadership coach, Jobly empowers you to take your talent far and wide, build a dedicated community, and turn your passion into a rewarding profession.</p>
                 <div className="media mb-40 mb-md-35 mb-sm-30 mb-xs-25">
-                  <img src="/assets/img/project-details/1c.png" alt="" />
+                  <img src="/assets/img/project-details/1c.png" alt="" loading="lazy" decoding="async" />
                 </div>
 
                 <h5>Create courses that reflect your expertise</h5>

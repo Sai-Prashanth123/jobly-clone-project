@@ -124,8 +124,8 @@ export default function PortalClients() {
         <DataTable
           data={clients}
           columns={columns}
-          searchPlaceholder="Search by company, contact, industry..."
-          searchKeys={['companyName', 'contactName', 'contactEmail', 'industry']}
+          searchPlaceholder="Search by ID, company, contact, industry, status…"
+          searchKeys={['displayId', 'companyName', 'contactName', 'contactEmail', 'industry', 'status']}
           getRowKey={c => c.id}
           onRowClick={c => navigate(`/portal/clients/${c.id}`)}
           emptyTitle="No clients found"

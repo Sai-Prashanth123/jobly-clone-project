@@ -95,8 +95,8 @@ export default function Employees() {
         <DataTable
           data={employees}
           columns={columns}
-          searchPlaceholder="Search by name, email, department..."
-          searchKeys={['firstName', 'lastName', 'email', 'department', 'jobTitle']}
+          searchPlaceholder="Search by ID, name, email, department, title, status…"
+          searchKeys={['displayId', 'firstName', 'lastName', 'email', 'department', 'jobTitle', 'employmentType', 'status']}
           getRowKey={e => e.id}
           onRowClick={e => navigate(`/portal/employees/${e.id}`)}
           emptyTitle="No employees found"

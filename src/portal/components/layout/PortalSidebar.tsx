@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
-  Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings,
+  Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -33,6 +33,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Assignments',    path: '/portal/assignments',    icon: <ClipboardList className="h-4 w-4" />,   roles: ['admin','operations','employee'] },
   { label: 'Timesheets',     path: '/portal/timesheets',     icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr','operations','finance','employee'] },
   { label: 'Invoices',       path: '/portal/invoices',       icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
+  { label: 'Documents',      path: '/portal/documents',      icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'] },
   { label: 'Reports',        path: '/portal/reports',        icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','operations'] },
   { label: 'My Profile',     path: '/portal/profile',        icon: <UserCircle className="h-4 w-4" />,      roles: ['employee'] },
   { label: 'Admin Settings', path: '/portal/admin',          icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },

@@ -16,7 +16,7 @@ const Clients = () => {
           <div className="row g-4">
             {['client7a.jpg','client7b.jpg','client7c.jpg','client7d.jpg','client7e.jpg','client7f.jpg','client7.jpg','client7g.jpg','client7h.jpg'].map((f, i) => (
               <div key={i} className="col-lg-4 col-md-6 col-6">
-                <img src={`/assets/img/clients/${f}`} alt="" className="img-fluid" />
+                <img src={`/assets/img/clients/${f}`} alt="" className="img-fluid" loading="lazy" decoding="async" />
               </div>
             ))}
           </div>

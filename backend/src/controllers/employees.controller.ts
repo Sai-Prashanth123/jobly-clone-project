@@ -2,6 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/employees.service';
 import { exportEmployeesCSV } from '../services/employees.service';
 import * as storageSvc from '../services/storage.service';
+import { ForbiddenError, NotFoundError } from '../lib/errors';
+import { supabaseAdmin } from '../config/supabase';
 import type { ListEmployeesQuery, CreateEmployeeInput, UpdateEmployeeInput } from '../schemas/employee.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -80,6 +82,10 @@ export async function uploadDoc(req: Request, res: Response, next: NextFunction)
   try {
     const file = req.file;
     if (!file) { res.status(400).json({ success: false, error: 'No file provided' }); return; }
+    // Employees may only upload to their own employee record.
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only manage their own documents');
+    }
     const { name, docType } = req.body as { name?: string; docType?: string };
     const data = await storageSvc.uploadDocument('employee', req.params.id, file, req.user!.id, name, docType);
     res.status(201).json({ success: true, data });
@@ -88,6 +94,21 @@ export async function uploadDoc(req: Request, res: Response, next: NextFunction)
 
 export async function deleteDoc(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // Employees may only delete docs that belong to their own employee record.
+    if (req.user!.role === 'employee') {
+      if (req.user!.employeeId !== req.params.id) {
+        throw new ForbiddenError('Employees may only manage their own documents');
+      }
+      const { data: doc, error } = await supabaseAdmin
+        .from('documents')
+        .select('entity_type, entity_id')
+        .eq('id', req.params.docId)
+        .single();
+      if (error || !doc) throw new NotFoundError('Document not found');
+      if (doc.entity_type !== 'employee' || doc.entity_id !== req.user!.employeeId) {
+        throw new ForbiddenError('Document does not belong to this employee');
+      }
+    }
     await storageSvc.deleteDocument(req.params.docId);
     res.json({ success: true });
   } catch (err) { next(err); }

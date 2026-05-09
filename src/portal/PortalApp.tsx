@@ -27,6 +27,7 @@ const TimesheetDetail = lazy(() => import('./pages/TimesheetDetail'));
 const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
 const Reports = lazy(() => import('./pages/Reports'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
+const Documents = lazy(() => import('./pages/Documents'));
 
 function RouteFallback() {
   return (
@@ -145,6 +146,15 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'finance', 'operations']}>
                   <Reports />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="documents"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
+                  <Documents />
                 </ProtectedRoute>
               }
             />

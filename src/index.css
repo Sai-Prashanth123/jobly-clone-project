@@ -71,10 +71,22 @@
   h5 { font-size: 20px; line-height: 26px; font-weight: 600; color: #243342; }
   h6 { font-size: 16px; line-height: 24px; font-weight: 600; color: #243342; }
 
-  @media (max-width: 1199px) { h2 { font-size: 42px; line-height: 54px; } }
-  @media (max-width: 991px)  { h2 { font-size: 36px; line-height: 48px; } }
-  @media (max-width: 767px)  { h2 { font-size: 32px; line-height: 44px; } }
-  @media (max-width: 575px)  { h2 { font-size: 28px; line-height: 38px; } }
+  @media (max-width: 1199px) { h2 { font-size: 42px; line-height: 54px; } h1 { font-size: 52px; line-height: 64px; } h3 { font-size: 30px; line-height: 42px; } }
+  @media (max-width: 991px)  { h2 { font-size: 36px; line-height: 48px; } h1 { font-size: 44px; line-height: 56px; } h3 { font-size: 28px; line-height: 38px; } }
+  @media (max-width: 767px)  { h2 { font-size: 32px; line-height: 44px; } h1 { font-size: 36px; line-height: 46px; } h3 { font-size: 26px; line-height: 36px; } }
+  @media (max-width: 575px)  { h2 { font-size: 28px; line-height: 38px; } h1 { font-size: 30px; line-height: 40px; } h3 { font-size: 22px; line-height: 32px; } }
+}
+
+/* Hide the Bootstrap top bar below 1200px (template uses d-none d-xl-block on .top-header).
+   Belt-and-suspenders override in case the template CSS specificity wins. */
+@media (max-width: 1199px) {
+  .top-header { display: none !important; }
+}
+
+/* Prevent any element from forcing horizontal page scroll on mobile. */
+@media (max-width: 575px) {
+  .overflow-hidden { overflow-x: hidden !important; }
+  body, html { overflow-x: hidden; }
 }
 
 /* ============================
