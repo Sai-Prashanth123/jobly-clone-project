@@ -190,12 +190,12 @@ function HrDocumentsView() {
         </CardHeader>
         <CardContent>
           <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search by name, ID, email, dept…"
               value={query}
               onChange={e => setQuery(e.target.value)}
-              className="pl-9 h-9 text-sm"
+              className="!pl-10 pr-3 h-9 text-sm"
             />
           </div>
           {isLoading ? (

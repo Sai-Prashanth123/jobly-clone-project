@@ -204,12 +204,12 @@ export function DataTable<T>({
       {/* Search + filters + export */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
         <div className="relative flex-1 sm:max-w-sm">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder={searchPlaceholder}
             value={query}
             onChange={e => { setQuery(e.target.value); setPage(1); }}
-            className="pl-9 h-9 text-sm"
+            className="!pl-10 pr-3 h-9 text-sm"
           />
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
