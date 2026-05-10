@@ -1,4 +1,5 @@
 import { useCounterUp } from '@/hooks/useCounterUp';
+import { useInViewReveal } from '@/hooks/useInViewReveal';
 
 const stats = [
   { icon: 'fas fa-chart-bar',  val: 5620, label: 'Successful Project'  },
@@ -9,12 +10,13 @@ const stats = [
 
 const StatsBar = () => {
   useCounterUp();
+  const sectionRef = useInViewReveal<HTMLDivElement>();
   return (
-    <div className="container">
+    <div ref={sectionRef} className="reveal container">
       <div className="row mb-minus-30">
         {stats.map((s, i) => (
           <div key={i} className="col-xl-3 col-lg-4 col-sm-6">
-            <div className="counter-area__item d-flex align-items-center">
+            <div className="counter-area__item hover-lift d-flex align-items-center">
               <div className="icon color-primary">
                 <i className={s.icon}></i>
               </div>

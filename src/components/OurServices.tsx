@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
+import { useInViewReveal } from '@/hooks/useInViewReveal';
 
 const services = [
   { img: '/assets/img/home/our2.png', title: 'Consulting Services', desc: 'Outcome-driven workforce strategy, talent operations and compliance advisory for growing teams.', href: '/career-guidance' },
@@ -12,8 +13,9 @@ const OurServices = () => {
   const ref2 = useScrollReveal('animate__fadeInUp', 0.15, '0.15s');
   const ref3 = useScrollReveal('animate__fadeInUp', 0.15, '0.3s');
   const refs = [ref1, ref2, ref3];
+  const sectionRef = useInViewReveal<HTMLElement>();
   return (
-  <section className="our-portfolio-home pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
+  <section ref={sectionRef} className="reveal our-portfolio-home pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
     <div className="container">
       <div className="row align-items-center">
         <div className="col-12">
@@ -28,7 +30,7 @@ const OurServices = () => {
       <div className="row mb-minus-30">
         {services.map((s, i) => (
           <div key={s.title} className="col-xl-4 col-md-6 col-12" ref={refs[i]}>
-            <div className="our-portfolio-home__item mb-30">
+            <div className="our-portfolio-home__item hover-lift mb-30">
               <div className="featured-thumb">
                 <div className="media overflow-hidden">
                   <img src={s.img} className="img-fluid" alt={s.title} loading="lazy" decoding="async" />
@@ -42,7 +44,7 @@ const OurServices = () => {
                   <div className="description font-la"><p>{s.desc}</p></div>
                 </div>
                 <div className="btn-link-share">
-                  <Link to={s.href} className="theme-btn color-pd_black" style={{ backgroundImage: 'url(/assets/img/home/theme-btn-overly.png)' }}>
+                  <Link to={s.href} className="theme-btn">
                     Read More <i className="fas fa-long-arrow-alt-right"></i>
                   </Link>
                 </div>

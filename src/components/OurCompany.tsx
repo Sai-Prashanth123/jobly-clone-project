@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import { useInViewReveal } from '@/hooks/useInViewReveal';
 
 const cards = [
   { img: '/assets/img/home/mission.png', title: 'Mission', desc: 'Giving quality and beneficial programming answers for our predominant customers' },
@@ -6,8 +7,10 @@ const cards = [
   { img: '/assets/img/home/culture.png', title: 'Culture', desc: 'A certainty that our faculty discover "work" intriguing, duty to unwavering quality' },
 ];
 
-const OurCompany = () => (
-  <section className="why-choose why-choose__home pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
+const OurCompany = () => {
+  const sectionRef = useInViewReveal<HTMLElement>();
+  return (
+  <section ref={sectionRef} className="reveal why-choose why-choose__home pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
     <div className="container">
       <div className="row">
         <div className="col-lg-6">
@@ -35,7 +38,7 @@ const OurCompany = () => (
       <div className="row">
         {cards.map(c => (
           <div key={c.title} className="col-xl-4 col-md-6 col-12 mb-30">
-            <div className="why-choose__item why-choose__item-two" style={{ backgroundImage: 'url(/assets/img/home/why-choose__item-two-overly.png)' }}>
+            <div className="why-choose__item why-choose__item-two hover-lift" style={{ backgroundImage: 'url(/assets/img/home/why-choose__item-two-overly.png)' }}>
               <div className="icon mb-30 mb-lg-20 mb-md-10 mb-xs-5 color-red">
                 <img src={c.img} alt={c.title} loading="lazy" decoding="async" />
               </div>
@@ -50,6 +53,7 @@ const OurCompany = () => (
       </div>
     </div>
   </section>
-);
+  );
+};
 
 export default OurCompany;

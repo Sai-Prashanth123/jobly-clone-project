@@ -1,11 +1,14 @@
 import { Link } from 'react-router-dom';
 import { useScrollReveal } from '@/hooks/useScrollReveal';
+import { useInViewReveal } from '@/hooks/useInViewReveal';
 
 const CareersSection = () => {
   const sectionRef = useScrollReveal<HTMLDivElement>('animate__fadeIn', 0.15, '0.2s');
+  const revealRef = useInViewReveal<HTMLElement>();
   return (
   <section
-    className="planning-success pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-130 overflow-hidden"
+    ref={revealRef}
+    className="reveal planning-success pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-130 overflow-hidden"
     style={{ backgroundImage: 'url(/assets/img/home/planning-success-bg.png)' }}
   >
     <div ref={sectionRef} className="container">

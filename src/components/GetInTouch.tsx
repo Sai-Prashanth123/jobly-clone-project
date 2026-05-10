@@ -1,10 +1,24 @@
-import { useScrollReveal } from '@/hooks/useScrollReveal';
+import { useInViewReveal } from '@/hooks/useInViewReveal';
 
 const GetInTouch = () => {
-  const sectionRef = useScrollReveal<HTMLDivElement>('animate__fadeIn', 0.15, '0s');
+  const revealRef = useInViewReveal<HTMLElement>();
   return (
-  <section ref={sectionRef} className="can-help can-help-home-1 pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
-      <div className="can-help-background" style={{ backgroundImage: 'url(/assets/img/home/can-help-background.png)' }}></div>
+  <section
+    ref={revealRef}
+    className="reveal grain-overlay can-help can-help-home-1 pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden"
+    style={{
+      background:
+        'linear-gradient(135deg, hsl(218 47% 20%) 0%, hsl(213 54% 12%) 60%, hsl(216 50% 7%) 100%)',
+    }}
+  >
+      <div
+        className="can-help-background"
+        style={{
+          backgroundImage: 'url(/assets/img/home/can-help-background.png)',
+          opacity: 0.18,
+          mixBlendMode: 'screen',
+        }}
+      ></div>
       <div className="container">
         <div className="row">
           <div className="col-xl-7">

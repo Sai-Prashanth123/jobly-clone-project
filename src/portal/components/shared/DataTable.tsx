@@ -236,10 +236,10 @@ export function DataTable<T>({
         </div>
       )}
 
-      {/* Table with horizontal scroll on mobile */}
-      <div className="rounded-md border bg-white overflow-x-auto">
+      {/* Table with horizontal scroll on mobile + sticky header on tall lists */}
+      <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto max-h-[640px] overflow-y-auto shadow-[var(--shadow-sm)]">
         <Table className="min-w-[500px]">
-          <TableHeader>
+          <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
             <TableRow className="bg-gray-50">
               {selectable && (
                 <TableHead className="w-10">
@@ -254,7 +254,7 @@ export function DataTable<T>({
               {columns.map(col => (
                 <TableHead
                   key={col.key}
-                  className={`font-semibold text-gray-700 text-xs sm:text-sm whitespace-nowrap ${col.hideOnMobile ? 'hidden sm:table-cell' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-gray-100' : ''}`}
+                  className={`font-semibold text-gray-600 uppercase tracking-wide text-[11px] sm:text-xs whitespace-nowrap ${col.hideOnMobile ? 'hidden sm:table-cell' : ''} ${col.sortable ? 'cursor-pointer select-none hover:bg-gray-100/80 transition-colors' : ''}`}
                   onClick={col.sortable ? () => handleSort(col.key) : undefined}
                 >
                   <div className="flex items-center gap-1">
@@ -268,7 +268,7 @@ export function DataTable<T>({
           <TableBody>
             {paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={visibleColumns.length} className="py-12">
+                <TableCell colSpan={visibleColumns.length} className="py-14">
                   <EmptyState title={emptyTitle} description={emptyDescription} />
                 </TableCell>
               </TableRow>
@@ -279,7 +279,7 @@ export function DataTable<T>({
                 return (
                   <TableRow
                     key={rowKey}
-                    className={`${onRowClick ? 'cursor-pointer hover:bg-gray-50' : ''} ${isSelected ? 'bg-blue-50/50' : ''}`}
+                    className={`${onRowClick ? 'cursor-pointer hover:bg-blue-50/30' : 'hover:bg-gray-50/60'} ${isSelected ? 'bg-blue-50/50' : ''} transition-colors`}
                     onClick={() => onRowClick?.(item)}
                   >
                     {selectable && (
@@ -294,7 +294,7 @@ export function DataTable<T>({
                     {columns.map(col => (
                       <TableCell
                         key={col.key}
-                        className={`text-sm py-3 ${col.hideOnMobile ? 'hidden sm:table-cell' : ''}`}
+                        className={`text-sm py-3.5 ${col.hideOnMobile ? 'hidden sm:table-cell' : ''}`}
                       >
                         {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key] ?? '—')}
                       </TableCell>

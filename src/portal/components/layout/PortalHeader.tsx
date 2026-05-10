@@ -4,9 +4,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { LogOut, User, Search, Bell } from 'lucide-react';
+import { LogOut, User, Search, Bell, ChevronRight } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useUnreadNotificationCount } from '../../hooks/useNotifications';
 
 const ROLE_GRADIENTS: Record<string, string> = {
@@ -32,6 +32,10 @@ export function PortalHeader() {
     >
       <SidebarTrigger className="text-gray-400 hover:text-gray-700 transition-colors" />
 
+      <Breadcrumb />
+
+      <div className="flex-1" />
+
       {/* Command palette trigger */}
       <Button
         variant="ghost"
@@ -43,8 +47,6 @@ export function PortalHeader() {
         <span>Search</span>
         <kbd className="ml-1 text-[10px] bg-gray-100 rounded px-1.5">⌘K</kbd>
       </Button>
-
-      <div className="flex-1" />
 
       <NotificationBell />
 
@@ -94,6 +96,48 @@ export function PortalHeader() {
         </DropdownMenuContent>
       </DropdownMenu>
     </header>
+  );
+}
+
+function Breadcrumb() {
+  const { pathname } = useLocation();
+  // Strip leading "/portal/" and split into crumbs.
+  const parts = pathname.replace(/^\/portal\/?/, '').split('/').filter(Boolean);
+
+  if (parts.length === 0) return null;
+
+  // Hide UUID/numeric ID segments — keep readable labels only.
+  const isIdLike = (s: string) =>
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)
+    || /^\d+$/.test(s);
+  const labelize = (s: string) =>
+    s.split('-').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+
+  const crumbs = parts.map((part, i) => {
+    const path = '/portal/' + parts.slice(0, i + 1).join('/');
+    const isLast = i === parts.length - 1;
+    const display = isIdLike(part) ? '#' + part.slice(0, 6) : labelize(part);
+    return { display, path, isLast };
+  });
+
+  return (
+    <nav className="hidden md:flex items-center text-xs text-gray-500" aria-label="Breadcrumb">
+      <Link to="/portal/dashboard" className="hover:text-gray-700 transition-colors">
+        Portal
+      </Link>
+      {crumbs.map((c) => (
+        <span key={c.path} className="flex items-center">
+          <ChevronRight className="h-3 w-3 mx-1 text-gray-300" />
+          {c.isLast ? (
+            <span className="text-gray-900 font-medium">{c.display}</span>
+          ) : (
+            <Link to={c.path} className="hover:text-gray-700 transition-colors">
+              {c.display}
+            </Link>
+          )}
+        </span>
+      ))}
+    </nav>
   );
 }
 

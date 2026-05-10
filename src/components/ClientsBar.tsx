@@ -66,7 +66,7 @@ const ClientsBar = () => {
             <div className="client-brand__slider" data-slick={slickConfig}>
               {clientLogos.map((src, i) => (
                 <div key={i} className="slider-item">
-                  <a href="#" className="client-brand__item">
+                  <a href="#" className="client-brand__item hover-lift">
                     <div className="client-brand__item-media">
                       <img src={src} className="img-fluid" alt={`Client ${i + 1}`} loading="lazy" decoding="async" />
                     </div>

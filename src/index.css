@@ -47,6 +47,24 @@
     --sidebar-accent-foreground: 240 5.9% 10%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* Motion tokens */
+    --motion-fast: 140ms;
+    --motion-base: 220ms;
+    --motion-slow: 320ms;
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+    /* Elevation tokens */
+    --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 1px 1px rgba(15,23,42,.03);
+    --shadow-md: 0 4px 12px rgba(15,23,42,.06), 0 2px 4px rgba(15,23,42,.04);
+    --shadow-lg: 0 12px 32px rgba(15,23,42,.08), 0 4px 12px rgba(15,23,42,.05);
+    --shadow-xl: 0 24px 60px rgba(15,23,42,.10), 0 8px 24px rgba(15,23,42,.06);
+
+    /* Radius tokens */
+    --radius-card: 14px;
+    --radius-input: 10px;
+    --radius-button: 10px;
   }
 }
 
@@ -194,7 +212,9 @@
 }
 
 /* ============================
-   theme-btn — original CSS
+   theme-btn — refined for senior-engineer UX feel
+   Replaces the original 380% pseudo-element overlay with a clean
+   transform + brightness lift. Lighter, faster, more confident.
    ============================ */
 .theme-btn {
   border: 0;
@@ -203,79 +223,230 @@
   line-height: 24px;
   font-weight: 500;
   font-family: "Poppins", sans-serif;
-  border-radius: 2px;
+  border-radius: var(--radius-button);
   box-sizing: border-box;
-  display: inline-block;
-  padding: 16px 34px;
-  transition: all 0.4s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 30px;
   background-color: #4069FF;
-  z-index: 1;
-  overflow: hidden;
   position: relative;
   cursor: pointer;
   text-decoration: none;
+  transition: transform var(--motion-fast) var(--ease-out-quart),
+              filter var(--motion-fast),
+              box-shadow var(--motion-fast),
+              background-color var(--motion-fast);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  will-change: transform;
 }
-
-.theme-btn::after {
-  top: 50%;
-  left: 50%;
-  content: "";
-  width: 100%;
-  height: 0%;
-  z-index: -1;
-  position: absolute;
-  transition: all 0.6s ease;
-  transform: translate(-50%, -50%) rotate(-45deg);
-  background: rgba(0, 102, 255, 0.85);
-}
-
 .theme-btn:hover,
 .theme-btn:focus {
   color: #FFF;
-  background-color: rgba(0, 102, 255, 0.85);
+  background-color: #4069FF;
+  filter: brightness(1.06);
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md), 0 6px 18px rgba(64, 105, 255, 0.22);
+}
+.theme-btn:active {
+  transform: translateY(0);
+  filter: brightness(0.98);
 }
 
-.theme-btn:hover::after,
-.theme-btn:focus::after {
-  height: 380%;
+/* Strip the legacy ::after overlay so older markup that still references
+   the rotated pseudo-element no longer shows the heavy hover sweep. */
+.theme-btn::after {
+  display: none !important;
 }
 
 .theme-btn.btn-sm {
-  padding: 14px 28px;
+  padding: 12px 24px;
   font-size: 15px;
 }
 
 .theme-btn.btn-red {
   background-color: #0066ff;
 }
-
-.theme-btn.btn-red::after {
-  background: rgba(0, 102, 255, 0.7);
-}
-
 .theme-btn.btn-red:hover,
 .theme-btn.btn-red:focus {
-  background-color: rgba(0, 102, 255, 0.85);
+  background-color: #0066ff;
 }
 
 .theme-btn.btn-white {
-  color: #000;
+  color: #0b1220;
   background-color: #FFF;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06), inset 0 0 0 1px rgba(15, 23, 42, 0.06);
 }
-
-.theme-btn.btn-white::after {
-  background: rgba(0, 102, 255, 0.85);
-}
-
 .theme-btn.btn-white:hover,
 .theme-btn.btn-white:focus {
-  color: #FFF;
-  background-color: rgba(0, 102, 255, 0.85);
+  color: #0b1220;
+  background-color: #FFF;
+  box-shadow: var(--shadow-md), inset 0 0 0 1px rgba(64, 105, 255, 0.35);
 }
 
 .theme-btn i {
   font-size: 12px;
   margin-left: 10px;
+}
+
+/* ============================
+   UX polish utilities
+   Used across landing-page sections + cards.
+   ============================ */
+
+/* Card lift on hover */
+.hover-lift {
+  transition: transform var(--motion-base) var(--ease-out-quart),
+              box-shadow var(--motion-base) var(--ease-out-quart);
+  will-change: transform;
+}
+.hover-lift:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Scroll-reveal section */
+.reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity var(--motion-slow) var(--ease-out-expo),
+              transform var(--motion-slow) var(--ease-out-expo);
+  will-change: opacity, transform;
+}
+.reveal.in-view {
+  opacity: 1;
+  transform: none;
+}
+
+/* Tighter typography on display headings (modern feel). */
+h1, h2, h3 {
+  letter-spacing: -0.02em;
+  font-feature-settings: "ss01", "cv02";
+}
+
+/* Form input refinement — used by .contact-form inputs/textarea. */
+.contact-form input,
+.contact-form textarea,
+.contact-form select {
+  border-radius: var(--radius-input) !important;
+  border: 1px solid #e5e7eb !important;
+  transition: border-color var(--motion-fast),
+              box-shadow var(--motion-fast),
+              background var(--motion-fast) !important;
+  background: #fff !important;
+}
+.contact-form input:focus,
+.contact-form textarea:focus,
+.contact-form select:focus {
+  border-color: hsl(var(--jobly-accent-blue)) !important;
+  box-shadow: 0 0 0 3px rgba(64, 105, 255, 0.16) !important;
+  outline: none !important;
+}
+
+/* Hero slider Ken Burns effect — subtle background drift on the
+   currently-active slide so the hero feels alive without auto-play noise. */
+@keyframes kenBurns {
+  0%   { transform: scale(1.04) translate3d(0, 0, 0); }
+  100% { transform: scale(1.10) translate3d(-1.5%, -1%, 0); }
+}
+.banner-slider .slick-active .slider-item {
+  animation: kenBurns 9s ease-in-out infinite alternate;
+}
+
+/* Refined Slick dots — pill-shaped, brand-coloured when active. */
+.banner-slider .slick-dots li {
+  width: 18px;
+  height: 8px;
+  margin: 0 4px;
+  transition: width var(--motion-base) var(--ease-out-quart);
+}
+.banner-slider .slick-dots li button {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+}
+.banner-slider .slick-dots li button:before {
+  content: "";
+  width: 100%;
+  height: 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.45);
+  opacity: 1;
+  position: absolute;
+  inset: 0;
+  transition: background var(--motion-base);
+}
+.banner-slider .slick-dots li.slick-active {
+  width: 32px;
+}
+.banner-slider .slick-dots li.slick-active button:before {
+  background: #4069FF;
+}
+
+/* Footer link animated underline */
+.single-footer-wid ul li a,
+.single-footer-wid2 ul li a {
+  position: relative;
+  display: inline-block;
+  transition: color var(--motion-fast);
+}
+.single-footer-wid ul li a::after,
+.single-footer-wid2 ul li a::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: -2px;
+  width: 0;
+  height: 1px;
+  background: currentColor;
+  transition: width var(--motion-base) var(--ease-out-quart);
+}
+.single-footer-wid ul li a:hover::after,
+.single-footer-wid2 ul li a:hover::after {
+  width: 100%;
+}
+
+/* Footer social icons subtle pop */
+.footer-social a,
+.social-icons a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--motion-fast) var(--ease-out-quart),
+              color var(--motion-fast);
+}
+.footer-social a:hover,
+.social-icons a:hover {
+  transform: scale(1.1) translateY(-2px);
+}
+
+/* Premium grain overlay used by GetInTouch and any dark hero section. */
+.grain-overlay {
+  position: relative;
+  isolation: isolate;
+}
+.grain-overlay::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/></filter><rect width='100%' height='100%' filter='url(%23n)' opacity='0.9'/></svg>");
+  mix-blend-mode: overlay;
+}
+
+/* Respect users' reduced-motion preference. */
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .hover-lift,
+  .theme-btn,
+  .banner-slider .slick-active .slider-item,
+  .banner-slider .slick-dots li {
+    animation: none !important;
+    transition: none !important;
+    transform: none !important;
+  }
+  .reveal { opacity: 1; }
 }
 
 /* ============================

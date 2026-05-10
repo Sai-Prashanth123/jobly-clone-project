@@ -1,9 +1,11 @@
 import { useCounterUp } from '@/hooks/useCounterUp';
+import { useInViewReveal } from '@/hooks/useInViewReveal';
 
 const AboutSection = () => {
   useCounterUp();
+  const sectionRef = useInViewReveal<HTMLElement>();
   return (
-    <section className="our-company pb-xs-80 pb-100 overflow-hidden">
+    <section ref={sectionRef} className="reveal our-company pb-xs-80 pb-100 overflow-hidden">
       <div className="container">
         <div className="row">
           <div className="col-lg-3 col-sm-6">
@@ -27,7 +29,7 @@ const AboutSection = () => {
                 <p>Jobly Solutions is a leading manpower consulting and recruitment company that offers top-notch staffing solutions to businesses across various industries. Our company was established in 2022 with a mission to connect the right talent with the right job, and we have been fulfilling this mission ever since.</p>
               </div>
               <div className="client-feedback d-flex flex-column flex-sm-row">
-                <div className="client-feedback__item client-feedback__item-two text-center">
+                <div className="client-feedback__item client-feedback__item-two hover-lift text-center">
                   <div className="client-feedback__item-header">
                     <span className="color-red font-la fw-600 text-uppercase">Success Project</span>
                   </div>
@@ -44,7 +46,7 @@ const AboutSection = () => {
                     </div>
                   </div>
                 </div>
-                <div className="client-feedback__item client-feedback__item-two text-center">
+                <div className="client-feedback__item client-feedback__item-two hover-lift text-center">
                   <div className="client-feedback__item-header">
                     <span className="color-red font-la fw-600 text-uppercase">Customer Review</span>
                   </div>
