@@ -3,16 +3,8 @@ import { Link } from 'react-router-dom';
 
 const slides = [
   {
-    image: '/assets/img/banner/banne-slider-1a.png',
-    num: '01',
-    sub: 'Accelerate your',
-    subSpan: 'Career Growth & Upskill Yourself',
-    title: 'Software Training <br/> Services',
-    href: '/software-training',
-  },
-  {
     image: '/assets/img/banner/banne-slider-1b.png',
-    num: '02',
+    num: '01',
     sub: 'Jobly offers a comprehensive range of',
     subSpan: 'IT consulting and staffing services',
     title: 'Staffing And Consulting Services',
@@ -20,7 +12,7 @@ const slides = [
   },
   {
     image: '/assets/img/banner/banne-slider-1c.png',
-    num: '03',
+    num: '02',
     sub: 'Outcome-driven workforce',
     subSpan: 'strategy & advisory',
     title: 'Consulting<br/> Services',

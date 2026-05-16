@@ -1,22 +1,56 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 
 const servicesSub = [
   { label: 'Consulting Services', path: '/career-guidance' },
   { label: 'Staffing And Consulting Services', path: '/staffing-and-consulting' },
-  { label: 'Software Training', path: '/software-training' },
 ];
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [servicesOpen, setServicesOpen] = useState(false);
+  const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
+  const [desktopServicesOpen, setDesktopServicesOpen] = useState(false);
+  const closeTimer = useRef<number | null>(null);
+  const dropdownRootRef = useRef<HTMLLIElement | null>(null);
   const location = useLocation();
+  const onServicesSubPage = servicesSub.some(s => location.pathname === s.path);
 
   useEffect(() => {
     const handleScroll = () => { if (window.scrollY > 0) setMobileOpen(false); };
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  // Close desktop dropdown when route changes
+  useEffect(() => { setDesktopServicesOpen(false); }, [location.pathname]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!desktopServicesOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (!dropdownRootRef.current) return;
+      if (!dropdownRootRef.current.contains(e.target as Node)) {
+        setDesktopServicesOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [desktopServicesOpen]);
+
+  const cancelCloseTimer = () => {
+    if (closeTimer.current !== null) {
+      window.clearTimeout(closeTimer.current);
+      closeTimer.current = null;
+    }
+  };
+  const openServices = () => {
+    cancelCloseTimer();
+    setDesktopServicesOpen(true);
+  };
+  const scheduleCloseServices = () => {
+    cancelCloseTimer();
+    closeTimer.current = window.setTimeout(() => setDesktopServicesOpen(false), 160);
+  };
 
   return (
     <>
@@ -38,11 +72,35 @@ const Navbar = () => {
                       <ul>
                         <li className={location.pathname === '/' ? 'active' : ''}><Link to="/">Home</Link></li>
                         <li className={location.pathname === '/about' ? 'active' : ''}><Link to="/about">About</Link></li>
-                        <li className={`dropdown ${servicesSub.some(s => location.pathname === s.path) ? 'active' : ''}`}>
-                          <a>Services</a>
+                        <li
+                          ref={dropdownRootRef}
+                          className={`dropdown${desktopServicesOpen ? ' open' : ''}${onServicesSubPage ? ' current' : ''}`}
+                          onMouseEnter={openServices}
+                          onMouseLeave={scheduleCloseServices}
+                        >
+                          <a
+                            role="button"
+                            aria-haspopup="true"
+                            aria-expanded={desktopServicesOpen}
+                            tabIndex={0}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => setDesktopServicesOpen(v => !v)}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setDesktopServicesOpen(v => !v);
+                              } else if (e.key === 'Escape') {
+                                setDesktopServicesOpen(false);
+                              }
+                            }}
+                          >
+                            Services <i className="fas fa-caret-down" style={{ fontSize: 12, marginLeft: 4 }}></i>
+                          </a>
                           <ul>
                             {servicesSub.map(s => (
-                              <li key={s.path}><Link to={s.path}>{s.label}</Link></li>
+                              <li key={s.path}>
+                                <Link to={s.path} onClick={() => setDesktopServicesOpen(false)}>{s.label}</Link>
+                              </li>
                             ))}
                           </ul>
                         </li>
@@ -81,14 +139,14 @@ const Navbar = () => {
               <ul className="consulter-navbar-mobile">
                 <li><Link to="/" onClick={() => setMobileOpen(false)}>Home</Link></li>
                 <li><Link to="/about" onClick={() => setMobileOpen(false)}>About</Link></li>
-                <li className={`dropdown${servicesOpen ? ' open' : ''}`}>
-                  <a onClick={() => setServicesOpen(v => !v)} style={{ cursor: 'pointer' }}>
-                    Services <i className={`fas fa-caret-${servicesOpen ? 'up' : 'down'}`}></i>
+                <li className={`dropdown${mobileServicesOpen ? ' open' : ''}`}>
+                  <a onClick={() => setMobileServicesOpen(v => !v)} style={{ cursor: 'pointer' }}>
+                    Services <i className={`fas fa-caret-${mobileServicesOpen ? 'up' : 'down'}`}></i>
                   </a>
-                  {servicesOpen && (
+                  {mobileServicesOpen && (
                     <ul className="mobile-sub-menu">
                       {servicesSub.map(s => (
-                        <li key={s.path}><Link to={s.path} onClick={() => { setMobileOpen(false); setServicesOpen(false); }}>{s.label}</Link></li>
+                        <li key={s.path}><Link to={s.path} onClick={() => { setMobileOpen(false); setMobileServicesOpen(false); }}>{s.label}</Link></li>
                       ))}
                     </ul>
                   )}

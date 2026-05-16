@@ -1109,3 +1109,56 @@ body { overflow-x: hidden; }
 @media (max-width: 991px) {
   .why-choose .row:last-child { row-gap: 24px; }
 }
+
+/* ─── DESKTOP DROPDOWN — click + hover controlled (overrides template) ─── */
+/* Stop ".active" parent li from forcibly showing the dropdown when on a sub-page */
+header.header-1 .main-menu ul > li.dropdown.active > ul {
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(40px);
+}
+/* Show only when explicitly opened (React state) OR on hover */
+header.header-1 .main-menu ul > li.dropdown.open > ul,
+header.header-1 .main-menu ul > li.dropdown:hover > ul,
+header.header-1 .main-menu ul > li.dropdown:focus-within > ul {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+}
+/* Faster open transition */
+header.header-1 .main-menu ul > li.dropdown > ul {
+  transition: opacity var(--motion-base, 220ms) var(--ease-out-quart, ease-out),
+              visibility var(--motion-base, 220ms) var(--ease-out-quart, ease-out),
+              transform var(--motion-base, 220ms) var(--ease-out-quart, ease-out) !important;
+  border-radius: var(--radius-card, 12px);
+  padding: 8px 0;
+  overflow: hidden;
+}
+/* Invisible hover bridge so the cursor can travel from trigger to menu without flicker */
+header.header-1 .main-menu ul > li.dropdown > ul::before {
+  content: '';
+  position: absolute;
+  top: -14px;
+  left: 0;
+  right: 0;
+  height: 14px;
+  background: transparent;
+}
+/* "current" class — colors the trigger blue without forcing the menu open */
+header.header-1 .main-menu ul > li.dropdown.current > a {
+  color: #4069FF;
+}
+/* Caret rotates when open */
+header.header-1 .main-menu ul > li.dropdown.open > a i,
+header.header-1 .main-menu ul > li.dropdown:hover > a i {
+  transform: rotate(180deg);
+}
+/* Dropdown item polish */
+header.header-1 .main-menu ul > li.dropdown > ul li a {
+  transition: color 140ms ease, background-color 140ms ease;
+  padding: 10px 22px;
+}
+header.header-1 .main-menu ul > li.dropdown > ul li a:hover {
+  background-color: rgba(64, 105, 255, 0.06);
+}
+

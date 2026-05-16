@@ -30,7 +30,6 @@ const StaffingConsulting = () => {
                 <p>Our staffing services are highly dedicated towards assisting the HRs of any business to find right talent at ease which could fit the business. Our workforce works round the clock to find the right candidates which could meet the specific requirements of the respective business.</p>
                 <h5>We offer flexible staffing services:</h5>
                 <ul>
-                  <li>Contract Staffing</li>
                   <li>Staffing</li>
                   <li>Direct Hire Staffing</li>
                 </ul>
