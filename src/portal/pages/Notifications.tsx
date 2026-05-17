@@ -107,10 +107,11 @@ export default function Notifications() {
                 variant="outline"
                 size="sm"
                 className="gap-2"
+                loading={markAllRead.isPending}
+                loadingText="Marking…"
                 onClick={() => markAllRead.mutate(undefined, {
                   onSuccess: () => toast.success('All notifications marked as read'),
                 })}
-                disabled={markAllRead.isPending}
               >
                 <CheckCheck className="h-4 w-4" />
                 Mark all read
@@ -133,7 +134,8 @@ export default function Notifications() {
                 variant="outline"
                 size="sm"
                 className="gap-2 text-xs border-amber-200 hover:bg-amber-100"
-                disabled={triggerReminders.isPending}
+                loading={triggerReminders.isPending}
+                loadingText="Sending…"
                 onClick={async () => {
                   try {
                     const res = await triggerReminders.mutateAsync();
@@ -143,16 +145,15 @@ export default function Notifications() {
                   }
                 }}
               >
-                {triggerReminders.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <Clock className="h-3.5 w-3.5" />}
+                <Clock className="h-3.5 w-3.5" />
                 Send Timesheet Reminders
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-2 text-xs border-amber-200 hover:bg-amber-100"
-                disabled={triggerContractExpiry.isPending}
+                loading={triggerContractExpiry.isPending}
+                loadingText="Checking…"
                 onClick={async () => {
                   try {
                     const res = await triggerContractExpiry.mutateAsync();
@@ -166,16 +167,15 @@ export default function Notifications() {
                   }
                 }}
               >
-                {triggerContractExpiry.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <AlertTriangle className="h-3.5 w-3.5" />}
+                <AlertTriangle className="h-3.5 w-3.5" />
                 Check Contract Expiry
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-2 text-xs border-amber-200 hover:bg-amber-100"
-                disabled={triggerInvoiceReadiness.isPending}
+                loading={triggerInvoiceReadiness.isPending}
+                loadingText="Checking…"
                 onClick={async () => {
                   try {
                     const res = await triggerInvoiceReadiness.mutateAsync();
@@ -189,9 +189,7 @@ export default function Notifications() {
                   }
                 }}
               >
-                {triggerInvoiceReadiness.isPending
-                  ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  : <FileText className="h-3.5 w-3.5" />}
+                <FileText className="h-3.5 w-3.5" />
                 Check Invoices Ready
               </Button>
             </div>

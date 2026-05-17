@@ -97,10 +97,12 @@ function DocumentManager({ employee }: { employee: Employee }) {
               <Button
                 type="button"
                 onClick={handleUpload}
-                disabled={!docType || !file || upload.isPending}
+                disabled={!docType || !file}
+                loading={upload.isPending}
+                loadingText="Uploading…"
                 className="w-full gap-2"
               >
-                {upload.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                <Upload className="h-4 w-4" />
                 Upload
               </Button>
             </div>
@@ -145,11 +147,10 @@ function DocumentManager({ employee }: { employee: Employee }) {
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-1"
                       onClick={() => handleDelete(doc.id, doc.name)}
-                      disabled={pendingDeleteId === doc.id}
+                      loading={pendingDeleteId === doc.id}
+                      loadingText="Deleting…"
                     >
-                      {pendingDeleteId === doc.id
-                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        : <Trash2 className="h-3.5 w-3.5" />}
+                      <Trash2 className="h-3.5 w-3.5" />
                       Delete
                     </Button>
                   </div>

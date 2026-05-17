@@ -175,7 +175,8 @@ function UsersTab() {
                           variant="ghost"
                           size="sm"
                           className="h-7 px-2 text-xs gap-1"
-                          disabled={resetPwd.isPending}
+                          loading={resetPwd.isPending && resetPwd.variables === u.id}
+                          loadingText="Resetting…"
                           onClick={async () => {
                             try {
                               const pwd = await resetPwd.mutateAsync(u.id);

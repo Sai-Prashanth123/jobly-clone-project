@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { CheckCircle, XCircle, Send, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Send } from 'lucide-react';
 import type { Timesheet } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -25,8 +25,8 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
 
   if (role === 'employee' && status === 'draft' && user.employeeId === timesheet.employeeId) {
     return (
-      <Button className="gap-2" disabled={isLoading} onClick={() => onStatusChange('submitted')}>
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+      <Button className="gap-2" loading={isLoading} loadingText="Submitting…" onClick={() => onStatusChange('submitted')}>
+        <Send className="h-4 w-4" />
         Submit Timesheet
       </Button>
     );
@@ -34,8 +34,8 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
 
   if (role === 'employee' && status === 'rejected' && user.employeeId === timesheet.employeeId) {
     return (
-      <Button className="gap-2" disabled={isLoading} onClick={() => onStatusChange('submitted')}>
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+      <Button className="gap-2" loading={isLoading} loadingText="Resubmitting…" onClick={() => onStatusChange('submitted')}>
+        <Send className="h-4 w-4" />
         Resubmit Timesheet
       </Button>
     );
@@ -50,9 +50,9 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
             <XCircle className="h-4 w-4" />
             Reject
           </Button>
-          <Button className="gap-2" disabled={isLoading}
+          <Button className="gap-2" loading={isLoading} loadingText="Approving…"
             onClick={() => onStatusChange('manager_approved')}>
-            {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+            <CheckCircle className="h-4 w-4" />
             Approve
           </Button>
         </div>
@@ -73,12 +73,17 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
               />
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setRejectOpen(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={() => {
-                onStatusChange('rejected', rejectReason);
-                setRejectOpen(false);
-                setRejectReason('');
-              }}>
+              <Button variant="outline" onClick={() => setRejectOpen(false)} disabled={isLoading}>Cancel</Button>
+              <Button
+                variant="destructive"
+                loading={isLoading}
+                loadingText="Rejecting…"
+                onClick={() => {
+                  onStatusChange('rejected', rejectReason);
+                  setRejectOpen(false);
+                  setRejectReason('');
+                }}
+              >
                 Reject Timesheet
               </Button>
             </DialogFooter>
@@ -90,9 +95,9 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
 
   if ((role === 'finance' || role === 'admin') && status === 'manager_approved') {
     return (
-      <Button className="gap-2" disabled={isLoading}
+      <Button className="gap-2" loading={isLoading} loadingText="Approving…"
         onClick={() => onStatusChange('client_approved')}>
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle className="h-4 w-4" />}
+        <CheckCircle className="h-4 w-4" />
         Client Approve
       </Button>
     );

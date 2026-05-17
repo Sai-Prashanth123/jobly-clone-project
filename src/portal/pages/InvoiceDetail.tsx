@@ -59,7 +59,8 @@ export default function InvoiceDetail() {
             variant="outline"
             size="sm"
             className="gap-2"
-            disabled={getInvoicePDF.isPending}
+            loading={getInvoicePDF.isPending}
+            loadingText="Generating…"
             onClick={async () => {
               try {
                 const url = await getInvoicePDF.mutateAsync(invoice.id);
@@ -69,14 +70,15 @@ export default function InvoiceDetail() {
               }
             }}
           >
-            {getInvoicePDF.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+            <Download className="h-4 w-4" />
             PDF
           </Button>
           {invoice.status === 'draft' && (
             <Button
               size="sm"
               className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={sendInvoice.isPending}
+              loading={sendInvoice.isPending}
+              loadingText="Sending…"
               onClick={async () => {
                 try {
                   await sendInvoice.mutateAsync();
@@ -86,7 +88,7 @@ export default function InvoiceDetail() {
                 }
               }}
             >
-              {sendInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+              <Send className="h-4 w-4" />
               Send to Client
             </Button>
           )}

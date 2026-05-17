@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
@@ -28,7 +28,6 @@ export default function EmployeeDetail() {
   const { user } = useAuth();
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [approvingOnboard, setApprovingOnboard] = useState(false);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -77,20 +76,19 @@ export default function EmployeeDetail() {
             <Button
               size="sm"
               className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-              disabled={approvingOnboard}
+              loading={updateEmployee.isPending}
+              loadingText="Approving…"
               onClick={async () => {
-                setApprovingOnboard(true);
                 try {
                   await updateEmployee.mutateAsync({ status: 'active' } as any);
                   toast.success('Employee onboarding approved — now Active');
                 } catch (err: any) {
                   toast.error(err?.response?.data?.error ?? 'Failed to approve onboarding');
-                } finally {
-                  setApprovingOnboard(false);
                 }
               }}
             >
-              {approvingOnboard ? <Loader2 className="h-4 w-4 animate-spin" /> : '✓ Approve Onboarding'}
+              <CheckCircle2 className="h-4 w-4" />
+              Approve Onboarding
             </Button>
           )}
           {(user?.role === 'admin' || user?.role === 'hr') && (
@@ -99,7 +97,8 @@ export default function EmployeeDetail() {
                 variant="outline"
                 size="sm"
                 className="gap-2"
-                disabled={resendCreds.isPending}
+                loading={resendCreds.isPending}
+                loadingText="Sending…"
                 onClick={async () => {
                   try {
                     const r = await resendCreds.mutateAsync(employee.id);
@@ -118,7 +117,7 @@ export default function EmployeeDetail() {
                   }
                 }}
               >
-                {resendCreds.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                <Mail className="h-4 w-4" />
                 Resend Welcome Email
               </Button>
               <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">

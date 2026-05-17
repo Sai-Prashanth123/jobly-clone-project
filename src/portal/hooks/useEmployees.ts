@@ -163,9 +163,14 @@ export function useDeleteEmployeeDocument(employeeId: string) {
   });
 }
 
-// Convert camelCase Employee fields to snake_case for API
+// Convert camelCase Employee fields to snake_case for API.
+// Empty strings on optional fields are coerced to undefined so they're stripped
+// from the JSON body — the backend schema treats undefined as "not provided",
+// but `''` would hit validators like z.string().email() and trigger 400s
+// (e.g. an unfilled optional workEmail would be sent as '' and rejected).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function toSnake(e: Partial<Employee>): Record<string, any> {
+  const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
   return {
     ...(e.firstName !== undefined && { firstName: e.firstName }),
     ...(e.lastName !== undefined && { lastName: e.lastName }),
@@ -183,14 +188,14 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.i9Status !== undefined && { i9Status: e.i9Status }),
     ...(e.payRate !== undefined && { payRate: e.payRate }),
     ...(e.payType !== undefined && { payType: e.payType }),
-    ...(e.workLocation !== undefined && { workLocation: e.workLocation }),
     ...(e.ssn !== undefined && { ssn: e.ssn }),
-    ...(e.paymentType !== undefined && { paymentType: e.paymentType }),
-    ...(e.bankName !== undefined && { bankName: e.bankName }),
-    ...(e.bankRoutingNumber !== undefined && { bankRoutingNumber: e.bankRoutingNumber }),
-    ...(e.bankAccountNumber !== undefined && { bankAccountNumber: e.bankAccountNumber }),
-    ...(e.taxFormType !== undefined && { taxFormType: e.taxFormType }),
-    ...(e.reportingManagerId !== undefined && { reportingManagerId: e.reportingManagerId }),
-    ...(e.workEmail !== undefined && { workEmail: e.workEmail }),
+    ...(e.workLocation !== undefined && { workLocation: blank(e.workLocation) }),
+    ...(e.paymentType !== undefined && { paymentType: blank(e.paymentType) }),
+    ...(e.bankName !== undefined && { bankName: blank(e.bankName) }),
+    ...(e.bankRoutingNumber !== undefined && { bankRoutingNumber: blank(e.bankRoutingNumber) }),
+    ...(e.bankAccountNumber !== undefined && { bankAccountNumber: blank(e.bankAccountNumber) }),
+    ...(e.taxFormType !== undefined && { taxFormType: blank(e.taxFormType) }),
+    ...(e.reportingManagerId !== undefined && { reportingManagerId: blank(e.reportingManagerId) }),
+    ...(e.workEmail !== undefined && { workEmail: blank(e.workEmail) }),
   };
 }
