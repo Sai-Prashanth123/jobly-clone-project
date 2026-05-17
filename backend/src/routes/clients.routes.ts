@@ -1,13 +1,13 @@
 import { Router } from 'express';
-import multer from 'multer';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
+import { documentUpload } from '../middleware/upload';
 import { createClientSchema, updateClientSchema, listClientsQuerySchema } from '../schemas/client.schema';
 import * as ctrl from '../controllers/clients.controller';
 
 const router = Router();
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = documentUpload;
 
 router.use(authenticate);
 

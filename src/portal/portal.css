@@ -27,6 +27,17 @@
   box-sizing: border-box;
 }
 
+/* Visible scrollbar affordance for tables that overflow horizontally on mobile */
+.portal-scope .portal-scroll-x::-webkit-scrollbar {
+  height: 8px;
+  background: rgba(15, 23, 42, 0.04);
+}
+.portal-scope .portal-scroll-x::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.18);
+  border-radius: 4px;
+}
+.portal-scope .portal-scroll-x { scrollbar-width: thin; }
+
 .portal-scope ul,
 .portal-scope ol {
   list-style: none;

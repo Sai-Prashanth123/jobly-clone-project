@@ -25,7 +25,7 @@ export async function deactivateUser(req: Request, res: Response, next: NextFunc
 
 export async function resetPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const tempPassword = await svc.resetUserPassword(req.params.id);
+    const tempPassword = await svc.resetUserPassword(req.params.id, req.user!.id);
     res.json({ success: true, data: { tempPassword } });
   } catch (err) { next(err); }
 }

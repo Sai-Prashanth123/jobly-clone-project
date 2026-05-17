@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
-  Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen,
+  Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -135,6 +135,15 @@ export function PortalSidebar() {
             </div>
           </div>
           <div className="flex items-center gap-1">
+            {/* Mobile-only search trigger — Ctrl+K isn't reachable on touch devices */}
+            <button
+              type="button"
+              aria-label="Open search"
+              className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
+              onClick={() => window.dispatchEvent(new CustomEvent('portal:open-command'))}
+            >
+              <Search className="h-4 w-4" />
+            </button>
             <button
               ref={bellRef}
               className="relative p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"

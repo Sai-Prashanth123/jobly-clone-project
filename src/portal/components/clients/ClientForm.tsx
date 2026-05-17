@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
 import type { Client, BillingType } from '../../types';
 import { useUploadClientDocument } from '../../hooks/useClients';
-import { formatDate } from '../../lib/utils';
+import { formatDate, parseNumberInput } from '../../lib/utils';
 import { toast } from 'sonner';
 
 type ClientFormData = Omit<Client, 'id' | 'createdAt' | 'updatedAt'>;
@@ -43,6 +43,12 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
   const [form, setForm] = useState<ClientFormData>({ ...defaultForm, ...initial, documents: initial?.documents ?? [] });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('basic');
+
+  useEffect(() => {
+    setForm({ ...defaultForm, ...initial, documents: initial?.documents ?? [] });
+    setErrors({});
+    setActiveTab('basic');
+  }, [initial?.id]);
 
   // Pending files (create mode) — key = temp id
   const [pendingFiles] = useState<Map<string, PendingDoc>>(new Map());
@@ -152,7 +158,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-4 h-auto gap-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1">
           {(['basic', 'contract', 'billing', 'docs'] as const).map(tab => (
             <TabsTrigger key={tab} value={tab} className="relative capitalize">
               {tab === 'docs' ? 'Documents' : tab.charAt(0).toUpperCase() + tab.slice(1)}
@@ -273,7 +279,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
             <div className="space-y-2">
               <Label>Default Bill Rate ($/hr)</Label>
               <Input type="number" min={0} step={0.01} value={form.defaultBillRate}
-                onChange={e => set('defaultBillRate', parseFloat(e.target.value) || 0)} />
+                onChange={e => set('defaultBillRate', parseNumberInput(e.target.value) ?? 0)} />
             </div>
             <div className="space-y-2">
               <Label>Currency</Label>

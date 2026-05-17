@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
+import { isValidId } from '../lib/utils';
 import type { Employee } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -78,7 +79,7 @@ export function useEmployee(id: string | undefined) {
       const { data } = await apiClient.get(`/employees/${id}`);
       return mapEmployee(data.data);
     },
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 }
 
@@ -121,6 +122,9 @@ export function useUpdateEmployee(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['employees'] });
       qc.invalidateQueries({ queryKey: ['employees', id] });
+      // Status flips (active ↔ inactive ↔ onboarding) change which assignments
+      // the operations dashboard considers active.
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }

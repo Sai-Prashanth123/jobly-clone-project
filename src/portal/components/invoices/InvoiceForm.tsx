@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { formatCurrency, formatDate } from '../../lib/utils';
+import { formatCurrency, formatDate, parseNumberInput } from '../../lib/utils';
 import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
 import { useEmployees } from '../../hooks/useEmployees';
@@ -149,7 +149,7 @@ export function InvoiceForm({ onGenerate, onCancel }: InvoiceFormProps) {
                 max={100}
                 step={0.5}
                 value={taxRate}
-                onChange={e => setTaxRate(Math.max(0, Math.min(100, parseFloat(e.target.value) || 0)))}
+                onChange={e => setTaxRate(Math.max(0, Math.min(100, parseNumberInput(e.target.value) ?? 0)))}
                 className="w-24"
               />
             </div>

@@ -61,3 +61,18 @@ export function getInitials(name: string): string {
 export function cn(...classes: (string | undefined | false | null)[]): string {
   return classes.filter(Boolean).join(' ');
 }
+
+// Guards against TanStack Query firing /api/.../undefined when useParams returns
+// the literal string "undefined" (which is truthy) or an empty string.
+export function isValidId(id: string | undefined | null): id is string {
+  return typeof id === 'string' && id.length > 0 && id !== 'undefined' && id !== 'null';
+}
+
+// Parses a numeric <input value> safely. Returns undefined for empty / NaN so
+// callers can show a validation error instead of silently saving 0.
+export function parseNumberInput(value: string): number | undefined {
+  const trimmed = value.trim();
+  if (trimmed === '') return undefined;
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : undefined;
+}

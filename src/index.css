@@ -1110,6 +1110,31 @@ body { overflow-x: hidden; }
   .why-choose .row:last-child { row-gap: 24px; }
 }
 
+/* ─── Mobile responsiveness — public site hardening ─────────────────────── */
+/* Contact form had hardcoded 85px side padding in the template that overflows phones */
+@media (max-width: 575px) {
+  .contact-form,
+  .contact-form .form-area { padding-left: 16px !important; padding-right: 16px !important; }
+}
+/* Hamburger touch target — Apple HIG 44px minimum */
+#hamburger {
+  padding: 10px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+}
+/* Footer links/contact info — long emails and addresses wrap instead of overflowing */
+footer .single-footer-wid a,
+footer .single-footer-wid2 a,
+footer .single-footer-wid ul li,
+footer .single-footer-wid2 ul li {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 /* ─── DESKTOP DROPDOWN — click + hover controlled (overrides template) ─── */
 /* Stop ".active" parent li from forcibly showing the dropdown when on a sub-page */
 header.header-1 .main-menu ul > li.dropdown.active > ul {

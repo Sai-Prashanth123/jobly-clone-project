@@ -74,7 +74,15 @@ export async function createTimesheet(input: CreateTimesheetInput) {
     .select()
     .single();
 
-  if (tsError) throw tsError;
+  if (tsError) {
+    // The pre-check above has a race window; the DB-level partial unique
+    // index (migration 004) is the real guard. Translate the unique violation
+    // into a friendly conflict instead of a generic 500.
+    if ((tsError as any).code === '23505') {
+      throw new ConflictError('A timesheet for this employee/assignment/week already exists');
+    }
+    throw tsError;
+  }
 
   if (input.entries.length > 0) {
     const entries = input.entries.map(e => ({

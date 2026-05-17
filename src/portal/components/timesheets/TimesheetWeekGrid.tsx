@@ -1,4 +1,5 @@
 import { Input } from '@/components/ui/input';
+import { parseNumberInput } from '../../lib/utils';
 import type { TimesheetEntry } from '../../types';
 
 interface TimesheetWeekGridProps {
@@ -50,7 +51,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false }: Times
                       step={0.5}
                       value={entry.hours || ''}
                       placeholder="0"
-                      onChange={e => handleChange(i, parseFloat(e.target.value) || 0)}
+                      onChange={e => handleChange(i, parseNumberInput(e.target.value) ?? 0)}
                       className="w-full text-center"
                       disabled={readonly}
                     />
@@ -89,7 +90,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false }: Times
                   step={0.5}
                   value={entry.hours || ''}
                   placeholder="0"
-                  onChange={e => handleChange(i, parseFloat(e.target.value) || 0)}
+                  onChange={e => handleChange(i, parseNumberInput(e.target.value) ?? 0)}
                   className="w-20 text-center"
                 />
                 <span className="text-xs text-gray-400">hrs</span>

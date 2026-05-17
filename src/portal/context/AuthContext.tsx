@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import type { AuthSession, PortalUser } from '../types';
 import { apiClient } from '../lib/apiClient';
+import { queryClient } from '../lib/queryClient';
 
 interface AuthContextValue {
   session: AuthSession | null;
@@ -56,10 +57,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
-    apiClient.post('/auth/logout').catch(() => {});
+    apiClient.post('/auth/logout').catch(err => console.warn('[auth] logout endpoint failed', err));
     setSession(null);
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem('access_token');
+    // Clear cached query data so the next user (on a shared device) doesn't
+    // see the previous user's data flash before refetch.
+    queryClient.clear();
   };
 
   return (

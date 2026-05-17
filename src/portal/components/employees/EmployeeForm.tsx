@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +10,7 @@ import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
 import type { Employee, EmployeeStatus, EmploymentType, PayType, VisaType, I9Status, EmployeeDocument } from '../../types';
 import { useEmployees, useUploadEmployeeDocument } from '../../hooks/useEmployees';
 import { generateId } from '../../lib/idGenerators';
-import { formatDate } from '../../lib/utils';
+import { formatDate, parseNumberInput } from '../../lib/utils';
 import { toast } from 'sonner';
 
 type EmployeeFormData = Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>;
@@ -38,6 +38,15 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
   const [form, setForm] = useState<EmployeeFormData>({ ...defaultForm, ...initial, documents: initial?.documents ?? [] });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('personal');
+
+  // Reset the form when the parent dialog opens with a different entity.
+  // Without this the form keeps the previous record's values until the user
+  // re-types something — a race condition on fast row clicks.
+  useEffect(() => {
+    setForm({ ...defaultForm, ...initial, documents: initial?.documents ?? [] });
+    setErrors({});
+    setActiveTab('personal');
+  }, [initial?.id]);
 
   // Document state
   const [newDocType, setNewDocType] = useState('');
@@ -144,7 +153,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3 sm:grid-cols-5 h-auto gap-1">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 h-auto gap-1">
           <TabsTrigger value="personal" className="relative">
             Personal
             {(errors.firstName || errors.lastName || errors.email || errors.dob || errors.addrStreet || errors.addrCity || errors.addrState || errors.addrZip) && (
@@ -357,7 +366,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
               <Input
                 type="number" min={0} step={0.01}
                 value={form.payRate}
-                onChange={e => set('payRate', parseFloat(e.target.value) || 0)}
+                onChange={e => set('payRate', parseNumberInput(e.target.value) ?? 0)}
               />
               {errors.payRate && <p className="text-xs text-red-500">{errors.payRate}</p>}
             </div>
@@ -392,9 +401,9 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
                 </SelectContent>
               </Select>
             </div>
-            <div className="col-span-2 border-t pt-4 mt-2">
+            <div className="sm:col-span-2 border-t pt-4 mt-2">
               <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">Bank Details (ACH)</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Bank Name</Label>
                   <Input value={form.bankName ?? ''} onChange={e => set('bankName', e.target.value)} />
@@ -403,7 +412,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
                   <Label>Routing Number</Label>
                   <Input value={form.bankRoutingNumber ?? ''} onChange={e => set('bankRoutingNumber', e.target.value)} />
                 </div>
-                <div className="col-span-2 space-y-2">
+                <div className="sm:col-span-2 space-y-2">
                   <Label>Account Number</Label>
                   <Input value={form.bankAccountNumber ?? ''} onChange={e => set('bankAccountNumber', e.target.value)} />
                 </div>

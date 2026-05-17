@@ -20,6 +20,10 @@ RUN npm run build
 # (tsc does not copy .js/.wasm non-source files from src/)
 RUN cp -r src/generated dist/
 
+# Strip sourcemaps from the production output — they expose original
+# TypeScript to anyone who can pull the image, and aren't useful at runtime.
+RUN find dist -name '*.map' -delete
+
 # ── Stage 2: Production ───────────────────────────────────────────────────────
 FROM node:20-alpine AS production
 WORKDIR /app

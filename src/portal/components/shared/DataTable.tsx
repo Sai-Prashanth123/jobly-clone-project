@@ -215,9 +215,9 @@ export function DataTable<T>({
         <div className="flex items-center gap-2 flex-shrink-0">
           {filterNode && <div>{filterNode}</div>}
           {exportFilename && (
-            <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 h-9 text-xs">
+            <Button variant="outline" size="sm" onClick={handleExport} className="gap-2 h-9 text-xs" aria-label="Export CSV">
               <Download className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Export CSV</span>
+              <span>Export</span>
             </Button>
           )}
         </div>
@@ -237,8 +237,8 @@ export function DataTable<T>({
       )}
 
       {/* Table with horizontal scroll on mobile + sticky header on tall lists */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto max-h-[640px] overflow-y-auto shadow-[var(--shadow-sm)]">
-        <Table className="min-w-[500px]">
+      <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto max-h-[640px] overflow-y-auto shadow-[var(--shadow-sm)] portal-scroll-x">
+        <Table>
           <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
             <TableRow className="bg-gray-50">
               {selectable && (

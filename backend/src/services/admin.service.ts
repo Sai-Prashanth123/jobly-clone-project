@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
+import { logActivity } from '../lib/activityLogger';
 
 const VALID_ROLES = ['admin', 'hr', 'operations', 'finance', 'employee'];
 
@@ -24,6 +25,13 @@ export async function updateUserRole(userId: string, role: string, actorId: stri
     throw new ForbiddenError('You cannot change your own admin role');
   }
 
+  // Capture the previous role for the audit record before the update.
+  const { data: prev } = await supabaseAdmin
+    .from('portal_users')
+    .select('email, role')
+    .eq('id', userId)
+    .single();
+
   const { data, error } = await supabaseAdmin
     .from('portal_users')
     .update({ role })
@@ -32,6 +40,12 @@ export async function updateUserRole(userId: string, role: string, actorId: stri
     .single();
 
   if (error || !data) throw new NotFoundError('User not found');
+
+  logActivity(actorId, 'updated', 'portal_user', userId, data.email ?? userId.slice(0, 8), {
+    event: 'role_changed',
+    previousRole: prev?.role,
+    newRole: role,
+  });
   return data;
 }
 
@@ -40,20 +54,39 @@ export async function deactivateUser(userId: string, actorId: string) {
     throw new ForbiddenError('You cannot deactivate your own account');
   }
 
+  // Look up the target email/role for the audit record before the delete cascades.
+  const { data: target } = await supabaseAdmin
+    .from('portal_users')
+    .select('email, role')
+    .eq('id', userId)
+    .single();
+
   // Delete the Supabase Auth user (this also cascades portal_users via FK)
   const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
   if (error) throw error;
 
   // Also remove portal_users row if not cascade-deleted
   await supabaseAdmin.from('portal_users').delete().eq('id', userId);
+
+  logActivity(actorId, 'deleted', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
+    event: 'deactivated',
+    role: target?.role,
+  });
 }
 
-export async function resetUserPassword(userId: string): Promise<string> {
+export async function resetUserPassword(userId: string, actorId?: string): Promise<string> {
   const tempPassword = 'Jobly@' + Math.random().toString(36).slice(2, 8).toUpperCase();
   const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
     password: tempPassword,
   });
   if (error) throw error;
+
+  // Audit: capture WHO reset WHOSE password, but never log the new password.
+  const { data: target } = await supabaseAdmin
+    .from('portal_users').select('email').eq('id', userId).single();
+  logActivity(actorId ?? null, 'updated', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
+    event: 'password_reset',
+  });
   return tempPassword;
 }
 

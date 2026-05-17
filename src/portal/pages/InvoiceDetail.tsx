@@ -81,8 +81,15 @@ export default function InvoiceDetail() {
               loadingText="Sending…"
               onClick={async () => {
                 try {
-                  await sendInvoice.mutateAsync();
-                  toast.success('Invoice sent to client via email');
+                  const r = await sendInvoice.mutateAsync();
+                  if (r.emailSent) {
+                    toast.success('Invoice sent to client via email');
+                  } else {
+                    toast.warning(
+                      r.warning ?? 'Invoice was prepared but the email could not be delivered. Try again or check the client billing email.',
+                      { duration: 12000 },
+                    );
+                  }
                 } catch (err: any) {
                   toast.error(err?.response?.data?.error ?? 'Failed to send invoice');
                 }

@@ -15,6 +15,11 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
 
 export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // Employees may only view their own profile — prevents enumerating other
+    // employees' SSN, pay rate, bank details, visa expiry, etc.
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only view their own profile');
+    }
     const data = await svc.getEmployee(req.params.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }

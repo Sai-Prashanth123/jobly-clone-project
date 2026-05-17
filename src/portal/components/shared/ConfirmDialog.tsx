@@ -39,7 +39,10 @@ export function ConfirmDialog({
 }: ConfirmDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={loading ? undefined : onOpenChange}>
-      <AlertDialogContent>
+      <AlertDialogContent
+        onEscapeKeyDown={e => { if (loading) e.preventDefault(); }}
+        onInteractOutside={e => { if (loading) e.preventDefault(); }}
+      >
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
           <AlertDialogDescription>{description}</AlertDialogDescription>

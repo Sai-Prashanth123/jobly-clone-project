@@ -1,4 +1,16 @@
 import nodemailer from 'nodemailer';
+import { formatDateSafe } from './dateUtils';
+
+// HTML-escape any user-supplied string before it lands in an email body.
+// Without this a client whose company name is `<img src=x onerror=...>` (or a
+// project name containing <script>) injects executable HTML into the email.
+const HTML_ESCAPES: Record<string, string> = {
+  '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+};
+function esc(value: unknown): string {
+  if (value === null || value === undefined) return '';
+  return String(value).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
+}
 
 // Gmail SMTP — set GMAIL_USER and GMAIL_APP_PASSWORD in env
 // Generate an App Password at: myaccount.google.com → Security → 2-Step Verification → App passwords
@@ -67,8 +79,8 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
   const tableRows = rows
     .map(([label, value]) => `
       <tr>
-        <td style="padding:8px 12px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">${label}</td>
-        <td style="padding:8px 12px;color:#111827;font-size:13px;font-weight:500;border-bottom:1px solid #f3f4f6;">${value}</td>
+        <td style="padding:8px 12px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">${esc(label)}</td>
+        <td style="padding:8px 12px;color:#111827;font-size:13px;font-weight:500;border-bottom:1px solid #f3f4f6;">${esc(value)}</td>
       </tr>`)
     .join('');
 
@@ -92,7 +104,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
         <!-- Body -->
         <tr>
           <td style="padding:32px 40px;">
-            <p style="margin:0 0 24px;color:#374151;font-size:15px;">Hi <strong>${firstName} ${lastName}</strong>,</p>
+            <p style="margin:0 0 24px;color:#374151;font-size:15px;">Hi <strong>${esc(firstName)} ${esc(lastName)}</strong>,</p>
             <p style="margin:0 0 24px;color:#374151;font-size:14px;line-height:1.6;">
               Welcome aboard! HR has added you to the Jobly Workforce Portal. Below are your onboarding details
               and your temporary login credentials &mdash; please log in and change your password right away.
@@ -127,11 +139,11 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
                 </tr>
                 <tr>
                   <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Username / Email</td>
-                  <td style="padding:12px 16px;color:#111827;font-size:13px;font-weight:600;font-family:monospace;border-bottom:1px solid #e5e7eb;">${loginEmail}</td>
+                  <td style="padding:12px 16px;color:#111827;font-size:13px;font-weight:600;font-family:monospace;border-bottom:1px solid #e5e7eb;">${esc(loginEmail)}</td>
                 </tr>
                 <tr>
                   <td style="padding:12px 16px;color:#6b7280;font-size:13px;">Temporary Password</td>
-                  <td style="padding:12px 16px;font-size:15px;font-weight:700;font-family:monospace;letter-spacing:2px;color:#4069FF;">${tempPassword}</td>
+                  <td style="padding:12px 16px;font-size:15px;font-weight:700;font-family:monospace;letter-spacing:2px;color:#4069FF;">${esc(tempPassword)}</td>
                 </tr>
               </tbody>
             </table>
@@ -144,7 +156,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
             <table width="100%" cellpadding="0" cellspacing="0">
               <tr>
                 <td align="center" style="padding:8px 0 24px;">
-                  <a href="${PORTAL_URL}/portal/login"
+                  <a href="${esc(PORTAL_URL)}/portal/login"
                      style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
                     Log In to Jobly Portal →
                   </a>
@@ -173,6 +185,9 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
 </body>
 </html>`;
 
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured on the server. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
+  }
   await transporter.sendMail({
     from: FROM,
     to,
@@ -200,6 +215,9 @@ export interface InvoiceEmailPayload {
 }
 
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<void> {
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured on the server. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
+  }
   const {
     to, clientName, contactName, invoiceNumber,
     issueDate, dueDate, subtotal, taxRate, taxAmount, totalAmount,
@@ -207,13 +225,13 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
   } = payload;
 
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
-  const fmtDate = (s: string) => new Date(s).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const fmtDate = (s: string) => formatDateSafe(s, { long: true }) || s;
 
   const lineRows = lineItems.map(li => `
     <tr>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${li.description}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">${li.hours}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">$${li.billRate}/hr</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${esc(li.description)}</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">${esc(li.hours)}</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">$${esc(li.billRate)}/hr</td>
       <td style="padding:10px 12px;font-size:13px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;text-align:right;">${fmt(li.amount)}</td>
     </tr>`).join('');
 
@@ -228,15 +246,15 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
         <tr>
           <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
             <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Invoice from Jobly Solutions</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${invoiceNumber}</p>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${esc(invoiceNumber)}</p>
           </td>
         </tr>
         <tr>
           <td style="padding:32px 40px;">
-            <p style="margin:0 0 20px;color:#374151;font-size:15px;">Dear <strong>${contactName}</strong>,</p>
+            <p style="margin:0 0 20px;color:#374151;font-size:15px;">Dear <strong>${esc(contactName)}</strong>,</p>
             <p style="margin:0 0 28px;color:#374151;font-size:14px;line-height:1.6;">
-              Please find attached the invoice for staffing services rendered to <strong>${clientName}</strong>.
-              ${billingPeriodStart && billingPeriodEnd ? `Billing period: <strong>${fmtDate(billingPeriodStart)}</strong> to <strong>${fmtDate(billingPeriodEnd)}</strong>.` : ''}
+              Please find attached the invoice for staffing services rendered to <strong>${esc(clientName)}</strong>.
+              ${billingPeriodStart && billingPeriodEnd ? `Billing period: <strong>${esc(fmtDate(billingPeriodStart))}</strong> to <strong>${esc(fmtDate(billingPeriodEnd))}</strong>.` : ''}
             </p>
 
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;">
@@ -257,7 +275,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
                 <td style="padding:6px 16px;font-size:13px;color:#111827;text-align:right;">${fmt(subtotal)}</td>
               </tr>
               ${taxRate > 0 ? `<tr>
-                <td style="padding:6px 16px;font-size:13px;color:#6b7280;">Tax (${taxRate}%)</td>
+                <td style="padding:6px 16px;font-size:13px;color:#6b7280;">Tax (${esc(taxRate)}%)</td>
                 <td style="padding:6px 16px;font-size:13px;color:#111827;text-align:right;">${fmt(taxAmount)}</td>
               </tr>` : ''}
               <tr style="background:#f9fafb;">
@@ -269,19 +287,19 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:28px;">
               <tr>
                 <td style="padding:10px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:40%;">Issue Date</td>
-                <td style="padding:10px 16px;font-size:13px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${fmtDate(issueDate)}</td>
+                <td style="padding:10px 16px;font-size:13px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${esc(fmtDate(issueDate))}</td>
               </tr>
               <tr>
                 <td style="padding:10px 16px;font-size:13px;color:#6b7280;">Payment Due</td>
-                <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#dc2626;">${fmtDate(dueDate)}</td>
+                <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#dc2626;">${esc(fmtDate(dueDate))}</td>
               </tr>
             </table>
 
-            ${notes ? `<p style="margin:0 0 24px;font-size:13px;color:#6b7280;background:#f9fafb;border-left:3px solid #4069FF;padding:12px 16px;border-radius:4px;">${notes}</p>` : ''}
+            ${notes ? `<p style="margin:0 0 24px;font-size:13px;color:#6b7280;background:#f9fafb;border-left:3px solid #4069FF;padding:12px 16px;border-radius:4px;">${esc(notes)}</p>` : ''}
 
             ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0">
               <tr><td align="center" style="padding:8px 0 24px;">
-                <a href="${pdfUrl}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
+                <a href="${esc(pdfUrl)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
                   Download Invoice PDF →
                 </a>
               </td></tr>

@@ -1,4 +1,5 @@
 import PDFDocument from 'pdfkit';
+import { formatDateSafe } from './dateUtils';
 
 export interface InvoicePDFData {
   invoiceNumber: string;
@@ -148,11 +149,5 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
 }
 
 function formatDate(dateStr: string): string {
-  try {
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'long', day: 'numeric'
-    });
-  } catch {
-    return dateStr;
-  }
+  return formatDateSafe(dateStr, { long: true }) || dateStr;
 }

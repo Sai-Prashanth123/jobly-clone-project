@@ -15,7 +15,7 @@ import { InvoiceForm } from '../components/invoices/InvoiceForm';
 import { useInvoices, useGenerateInvoice, useUpdateInvoice } from '../hooks/useInvoices';
 import { useClients } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
-import { formatDate, formatCurrency } from '../lib/utils';
+import { formatDate, formatCurrency, parseNumberInput } from '../lib/utils';
 import type { Invoice, InvoiceStatus } from '../types';
 
 export default function Invoices() {
@@ -207,7 +207,7 @@ export default function Invoices() {
               <Input
                 type="number" min={0} max={100} step={0.01}
                 value={editTaxRate}
-                onChange={(e) => setEditTaxRate(parseFloat(e.target.value) || 0)}
+                onChange={(e) => setEditTaxRate(parseNumberInput(e.target.value) ?? 0)}
               />
               <p className="text-xs text-muted-foreground">Updating the rate recalculates the total on save.</p>
             </div>

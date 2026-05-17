@@ -246,6 +246,18 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
   // can surface email failures back to the HR user instead of silently dropping them.
   const credsResult = await issueCredentials(emp.id, emp, input);
 
+  // Best-effort rollback: if auth setup failed entirely (no portal_users row
+  // created), soft-delete the employee row so HR can retry cleanly. Without
+  // this the employee exists but cannot log in, with no way to recover except
+  // manual DB edits.
+  if (!credsResult.credentialsReady) {
+    await supabaseAdmin.from('employees')
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', emp.id);
+    logActivity(actorId ?? null, 'deleted', 'employee', emp.id, emp.display_id ?? input.email, { reason: 'auth_setup_failed' });
+    return { ...serializeEmployee(emp), _credentials: credsResult };
+  }
+
   // Notify HR about new onboarding employee (fire-and-forget)
   try {
     const hrIds = await getUserIdsByRole('hr');
@@ -434,10 +446,10 @@ export async function exportEmployeesCSV(query: { status?: string; department?: 
   const headers = ['ID','First Name','Last Name','Email','Phone','Department','Job Title','Employment Type','Start Date','Status','Visa Type','Visa Expiry','Pay Rate','Pay Type','Work Location'];
   const rows = (data ?? []).map(e => [
     e.display_id ?? '',
-    e.first_name, e.last_name, e.email, e.phone ?? '',
-    e.department, e.job_title, e.employment_type, e.start_date, e.status,
+    e.first_name ?? '', e.last_name ?? '', e.email ?? '', e.phone ?? '',
+    e.department ?? '', e.job_title ?? '', e.employment_type ?? '', e.start_date ?? '', e.status ?? '',
     e.visa_type ?? '', e.visa_expiry ?? '',
-    e.pay_rate, e.pay_type, e.work_location ?? '',
+    e.pay_rate ?? '', e.pay_type ?? '', e.work_location ?? '',
   ]);
   return [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
 }

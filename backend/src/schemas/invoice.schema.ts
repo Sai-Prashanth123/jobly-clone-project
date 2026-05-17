@@ -1,9 +1,11 @@
 import { z } from 'zod';
 
+const ymdDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be a YYYY-MM-DD date');
+
 export const generateInvoiceSchema = z.object({
   clientId: z.string().uuid(),
   timesheetIds: z.array(z.string().uuid()).min(1),
-  issueDate: z.string(),
+  issueDate: ymdDate,
   taxRate: z.number().min(0).max(100).default(0),
   notes: z.string().optional().nullable(),
 });

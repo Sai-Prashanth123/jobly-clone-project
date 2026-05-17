@@ -24,8 +24,14 @@ export default function Login() {
   const [loading, setLoading]   = useState(false);
   const [active, setActive]     = useState<string | null>(null);
 
+  // Only honour redirects to in-portal paths to prevent open-redirect to external sites.
+  const safeRedirect = (() => {
+    const raw = params.get('redirect');
+    return raw && raw.startsWith('/portal/') ? raw : '/portal/dashboard';
+  })();
+
   if (isAuthenticated) {
-    return <Navigate to={params.get('redirect') ?? '/portal/dashboard'} replace />;
+    return <Navigate to={safeRedirect} replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -34,7 +40,7 @@ export default function Login() {
     setError('');
     const result = await login(email, password);
     if (result.success) {
-      navigate(params.get('redirect') ?? '/portal/dashboard', { replace: true });
+      navigate(safeRedirect, { replace: true });
     } else {
       setError(result.error ?? 'Invalid credentials. Please try again.');
       setLoading(false);

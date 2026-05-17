@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
+import { isValidId } from '../lib/utils';
 import type { Invoice } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +57,7 @@ export function useInvoice(id: string | undefined) {
       const { data } = await apiClient.get(`/invoices/${id}`);
       return mapInvoice(data.data);
     },
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 }
 
@@ -73,7 +74,14 @@ export function useGenerateInvoice() {
       const { data } = await apiClient.post('/invoices/generate', body);
       return mapInvoice(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoices'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      // The invoiced timesheets must disappear from the Generate-Invoice picker
+      // (which lists status='client_approved' timesheets) — otherwise the user
+      // can re-select and double-invoice.
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    },
   });
 }
 
@@ -87,6 +95,7 @@ export function useUpdateInvoice(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoices'] });
       qc.invalidateQueries({ queryKey: ['invoices', id] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
     },
   });
 }
@@ -113,7 +122,11 @@ export function useSendInvoice(id: string) {
   return useMutation({
     mutationFn: async () => {
       const { data } = await apiClient.post(`/invoices/${id}/send`);
-      return mapInvoice(data.data);
+      return {
+        invoice: mapInvoice(data.data),
+        emailSent: data.emailSent as boolean,
+        warning: data.warning as string | undefined,
+      };
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoices'] });

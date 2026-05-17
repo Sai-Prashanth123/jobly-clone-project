@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import type { Assignment, AssignmentStatus, BillingType } from '../../types';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useClients } from '../../hooks/useClients';
+import { parseNumberInput } from '../../lib/utils';
 
 type AssignmentFormData = Omit<Assignment, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -28,6 +29,11 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
   const { data: clientData } = useClients({ limit: 200 });
   const [form, setForm] = useState<AssignmentFormData>({ ...defaultForm, ...initial });
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setForm({ ...defaultForm, ...initial });
+    setErrors({});
+  }, [initial?.id]);
 
   const employees = empData?.data ?? [];
   const clients = clientData?.data ?? [];
@@ -122,7 +128,7 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
             <Input
               type="number" min={0} step={0.01}
               value={form.billRate}
-              onChange={e => set('billRate', parseFloat(e.target.value) || 0)}
+              onChange={e => set('billRate', parseNumberInput(e.target.value) ?? 0)}
             />
             {errors.billRate && <p className="text-xs text-red-500">{errors.billRate}</p>}
           </div>
@@ -132,7 +138,7 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
             <Input
               type="number" min={0} step={0.01}
               value={form.payRate}
-              onChange={e => set('payRate', parseFloat(e.target.value) || 0)}
+              onChange={e => set('payRate', parseNumberInput(e.target.value) ?? 0)}
             />
             {errors.payRate && <p className="text-xs text-red-500">{errors.payRate}</p>}
           </div>

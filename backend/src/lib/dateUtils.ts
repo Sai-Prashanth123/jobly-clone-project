@@ -60,3 +60,20 @@ export function daysBetween(dateA: string, dateB: string): number {
     (parseDateUTC(dateB).getTime() - parseDateUTC(dateA).getTime()) / (1000 * 60 * 60 * 24),
   );
 }
+
+/**
+ * Format a YYYY-MM-DD date for display ("Jan 15, 2026") without ever going
+ * through `new Date(string)`, which JS parses as UTC midnight and then formats
+ * in the server's local timezone — drifting by ±1 day depending on offset.
+ */
+const MONTHS_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS_LONG  = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+export function formatDateSafe(dateStr: string | undefined | null, opts: { long?: boolean } = {}): string {
+  if (!dateStr) return '';
+  const parts = dateStr.slice(0, 10).split('-');
+  if (parts.length !== 3) return dateStr;
+  const [y, m, d] = parts.map(Number);
+  if (!y || !m || !d) return dateStr;
+  const months = opts.long ? MONTHS_LONG : MONTHS_SHORT;
+  return `${months[m - 1]} ${d}, ${y}`;
+}

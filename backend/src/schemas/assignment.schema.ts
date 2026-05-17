@@ -14,9 +14,31 @@ export const createAssignmentSchema = z.object({
   billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),
   workLocation: z.string().optional().nullable().transform(v => v || null),
   reportingManagerId: z.string().uuid().optional().nullable(),
-});
+}).refine(
+  v => !v.endDate || v.endDate >= v.startDate,
+  { message: 'End date must be on or after start date', path: ['endDate'] },
+);
 
-export const updateAssignmentSchema = createAssignmentSchema.partial();
+// Partial schemas cannot inherit object-level .refine(), so re-apply the rule
+// for updates by checking both fields when both are present.
+export const updateAssignmentSchema = z.object({
+  employeeId: z.string().uuid().optional(),
+  clientId: z.string().uuid().optional(),
+  projectName: z.string().min(1).optional(),
+  role: z.string().min(1).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional().nullable().transform(v => v || null),
+  billRate: z.number().min(0).optional(),
+  payRate: z.number().min(0).optional(),
+  maxHoursPerWeek: z.number().int().min(1).max(168).optional(),
+  status: z.enum(['active','completed','pending','terminated']).optional(),
+  billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),
+  workLocation: z.string().optional().nullable().transform(v => v || null),
+  reportingManagerId: z.string().uuid().optional().nullable(),
+}).refine(
+  v => !(v.startDate && v.endDate) || v.endDate >= v.startDate,
+  { message: 'End date must be on or after start date', path: ['endDate'] },
+);
 
 export const listAssignmentsQuerySchema = z.object({
   status: z.enum(['active','completed','pending','terminated']).optional(),

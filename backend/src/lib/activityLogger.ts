@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../config/supabase';
 export async function logActivity(
   actorId: string | null,
   action: 'created' | 'updated' | 'deleted' | 'status_changed',
-  entityType: 'employee' | 'client' | 'assignment' | 'timesheet' | 'invoice',
+  entityType: 'employee' | 'client' | 'assignment' | 'timesheet' | 'invoice' | 'portal_user',
   entityId: string,
   entityLabel: string,
   metadata?: object,
@@ -17,7 +17,9 @@ export async function logActivity(
       entity_label: entityLabel,
       metadata: metadata ?? null,
     });
-  } catch (_) {
-    // Activity logging must never break the main flow
+  } catch (err) {
+    // Activity logging must never break the main flow, but ops needs to see
+    // failures so audit-trail gaps don't go unnoticed.
+    console.error('[activityLogger] insert failed', { actorId, action, entityType, entityId, entityLabel }, err);
   }
 }

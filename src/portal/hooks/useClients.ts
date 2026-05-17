@@ -1,6 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
+import { isValidId } from '../lib/utils';
 import type { Client } from '../types';
+
+// Empty strings on optional fields trip backend validators like
+// z.string().email() — coerce them to undefined so JSON.stringify drops them.
+const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function sanitizeClient(body: Partial<Client>): Record<string, any> {
+  const out: Record<string, any> = { ...body };
+  const optionalStringFields: (keyof Client)[] = [
+    'industry', 'contactPhone', 'contractEndDate',
+    'billingType', 'billingContactName', 'billingContactEmail', 'billingContactPhone',
+    'billingStreet', 'billingCity', 'billingState', 'billingZip', 'billingCountry',
+    'taxId',
+  ];
+  for (const k of optionalStringFields) {
+    if (k in out) out[k as string] = blank(out[k as string]);
+  }
+  return out;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapClient(raw: any): Client {
@@ -69,7 +89,7 @@ export function useClient(id: string | undefined) {
       const { data } = await apiClient.get(`/clients/${id}`);
       return mapClient(data.data);
     },
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 }
 
@@ -77,7 +97,7 @@ export function useCreateClient() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: Partial<Client>) => {
-      const { data } = await apiClient.post('/clients', body);
+      const { data } = await apiClient.post('/clients', sanitizeClient(body));
       return mapClient(data.data);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
@@ -88,7 +108,7 @@ export function useUpdateClient(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: Partial<Client>) => {
-      const { data } = await apiClient.put(`/clients/${id}`, body);
+      const { data } = await apiClient.put(`/clients/${id}`, sanitizeClient(body));
       return mapClient(data.data);
     },
     onSuccess: () => {

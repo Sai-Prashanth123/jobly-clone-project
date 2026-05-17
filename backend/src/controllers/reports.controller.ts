@@ -10,7 +10,10 @@ export async function employeeUtilization(req: Request, res: Response, next: Nex
 
 export async function visaExpiry(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const daysAhead = parseInt(req.query.daysAhead as string) || 90;
+    const raw = parseInt(req.query.daysAhead as string);
+    // Clamp to a sane window. Negative values would surface long-expired visas
+    // as "expiring soon"; >365 is noise. Default to 90.
+    const daysAhead = Math.max(0, Math.min(365, Number.isFinite(raw) ? raw : 90));
     const data = await svc.getVisaExpiry(daysAhead);
     res.json({ success: true, data });
   } catch (err) { next(err); }

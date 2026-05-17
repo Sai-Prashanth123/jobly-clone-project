@@ -4,11 +4,17 @@ import { UnauthorizedError } from '../lib/errors';
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { email, password } = req.body as { email: string; password: string };
+    const raw = req.body as { email: string; password: string };
 
-    if (!email || !password) {
+    if (!raw?.email || !raw?.password) {
       throw new UnauthorizedError('Email and password are required');
     }
+
+    // Normalize email: Supabase Auth is case-insensitive on its end, but the
+    // secondary lookup against portal_users below uses `.eq(...)` which is not.
+    // Strip whitespace and lowercase to keep both sides consistent.
+    const email = raw.email.trim().toLowerCase();
+    const password = raw.password;
 
     const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
 

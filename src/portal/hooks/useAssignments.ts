@@ -1,6 +1,27 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
+import { isValidId } from '../lib/utils';
 import type { Assignment } from '../types';
+
+const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
+
+function sanitizeAssignment(body: Partial<Assignment>) {
+  return {
+    employeeId: body.employeeId,
+    clientId: body.clientId,
+    projectName: body.projectName,
+    role: body.role,
+    startDate: body.startDate,
+    endDate: blank(body.endDate),
+    billRate: body.billRate,
+    payRate: body.payRate,
+    maxHoursPerWeek: body.maxHoursPerWeek,
+    status: body.status,
+    billingType: blank(body.billingType),
+    workLocation: blank(body.workLocation),
+    reportingManagerId: blank(body.reportingManagerId),
+  };
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapAssignment(raw: any): Assignment {
@@ -47,7 +68,7 @@ export function useAssignment(id: string | undefined) {
       const { data } = await apiClient.get(`/assignments/${id}`);
       return mapAssignment(data.data);
     },
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 }
 
@@ -55,24 +76,13 @@ export function useCreateAssignment() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: Partial<Assignment>) => {
-      const { data } = await apiClient.post('/assignments', {
-        employeeId: body.employeeId,
-        clientId: body.clientId,
-        projectName: body.projectName,
-        role: body.role,
-        startDate: body.startDate,
-        endDate: body.endDate,
-        billRate: body.billRate,
-        payRate: body.payRate,
-        maxHoursPerWeek: body.maxHoursPerWeek,
-        status: body.status,
-        billingType: body.billingType,
-        workLocation: body.workLocation,
-        reportingManagerId: body.reportingManagerId,
-      });
+      const { data } = await apiClient.post('/assignments', sanitizeAssignment(body));
       return mapAssignment(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['assignments'] }),
+    onSuccess: (data) => {
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+      if (data?.employeeId) qc.invalidateQueries({ queryKey: ['employees', data.employeeId] });
+    },
   });
 }
 
@@ -80,26 +90,13 @@ export function useUpdateAssignment(id: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (body: Partial<Assignment>) => {
-      const { data } = await apiClient.put(`/assignments/${id}`, {
-        employeeId: body.employeeId,
-        clientId: body.clientId,
-        projectName: body.projectName,
-        role: body.role,
-        startDate: body.startDate,
-        endDate: body.endDate,
-        billRate: body.billRate,
-        payRate: body.payRate,
-        maxHoursPerWeek: body.maxHoursPerWeek,
-        status: body.status,
-        billingType: body.billingType,
-        workLocation: body.workLocation,
-        reportingManagerId: body.reportingManagerId,
-      });
+      const { data } = await apiClient.put(`/assignments/${id}`, sanitizeAssignment(body));
       return mapAssignment(data.data);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       qc.invalidateQueries({ queryKey: ['assignments'] });
       qc.invalidateQueries({ queryKey: ['assignments', id] });
+      if (data?.employeeId) qc.invalidateQueries({ queryKey: ['employees', data.employeeId] });
     },
   });
 }

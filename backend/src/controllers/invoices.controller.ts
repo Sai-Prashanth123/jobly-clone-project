@@ -47,8 +47,13 @@ export async function getPDF(req: Request, res: Response, next: NextFunction): P
 
 export async function send(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.sendInvoice(req.params.id);
-    res.json({ success: true, data });
+    const result = await svc.sendInvoice(req.params.id);
+    res.json({
+      success: true,
+      data: result.invoice,
+      emailSent: result.emailSent,
+      warning: result.warning,
+    });
   } catch (err) { next(err); }
 }
 

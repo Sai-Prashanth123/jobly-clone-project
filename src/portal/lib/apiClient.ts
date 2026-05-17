@@ -21,13 +21,22 @@ apiClient.interceptors.request.use(config => {
   return config;
 });
 
-// On 401 → clear session and redirect to login
+// On 401 → clear session and redirect to login, preserving the current path
+// so the user lands back where they were after re-authenticating.
+let redirecting = false;
 apiClient.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401) {
+    if (err.response?.status === 401 && !redirecting) {
+      redirecting = true;
       sessionStorage.clear();
-      window.location.href = '/portal/login';
+      const here = window.location.pathname + window.location.search;
+      // Don't loop back to login itself; only set redirect for in-portal pages.
+      const redirectParam =
+        here.startsWith('/portal/') && !here.startsWith('/portal/login')
+          ? `?redirect=${encodeURIComponent(here)}`
+          : '';
+      window.location.href = `/portal/login${redirectParam}`;
     }
     return Promise.reject(err);
   },

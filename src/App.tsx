@@ -2,6 +2,7 @@ import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { ScrollToTop } from './components/ScrollToTop';
+import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -41,9 +42,11 @@ const App = () => (
           <Route
             path="/portal/*"
             element={
-              <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-500">Loading portal...</div>}>
-                <PortalApp />
-              </Suspense>
+              <ChunkErrorBoundary>
+                <Suspense fallback={<div className="flex items-center justify-center h-screen text-gray-500">Loading portal...</div>}>
+                  <PortalApp />
+                </Suspense>
+              </ChunkErrorBoundary>
             }
           />
 

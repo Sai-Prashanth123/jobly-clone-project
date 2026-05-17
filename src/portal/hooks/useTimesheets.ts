@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
+import { isValidId } from '../lib/utils';
 import type { Timesheet } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -59,7 +60,7 @@ export function useTimesheet(id: string | undefined) {
       const { data } = await apiClient.get(`/timesheets/${id}`);
       return mapTimesheet(data.data);
     },
-    enabled: !!id,
+    enabled: isValidId(id),
   });
 }
 
@@ -120,6 +121,9 @@ export function usePatchTimesheetStatus(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['timesheets'] });
       qc.invalidateQueries({ queryKey: ['timesheets', id] });
+      // Status changes alter approved-hours totals on dashboards + invoice
+      // eligibility (only client_approved timesheets are invoiceable).
+      qc.invalidateQueries({ queryKey: ['reports'] });
     },
   });
 }

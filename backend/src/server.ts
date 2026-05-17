@@ -3,6 +3,19 @@ import { env } from './config/env';
 import { supabaseAdmin } from './config/supabase';
 import { verifyMailer } from './lib/mailer';
 
+// Process-level safety nets. Without these, a stray unhandled Promise
+// rejection (e.g. a fire-and-forget notification) leaves the process in an
+// undefined state — Node 17+ exits on unhandledRejection by default, which
+// is fine, but we want a structured log first so ops can debug.
+process.on('unhandledRejection', (reason) => {
+  console.error('[unhandledRejection]', reason);
+});
+process.on('uncaughtException', (err) => {
+  console.error('[uncaughtException]', err);
+  // Re-throw to let the orchestrator restart us in a known-good state.
+  process.exit(1);
+});
+
 async function startServer(): Promise<void> {
   // Test Supabase connection
   try {
@@ -22,11 +35,32 @@ async function startServer(): Promise<void> {
   await verifyMailer();
 
   const port = parseInt(env.PORT, 10);
-  app.listen(port, () => {
+  const httpServer = app.listen(port, () => {
     console.log(`🚀 Jobly Backend running on http://localhost:${port}`);
     console.log(`   Environment: ${env.NODE_ENV}`);
     console.log(`   API base: http://localhost:${port}/api/v1`);
   });
+
+  // Graceful shutdown on container stop / Ctrl+C so in-flight requests
+  // finish and the DB connection pool drains cleanly.
+  const shutdown = (signal: string) => {
+    console.log(`\n${signal} received — draining connections…`);
+    httpServer.close(err => {
+      if (err) {
+        console.error('Error during server close', err);
+        process.exit(1);
+      }
+      console.log('HTTP server closed cleanly');
+      process.exit(0);
+    });
+    // Force-exit if cleanup hangs longer than 10s
+    setTimeout(() => {
+      console.warn('Shutdown timeout — forcing exit');
+      process.exit(1);
+    }, 10_000).unref();
+  };
+  process.on('SIGTERM', () => shutdown('SIGTERM'));
+  process.on('SIGINT', () => shutdown('SIGINT'));
 }
 
 startServer().catch(err => {

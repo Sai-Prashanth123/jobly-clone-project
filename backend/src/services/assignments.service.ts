@@ -89,7 +89,9 @@ export async function createAssignment(input: CreateAssignmentInput) {
         'success', 'assignment', data.id,
       );
     }
-  } catch (_) { /* non-blocking */ }
+  } catch (err) {
+    console.error('[assignments.service] notification failed for assignment', data.id, err);
+  }
 
   return data;
 }

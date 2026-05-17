@@ -1,8 +1,8 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError, ForbiddenError } from '../lib/errors';
+import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../lib/errors';
 import { generateInvoicePDF } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
-import { sendInvoiceEmail } from '../lib/mailer';
+import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { addDaysToDate } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
@@ -35,6 +35,21 @@ export async function getInvoice(id: string) {
 }
 
 export async function generateInvoice(input: GenerateInvoiceInput, actorId?: string) {
+  // Reject re-invoicing timesheets that are already on another invoice. The
+  // invoice_timesheets junction has PK (invoice_id, timesheet_id) so duplicates
+  // within ONE invoice are blocked, but nothing prevents the same TS from
+  // appearing on TWO invoices → double-billing. Catch it here.
+  const { data: alreadyInvoiced } = await supabaseAdmin
+    .from('invoice_timesheets')
+    .select('timesheet_id, invoice_id')
+    .in('timesheet_id', input.timesheetIds);
+  if (alreadyInvoiced && alreadyInvoiced.length > 0) {
+    const ids = [...new Set(alreadyInvoiced.map(r => r.timesheet_id))];
+    throw new ConflictError(
+      `These timesheets are already on an existing invoice and cannot be re-invoiced: ${ids.join(', ')}`,
+    );
+  }
+
   // Fetch timesheets
   const { data: timesheets, error: tsError } = await supabaseAdmin
     .from('timesheets')
@@ -43,6 +58,21 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
     .eq('status', 'client_approved');
 
   if (tsError) throw tsError;
+
+  // All requested timesheets must exist and be client_approved.
+  if (!timesheets || timesheets.length !== input.timesheetIds.length) {
+    throw new ValidationError('One or more timesheets are missing or not client-approved');
+  }
+
+  // Every timesheet must belong to the supplied client — guards against the
+  // frontend (or a malicious caller) submitting timesheets that belong to a
+  // different client.
+  const mismatched = timesheets.filter(t => t.client_id !== input.clientId);
+  if (mismatched.length > 0) {
+    throw new ValidationError(
+      `Some timesheets do not belong to the selected client: ${mismatched.map(t => t.id).join(', ')}`,
+    );
+  }
 
   // Fetch assignments for bill rates
   const assignmentIds = [...new Set((timesheets ?? []).map(t => t.assignment_id))];
@@ -53,12 +83,13 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
 
   const assignmentMap = new Map((assignments ?? []).map(a => [a.id, a]));
 
-  // Fetch client
-  const { data: client } = await supabaseAdmin
+  // Fetch client (must exist)
+  const { data: client, error: clientErr } = await supabaseAdmin
     .from('clients')
     .select('*')
     .eq('id', input.clientId)
     .single();
+  if (clientErr || !client) throw new NotFoundError('Client not found');
 
   // Fetch employees
   const employeeIds = [...new Set((timesheets ?? []).map(t => t.employee_id))];
@@ -99,34 +130,48 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
   // Calculate due date from client net payment days (UTC-safe)
   const dueDate = addDaysToDate(input.issueDate, client?.net_payment_days ?? 30);
 
-  // Generate invoice number
+  // Generate invoice number — count+1 has a race when two requests run
+  // simultaneously (both see count=N and both compute the same number). Retry
+  // a few times on unique-violation with a freshly refetched count each loop.
   const year = new Date().getUTCFullYear();
-  const { count } = await supabaseAdmin
-    .from('invoices')
-    .select('*', { count: 'exact', head: true });
-  const invoiceNumber = `INV-${year}-${String((count ?? 0) + 1).padStart(4, '0')}`;
+  let invoice: any = null;
+  let invError: any = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const { count } = await supabaseAdmin
+      .from('invoices')
+      .select('*', { count: 'exact', head: true });
+    const invoiceNumber = `INV-${year}-${String((count ?? 0) + 1 + attempt).padStart(4, '0')}`;
 
-  // Insert invoice
-  const { data: invoice, error: invError } = await supabaseAdmin
-    .from('invoices')
-    .insert({
-      invoice_number: invoiceNumber,
-      client_id: input.clientId,
-      issue_date: input.issueDate,
-      due_date: dueDate,
-      subtotal,
-      tax_rate: input.taxRate,
-      tax_amount: taxAmount,
-      total_amount: totalAmount,
-      billing_period_start: billingPeriodStart,
-      billing_period_end: billingPeriodEnd,
-      status: 'draft',
-      notes: input.notes ?? null,
-    })
-    .select()
-    .single();
+    const result = await supabaseAdmin
+      .from('invoices')
+      .insert({
+        invoice_number: invoiceNumber,
+        client_id: input.clientId,
+        issue_date: input.issueDate,
+        due_date: dueDate,
+        subtotal,
+        tax_rate: input.taxRate,
+        tax_amount: taxAmount,
+        total_amount: totalAmount,
+        billing_period_start: billingPeriodStart,
+        billing_period_end: billingPeriodEnd,
+        status: 'draft',
+        notes: input.notes ?? null,
+      })
+      .select()
+      .single();
 
-  if (invError) throw invError;
+    if (!result.error) {
+      invoice = result.data;
+      invError = null;
+      break;
+    }
+    invError = result.error;
+    // Postgres unique-violation code is 23505. Retry; any other error → bail.
+    if (result.error.code !== '23505') break;
+  }
+
+  if (invError || !invoice) throw invError ?? new Error('Failed to generate invoice number after retries');
 
   // Insert line items
   const itemsWithInvoiceId = lineItems.map(li => ({ ...li, invoice_id: invoice.id }));
@@ -154,7 +199,9 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
         'success', 'invoice', invoice.id,
       );
     }
-  } catch (_) { /* non-blocking */ }
+  } catch (err) {
+    console.error('[invoices.service] generate notification failed for invoice', invoice.id, err);
+  }
 
   return getInvoice(invoice.id);
 }
@@ -190,6 +237,17 @@ export async function deleteInvoice(id: string) {
     throw new ForbiddenError('Only draft invoices can be deleted');
   }
 
+  // Best-effort: remove the cached PDF from Supabase Storage so deleted
+  // invoices don't leave orphan files growing the storage bill (and don't
+  // remain accessible via a still-valid signed URL).
+  if (inv.invoice_number) {
+    try {
+      await supabaseAdmin.storage.from('invoices').remove([`${inv.invoice_number}.pdf`]);
+    } catch (err) {
+      console.error('[invoices.service] failed to remove PDF from storage for', inv.invoice_number, err);
+    }
+  }
+
   const { error } = await supabaseAdmin.from('invoices').delete().eq('id', id);
   if (error) throw error;
 }
@@ -208,36 +266,49 @@ export async function sendInvoice(id: string) {
 
   const recipientEmail = client?.billing_contact_email || client?.contact_email;
   if (!recipientEmail) {
-    throw new Error('Client has no billing email address on file');
+    throw new ValidationError('Client has no billing email address on file. Add one in the client profile and try again.');
   }
 
-  await sendInvoiceEmail({
-    to: recipientEmail,
-    clientName: client?.company_name ?? 'Client',
-    contactName: client?.billing_contact_name || client?.contact_name || 'Team',
-    invoiceNumber: inv.invoice_number,
-    issueDate: inv.issue_date,
-    dueDate: inv.due_date,
-    subtotal: inv.subtotal,
-    taxRate: inv.tax_rate ?? 0,
-    taxAmount: inv.tax_amount ?? 0,
-    totalAmount: inv.total_amount,
-    billingPeriodStart: inv.billing_period_start ?? undefined,
-    billingPeriodEnd: inv.billing_period_end ?? undefined,
-    pdfUrl: pdfUrl ?? undefined,
-    notes: inv.notes ?? undefined,
-    lineItems: (inv.invoice_line_items ?? []).map((li: Record<string, unknown>) => ({
-      description: String(li.description ?? ''),
-      hours: Number(li.hours ?? 0),
-      billRate: Number(li.bill_rate ?? 0),
-      amount: Number(li.amount ?? 0),
-    })),
-  });
+  // Attempt to send the email. Capture success/failure so the caller can
+  // surface a structured warning instead of throwing a generic 500. Mirrors
+  // the pattern in employees.service.ts:issueCredentials.
+  let emailSent = false;
+  let warning: string | undefined;
+  try {
+    await sendInvoiceEmail({
+      to: recipientEmail,
+      clientName: client?.company_name ?? 'Client',
+      contactName: client?.billing_contact_name || client?.contact_name || 'Team',
+      invoiceNumber: inv.invoice_number,
+      issueDate: inv.issue_date,
+      dueDate: inv.due_date,
+      subtotal: inv.subtotal,
+      taxRate: inv.tax_rate ?? 0,
+      taxAmount: inv.tax_amount ?? 0,
+      totalAmount: inv.total_amount,
+      billingPeriodStart: inv.billing_period_start ?? undefined,
+      billingPeriodEnd: inv.billing_period_end ?? undefined,
+      pdfUrl: pdfUrl ?? undefined,
+      notes: inv.notes ?? undefined,
+      lineItems: (inv.invoice_line_items ?? []).map((li: Record<string, unknown>) => ({
+        description: String(li.description ?? ''),
+        hours: Number(li.hours ?? 0),
+        billRate: Number(li.bill_rate ?? 0),
+        amount: Number(li.amount ?? 0),
+      })),
+    });
+    emailSent = true;
+  } catch (err: any) {
+    warning = `Invoice was prepared but the email could not be delivered (${err?.code ?? ''} ${err?.message ?? 'send failed'}).`;
+    console.error('[invoices.service] sendInvoiceEmail failed for invoice', id, err);
+  }
 
-  // Mark invoice as sent
+  // Mark invoice as 'sent' only when the email actually went out. Otherwise
+  // leave it as draft so the user can retry without confusion.
+  const newStatus = emailSent ? 'sent' : inv.status;
   const { data, error } = await supabaseAdmin
     .from('invoices')
-    .update({ status: 'sent' })
+    .update({ status: newStatus })
     .eq('id', id)
     .select()
     .single();
@@ -257,9 +328,11 @@ export async function sendInvoice(id: string) {
         'info', 'invoice', id,
       );
     }
-  } catch (_) { /* non-blocking */ }
+  } catch (err) {
+    console.error('[invoices.service] send notification failed for invoice', id, err);
+  }
 
-  return data;
+  return { invoice: data, emailSent, warning };
 }
 
 // ── CSV export ────────────────────────────────────────────────────────────────
@@ -337,11 +410,12 @@ export async function getInvoicePDF(id: string) {
 
   if (uploadError) throw uploadError;
 
-  // Get signed URL (1 hour)
+  // Get signed URL (7 days — the link is embedded in the invoice email and
+  // must survive spam-folder delays. 1 hour was too short.)
   const { data: urlData } = await supabaseAdmin
     .storage
     .from('invoices')
-    .createSignedUrl(fileName, 3600);
+    .createSignedUrl(fileName, 7 * 24 * 60 * 60);
 
   // Cache pdf_url on invoice
   await supabaseAdmin
