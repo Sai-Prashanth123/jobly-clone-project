@@ -1,16 +1,12 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { UserPlus, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
-import { EmployeeForm } from '../components/employees/EmployeeForm';
-import { useEmployees, useCreateEmployee } from '../hooks/useEmployees';
+import { useEmployees } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
-import { apiClient } from '../lib/apiClient';
 import { formatDate } from '../lib/utils';
 import type { Employee } from '../types';
 
@@ -18,9 +14,20 @@ export default function Employees() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data, isLoading } = useEmployees({ limit: 100 });
-  const createEmployee = useCreateEmployee();
-  const [showForm, setShowForm] = useState(false);
   const canManage = user?.role === 'admin' || user?.role === 'hr';
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Backward-compat: ?new=1 used to open an inline modal. The create flow is
+  // now a dedicated page — redirect there and clean the query string so the
+  // legacy HRDashboard link still works.
+  useEffect(() => {
+    if (canManage && searchParams.get('new') === '1') {
+      const next = new URLSearchParams(searchParams);
+      next.delete('new');
+      setSearchParams(next, { replace: true });
+      navigate('/portal/employees/new', { replace: true });
+    }
+  }, [canManage, searchParams, setSearchParams, navigate]);
 
   const employees = data?.data ?? [];
 
@@ -80,9 +87,11 @@ export default function Employees() {
         title="Employees"
         description={isLoading ? 'Loading...' : `${employees.length} total employees`}
         action={canManage ? (
-          <Button onClick={() => setShowForm(true)} className="gap-2">
-            <UserPlus className="h-4 w-4" />
-            Add Employee
+          <Button asChild className="gap-2">
+            <Link to="/portal/employees/new">
+              <UserPlus className="h-4 w-4" />
+              Add Employee
+            </Link>
           </Button>
         ) : undefined}
       />
@@ -103,54 +112,6 @@ export default function Employees() {
           emptyDescription="Add your first employee to get started."
           exportFilename="employees"
         />
-      )}
-
-      {canManage && (
-        <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Add New Employee</DialogTitle>
-              <DialogDescription className="sr-only">Fill in the employee details to create a new employee record.</DialogDescription>
-            </DialogHeader>
-            <EmployeeForm
-              onSubmit={async (data, pendingFiles) => {
-                try {
-                  const result = await createEmployee.mutateAsync(data as Partial<Employee>);
-                  const emp = result.employee;
-                  if (pendingFiles.size > 0) {
-                    const docMeta = new Map(data.documents.map(d => [d.id, d]));
-                    await Promise.all(
-                      Array.from(pendingFiles.entries()).map(([docId, file]) => {
-                        const meta = docMeta.get(docId);
-                        const fd = new FormData();
-                        fd.append('file', file);
-                        fd.append('name', file.name);
-                        fd.append('docType', meta?.type ?? 'Document');
-                        return apiClient.post(`/employees/${emp.id}/documents`, fd, {
-                          headers: { 'Content-Type': 'multipart/form-data' },
-                        });
-                      })
-                    );
-                  }
-                  if (result.welcomeEmailSent) {
-                    toast.success(`Employee ${emp.displayId ?? emp.id} created — welcome email sent.`);
-                  } else {
-                    toast.warning(
-                      result.warning
-                        ?? `Employee ${emp.displayId ?? emp.id} created, but the welcome email was not delivered. Use the Resend Welcome Email button on the employee detail page.`,
-                      { duration: 12000 },
-                    );
-                  }
-                  setShowForm(false);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to create employee');
-                }
-              }}
-              onCancel={() => setShowForm(false)}
-              isPending={createEmployee.isPending}
-            />
-          </DialogContent>
-        </Dialog>
       )}
     </div>
   );

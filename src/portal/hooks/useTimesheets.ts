@@ -36,6 +36,7 @@ interface ListParams {
   employeeId?: string;
   clientId?: string;
   weekStartDate?: string;
+  excludeInvoiced?: boolean;
   page?: number;
   limit?: number;
 }

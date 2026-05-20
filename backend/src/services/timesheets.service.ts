@@ -26,6 +26,19 @@ export async function listTimesheets(query: ListTimesheetsQuery, userRole?: stri
   if (query.clientId) q = q.eq('client_id', query.clientId);
   if (query.weekStartDate) q = q.eq('week_start_date', query.weekStartDate);
 
+  // Exclude timesheets already on an invoice — used by the Generate-Invoice
+  // picker. Pre-fetch the invoiced IDs (cap to a reasonable batch) and chain
+  // a NOT-IN filter. Empty list is a no-op so the main query still runs.
+  if (query.excludeInvoiced) {
+    const { data: invoicedRows } = await supabaseAdmin
+      .from('invoice_timesheets')
+      .select('timesheet_id');
+    const invoicedIds = (invoicedRows ?? []).map(r => r.timesheet_id).filter(Boolean);
+    if (invoicedIds.length > 0) {
+      q = q.not('id', 'in', `(${invoicedIds.join(',')})`);
+    }
+  }
+
   const offset = (query.page - 1) * query.limit;
   q = q.order('week_start_date', { ascending: false }).range(offset, offset + query.limit - 1);
 

@@ -32,6 +32,13 @@ export const listTimesheetsQuerySchema = z.object({
   employeeId: z.string().uuid().optional(),
   clientId: z.string().uuid().optional(),
   weekStartDate: z.string().optional(),
+  // When true, exclude timesheets already attached to any invoice.
+  // Used by the Generate-Invoice picker so users can't re-select an
+  // invoiced timesheet and trip the backend's double-billing guard.
+  excludeInvoiced: z.preprocess(
+    v => (v === 'true' || v === true ? true : v === 'false' || v === false ? false : undefined),
+    z.boolean().optional(),
+  ),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(1000).default(50),
 });

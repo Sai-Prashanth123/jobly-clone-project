@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { PortalSidebar } from './PortalSidebar';
+import { MailerStatusBanner } from './MailerStatusBanner';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { CommandPalette } from '../shared/CommandPalette';
 import '../../portal.css';
@@ -31,6 +32,7 @@ export function PortalLayout() {
         <PortalSidebar />
         <SidebarInset className="bg-gray-50">
           <main className="p-3 sm:p-4 md:p-6 pb-16">
+            <MailerStatusBanner />
             <ErrorBoundary>
               <Outlet />
             </ErrorBoundary>

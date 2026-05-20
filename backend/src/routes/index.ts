@@ -9,6 +9,7 @@ import reportRoutes from './reports.routes';
 import documentRoutes from './documents.routes';
 import notificationRoutes from './notifications.routes';
 import adminRoutes from './admin.routes';
+import systemRoutes from './system.routes';
 
 export const router = Router();
 
@@ -22,3 +23,4 @@ router.use('/reports', reportRoutes);
 router.use('/documents', documentRoutes);
 router.use('/notifications', notificationRoutes);
 router.use('/admin', adminRoutes);
+router.use('/system', systemRoutes);

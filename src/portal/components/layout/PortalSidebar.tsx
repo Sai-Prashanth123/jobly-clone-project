@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
-  Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search,
+  Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search, UserPlus,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -29,6 +29,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',      path: '/portal/dashboard',      icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee'] },
   { label: 'Employees',      path: '/portal/employees',      icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
+  { label: 'Add Employee',   path: '/portal/employees/new',  icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'] },
   { label: 'Clients',        path: '/portal/clients',        icon: <Building2 className="h-4 w-4" />,       roles: ['admin','operations','finance'] },
   { label: 'Assignments',    path: '/portal/assignments',    icon: <ClipboardList className="h-4 w-4" />,   roles: ['admin','operations','employee'] },
   { label: 'Timesheets',     path: '/portal/timesheets',     icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr','operations','finance','employee'] },
@@ -219,11 +220,19 @@ export function PortalSidebar() {
           Workspace
         </p>
 
+        {/* Pick the single best-matching item — longest-prefix wins. This stops
+            "Employees" from staying active when the user navigates to
+            "Add Employee" (whose path is a child of /portal/employees). */}
+        {(() => null)()}
         <SidebarMenu className="space-y-0.5">
-          {visibleItems.map((item, i) => {
-            const isActive =
-              location.pathname === item.path ||
-              (item.path !== '/portal/dashboard' && location.pathname.startsWith(item.path));
+          {(() => {
+            let bestPath = '';
+            for (const item of visibleItems) {
+              if (location.pathname === item.path && item.path.length > bestPath.length) bestPath = item.path;
+              else if (item.path !== '/portal/dashboard' && location.pathname.startsWith(item.path + '/') && item.path.length > bestPath.length) bestPath = item.path;
+            }
+            return visibleItems.map((item, i) => {
+            const isActive = bestPath === item.path;
 
             return (
               <SidebarMenuItem
@@ -256,7 +265,8 @@ export function PortalSidebar() {
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );
-          })}
+          });
+          })()}
         </SidebarMenu>
       </SidebarContent>
 

@@ -11,6 +11,9 @@ import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
 import { formatDate } from '../../lib/utils';
 import { useEmployees } from '../../hooks/useEmployees';
+import {
+  isActive, isOnboarding, isInactive, isVisaExpiringSoon, isI9Issue,
+} from '../../lib/employeeSegments';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DEPT_COLORS = ['#4069FF', '#32CDDC', '#10b981', '#f59e0b', '#7c3aed', '#ef4444', '#06b6d4', '#84cc16'];
@@ -19,22 +22,13 @@ export function HRDashboard() {
   const { data } = useEmployees({ limit: 500 });
   const employees = data?.data ?? [];
 
-  const active = employees.filter(e => e.status === 'active');
-  const onboarding = employees.filter(e => e.status === 'onboarding');
-  const inactive = employees.filter(e => e.status === 'inactive');
+  const active = employees.filter(isActive);
+  const onboarding = employees.filter(isOnboarding);
+  const inactive = employees.filter(isInactive);
+  const expiringVisa = employees.filter(e => isVisaExpiringSoon(e));
+  const i9NonCompliant = employees.filter(isI9Issue);
 
   const today = new Date();
-  const in90Days = new Date(today);
-  in90Days.setDate(today.getDate() + 90);
-  const expiringVisa = employees.filter(e => {
-    if (!e.visaExpiry) return false;
-    const exp = new Date(e.visaExpiry);
-    return exp >= today && exp <= in90Days;
-  });
-
-  const i9NonCompliant = employees.filter(
-    e => e.i9Status === 'pending' || e.i9Status === 'expired'
-  );
 
   const recentHires = [...employees]
     .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
@@ -74,23 +68,64 @@ export function HRDashboard() {
 
       <QuickActions
         actions={[
-          { label: 'Add Employee',     to: '/portal/employees',     icon: UserPlus, tone: 'blue' },
-          { label: 'View Onboarding',  to: '/portal/employees',     icon: Users, tone: 'violet' },
-          { label: 'I-9 Issues',       to: '/portal/employees',     icon: ShieldAlert, tone: 'red' },
-          { label: 'Documents',        to: '/portal/documents',     icon: FolderOpen, tone: 'cyan' },
+          { label: 'Add Employee',     to: '/portal/employees?new=1', icon: UserPlus, tone: 'blue' },
+          { label: 'View Onboarding',  to: '/portal/hr/onboarding',   icon: Users, tone: 'violet' },
+          { label: 'I-9 Status',       to: '/portal/hr/i9-status',    icon: ShieldAlert, tone: 'red' },
+          { label: 'Documents',        to: '/portal/documents',       icon: FolderOpen, tone: 'cyan' },
         ]}
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {[
-          { title: 'Active Employees', value: active.length, icon: <Users className="h-5 w-5" />, variant: 'blue' as const, sparkline: hireSpark },
-          { title: 'Onboarding', value: onboarding.length, icon: <UserPlus className="h-5 w-5" />, variant: 'purple' as const, description: 'In progress' },
-          { title: 'Inactive', value: inactive.length, icon: <UserCheck className="h-5 w-5" />, variant: 'cyan' as const },
-          { title: 'Visa Expiring Soon', value: expiringVisa.length, icon: <AlertCircle className="h-5 w-5" />, variant: 'orange' as const, description: 'Within 90 days' },
-          { title: 'I-9 Issues', value: i9NonCompliant.length, icon: <ShieldAlert className="h-5 w-5" />, variant: 'red' as const, description: 'Pending or expired' },
+          {
+            title: 'Active Employees',
+            value: active.length,
+            icon: <Users className="h-5 w-5" />,
+            variant: 'blue' as const,
+            sparkline: hireSpark,
+            description: 'Currently on payroll',
+            helper: 'Employees with status = Active',
+            to: '/portal/hr/active',
+          },
+          {
+            title: 'Onboarding',
+            value: onboarding.length,
+            icon: <UserPlus className="h-5 w-5" />,
+            variant: 'purple' as const,
+            description: 'Joining — paperwork pending',
+            helper: 'Employees with status = Onboarding',
+            to: '/portal/hr/onboarding',
+          },
+          {
+            title: 'Inactive',
+            value: inactive.length,
+            icon: <UserCheck className="h-5 w-5" />,
+            variant: 'cyan' as const,
+            description: 'Off-boarded or on hold',
+            helper: 'Employees with status = Inactive',
+            to: '/portal/hr/inactive',
+          },
+          {
+            title: 'Visa Expiring Soon',
+            value: expiringVisa.length,
+            icon: <AlertCircle className="h-5 w-5" />,
+            variant: 'orange' as const,
+            description: 'Expiring within 90 days',
+            helper: 'Visa expiry date falls in the next 90 days',
+            to: '/portal/hr/visa-expiring',
+          },
+          {
+            title: 'I-9 Status',
+            value: i9NonCompliant.length,
+            icon: <ShieldAlert className="h-5 w-5" />,
+            variant: 'red' as const,
+            description: 'Pending or expired forms',
+            helper: 'Employees whose I-9 is Pending or Expired',
+            to: '/portal/hr/i9-status',
+          },
         ].map((c, i) => (
           <div key={c.title} className="portal-stagger" style={{ animationDelay: `${i * 60}ms` }}>
-            <StatCard {...c} />
+            <StatCard {...c} linkLabel="Open details" />
           </div>
         ))}
       </div>
@@ -190,7 +225,7 @@ export function HRDashboard() {
               </div>
             </div>
             <Button asChild variant="ghost" size="sm" className="text-red-600 hover:text-red-700 flex-shrink-0">
-              <Link to="/portal/employees">View all →</Link>
+              <Link to="/portal/hr/i9-status">View all →</Link>
             </Button>
           </div>
         </div>
@@ -220,7 +255,7 @@ export function HRDashboard() {
               </div>
             </div>
             <Button asChild variant="ghost" size="sm" className="text-amber-700 hover:text-amber-900 flex-shrink-0">
-              <Link to="/portal/employees">View all →</Link>
+              <Link to="/portal/hr/visa-expiring">View all →</Link>
             </Button>
           </div>
         </div>

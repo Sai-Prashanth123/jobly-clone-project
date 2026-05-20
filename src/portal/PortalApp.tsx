@@ -29,6 +29,16 @@ const Reports = lazy(() => import('./pages/Reports'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const Documents = lazy(() => import('./pages/Documents'));
 
+// HR drill-down pages (linked from HRDashboard cards)
+const HrActiveEmployees = lazy(() => import('./pages/hr/ActiveEmployees'));
+const HrOnboardingEmployees = lazy(() => import('./pages/hr/OnboardingEmployees'));
+const HrInactiveEmployees = lazy(() => import('./pages/hr/InactiveEmployees'));
+const HrVisaExpiringEmployees = lazy(() => import('./pages/hr/VisaExpiringEmployees'));
+const HrI9StatusEmployees = lazy(() => import('./pages/hr/I9StatusEmployees'));
+
+// New card-per-section Add Employee onboarding page
+const NewEmployee = lazy(() => import('./pages/NewEmployee'));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -61,6 +71,14 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
                   <Employees />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="employees/new"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <NewEmployee />
                 </ProtectedRoute>
               }
             />
@@ -155,6 +173,48 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
                   <Documents />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* HR drill-down pages — segmented views of the employee list */}
+            <Route
+              path="hr/active"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <HrActiveEmployees />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="hr/onboarding"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <HrOnboardingEmployees />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="hr/inactive"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <HrInactiveEmployees />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="hr/visa-expiring"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <HrVisaExpiringEmployees />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="hr/i9-status"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <HrI9StatusEmployees />
                 </ProtectedRoute>
               }
             />

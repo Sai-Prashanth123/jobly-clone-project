@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2, Pencil } from 'lucide-react';
+import { Plus, Loader2, Pencil, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
@@ -129,6 +129,36 @@ export default function Invoices() {
           </Button>
         }
       />
+
+      {/* Status legend — answers "what does Draft mean?" without forcing the
+          user to hover every badge. Hover the badges in the table for the
+          same explanation tied to a specific invoice. */}
+      <div className="mb-4 bg-blue-50/40 border border-blue-100 rounded-md px-3 py-2.5">
+        <div className="flex items-start gap-2">
+          <Info className="h-3.5 w-3.5 mt-0.5 text-[#4069FF] flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-[12px] font-medium text-gray-700">Invoice status flow</p>
+            <ul className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1 text-[11px] text-gray-600">
+              <li className="flex items-start gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0" />
+                <span><strong className="text-gray-800">Draft</strong> — created but not yet sent to the client. Safe to edit or delete.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+                <span><strong className="text-gray-800">Sent</strong> — emailed to the client. Awaiting payment.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
+                <span><strong className="text-gray-800">Paid</strong> — payment received and recorded.</span>
+              </li>
+              <li className="flex items-start gap-1.5">
+                <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+                <span><strong className="text-gray-800">Overdue</strong> — past the due date with no payment yet.</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">

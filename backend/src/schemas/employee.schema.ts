@@ -1,5 +1,42 @@
 import { z } from 'zod';
 
+// Education + work-history rows stored as JSONB. Loose validation here —
+// the UI is the source of truth for required fields per row and we don't
+// want partial data on an existing employee to block an update.
+export const educationEntrySchema = z.object({
+  level: z.string().optional().default(''),
+  specialization: z.string().optional().default(''),
+  institution: z.string().optional().default(''),
+  passYear: z.string().optional().default(''),
+  gradeOrGPA: z.string().optional().default(''),
+  mode: z.string().optional().default(''),
+});
+
+export const workHistoryEntrySchema = z.object({
+  company: z.string().optional().default(''),
+  jobTitle: z.string().optional().default(''),
+  fromDate: z.string().optional().default(''),
+  toDate: z.string().optional().default(''),
+  reasonForLeaving: z.string().optional().default(''),
+  lastAnnualSalary: z.number().nullable().optional(),
+});
+
+const permanentAddressSchema = z.object({
+  street: z.string().optional().default(''),
+  city: z.string().optional().default(''),
+  state: z.string().optional().default(''),
+  zip: z.string().optional().default(''),
+  country: z.string().optional().default('US'),
+}).optional().nullable();
+
+const emergencyContactSchema = z.object({
+  name: z.string().optional().default(''),
+  relationship: z.string().optional().default(''),
+  phone: z.string().optional().default(''),
+  altPhone: z.string().optional().default(''),
+  address: z.string().optional().default(''),
+}).optional().nullable();
+
 export const createEmployeeSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
@@ -32,6 +69,24 @@ export const createEmployeeSchema = z.object({
   taxFormType: z.enum(['w4','w9']).optional().nullable(),
   reportingManagerId: z.string().uuid().optional().nullable(),
   workEmail: z.string().email().optional().nullable(),
+
+  // ── Onboarding-form extension fields (all optional) ────────────────────
+  middleName: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  maritalStatus: z.string().optional().nullable(),
+  nationality: z.string().optional().nullable(),
+  preferredLanguage: z.string().optional().nullable(),
+  languagesKnown: z.string().optional().nullable(),
+  profilePhotoUrl: z.string().optional().nullable(),
+  altPhone: z.string().optional().nullable(),
+  linkedinUrl: z.string().optional().nullable(),
+  skypeId: z.string().optional().nullable(),
+  permanentAddress: permanentAddressSchema,
+  emergencyContact: emergencyContactSchema,
+  education: z.array(educationEntrySchema).optional().default([]),
+  workHistory: z.array(workHistoryEntrySchema).optional().default([]),
+  totalExperienceYears: z.number().nullable().optional(),
+  experienceLevel: z.string().optional().nullable(),
 });
 
 // Update keeps every field optional and lenient — pre-existing employees
@@ -69,6 +124,24 @@ export const updateEmployeeSchema = z.object({
   taxFormType: z.enum(['w4','w9']).optional().nullable(),
   reportingManagerId: z.string().uuid().optional().nullable(),
   workEmail: z.string().email().optional().nullable(),
+
+  // Same extension fields, all optional + nullable for partial updates.
+  middleName: z.string().optional().nullable(),
+  gender: z.string().optional().nullable(),
+  maritalStatus: z.string().optional().nullable(),
+  nationality: z.string().optional().nullable(),
+  preferredLanguage: z.string().optional().nullable(),
+  languagesKnown: z.string().optional().nullable(),
+  profilePhotoUrl: z.string().optional().nullable(),
+  altPhone: z.string().optional().nullable(),
+  linkedinUrl: z.string().optional().nullable(),
+  skypeId: z.string().optional().nullable(),
+  permanentAddress: permanentAddressSchema,
+  emergencyContact: emergencyContactSchema,
+  education: z.array(educationEntrySchema).optional(),
+  workHistory: z.array(workHistoryEntrySchema).optional(),
+  totalExperienceYears: z.number().nullable().optional(),
+  experienceLevel: z.string().optional().nullable(),
 });
 
 export const listEmployeesQuerySchema = z.object({
@@ -82,3 +155,5 @@ export const listEmployeesQuerySchema = z.object({
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 export type ListEmployeesQuery = z.infer<typeof listEmployeesQuerySchema>;
+export type EducationEntryInput = z.infer<typeof educationEntrySchema>;
+export type WorkHistoryEntryInput = z.infer<typeof workHistoryEntrySchema>;

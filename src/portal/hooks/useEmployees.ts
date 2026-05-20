@@ -46,6 +46,41 @@ function mapEmployee(raw: any): Employee {
       uploadedAt: d.uploaded_at,
       url: d.storage_url ?? undefined,
     })),
+
+    // Onboarding-form extension fields (migration 005). JSONB columns map 1:1.
+    middleName: raw.middle_name ?? undefined,
+    gender: raw.gender ?? undefined,
+    maritalStatus: raw.marital_status ?? undefined,
+    nationality: raw.nationality ?? undefined,
+    preferredLanguage: raw.preferred_language ?? undefined,
+    languagesKnown: raw.languages_known ?? undefined,
+    profilePhotoUrl: raw.profile_photo_url ?? undefined,
+    altPhone: raw.alt_phone ?? undefined,
+    linkedinUrl: raw.linkedin_url ?? undefined,
+    skypeId: raw.skype_id ?? undefined,
+    permanentAddress: (raw.permanent_address_street || raw.permanent_address_city || raw.permanent_address_state || raw.permanent_address_zip)
+      ? {
+          street: raw.permanent_address_street ?? '',
+          city: raw.permanent_address_city ?? '',
+          state: raw.permanent_address_state ?? '',
+          zip: raw.permanent_address_zip ?? '',
+          country: raw.permanent_address_country ?? 'US',
+        }
+      : undefined,
+    emergencyContact: (raw.emergency_contact_name || raw.emergency_contact_phone)
+      ? {
+          name: raw.emergency_contact_name ?? '',
+          relationship: raw.emergency_contact_relationship ?? '',
+          phone: raw.emergency_contact_phone ?? '',
+          altPhone: raw.emergency_contact_alt_phone ?? '',
+          address: raw.emergency_contact_address ?? '',
+        }
+      : undefined,
+    education: Array.isArray(raw.education) ? raw.education : [],
+    workHistory: Array.isArray(raw.work_history) ? raw.work_history : [],
+    totalExperienceYears: raw.total_experience_years != null ? Number(raw.total_experience_years) : undefined,
+    experienceLevel: raw.experience_level ?? undefined,
+
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
@@ -201,5 +236,25 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.taxFormType !== undefined && { taxFormType: blank(e.taxFormType) }),
     ...(e.reportingManagerId !== undefined && { reportingManagerId: blank(e.reportingManagerId) }),
     ...(e.workEmail !== undefined && { workEmail: blank(e.workEmail) }),
+
+    // Onboarding-form extension fields. The blank() helper coerces '' → undefined
+    // so optional inputs that were never filled don't get sent as empty strings
+    // (Postgres would store them; we'd rather have NULL).
+    ...(e.middleName !== undefined && { middleName: blank(e.middleName) }),
+    ...(e.gender !== undefined && { gender: blank(e.gender) }),
+    ...(e.maritalStatus !== undefined && { maritalStatus: blank(e.maritalStatus) }),
+    ...(e.nationality !== undefined && { nationality: blank(e.nationality) }),
+    ...(e.preferredLanguage !== undefined && { preferredLanguage: blank(e.preferredLanguage) }),
+    ...(e.languagesKnown !== undefined && { languagesKnown: blank(e.languagesKnown) }),
+    ...(e.profilePhotoUrl !== undefined && { profilePhotoUrl: blank(e.profilePhotoUrl) }),
+    ...(e.altPhone !== undefined && { altPhone: blank(e.altPhone) }),
+    ...(e.linkedinUrl !== undefined && { linkedinUrl: blank(e.linkedinUrl) }),
+    ...(e.skypeId !== undefined && { skypeId: blank(e.skypeId) }),
+    ...(e.permanentAddress !== undefined && { permanentAddress: e.permanentAddress }),
+    ...(e.emergencyContact !== undefined && { emergencyContact: e.emergencyContact }),
+    ...(e.education !== undefined && { education: e.education }),
+    ...(e.workHistory !== undefined && { workHistory: e.workHistory }),
+    ...(e.totalExperienceYears !== undefined && { totalExperienceYears: e.totalExperienceYears }),
+    ...(e.experienceLevel !== undefined && { experienceLevel: blank(e.experienceLevel) }),
   };
 }

@@ -194,6 +194,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
               <Label>Personal Email * <span className="text-xs font-normal text-muted-foreground">(credentials will be sent here)</span></Label>
               <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="john.doe@gmail.com" />
               {errors.email && <p className="text-xs text-red-500">{errors.email}</p>}
+              <p className="text-[11px] text-muted-foreground">Must be unique — we'll let you know if this email already belongs to another employee.</p>
             </div>
             <div className="space-y-2">
               <Label>Work Email <span className="text-xs font-normal text-muted-foreground">(portal login — assigned by HR)</span></Label>

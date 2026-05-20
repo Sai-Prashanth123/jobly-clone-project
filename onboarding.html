@@ -1,0 +1,1435 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employee Onboarding — Unisys Infotech</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:      #0d1f3c;
+  --navy-mid:  #1a3560;
+  --navy-soft: #243f6e;
+  --gold:      #c8922a;
+  --gold-lt:   #f8eedb;
+  --teal:      #1a7a6e;
+  --teal-lt:   #d4f0ec;
+  --red:       #c0392b;
+  --red-lt:    #fde8e6;
+  --green:     #1e7e5a;
+  --green-lt:  #d6f0e4;
+  --gray-50:   #f9f8f6;
+  --gray-100:  #f0eee9;
+  --gray-200:  #dedad2;
+  --gray-300:  #c8c3b8;
+  --gray-400:  #9e9890;
+  --gray-600:  #5c5750;
+  --gray-800:  #2a2723;
+  --white:     #ffffff;
+  --border:    1px solid #dedad2;
+  --shadow:    0 2px 12px rgba(13,31,60,.08);
+  --shadow-md: 0 4px 24px rgba(13,31,60,.12);
+  --radius:    10px;
+  --radius-lg: 14px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--gray-50);
+  color:var(--gray-800);
+  font-size:14px;
+  line-height:1.6;
+  min-height:100vh;
+}
+
+/* ── TOP BAR ── */
+.top-bar{
+  background:var(--navy);
+  padding:0 32px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  height:58px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 2px 16px rgba(13,31,60,.3);
+}
+
+.brand{display:flex;align-items:center;gap:12px;}
+
+.brand-mark{
+  width:34px;height:34px;
+  background:linear-gradient(135deg,var(--gold),#e8b040);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Sora',sans-serif;
+  font-weight:700;font-size:15px;
+  color:var(--navy);letter-spacing:-1px;
+}
+
+.brand-name{
+  font-family:'Sora',sans-serif;
+  font-size:15px;font-weight:600;
+  color:var(--white);letter-spacing:.01em;
+}
+.brand-name span{color:var(--gold);}
+
+/* Page nav pills */
+.page-nav{
+  display:flex;gap:6px;align-items:center;
+}
+
+.nav-pill{
+  padding:5px 16px;
+  border-radius:20px;
+  font-size:12px;font-weight:500;
+  text-decoration:none;
+  cursor:pointer;
+  transition:all .15s;
+  border:1px solid rgba(255,255,255,.2);
+  color:rgba(255,255,255,.7);
+  background:transparent;
+}
+
+.nav-pill:hover{background:rgba(255,255,255,.1);color:var(--white);}
+.nav-pill.active{background:var(--gold);color:var(--navy);border-color:var(--gold);font-weight:600;}
+
+.top-right{display:flex;align-items:center;gap:10px;}
+
+.pill-badge{
+  background:rgba(200,146,42,.18);
+  color:var(--gold);
+  border:1px solid rgba(200,146,42,.3);
+  font-size:11px;font-weight:500;
+  padding:3px 10px;border-radius:20px;
+  font-family:'DM Mono',monospace;
+}
+
+/* ── HERO STRIP ── */
+.hero-strip{
+  background:linear-gradient(135deg,var(--navy) 0%,var(--navy-mid) 60%,#1e4a82 100%);
+  padding:36px 32px 32px;
+  position:relative;
+  overflow:hidden;
+}
+
+.hero-strip::before{
+  content:'';
+  position:absolute;
+  top:-40px;right:-40px;
+  width:260px;height:260px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(200,146,42,.12),transparent 70%);
+}
+
+.hero-strip::after{
+  content:'';
+  position:absolute;
+  bottom:-60px;left:30%;
+  width:200px;height:200px;
+  border-radius:50%;
+  background:radial-gradient(circle,rgba(26,122,110,.15),transparent 70%);
+}
+
+.hero-inner{
+  max-width:1180px;margin:0 auto;
+  position:relative;z-index:1;
+}
+
+.hero-inner h2{
+  font-family:'Sora',sans-serif;
+  font-size:28px;font-weight:700;
+  color:var(--white);letter-spacing:-.03em;
+  margin-bottom:6px;
+}
+
+.hero-inner h2 span{color:var(--gold);}
+
+.hero-inner p{
+  font-size:14px;
+  color:rgba(255,255,255,.65);
+  max-width:600px;
+}
+
+.hero-steps{
+  display:flex;gap:8px;margin-top:20px;flex-wrap:wrap;
+}
+
+.step-chip{
+  display:flex;align-items:center;gap:6px;
+  background:rgba(255,255,255,.08);
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:20px;
+  padding:4px 12px;
+  font-size:11px;font-weight:500;
+  color:rgba(255,255,255,.8);
+}
+
+.step-chip.done{background:rgba(200,146,42,.2);border-color:rgba(200,146,42,.4);color:var(--gold);}
+
+.step-num{
+  width:18px;height:18px;
+  border-radius:50%;
+  background:var(--gold);
+  color:var(--navy);
+  font-size:9px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* ── MAIN WRAP ── */
+.wrap{max-width:1180px;margin:0 auto;padding:28px 24px 80px;}
+
+/* ── SECTION CARD ── */
+.section-card{
+  background:var(--white);
+  border:var(--border);
+  border-radius:var(--radius-lg);
+  box-shadow:var(--shadow);
+  margin-bottom:20px;
+  overflow:hidden;
+}
+
+.section-head{
+  padding:14px 24px;
+  background:linear-gradient(90deg,var(--navy),var(--navy-mid));
+  display:flex;align-items:center;gap:12px;
+}
+
+.section-num{
+  width:26px;height:26px;
+  border-radius:50%;
+  background:var(--gold);
+  color:var(--navy);
+  font-family:'Sora',sans-serif;
+  font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+  flex-shrink:0;
+}
+
+.section-head h3{
+  font-family:'Sora',sans-serif;
+  font-size:14px;font-weight:600;
+  color:var(--white);letter-spacing:.01em;
+}
+
+.section-head p{font-size:11px;color:rgba(255,255,255,.55);margin-left:auto;}
+
+.section-body{padding:22px 24px;}
+
+/* ── FORM GRID ── */
+.form-grid{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:16px 20px;
+}
+
+.form-grid.col2{grid-template-columns:repeat(2,1fr);}
+.form-grid.col1{grid-template-columns:1fr;}
+.form-grid.col4{grid-template-columns:repeat(4,1fr);}
+
+.span2{grid-column:span 2;}
+.span3{grid-column:span 3;}
+.span4{grid-column:span 4;}
+
+/* ── FIELD ── */
+.field{display:flex;flex-direction:column;gap:5px;}
+
+.field label{
+  font-size:11px;font-weight:600;
+  letter-spacing:.07em;text-transform:uppercase;
+  color:var(--gray-400);
+}
+
+.field label .req{color:var(--red);margin-left:2px;}
+
+.field input,
+.field select,
+.field textarea{
+  border:1px solid var(--gray-200);
+  border-radius:7px;
+  padding:9px 12px;
+  font-size:13px;
+  font-family:'DM Sans',sans-serif;
+  color:var(--gray-800);
+  background:var(--gray-50);
+  outline:none;
+  transition:border-color .15s,background .15s,box-shadow .15s;
+  width:100%;
+}
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus{
+  border-color:var(--navy-soft);
+  background:var(--white);
+  box-shadow:0 0 0 3px rgba(36,63,110,.08);
+}
+
+.field select{cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239e9890' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 10px center;
+  padding-right:30px;}
+
+.field textarea{resize:vertical;min-height:80px;}
+
+.field-hint{font-size:11px;color:var(--gray-400);margin-top:2px;}
+
+/* ── PHOTO UPLOAD ── */
+.photo-upload{
+  display:flex;align-items:center;gap:16px;
+  padding:16px;
+  border:2px dashed var(--gray-200);
+  border-radius:10px;
+  background:var(--gray-50);
+  cursor:pointer;
+  transition:border-color .15s,background .15s;
+}
+
+.photo-upload:hover{border-color:var(--navy-soft);background:var(--white);}
+
+.photo-preview{
+  width:64px;height:64px;
+  border-radius:50%;
+  background:var(--gray-100);
+  border:2px solid var(--gray-200);
+  display:flex;align-items:center;justify-content:center;
+  overflow:hidden;flex-shrink:0;
+}
+
+.photo-preview img{width:100%;height:100%;object-fit:cover;display:none;}
+.photo-preview svg{width:28px;height:28px;stroke:var(--gray-300);}
+
+.photo-info h4{font-size:13px;font-weight:500;color:var(--gray-800);}
+.photo-info p{font-size:11px;color:var(--gray-400);margin-top:2px;}
+
+/* ── DOC UPLOAD ROW ── */
+.doc-row{
+  display:flex;align-items:center;
+  padding:10px 0;
+  border-bottom:1px solid var(--gray-100);
+  gap:12px;
+}
+.doc-row:last-child{border-bottom:none;}
+
+.doc-label{
+  width:200px;flex-shrink:0;
+  font-size:12px;font-weight:500;color:var(--gray-600);
+}
+
+.doc-label span{
+  font-size:10px;font-weight:600;
+  color:var(--red);margin-left:4px;
+}
+
+.doc-input-group{display:flex;gap:8px;flex:1;align-items:center;}
+
+.doc-number-input{
+  flex:1;
+  border:1px solid var(--gray-200);
+  border-radius:7px;
+  padding:7px 10px;
+  font-size:12px;font-family:'DM Mono',monospace;
+  color:var(--gray-800);background:var(--gray-50);
+  outline:none;transition:border-color .15s;
+  letter-spacing:.05em;
+}
+.doc-number-input:focus{border-color:var(--navy-soft);background:var(--white);}
+
+.upload-btn{
+  padding:6px 14px;
+  border:1px solid var(--gray-200);
+  border-radius:7px;
+  background:var(--white);
+  font-size:11px;font-weight:500;
+  color:var(--gray-600);cursor:pointer;
+  white-space:nowrap;
+  transition:all .15s;
+  display:flex;align-items:center;gap:5px;
+}
+.upload-btn:hover{background:var(--gray-50);border-color:var(--navy-soft);color:var(--navy);}
+.upload-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2;}
+
+.doc-status{
+  width:70px;text-align:center;
+  font-size:10px;font-weight:600;
+  padding:2px 8px;border-radius:10px;
+  background:var(--gray-100);color:var(--gray-400);
+}
+.doc-status.ok{background:var(--green-lt);color:var(--green);}
+
+/* ── EDUCATION TABLE ── */
+.edu-table{width:100%;border-collapse:collapse;}
+.edu-table th{
+  font-size:10px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--gray-400);padding:8px 10px;
+  border-bottom:var(--border);text-align:left;
+  background:var(--gray-50);
+}
+.edu-table td{padding:6px 8px;border-bottom:1px solid var(--gray-100);}
+.edu-input{
+  border:1px solid var(--gray-200);border-radius:5px;
+  padding:6px 8px;font-size:12px;font-family:'DM Sans',sans-serif;
+  color:var(--gray-800);background:var(--white);
+  outline:none;width:100%;transition:border-color .15s;
+}
+.edu-input:focus{border-color:var(--navy-soft);}
+
+.add-row-btn{
+  margin-top:10px;
+  padding:6px 14px;border:1px dashed var(--gray-300);
+  border-radius:7px;background:transparent;
+  font-size:12px;color:var(--gray-400);cursor:pointer;
+  display:flex;align-items:center;gap:5px;
+  transition:all .15s;
+}
+.add-row-btn:hover{border-color:var(--navy-soft);color:var(--navy);background:var(--gray-50);}
+.add-row-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:2;}
+
+.del-btn{
+  width:26px;height:26px;border-radius:5px;
+  border:1px solid var(--gray-200);background:var(--white);
+  color:var(--red);cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.del-btn:hover{background:var(--red-lt);}
+
+/* ── DIVIDER ── */
+.divider{
+  height:1px;background:var(--gray-100);
+  margin:20px 0;
+}
+
+/* ── RADIO / CHECKBOX GROUP ── */
+.radio-group,.check-group{
+  display:flex;gap:16px;flex-wrap:wrap;padding-top:4px;
+}
+
+.radio-item,.check-item{
+  display:flex;align-items:center;gap:6px;
+  font-size:13px;color:var(--gray-800);cursor:pointer;
+}
+
+.radio-item input,.check-item input{
+  accent-color:var(--navy);
+  width:15px;height:15px;cursor:pointer;
+}
+
+/* ── DECLARATION ── */
+.declaration-box{
+  background:linear-gradient(135deg,#fff9ed,#fffbf5);
+  border:1px solid #e8d49a;
+  border-radius:10px;
+  padding:20px 22px;
+}
+
+.declaration-box p{
+  font-size:13px;color:var(--gray-600);
+  line-height:1.8;margin-bottom:16px;
+}
+
+.sign-row{
+  display:grid;grid-template-columns:1fr 1fr auto;
+  gap:14px;align-items:end;margin-top:16px;
+}
+
+/* ── ACTION BAR ── */
+.action-bar{
+  position:sticky;bottom:0;
+  background:rgba(255,255,255,.95);
+  backdrop-filter:blur(12px);
+  border-top:var(--border);
+  padding:16px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+  gap:12px;
+  z-index:50;
+  box-shadow:0 -4px 20px rgba(13,31,60,.08);
+}
+
+.action-left{display:flex;gap:10px;align-items:center;}
+
+.btn{
+  padding:10px 22px;border-radius:8px;
+  font-size:13px;font-weight:500;cursor:pointer;
+  font-family:'DM Sans',sans-serif;border:none;
+  transition:all .15s;display:inline-flex;align-items:center;gap:7px;
+}
+
+.btn svg{width:15px;height:15px;stroke-width:2;fill:none;flex-shrink:0;}
+
+.btn-ghost{
+  background:var(--white);border:1px solid var(--gray-200);color:var(--gray-600);
+}
+.btn-ghost:hover{background:var(--gray-100);}
+
+.btn-navy{background:var(--navy-mid);color:var(--white);}
+.btn-navy:hover{background:var(--navy);}
+
+.btn-submit{
+  background:linear-gradient(135deg,#1a6e60,var(--teal));
+  color:var(--white);
+  box-shadow:0 3px 12px rgba(26,122,110,.3);
+  padding:11px 30px;font-size:14px;font-weight:600;
+}
+.btn-submit:hover{
+  background:linear-gradient(135deg,#125048,#157a6e);
+  box-shadow:0 4px 18px rgba(26,122,110,.4);
+  transform:translateY(-1px);
+}
+
+/* ── PROGRESS BAR ── */
+.progress-bar-wrap{
+  background:var(--gray-100);
+  border-radius:4px;height:4px;
+  overflow:hidden;width:180px;
+}
+.progress-bar-fill{
+  background:linear-gradient(90deg,var(--teal),var(--gold));
+  height:100%;border-radius:4px;
+  transition:width .3s;
+}
+.progress-label{font-size:11px;color:var(--gray-400);}
+
+/* ── TOAST ── */
+.toast{
+  position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+  background:var(--navy);color:var(--white);
+  padding:10px 24px;border-radius:30px;
+  font-size:13px;font-weight:500;
+  box-shadow:0 8px 24px rgba(13,31,60,.2);
+  opacity:0;pointer-events:none;
+  transition:opacity .3s;z-index:200;
+}
+.toast.show{opacity:1;}
+
+/* ── MODAL ── */
+.modal-bg{
+  display:none;position:fixed;inset:0;
+  background:rgba(13,31,60,.55);z-index:200;
+  align-items:center;justify-content:center;padding:20px;
+  backdrop-filter:blur(3px);
+}
+.modal-bg.open{display:flex;}
+
+.modal{
+  background:var(--white);border-radius:var(--radius-lg);
+  box-shadow:0 24px 80px rgba(13,31,60,.25);
+  width:100%;max-width:680px;
+  display:flex;flex-direction:column;overflow:hidden;
+}
+
+.modal-head{
+  background:var(--navy);padding:16px 24px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.modal-head h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:600;color:var(--white);}
+.modal-head p{font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;}
+
+.btn-close{
+  background:rgba(255,255,255,.1);border:none;
+  width:30px;height:30px;border-radius:6px;
+  color:var(--white);font-size:18px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.btn-close:hover{background:rgba(255,255,255,.2);}
+
+.modal-body{padding:24px;overflow-y:auto;}
+.modal-foot{
+  padding:16px 24px;border-top:var(--border);
+  display:flex;gap:10px;justify-content:flex-end;
+  background:var(--gray-50);
+}
+
+.report-preview{
+  background:var(--gray-50);border:var(--border);border-radius:8px;
+  padding:16px;font-family:'DM Mono',monospace;font-size:11px;
+  color:var(--gray-800);white-space:pre-wrap;line-height:1.8;
+  max-height:340px;overflow-y:auto;
+}
+
+/* ── PRINT ── */
+@media print{
+  @page{size:A4 portrait;margin:12mm 14mm;}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body{background:white;}
+  .top-bar,.action-bar,.hero-strip,.toast,.modal-bg{display:none!important;}
+  .wrap{padding:0;max-width:100%;}
+  .section-card{margin-bottom:12px;box-shadow:none;border:1pt solid #ccc;}
+  .field input,.field select,.field textarea{border:none;background:transparent;font-size:9pt;}
+  .section-body{padding:12px 16px;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="brand">
+    <div class="brand-mark">UI</div>
+    <div>
+      <div class="brand-name">Unisys <span>Infotech</span></div>
+    </div>
+  </div>
+  <div class="page-nav">
+    <a class="nav-pill" href="timesheet.html">📋 Page 1 — Timesheet</a>
+    <a class="nav-pill active" href="onboarding.html">👤 Page 2 — Onboarding</a>
+  </div>
+  <div class="top-right">
+    <span class="pill-badge" id="date-badge"></span>
+    <span class="pill-badge">HR PORTAL</span>
+  </div>
+</div>
+
+<!-- HERO -->
+<div class="hero-strip">
+  <div class="hero-inner">
+    <h2>Employee <span>Onboarding</span> Form</h2>
+    <p>Complete all sections below. Your information will be submitted securely to the HR department for processing.</p>
+    <div class="hero-steps">
+      <div class="step-chip"><div class="step-num">1</div>Personal Info</div>
+      <div class="step-chip"><div class="step-num">2</div>Contact Details</div>
+      <div class="step-chip"><div class="step-num">3</div>Identity &amp; Docs</div>
+      <div class="step-chip"><div class="step-num">4</div>Education</div>
+      <div class="step-chip"><div class="step-num">5</div>Work Experience</div>
+      <div class="step-chip"><div class="step-num">6</div>Emergency Contact</div>
+      <div class="step-chip"><div class="step-num">7</div>Bank Details</div>
+      <div class="step-chip"><div class="step-num">8</div>Declaration</div>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="wrap">
+
+  <!-- ── SECTION 1: PERSONAL ── -->
+  <div class="section-card" id="sec1">
+    <div class="section-head">
+      <div class="section-num">1</div>
+      <h3>Personal Information</h3>
+      <p>* Required fields</p>
+    </div>
+    <div class="section-body">
+
+      <!-- Photo + Name row -->
+      <div style="display:grid;grid-template-columns:auto 1fr;gap:24px;margin-bottom:20px;align-items:start">
+        <div>
+          <label style="font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;color:var(--gray-400);display:block;margin-bottom:8px">Profile Photo</label>
+          <div class="photo-upload" onclick="document.getElementById('photo-file').click()">
+            <div class="photo-preview" id="photo-preview">
+              <img id="photo-img" alt="Preview">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke="currentColor"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            </div>
+            <div class="photo-info">
+              <h4>Upload Photo</h4>
+              <p>JPG / PNG, max 2MB<br>Passport size preferred</p>
+            </div>
+          </div>
+          <input type="file" id="photo-file" accept="image/*" style="display:none" onchange="previewPhoto(this)">
+        </div>
+
+        <div class="form-grid">
+          <div class="field">
+            <label>First Name <span class="req">*</span></label>
+            <input type="text" id="first-name" placeholder="e.g. Rajesh">
+          </div>
+          <div class="field">
+            <label>Middle Name</label>
+            <input type="text" id="middle-name" placeholder="Optional">
+          </div>
+          <div class="field">
+            <label>Last Name <span class="req">*</span></label>
+            <input type="text" id="last-name" placeholder="e.g. Kumar">
+          </div>
+          <div class="field">
+            <label>Date of Birth <span class="req">*</span></label>
+            <input type="date" id="dob">
+          </div>
+          <div class="field">
+            <label>Age</label>
+            <input type="text" id="age" placeholder="Auto-calculated" readonly style="background:var(--gray-100);color:var(--gray-400)">
+          </div>
+          <div class="field">
+            <label>Gender <span class="req">*</span></label>
+            <select id="gender">
+              <option value="">— Select —</option>
+              <option>Male</option>
+              <option>Female</option>
+              <option>Prefer not to say</option>
+              <option>Other</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="form-grid">
+        <div class="field">
+          <label>Blood Group</label>
+          <select id="blood-group">
+            <option value="">— Select —</option>
+            <option>A+</option><option>A−</option>
+            <option>B+</option><option>B−</option>
+            <option>AB+</option><option>AB−</option>
+            <option>O+</option><option>O−</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Nationality <span class="req">*</span></label>
+          <input type="text" id="nationality" value="Indian">
+        </div>
+        <div class="field">
+          <label>Marital Status</label>
+          <select id="marital">
+            <option value="">— Select —</option>
+            <option>Single</option>
+            <option>Married</option>
+            <option>Divorced</option>
+            <option>Widowed</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Religion</label>
+          <input type="text" id="religion" placeholder="Optional">
+        </div>
+        <div class="field">
+          <label>Caste Category</label>
+          <select id="caste">
+            <option value="">— Select —</option>
+            <option>General</option><option>OBC</option>
+            <option>SC</option><option>ST</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Mother Tongue</label>
+          <input type="text" id="mother-tongue" placeholder="e.g. Telugu">
+        </div>
+        <div class="field">
+          <label>Languages Known</label>
+          <input type="text" id="languages" placeholder="e.g. Telugu, Hindi, English">
+        </div>
+        <div class="field">
+          <label>Date of Joining <span class="req">*</span></label>
+          <input type="date" id="doj">
+        </div>
+        <div class="field">
+          <label>Designation <span class="req">*</span></label>
+          <input type="text" id="designation" placeholder="e.g. Software Engineer">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 2: CONTACT ── -->
+  <div class="section-card" id="sec2">
+    <div class="section-head">
+      <div class="section-num">2</div>
+      <h3>Contact Details</h3>
+    </div>
+    <div class="section-body">
+      <div class="form-grid">
+        <div class="field">
+          <label>Mobile Number <span class="req">*</span></label>
+          <input type="tel" id="mobile" placeholder="+91 00000 00000">
+        </div>
+        <div class="field">
+          <label>Alternate Phone</label>
+          <input type="tel" id="alt-phone" placeholder="Optional">
+        </div>
+        <div class="field">
+          <label>Personal Email <span class="req">*</span></label>
+          <input type="email" id="personal-email" placeholder="you@example.com">
+        </div>
+        <div class="field">
+          <label>Company Email</label>
+          <input type="email" id="company-email" placeholder="Will be assigned">
+        </div>
+        <div class="field">
+          <label>LinkedIn Profile</label>
+          <input type="url" id="linkedin" placeholder="linkedin.com/in/yourname">
+        </div>
+        <div class="field">
+          <label>Skype / Teams ID</label>
+          <input type="text" id="skype" placeholder="Optional">
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div style="margin-bottom:12px;font-size:12px;font-weight:600;color:var(--navy);text-transform:uppercase;letter-spacing:.06em">Present Address</div>
+      <div class="form-grid">
+        <div class="field span3">
+          <label>Address Line 1 <span class="req">*</span></label>
+          <input type="text" id="addr1-line1" placeholder="Flat / House No., Street Name">
+        </div>
+        <div class="field span3">
+          <label>Address Line 2</label>
+          <input type="text" id="addr1-line2" placeholder="Area / Locality">
+        </div>
+        <div class="field">
+          <label>City <span class="req">*</span></label>
+          <input type="text" id="addr1-city" placeholder="City">
+        </div>
+        <div class="field">
+          <label>State <span class="req">*</span></label>
+          <input type="text" id="addr1-state" placeholder="State">
+        </div>
+        <div class="field">
+          <label>Pincode <span class="req">*</span></label>
+          <input type="text" id="addr1-pin" placeholder="000000" maxlength="6">
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--navy);text-transform:uppercase;letter-spacing:.06em">Permanent Address</div>
+        <label class="check-item" style="font-size:12px;color:var(--gray-600)">
+          <input type="checkbox" id="same-addr" onchange="copyAddress()"> Same as present address
+        </label>
+      </div>
+      <div class="form-grid" id="perm-addr-grid">
+        <div class="field span3">
+          <label>Address Line 1</label>
+          <input type="text" id="addr2-line1" placeholder="Flat / House No., Street Name">
+        </div>
+        <div class="field span3">
+          <label>Address Line 2</label>
+          <input type="text" id="addr2-line2" placeholder="Area / Locality">
+        </div>
+        <div class="field">
+          <label>City</label>
+          <input type="text" id="addr2-city" placeholder="City">
+        </div>
+        <div class="field">
+          <label>State</label>
+          <input type="text" id="addr2-state" placeholder="State">
+        </div>
+        <div class="field">
+          <label>Pincode</label>
+          <input type="text" id="addr2-pin" placeholder="000000" maxlength="6">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 3: IDENTITY ── -->
+  <div class="section-card" id="sec3">
+    <div class="section-head">
+      <div class="section-num">3</div>
+      <h3>Identity &amp; Documents</h3>
+    </div>
+    <div class="section-body">
+      <div class="doc-row">
+        <div class="doc-label">Aadhaar Number <span>*</span></div>
+        <div class="doc-input-group">
+          <input class="doc-number-input" id="aadhaar" placeholder="0000 0000 0000" maxlength="14">
+          <input type="file" id="aadhaar-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="setDocStatus('aadhaar-status',this)">
+          <button class="upload-btn" onclick="document.getElementById('aadhaar-file').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Copy
+          </button>
+          <div class="doc-status" id="aadhaar-status">Pending</div>
+        </div>
+      </div>
+      <div class="doc-row">
+        <div class="doc-label">PAN Card <span>*</span></div>
+        <div class="doc-input-group">
+          <input class="doc-number-input" id="pan" placeholder="ABCDE1234F" maxlength="10" style="text-transform:uppercase">
+          <input type="file" id="pan-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="setDocStatus('pan-status',this)">
+          <button class="upload-btn" onclick="document.getElementById('pan-file').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Copy
+          </button>
+          <div class="doc-status" id="pan-status">Pending</div>
+        </div>
+      </div>
+      <div class="doc-row">
+        <div class="doc-label">Passport Number</div>
+        <div class="doc-input-group">
+          <input class="doc-number-input" id="passport" placeholder="A1234567" maxlength="8" style="text-transform:uppercase">
+          <input type="file" id="passport-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="setDocStatus('passport-status',this)">
+          <button class="upload-btn" onclick="document.getElementById('passport-file').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Copy
+          </button>
+          <div class="doc-status" id="passport-status">Pending</div>
+        </div>
+      </div>
+      <div class="doc-row">
+        <div class="doc-label">Driving Licence</div>
+        <div class="doc-input-group">
+          <input class="doc-number-input" id="dl" placeholder="DL-0420110012345">
+          <input type="file" id="dl-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="setDocStatus('dl-status',this)">
+          <button class="upload-btn" onclick="document.getElementById('dl-file').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Copy
+          </button>
+          <div class="doc-status" id="dl-status">Pending</div>
+        </div>
+      </div>
+      <div class="doc-row">
+        <div class="doc-label">Voter ID</div>
+        <div class="doc-input-group">
+          <input class="doc-number-input" id="voter" placeholder="ABC1234567">
+          <input type="file" id="voter-file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="setDocStatus('voter-status',this)">
+          <button class="upload-btn" onclick="document.getElementById('voter-file').click()">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload Copy
+          </button>
+          <div class="doc-status" id="voter-status">Pending</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 4: EDUCATION ── -->
+  <div class="section-card" id="sec4">
+    <div class="section-head">
+      <div class="section-num">4</div>
+      <h3>Education Details</h3>
+    </div>
+    <div class="section-body">
+      <table class="edu-table" id="edu-table">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th>Qualification</th>
+            <th>Specialisation / Subject</th>
+            <th>Institution / University</th>
+            <th style="width:80px">Pass Year</th>
+            <th style="width:80px">% / CGPA</th>
+            <th style="width:90px">Mode</th>
+            <th style="width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="edu-body"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="addEduRow()">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Add Qualification
+      </button>
+    </div>
+  </div>
+
+  <!-- ── SECTION 5: WORK EXPERIENCE ── -->
+  <div class="section-card" id="sec5">
+    <div class="section-head">
+      <div class="section-num">5</div>
+      <h3>Work Experience</h3>
+    </div>
+    <div class="section-body">
+      <table class="edu-table" id="exp-table">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th>Company Name</th>
+            <th>Designation</th>
+            <th style="width:100px">From Date</th>
+            <th style="width:100px">To Date</th>
+            <th>Reason for Leaving</th>
+            <th style="width:90px">Last CTC (₹)</th>
+            <th style="width:36px"></th>
+          </tr>
+        </thead>
+        <tbody id="exp-body"></tbody>
+      </table>
+      <button class="add-row-btn" onclick="addExpRow()">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+        Add Experience
+      </button>
+      <div class="divider"></div>
+      <div class="form-grid col2" style="margin-top:4px">
+        <div class="field">
+          <label>Total Experience</label>
+          <input type="text" id="total-exp" placeholder="e.g. 3 Years 6 Months">
+        </div>
+        <div class="field">
+          <label>Fresher / Experienced</label>
+          <select id="fresher">
+            <option value="">— Select —</option>
+            <option>Fresher</option>
+            <option>Experienced</option>
+          </select>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 6: EMERGENCY CONTACT ── -->
+  <div class="section-card" id="sec6">
+    <div class="section-head">
+      <div class="section-num">6</div>
+      <h3>Emergency Contact</h3>
+    </div>
+    <div class="section-body">
+      <div class="form-grid">
+        <div class="field">
+          <label>Contact Name <span class="req">*</span></label>
+          <input type="text" id="emg-name" placeholder="Full Name">
+        </div>
+        <div class="field">
+          <label>Relationship <span class="req">*</span></label>
+          <select id="emg-relation">
+            <option value="">— Select —</option>
+            <option>Father</option><option>Mother</option>
+            <option>Spouse</option><option>Sibling</option>
+            <option>Child</option><option>Friend</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Mobile Number <span class="req">*</span></label>
+          <input type="tel" id="emg-phone" placeholder="+91 00000 00000">
+        </div>
+        <div class="field">
+          <label>Alternate Phone</label>
+          <input type="tel" id="emg-alt" placeholder="Optional">
+        </div>
+        <div class="field span2">
+          <label>Address</label>
+          <input type="text" id="emg-address" placeholder="Full address">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 7: BANK DETAILS ── -->
+  <div class="section-card" id="sec7">
+    <div class="section-head">
+      <div class="section-num">7</div>
+      <h3>Bank Account Details</h3>
+    </div>
+    <div class="section-body">
+      <div class="form-grid">
+        <div class="field">
+          <label>Bank Name <span class="req">*</span></label>
+          <input type="text" id="bank-name" placeholder="e.g. State Bank of India">
+        </div>
+        <div class="field">
+          <label>Branch Name <span class="req">*</span></label>
+          <input type="text" id="bank-branch" placeholder="Branch name">
+        </div>
+        <div class="field">
+          <label>Account Type</label>
+          <select id="bank-type">
+            <option value="">— Select —</option>
+            <option>Savings</option><option>Current</option><option>Salary</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Account Number <span class="req">*</span></label>
+          <input type="text" id="bank-acc" placeholder="Account number" style="font-family:'DM Mono',monospace;letter-spacing:.05em">
+        </div>
+        <div class="field">
+          <label>IFSC Code <span class="req">*</span></label>
+          <input type="text" id="bank-ifsc" placeholder="e.g. SBIN0001234" maxlength="11" style="text-transform:uppercase;font-family:'DM Mono',monospace">
+        </div>
+        <div class="field">
+          <label>MICR Code</label>
+          <input type="text" id="bank-micr" placeholder="9 digit MICR" style="font-family:'DM Mono',monospace">
+        </div>
+      </div>
+      <div class="field-hint" style="margin-top:4px">Please attach a cancelled cheque or bank passbook first page for verification.</div>
+    </div>
+  </div>
+
+  <!-- ── SECTION 8: DECLARATION ── -->
+  <div class="section-card" id="sec8">
+    <div class="section-head">
+      <div class="section-num">8</div>
+      <h3>Declaration</h3>
+    </div>
+    <div class="section-body">
+      <div class="declaration-box">
+        <p>I, the undersigned, hereby declare that all the information furnished above is true, complete and correct to the best of my knowledge and belief. I understand that any false or misleading information may result in the termination of my employment and/or legal action. I authorise Unisys Infotech to verify any information provided in this form.</p>
+
+        <label class="check-item" style="font-size:13px;margin-bottom:12px;display:flex">
+          <input type="checkbox" id="decl-check" style="margin-top:2px;accent-color:var(--navy)">
+          <span style="margin-left:8px">I agree to the above declaration and confirm all information is accurate.</span>
+        </label>
+
+        <div class="sign-row">
+          <div class="field">
+            <label>Employee Full Name</label>
+            <input type="text" id="sign-name" placeholder="Type your full name as signature">
+          </div>
+          <div class="field">
+            <label>Date</label>
+            <input type="date" id="sign-date">
+          </div>
+          <button class="btn btn-navy" onclick="previewReport()">
+            <svg viewBox="0 0 24 24" stroke="white"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+            Preview
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<!-- ACTION BAR -->
+<div class="action-bar">
+  <div class="action-left">
+    <div>
+      <div class="progress-label" id="progress-label">0 / 8 sections filled</div>
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+    <button class="btn btn-ghost" onclick="window.print()">
+      <svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      Print
+    </button>
+    <button class="btn btn-ghost" onclick="clearForm()">
+      <svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+      Clear
+    </button>
+  </div>
+  <button class="btn btn-submit" onclick="submitForm()">
+    <svg viewBox="0 0 24 24" stroke="white" fill="none" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+    Submit to HR
+  </button>
+</div>
+
+<!-- PREVIEW MODAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>📋 Onboarding Summary — Ready to Submit</h3>
+        <p>Review before sending to hr@unisysinfotech.com</p>
+      </div>
+      <button class="btn-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:12px;margin-bottom:14px;padding:12px 16px;background:var(--teal-lt);border-radius:8px;align-items:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--teal)">Sending to: hr@unisysinfotech.com</div>
+          <div style="font-size:11px;color:var(--gray-400)" id="modal-subject"></div>
+        </div>
+      </div>
+      <pre class="report-preview" id="modal-body-text"></pre>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-submit" onclick="sendEmail()">
+        <svg viewBox="0 0 24 24" stroke="white" fill="none" width="14" height="14" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Open Email &amp; Send
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const HR = 'hr@unisysinfotech.com';
+
+// ── DATE BADGE ──
+(function(){
+  const now = new Date();
+  document.getElementById('date-badge').textContent =
+    now.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+  // default sign date
+  document.getElementById('sign-date').value = now.toISOString().slice(0,10);
+})();
+
+// ── AUTO AGE ──
+document.getElementById('dob').addEventListener('change', function(){
+  const dob = new Date(this.value);
+  if(isNaN(dob)) return;
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const m = today.getMonth() - dob.getMonth();
+  if(m < 0 || (m === 0 && today.getDate() < dob.getDate())) age--;
+  document.getElementById('age').value = age + ' years';
+  updateProgress();
+});
+
+// ── COPY ADDRESS ──
+function copyAddress(){
+  const same = document.getElementById('same-addr').checked;
+  const ids = ['line1','line2','city','state','pin'];
+  ids.forEach(k=>{
+    const v = same ? document.getElementById('addr1-'+k).value : '';
+    const el = document.getElementById('addr2-'+k);
+    el.value = v; el.disabled = same;
+    el.style.background = same ? 'var(--gray-100)' : '';
+    el.style.color = same ? 'var(--gray-400)' : '';
+  });
+}
+
+// ── PHOTO PREVIEW ──
+function previewPhoto(input){
+  if(!input.files||!input.files[0]) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = document.getElementById('photo-img');
+    img.src = e.target.result;
+    img.style.display = 'block';
+    document.querySelector('.photo-preview svg').style.display = 'none';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+// ── DOC STATUS ──
+function setDocStatus(id, input){
+  const el = document.getElementById(id);
+  if(input.files && input.files[0]){
+    el.textContent = 'Uploaded';
+    el.classList.add('ok');
+  }
+}
+
+// ── EDUCATION TABLE ──
+let eduCount = 0;
+function addEduRow(q='',sp='',inst='',yr='',pct='',mode=''){
+  eduCount++;
+  const id = eduCount;
+  const quals = ['10th / SSC','12th / HSC','Diploma','B.E / B.Tech','B.Sc','B.Com','BBA','MCA',
+                 'M.E / M.Tech','MBA','M.Sc','Ph.D','Other'];
+  const qualOpts = quals.map(q2=>`<option${q===q2?' selected':''}>${q2}</option>`).join('');
+  const modes = ['Regular','Distance','Online'];
+  const modeOpts = modes.map(m=>`<option${mode===m?' selected':''}>${m}</option>`).join('');
+
+  const row = document.createElement('tr');
+  row.id = 'edu-row-'+id;
+  row.innerHTML = `
+    <td style="color:var(--gray-400);font-size:12px;text-align:center">${id}</td>
+    <td><select class="edu-input"><option value="">Select</option>${qualOpts}</select></td>
+    <td><input class="edu-input" type="text" placeholder="e.g. Computer Science" value="${sp}"></td>
+    <td><input class="edu-input" type="text" placeholder="Institution name" value="${inst}"></td>
+    <td><input class="edu-input" type="text" placeholder="2023" maxlength="4" value="${yr}"></td>
+    <td><input class="edu-input" type="text" placeholder="85% / 8.5" value="${pct}"></td>
+    <td><select class="edu-input"><option value="">Mode</option>${modeOpts}</select></td>
+    <td><button class="del-btn" onclick="document.getElementById('edu-row-${id}').remove()">×</button></td>`;
+  document.getElementById('edu-body').appendChild(row);
+}
+
+// ── EXPERIENCE TABLE ──
+let expCount = 0;
+function addExpRow(){
+  expCount++;
+  const id = expCount;
+  const row = document.createElement('tr');
+  row.id = 'exp-row-'+id;
+  row.innerHTML = `
+    <td style="color:var(--gray-400);font-size:12px;text-align:center">${id}</td>
+    <td><input class="edu-input" type="text" placeholder="Company name"></td>
+    <td><input class="edu-input" type="text" placeholder="Your role"></td>
+    <td><input class="edu-input" type="date"></td>
+    <td><input class="edu-input" type="date"></td>
+    <td><input class="edu-input" type="text" placeholder="Reason"></td>
+    <td><input class="edu-input" type="text" placeholder="₹ per year"></td>
+    <td><button class="del-btn" onclick="document.getElementById('exp-row-${id}').remove()">×</button></td>`;
+  document.getElementById('exp-body').appendChild(row);
+}
+
+// ── PROGRESS ──
+function updateProgress(){
+  const checks = [
+    document.getElementById('first-name').value.trim(),
+    document.getElementById('dob').value,
+    document.getElementById('gender').value,
+    document.getElementById('mobile').value.trim(),
+    document.getElementById('personal-email').value.trim(),
+    document.getElementById('addr1-line1').value.trim(),
+    document.getElementById('aadhaar').value.trim(),
+    document.getElementById('bank-acc').value.trim(),
+  ];
+  const done = checks.filter(Boolean).length;
+  const pct = Math.round((done/8)*100);
+  document.getElementById('progress-fill').style.width = pct+'%';
+  document.getElementById('progress-label').textContent = done+' / 8 sections filled';
+}
+
+// track key fields
+['first-name','dob','gender','mobile','personal-email','addr1-line1','aadhaar','bank-acc']
+  .forEach(id=>document.getElementById(id)?.addEventListener('input',updateProgress));
+
+// ── REPORT BUILD ──
+function buildReport(){
+  const g = id => document.getElementById(id)?.value || '';
+  const name = [g('first-name'),g('middle-name'),g('last-name')].filter(Boolean).join(' ') || 'N/A';
+
+  // Collect education
+  let eduLines = '';
+  document.querySelectorAll('#edu-body tr').forEach((row,i)=>{
+    const cells = row.querySelectorAll('input,select');
+    if(cells.length){
+      eduLines += `\n  ${i+1}. ${cells[1]?.value||'—'} | ${cells[0]?.value||'—'} | ${cells[2]?.value||'—'} | ${cells[3]?.value||'—'} | ${cells[4]?.value||'—'}`;
+    }
+  });
+
+  // Collect experience
+  let expLines = '';
+  document.querySelectorAll('#exp-body tr').forEach((row,i)=>{
+    const cells = row.querySelectorAll('input,select');
+    if(cells.length){
+      expLines += `\n  ${i+1}. ${cells[0]?.value||'—'} | ${cells[1]?.value||'—'} | From: ${cells[2]?.value||'—'} To: ${cells[3]?.value||'—'} | ${cells[5]?.value||'—'}`;
+    }
+  });
+
+  const sep  = '─'.repeat(80);
+  const sep2 = '═'.repeat(80);
+  const today = new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'});
+
+  return `
+╔═══════════════════════════════════════════════════════════════╗
+║       UNISYS INFOTECH — EMPLOYEE ONBOARDING FORM             ║
+╚═══════════════════════════════════════════════════════════════╝
+  Submitted On : ${today}
+  Submitted To : HR Department — ${HR}
+
+${sep2}
+  PERSONAL INFORMATION
+${sep}
+  Full Name         : ${name}
+  Date of Birth     : ${g('dob') || 'N/A'}
+  Age               : ${g('age') || 'N/A'}
+  Gender            : ${g('gender') || 'N/A'}
+  Blood Group       : ${g('blood-group') || 'N/A'}
+  Nationality       : ${g('nationality') || 'N/A'}
+  Marital Status    : ${g('marital') || 'N/A'}
+  Mother Tongue     : ${g('mother-tongue') || 'N/A'}
+  Languages Known   : ${g('languages') || 'N/A'}
+  Date of Joining   : ${g('doj') || 'N/A'}
+  Designation       : ${g('designation') || 'N/A'}
+
+${sep}
+  CONTACT DETAILS
+${sep}
+  Mobile            : ${g('mobile') || 'N/A'}
+  Alternate Phone   : ${g('alt-phone') || 'N/A'}
+  Personal Email    : ${g('personal-email') || 'N/A'}
+  Present Address   : ${[g('addr1-line1'),g('addr1-line2'),g('addr1-city'),g('addr1-state'),g('addr1-pin')].filter(Boolean).join(', ') || 'N/A'}
+  Permanent Address : ${[g('addr2-line1'),g('addr2-line2'),g('addr2-city'),g('addr2-state'),g('addr2-pin')].filter(Boolean).join(', ') || 'Same as present'}
+
+${sep}
+  IDENTITY & DOCUMENTS
+${sep}
+  Aadhaar Number    : ${g('aadhaar') || 'N/A'}
+  PAN Number        : ${g('pan') || 'N/A'}
+  Passport Number   : ${g('passport') || 'N/A'}
+  Driving Licence   : ${g('dl') || 'N/A'}
+  Voter ID          : ${g('voter') || 'N/A'}
+
+${sep}
+  EDUCATION DETAILS${eduLines || '\n  — No entries —'}
+
+${sep}
+  WORK EXPERIENCE${expLines || '\n  — No entries (Fresher) —'}
+  Total Experience  : ${g('total-exp') || 'N/A'}
+
+${sep}
+  EMERGENCY CONTACT
+${sep}
+  Name              : ${g('emg-name') || 'N/A'}
+  Relationship      : ${g('emg-relation') || 'N/A'}
+  Mobile            : ${g('emg-phone') || 'N/A'}
+  Address           : ${g('emg-address') || 'N/A'}
+
+${sep}
+  BANK ACCOUNT DETAILS
+${sep}
+  Bank Name         : ${g('bank-name') || 'N/A'}
+  Branch            : ${g('bank-branch') || 'N/A'}
+  Account Type      : ${g('bank-type') || 'N/A'}
+  Account Number    : ${g('bank-acc') || 'N/A'}
+  IFSC Code         : ${g('bank-ifsc') || 'N/A'}
+
+${sep2}
+  DECLARATION
+${sep}
+  Employee Name     : ${g('sign-name') || name}
+  Date              : ${g('sign-date') || today}
+  Declaration       : Agreed and confirmed
+
+  I declare that all information provided is true and accurate.
+  — ${name}
+`;
+}
+
+// ── PREVIEW ──
+function previewReport(){
+  const name = [
+    document.getElementById('first-name').value,
+    document.getElementById('last-name').value
+  ].filter(Boolean).join(' ') || 'Employee';
+
+  const report = buildReport();
+  const subject = `Employee Onboarding Form — ${name} — ${new Date().toLocaleDateString('en-IN')}`;
+  document.getElementById('modal-subject').textContent = 'Subject: '+subject;
+  document.getElementById('modal-body-text').textContent = report;
+  document.getElementById('modal').classList.add('open');
+}
+
+// ── SEND ──
+function sendEmail(){
+  const name = [
+    document.getElementById('first-name').value,
+    document.getElementById('last-name').value
+  ].filter(Boolean).join(' ') || 'Employee';
+  const subject = `Employee Onboarding Form — ${name} — ${new Date().toLocaleDateString('en-IN')}`;
+  const body = buildReport();
+  window.location.href = `mailto:${HR}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  closeModal();
+}
+
+// ── FORM VALIDATE & SUBMIT ──
+function submitForm(){
+  const req = ['first-name','last-name','dob','gender','mobile','personal-email',
+               'addr1-line1','addr1-city','addr1-state','aadhaar','bank-acc','bank-ifsc'];
+  const missing = req.filter(id=>!document.getElementById(id)?.value?.trim());
+  if(missing.length){
+    showToast('Please fill required fields: '+missing.map(id=>id.replace(/-/g,' ')).join(', '));
+    return;
+  }
+  if(!document.getElementById('decl-check').checked){
+    showToast('Please agree to the declaration before submitting.');
+    return;
+  }
+  previewReport();
+}
+
+// ── CLEAR ──
+function clearForm(){
+  if(!confirm('Clear all form data? This cannot be undone.')) return;
+  document.querySelectorAll('input:not([type=file]),select,textarea').forEach(el=>{
+    if(el.type==='checkbox'||el.type==='radio') el.checked=false;
+    else el.value='';
+    el.disabled=false;el.style.background='';el.style.color='';
+  });
+  document.getElementById('edu-body').innerHTML='';
+  document.getElementById('exp-body').innerHTML='';
+  eduCount=0; expCount=0;
+  document.querySelectorAll('.doc-status').forEach(el=>{el.textContent='Pending';el.classList.remove('ok');});
+  const img=document.getElementById('photo-img');
+  img.src='';img.style.display='none';
+  document.querySelector('.photo-preview svg').style.display='';
+  updateProgress();
+}
+
+// ── MODAL ──
+function closeModal(){ document.getElementById('modal').classList.remove('open'); }
+document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+// ── TOAST ──
+function showToast(msg){
+  const t=document.getElementById('toast');
+  t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),3500);
+}
+
+// ── INIT TABLE ROWS ──
+addEduRow();
+addExpRow();
+</script>
+</body>
+</html>

@@ -1,4 +1,5 @@
-import { TrendingUp, TrendingDown } from 'lucide-react';
+import { ChevronRight, TrendingUp, TrendingDown } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 type Variant = 'blue' | 'cyan' | 'green' | 'orange' | 'purple' | 'red';
 
@@ -29,6 +30,12 @@ interface StatCardProps {
   description?: string;
   /** Optional time-series for the sparkline drawn under the value. */
   sparkline?: number[];
+  /** When set, the whole card becomes a Link to this route. */
+  to?: string;
+  /** Footer affordance label (only shown when `to` is set). */
+  linkLabel?: string;
+  /** Hover tooltip on the icon explaining the metric. */
+  helper?: string;
   className?: string;
 }
 
@@ -90,11 +97,18 @@ export function StatCard({
   trend,
   description,
   sparkline,
+  to,
+  linkLabel,
+  helper,
   className,
 }: StatCardProps) {
-  return (
-    <div className={`portal-glass-card portal-hover-lift p-5 ${className ?? ''}`}>
-      <div className="flex items-start justify-between gap-3">
+  const body = (
+    <div
+      className={`portal-glass-card portal-hover-lift p-5 min-h-[148px] flex flex-col h-full ${
+        to ? 'group cursor-pointer' : ''
+      } ${className ?? ''}`}
+    >
+      <div className="flex items-start justify-between gap-3 flex-1">
         <div className="flex-1 min-w-0">
           <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.08em]">
             {title}
@@ -127,6 +141,7 @@ export function StatCard({
         <div className="flex flex-col items-end gap-2 flex-shrink-0">
           {icon && (
             <div
+              title={helper}
               className={`w-10 h-10 rounded-xl ${ICON_BG[variant]} flex items-center justify-center`}
             >
               {icon}
@@ -137,6 +152,17 @@ export function StatCard({
           )}
         </div>
       </div>
+      {to && (
+        <div className="mt-3 pt-3 border-t border-gray-100/80 flex items-center justify-between text-[11px] font-medium text-gray-500 group-hover:text-[#4069FF] transition-colors">
+          <span>{linkLabel ?? 'View details'}</span>
+          <ChevronRight className="h-3.5 w-3.5 transform group-hover:translate-x-0.5 transition-transform" />
+        </div>
+      )}
     </div>
   );
+
+  if (to) {
+    return <Link to={to} aria-label={`${title}: view details`} className="block h-full">{body}</Link>;
+  }
+  return body;
 }

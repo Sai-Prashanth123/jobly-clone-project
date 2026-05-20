@@ -4,10 +4,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Loader2, Search, Trash2, Upload } from 'lucide-react';
+import {
+  FileText, FileImage, FileSpreadsheet, FolderOpen, Loader2, Search, Trash2, Upload,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { EmptyState } from '../components/shared/EmptyState';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import {
   useEmployee,
   useEmployees,
@@ -20,12 +23,56 @@ import type { Employee } from '../types';
 
 const DOC_TYPES = ['Resume', 'Offer Letter', 'ID Proof', 'Compliance Document', 'Other'];
 
+// Badge tone per document type. Keep keys exactly matching DOC_TYPES so the
+// pill colour matches what HR picked in the upload form.
+const DOC_TYPE_TONE: Record<string, string> = {
+  Resume:               'bg-blue-50 text-blue-700 border-blue-100',
+  'Offer Letter':       'bg-violet-50 text-violet-700 border-violet-100',
+  'ID Proof':           'bg-emerald-50 text-emerald-700 border-emerald-100',
+  'Compliance Document':'bg-amber-50 text-amber-700 border-amber-100',
+  Other:                'bg-gray-50 text-gray-600 border-gray-100',
+};
+
+function DocTypeBadge({ type }: { type: string }) {
+  const tone = DOC_TYPE_TONE[type] ?? DOC_TYPE_TONE.Other;
+  return (
+    <span className={`inline-flex items-center text-[11px] font-medium px-2 py-0.5 rounded-full border ${tone}`}>
+      {type}
+    </span>
+  );
+}
+
+// Pick a lucide icon based on the file extension. Falls back to FileText.
+function FileTypeIcon({ name }: { name: string }) {
+  const ext = name.split('.').pop()?.toLowerCase() ?? '';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) {
+    return <FileImage className="h-5 w-5 text-blue-500" />;
+  }
+  if (['xls', 'xlsx', 'csv'].includes(ext)) {
+    return <FileSpreadsheet className="h-5 w-5 text-emerald-600" />;
+  }
+  if (['pdf'].includes(ext)) {
+    return <FileText className="h-5 w-5 text-red-500" />;
+  }
+  return <FileText className="h-5 w-5 text-gray-500" />;
+}
+
+function AvatarCircle({ first, last }: { first: string; last: string }) {
+  const initials = `${first[0] ?? ''}${last[0] ?? ''}`.toUpperCase();
+  return (
+    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center text-xs font-semibold text-blue-700 flex-shrink-0">
+      {initials || '?'}
+    </div>
+  );
+}
+
 function DocumentManager({ employee }: { employee: Employee }) {
   const upload = useUploadEmployeeDocument(employee.id);
   const remove = useDeleteEmployeeDocument(employee.id);
   const [docType, setDocType] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+  const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
 
   const handleUpload = async () => {
     if (!docType || !file) {
@@ -48,12 +95,14 @@ function DocumentManager({ employee }: { employee: Employee }) {
     }
   };
 
-  const handleDelete = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const handleDelete = async () => {
+    if (!confirmTarget) return;
+    const { id } = confirmTarget;
     setPendingDeleteId(id);
     try {
       await remove.mutateAsync(id);
       toast.success('Document deleted');
+      setConfirmTarget(null);
     } catch (err: any) {
       toast.error(err?.response?.data?.error ?? 'Delete failed');
     } finally {
@@ -66,14 +115,14 @@ function DocumentManager({ employee }: { employee: Employee }) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Upload className="h-4 w-4" />
+            <Upload className="h-4 w-4 text-[#4069FF]" />
             Add new document
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">Document type *</Label>
+              <Label className="text-xs font-medium">1. Document type *</Label>
               <Select value={docType} onValueChange={setDocType}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>
@@ -84,11 +133,11 @@ function DocumentManager({ employee }: { employee: Employee }) {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">File *</Label>
+              <Label className="text-xs font-medium">2. Pick a file *</Label>
               <input
                 id="doc-file"
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.csv"
                 onChange={e => setFile(e.target.files?.[0] ?? null)}
                 className="block w-full h-10 text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
               />
@@ -103,12 +152,12 @@ function DocumentManager({ employee }: { employee: Employee }) {
                 className="w-full gap-2"
               >
                 <Upload className="h-4 w-4" />
-                Upload
+                3. Upload
               </Button>
             </div>
           </div>
           <p className="text-[11px] text-gray-400 mt-3">
-            Accepted: PDF, DOC, DOCX, JPG, PNG · Max 20 MB
+            Accepted: PDF, DOC, DOCX, JPG, PNG, XLS, CSV · Max 20 MB
           </p>
         </CardContent>
       </Card>
@@ -116,25 +165,37 @@ function DocumentManager({ employee }: { employee: Employee }) {
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <FileText className="h-4 w-4" />
+            <FileText className="h-4 w-4 text-[#4069FF]" />
             Documents on file ({employee.documents.length})
           </CardTitle>
         </CardHeader>
         <CardContent>
           {employee.documents.length === 0 ? (
-            <EmptyState title="No documents yet" description="Upload the first document above." />
+            <EmptyState
+              icon={<FileText className="h-10 w-10 text-gray-300" strokeWidth={1.5} />}
+              title="No documents yet"
+              description="Upload the first document above."
+            />
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-1">
               {employee.documents.map(doc => (
                 <div
                   key={doc.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-3 border-b border-gray-100 last:border-0"
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-3 -mx-3 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50/40"
                 >
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{doc.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {doc.type} · {formatDate(doc.uploadedAt)}
-                    </p>
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="flex-shrink-0 p-2 rounded-lg bg-gray-50 border border-gray-100">
+                      <FileTypeIcon name={doc.name} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate">{doc.name}</p>
+                      <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <DocTypeBadge type={doc.type} />
+                        <span className="text-xs text-muted-foreground">
+                          Uploaded {formatDate(doc.uploadedAt)}
+                        </span>
+                      </div>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {doc.url && (
@@ -146,7 +207,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
                       variant="ghost"
                       size="sm"
                       className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-1"
-                      onClick={() => handleDelete(doc.id, doc.name)}
+                      onClick={() => setConfirmTarget({ id: doc.id, name: doc.name })}
                       loading={pendingDeleteId === doc.id}
                       loadingText="Deleting…"
                     >
@@ -160,6 +221,16 @@ function DocumentManager({ employee }: { employee: Employee }) {
           )}
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!confirmTarget}
+        onOpenChange={open => { if (!open) setConfirmTarget(null); }}
+        title={confirmTarget ? `Delete "${confirmTarget.name}"?` : 'Delete document?'}
+        description="This will permanently remove the document. It cannot be undone."
+        confirmLabel="Delete document"
+        loading={!!pendingDeleteId}
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }
@@ -187,7 +258,10 @@ function HrDocumentsView() {
     <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
       <Card className="h-fit">
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Pick an employee</CardTitle>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Search className="h-4 w-4 text-[#4069FF]" />
+            Pick an employee
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="relative mb-3">
@@ -208,24 +282,27 @@ function HrDocumentsView() {
           ) : (
             <div className="max-h-[480px] overflow-y-auto space-y-1 -mx-2 px-2">
               {filtered.map(e => {
-                const isActive = e.id === selectedId;
+                const isSelected = e.id === selectedId;
                 return (
                   <button
                     key={e.id}
                     type="button"
                     onClick={() => setSelectedId(e.id)}
-                    className={`w-full text-left rounded-md px-3 py-2 transition-colors ${
-                      isActive
+                    className={`w-full text-left rounded-md px-2 py-2 transition-colors flex items-center gap-2.5 ${
+                      isSelected
                         ? 'bg-blue-50 ring-1 ring-blue-200'
                         : 'hover:bg-gray-50'
                     }`}
                   >
-                    <p className={`text-sm font-medium truncate ${isActive ? 'text-blue-700' : 'text-gray-900'}`}>
-                      {e.firstName} {e.lastName}
-                    </p>
-                    <p className="text-[11px] text-muted-foreground truncate">
-                      {e.displayId ?? e.id.slice(0, 8)} · {e.jobTitle ?? '—'}
-                    </p>
+                    <AvatarCircle first={e.firstName} last={e.lastName} />
+                    <div className="min-w-0 flex-1">
+                      <p className={`text-sm font-medium truncate ${isSelected ? 'text-blue-700' : 'text-gray-900'}`}>
+                        {e.firstName} {e.lastName}
+                      </p>
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {e.displayId ?? e.id.slice(0, 8)} · {e.jobTitle ?? '—'}
+                      </p>
+                    </div>
                   </button>
                 );
               })}
@@ -239,9 +316,13 @@ function HrDocumentsView() {
           <Card>
             <CardContent className="py-16">
               <EmptyState
-                title="Select an employee"
-                description="Pick someone on the left to view, upload, or delete their documents."
+                icon={<FolderOpen className="h-10 w-10 text-blue-400" strokeWidth={1.5} />}
+                title="Select an employee to manage documents"
+                description="Pick someone on the left to view, upload, or delete their resume, offer letter, ID proof, and compliance docs."
               />
+              <p className="text-[11px] text-center text-gray-400 mt-2">
+                💡 Tip — use the search box to find anyone by name, ID, email, or department.
+              </p>
             </CardContent>
           </Card>
         ) : !selected ? (
@@ -250,12 +331,15 @@ function HrDocumentsView() {
           </div>
         ) : (
           <div className="space-y-3">
-            <div>
-              <p className="text-sm text-muted-foreground">Managing documents for</p>
-              <p className="text-lg font-semibold">{selected.firstName} {selected.lastName}</p>
-              <p className="text-xs text-muted-foreground">
-                {selected.displayId ?? selected.id.slice(0, 8)} · {selected.jobTitle ?? '—'} · {selected.department ?? '—'}
-              </p>
+            <div className="flex items-center gap-3">
+              <AvatarCircle first={selected.firstName} last={selected.lastName} />
+              <div className="min-w-0">
+                <p className="text-xs text-muted-foreground">Managing documents for</p>
+                <p className="text-lg font-semibold truncate">{selected.firstName} {selected.lastName}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {selected.displayId ?? selected.id.slice(0, 8)} · {selected.jobTitle ?? '—'} · {selected.department ?? '—'}
+                </p>
+              </div>
             </div>
             <DocumentManager employee={selected} />
           </div>
@@ -306,8 +390,8 @@ export default function Documents() {
         title="Documents"
         description={
           isHr
-            ? 'Upload, view, or remove documents for any employee.'
-            : 'Upload, view, or remove your own documents.'
+            ? 'Upload, view, or remove documents for any employee. Useful for storing resumes, offer letters, ID proofs and compliance paperwork in one place.'
+            : 'Upload, view, or remove your own documents. Keep your resume, ID proof, and compliance paperwork up to date.'
         }
       />
       {isHr ? <HrDocumentsView /> : <EmployeeDocumentsView />}

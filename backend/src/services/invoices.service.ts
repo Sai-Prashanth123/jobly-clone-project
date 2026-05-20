@@ -44,9 +44,19 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
     .select('timesheet_id, invoice_id')
     .in('timesheet_id', input.timesheetIds);
   if (alreadyInvoiced && alreadyInvoiced.length > 0) {
-    const ids = [...new Set(alreadyInvoiced.map(r => r.timesheet_id))];
+    const tsIds = [...new Set(alreadyInvoiced.map(r => r.timesheet_id))];
+    // Look up human-readable display IDs so the error names timesheets a
+    // user can recognize, not opaque UUIDs.
+    const { data: tsRows } = await supabaseAdmin
+      .from('timesheets')
+      .select('id, display_id')
+      .in('id', tsIds);
+    const labels = tsIds.map(id => {
+      const row = (tsRows ?? []).find(r => r.id === id);
+      return row?.display_id ?? id.slice(0, 8);
+    });
     throw new ConflictError(
-      `These timesheets are already on an existing invoice and cannot be re-invoiced: ${ids.join(', ')}`,
+      `Some of the selected timesheets are already on an existing invoice: ${labels.join(', ')}. Reload the page and try again.`,
     );
   }
 

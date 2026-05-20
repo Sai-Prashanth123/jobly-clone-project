@@ -24,7 +24,12 @@ export function InvoiceForm({ onGenerate, onCancel }: InvoiceFormProps) {
   const [error, setError] = useState('');
 
   const { data: clientData } = useClients({ limit: 200 });
-  const { data: tsData } = useTimesheets({ limit: 200, status: 'client_approved', clientId: clientId || undefined });
+  const { data: tsData } = useTimesheets({
+    limit: 200,
+    status: 'client_approved',
+    clientId: clientId || undefined,
+    excludeInvoiced: true,
+  });
   const { data: empData } = useEmployees({ limit: 500 });
   const { data: assignData } = useAssignments({ limit: 200 });
 

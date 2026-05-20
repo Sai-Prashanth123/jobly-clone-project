@@ -84,18 +84,67 @@ export function FinanceDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
-          { title: 'Pending Invoices', value: pendingInvoices, icon: <FileText className="h-5 w-5" />, variant: 'orange' as const,
-            description: readyToInvoice > 0 ? `${readyToInvoice} ready to invoice` : 'Draft invoices' },
-          { title: 'Outstanding Payments', value: formatCurrency(outstandingAmount), icon: <DollarSign className="h-5 w-5" />,
+          {
+            title: 'Draft Invoices',
+            value: pendingInvoices,
+            icon: <FileText className="h-5 w-5" />,
+            variant: 'orange' as const,
+            description: 'Created but not yet sent to the client',
+            helper: 'Drafts are safe to edit or delete. Send them to move to "Sent" status.',
+            to: '/portal/invoices',
+            linkLabel: 'Open invoices',
+          },
+          {
+            title: 'Outstanding Payments',
+            value: formatCurrency(outstandingAmount),
+            icon: <DollarSign className="h-5 w-5" />,
             variant: (totalOverdue > 0 ? 'red' : 'blue') as 'red' | 'blue',
-            description: totalOverdue > 0 ? `${formatCurrency(totalOverdue)} overdue` : 'Awaiting payment' },
-          { title: 'Total Collected', value: formatCurrency(totalPaidAllTime), icon: <TrendingUp className="h-5 w-5" />,
-            variant: 'green' as const, description: 'All-time paid', sparkline: monthlyRevenue.map(m => m.revenue) },
+            description: totalOverdue > 0
+              ? `${formatCurrency(totalOverdue)} is past due`
+              : 'Sent invoices awaiting payment',
+            helper: 'Total of Sent + Overdue invoices. These are emails sent but not yet paid.',
+            to: '/portal/invoices',
+            linkLabel: 'Open invoices',
+          },
+          {
+            title: 'Total Collected',
+            value: formatCurrency(totalPaidAllTime),
+            icon: <TrendingUp className="h-5 w-5" />,
+            variant: 'green' as const,
+            description: 'All-time revenue from Paid invoices',
+            helper: 'Lifetime sum of every invoice marked Paid. Sparkline shows the last 6 months.',
+            sparkline: monthlyRevenue.map(m => m.revenue),
+            to: '/portal/reports',
+            linkLabel: 'View revenue report',
+          },
         ].map((c, i) => (
           <div key={c.title} className="portal-stagger" style={{ animationDelay: `${i * 60}ms` }}>
             <StatCard {...c} />
           </div>
         ))}
+      </div>
+
+      {/* Status legend — answers "what does Draft mean?" right on the dashboard. */}
+      <div className="bg-blue-50/40 border border-blue-100 rounded-md px-3 py-2.5">
+        <p className="text-[12px] font-medium text-gray-700 mb-1.5">Invoice status flow</p>
+        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1 text-[11px] text-gray-600">
+          <li className="flex items-start gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-gray-400 mt-1.5 flex-shrink-0" />
+            <span><strong className="text-gray-800">Draft</strong> — generated, not yet emailed to the client.</span>
+          </li>
+          <li className="flex items-start gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 flex-shrink-0" />
+            <span><strong className="text-gray-800">Sent</strong> — emailed to the client. Awaiting payment.</span>
+          </li>
+          <li className="flex items-start gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 mt-1.5 flex-shrink-0" />
+            <span><strong className="text-gray-800">Paid</strong> — payment received and recorded.</span>
+          </li>
+          <li className="flex items-start gap-1.5">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 flex-shrink-0" />
+            <span><strong className="text-gray-800">Overdue</strong> — past the due date with no payment.</span>
+          </li>
+        </ul>
       </div>
 
       {/* Charts row */}

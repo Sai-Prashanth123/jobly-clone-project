@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2, Pencil } from 'lucide-react';
+import { Plus, Loader2, Pencil, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
@@ -210,11 +210,32 @@ export default function Timesheets() {
     }] : []),
   ];
 
+  // Role-specific help text. Page is one component but HR/Operations/Finance/
+  // Employee each see a different slice — the description sets that expectation.
+  const roleDescription = (() => {
+    if (isLoading) return 'Loading…';
+    const count = `${timesheets.length} record${timesheets.length === 1 ? '' : 's'}`;
+    switch (user?.role) {
+      case 'hr':
+        return `Review your team's weekly hours. View every submission, monitor approvals, and spot missing timesheets. · ${count}`;
+      case 'admin':
+        return `Full access to every timesheet across all roles. Override status, edit entries, or fix data. · ${count}`;
+      case 'operations':
+        return `Create timesheets for your team, approve submissions, and forward to clients for final approval. · ${count}`;
+      case 'finance':
+        return `Read-only view of approved timesheets — these become invoice line items once client-approved. · ${count}`;
+      case 'employee':
+        return `Track your weekly hours. Save as draft, submit for manager approval, and see rejection reasons. · ${count}`;
+      default:
+        return count;
+    }
+  })();
+
   return (
     <div>
       <PageHeader
         title="Timesheets"
-        description={isLoading ? 'Loading...' : `${timesheets.length} timesheets`}
+        description={roleDescription}
         action={
           canCreate ? (
             <Button onClick={() => setShowForm(true)} className="gap-2">
@@ -224,6 +245,14 @@ export default function Timesheets() {
           ) : undefined
         }
       />
+
+      <div className="mb-3 flex items-start gap-2 text-[12px] text-gray-500 bg-blue-50/40 border border-blue-100 rounded-md px-3 py-2">
+        <Info className="h-3.5 w-3.5 mt-0.5 text-[#4069FF] flex-shrink-0" />
+        <p>
+          Status flow: <strong>Draft</strong> → <strong>Submitted</strong> → <strong>Manager Approved</strong> → <strong>Client Approved</strong>.
+          A timesheet can be rejected from any approval step back to the employee.
+        </p>
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">

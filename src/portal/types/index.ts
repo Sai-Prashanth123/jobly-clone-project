@@ -33,6 +33,43 @@ export interface EmployeeDocument {
   url?: string;
 }
 
+// Onboarding-form education + work-history rows. Stored as JSONB on the
+// employees table (migration 005). Keep optional/free-form so partial rows
+// don't block validation on the rest of the form.
+export interface EducationEntry {
+  level?: string;          // 'high_school' | 'associate' | 'bachelor' | 'master' | 'mba' | 'phd' | 'bootcamp' | 'certification' | 'other'
+  specialization?: string;
+  institution?: string;
+  passYear?: string;
+  gradeOrGPA?: string;
+  mode?: string;           // 'on_campus' | 'online' | 'hybrid'
+}
+
+export interface WorkHistoryEntry {
+  company?: string;
+  jobTitle?: string;
+  fromDate?: string;
+  toDate?: string;
+  reasonForLeaving?: string;
+  lastAnnualSalary?: number | null;
+}
+
+export interface PermanentAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  country?: string;
+}
+
+export interface EmergencyContact {
+  name?: string;
+  relationship?: string;
+  phone?: string;
+  altPhone?: string;
+  address?: string;
+}
+
 export interface ClientDocument {
   id: string;
   name: string;
@@ -76,6 +113,25 @@ export interface Employee {
   reportingManagerId?: string;
   workEmail?: string;
   documents: EmployeeDocument[];
+
+  // Onboarding-form extension fields (migration 005). All optional.
+  middleName?: string;
+  gender?: string;
+  maritalStatus?: string;
+  nationality?: string;
+  preferredLanguage?: string;
+  languagesKnown?: string;
+  profilePhotoUrl?: string;
+  altPhone?: string;
+  linkedinUrl?: string;
+  skypeId?: string;
+  permanentAddress?: PermanentAddress;
+  emergencyContact?: EmergencyContact;
+  education?: EducationEntry[];
+  workHistory?: WorkHistoryEntry[];
+  totalExperienceYears?: number;
+  experienceLevel?: string;
+
   createdAt: string;
   updatedAt: string;
 }

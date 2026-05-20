@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError } from '../lib/errors';
+import { ConflictError, NotFoundError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
@@ -181,7 +181,10 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
 // ── create ───────────────────────────────────────────────────────────────────
 
 export async function createEmployee(input: CreateEmployeeInput, actorId?: string) {
-  // If employee with this email already exists (active or soft-deleted), re-issue credentials
+  // Pre-check by email so HR gets a precise 409 with the existing employee's
+  // displayId, instead of a generic 500 from the DB unique-violation.
+  // Soft-deleted rows are silently restored — that path predates this guard and
+  // is useful for HR who delete by accident, then immediately re-create.
   const { data: existingEmp } = await supabaseAdmin
     .from('employees')
     .select('*')
@@ -191,54 +194,96 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     .maybeSingle();
 
   if (existingEmp) {
-    // Restore soft-deleted employee if needed
     if (existingEmp.deleted_at) {
       await supabaseAdmin.from('employees').update({ deleted_at: null }).eq('id', existingEmp.id);
       existingEmp.deleted_at = null;
+      const credsResult = await issueCredentials(existingEmp.id, existingEmp, input);
+      logActivity(actorId ?? null, 'updated', 'employee', existingEmp.id, existingEmp.display_id ?? input.email, { event: 'restored_soft_deleted' });
+      return { ...serializeEmployee(existingEmp), _credentials: credsResult };
     }
-    // Re-issue new login credentials and send welcome email
-    const credsResult = await issueCredentials(existingEmp.id, existingEmp, input);
-    logActivity(actorId ?? null, 'updated', 'employee', existingEmp.id, existingEmp.display_id ?? input.email);
-    return { ...serializeEmployee(existingEmp), _credentials: credsResult };
+    // Active duplicate — refuse with a clear message including the existing
+    // employee's displayId and name so HR can find the right record.
+    const label = existingEmp.display_id ?? existingEmp.id.slice(0, 8);
+    throw new ConflictError(
+      `An employee with email ${input.email} already exists (${label} — ${existingEmp.first_name} ${existingEmp.last_name}). Open their profile or use a different email.`,
+    );
   }
 
-  const { data: emp, error } = await supabaseAdmin
-    .from('employees')
-    .insert({
-      first_name:        input.firstName,
-      last_name:         input.lastName,
-      email:             input.email,
-      phone:             input.phone ?? '',
-      dob:               input.dob || null,
-      address_street:    input.address?.street ?? '',
-      address_city:      input.address?.city ?? '',
-      address_state:     input.address?.state ?? '',
-      address_zip:       input.address?.zip ?? '',
-      address_country:   input.address?.country ?? 'US',
-      department:        input.department ?? '',
-      job_title:         input.jobTitle ?? '',
-      employment_type:   input.employmentType,
-      start_date:        input.startDate,
-      status:            input.status ?? 'onboarding',
-      visa_type:         input.visaType ?? null,
-      visa_expiry:       input.visaExpiry || null,
-      i9_status:         input.i9Status ?? null,
-      pay_rate:          input.payRate,
-      pay_type:          input.payType,
-      work_location:     input.workLocation ?? null,
-      ssn:               input.ssn ?? null,
-      payment_type:      input.paymentType ?? null,
-      bank_name:         input.bankName ?? null,
-      bank_routing_number: input.bankRoutingNumber ?? null,
-      bank_account_number: input.bankAccountNumber ?? null,
-      tax_form_type:     input.taxFormType ?? null,
-      reporting_manager_id: input.reportingManagerId ?? null,
-      work_email:        input.workEmail ?? null,
-    })
-    .select()
-    .single();
+  let emp: any;
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('employees')
+      .insert({
+        first_name:        input.firstName,
+        last_name:         input.lastName,
+        email:             input.email,
+        phone:             input.phone ?? '',
+        dob:               input.dob || null,
+        address_street:    input.address?.street ?? '',
+        address_city:      input.address?.city ?? '',
+        address_state:     input.address?.state ?? '',
+        address_zip:       input.address?.zip ?? '',
+        address_country:   input.address?.country ?? 'US',
+        department:        input.department ?? '',
+        job_title:         input.jobTitle ?? '',
+        employment_type:   input.employmentType,
+        start_date:        input.startDate,
+        status:            input.status ?? 'onboarding',
+        visa_type:         input.visaType ?? null,
+        visa_expiry:       input.visaExpiry || null,
+        i9_status:         input.i9Status ?? null,
+        pay_rate:          input.payRate,
+        pay_type:          input.payType,
+        work_location:     input.workLocation ?? null,
+        ssn:               input.ssn ?? null,
+        payment_type:      input.paymentType ?? null,
+        bank_name:         input.bankName ?? null,
+        bank_routing_number: input.bankRoutingNumber ?? null,
+        bank_account_number: input.bankAccountNumber ?? null,
+        tax_form_type:     input.taxFormType ?? null,
+        reporting_manager_id: input.reportingManagerId ?? null,
+        work_email:        input.workEmail ?? null,
 
-  if (error) throw error;
+        // Onboarding-form extension fields (see migration 005). All nullable.
+        middle_name:               input.middleName ?? null,
+        gender:                    input.gender ?? null,
+        marital_status:            input.maritalStatus ?? null,
+        nationality:               input.nationality ?? null,
+        preferred_language:        input.preferredLanguage ?? null,
+        languages_known:           input.languagesKnown ?? null,
+        profile_photo_url:         input.profilePhotoUrl ?? null,
+        alt_phone:                 input.altPhone ?? null,
+        linkedin_url:              input.linkedinUrl ?? null,
+        skype_id:                  input.skypeId ?? null,
+        permanent_address_street:  input.permanentAddress?.street ?? null,
+        permanent_address_city:    input.permanentAddress?.city ?? null,
+        permanent_address_state:   input.permanentAddress?.state ?? null,
+        permanent_address_zip:     input.permanentAddress?.zip ?? null,
+        permanent_address_country: input.permanentAddress?.country ?? null,
+        emergency_contact_name:         input.emergencyContact?.name ?? null,
+        emergency_contact_relationship: input.emergencyContact?.relationship ?? null,
+        emergency_contact_phone:        input.emergencyContact?.phone ?? null,
+        emergency_contact_alt_phone:    input.emergencyContact?.altPhone ?? null,
+        emergency_contact_address:      input.emergencyContact?.address ?? null,
+        education:                 input.education ?? [],
+        work_history:              input.workHistory ?? [],
+        total_experience_years:    input.totalExperienceYears ?? null,
+        experience_level:          input.experienceLevel ?? null,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    emp = data;
+  } catch (err: any) {
+    // 23505 = unique_violation. The pre-check should catch this, but if two
+    // requests race the second one ends up here. Translate to a friendly 409.
+    if (err?.code === '23505') {
+      throw new ConflictError(
+        `An employee with email ${input.email} already exists. Reload the page and search by email to find the existing record.`,
+      );
+    }
+    throw err;
+  }
 
   logActivity(actorId ?? null, 'created', 'employee', emp.id, emp.display_id ?? `${input.firstName} ${input.lastName}`);
 
@@ -326,6 +371,10 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
     bankAccountNumber: emp.bank_account_number ?? null,
     taxFormType: emp.tax_form_type ?? null,
     reportingManagerId: emp.reporting_manager_id ?? null,
+    // Onboarding-form extension fields (migration 005). issueCredentials only
+    // touches name/email/work_email so empty defaults are fine here.
+    education: [],
+    workHistory: [],
   };
 
   const result = await issueCredentials(emp.id, emp, input);
@@ -376,6 +425,37 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     patch.address_zip     = input.address.zip ?? '';
     patch.address_country = input.address.country ?? 'US';
   }
+
+  // Onboarding-form extension fields. Only patch when explicitly provided so
+  // existing rows keep their values unless the form sends an explicit change.
+  if (input.middleName !== undefined)        patch.middle_name        = input.middleName;
+  if (input.gender !== undefined)            patch.gender             = input.gender;
+  if (input.maritalStatus !== undefined)     patch.marital_status     = input.maritalStatus;
+  if (input.nationality !== undefined)       patch.nationality        = input.nationality;
+  if (input.preferredLanguage !== undefined) patch.preferred_language = input.preferredLanguage;
+  if (input.languagesKnown !== undefined)    patch.languages_known    = input.languagesKnown;
+  if (input.profilePhotoUrl !== undefined)   patch.profile_photo_url  = input.profilePhotoUrl;
+  if (input.altPhone !== undefined)          patch.alt_phone          = input.altPhone;
+  if (input.linkedinUrl !== undefined)       patch.linkedin_url       = input.linkedinUrl;
+  if (input.skypeId !== undefined)           patch.skype_id           = input.skypeId;
+  if (input.permanentAddress !== undefined) {
+    patch.permanent_address_street  = input.permanentAddress?.street ?? null;
+    patch.permanent_address_city    = input.permanentAddress?.city ?? null;
+    patch.permanent_address_state   = input.permanentAddress?.state ?? null;
+    patch.permanent_address_zip     = input.permanentAddress?.zip ?? null;
+    patch.permanent_address_country = input.permanentAddress?.country ?? null;
+  }
+  if (input.emergencyContact !== undefined) {
+    patch.emergency_contact_name         = input.emergencyContact?.name ?? null;
+    patch.emergency_contact_relationship = input.emergencyContact?.relationship ?? null;
+    patch.emergency_contact_phone        = input.emergencyContact?.phone ?? null;
+    patch.emergency_contact_alt_phone    = input.emergencyContact?.altPhone ?? null;
+    patch.emergency_contact_address      = input.emergencyContact?.address ?? null;
+  }
+  if (input.education !== undefined)            patch.education             = input.education;
+  if (input.workHistory !== undefined)          patch.work_history          = input.workHistory;
+  if (input.totalExperienceYears !== undefined) patch.total_experience_years = input.totalExperienceYears;
+  if (input.experienceLevel !== undefined)      patch.experience_level      = input.experienceLevel;
 
   const { data: emp, error } = await supabaseAdmin
     .from('employees')
