@@ -794,7 +794,7 @@ export default function NewEmployee() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 lg:gap-6">
+      <div className="grid grid-cols-1 gap-4 lg:gap-6">
         {/* Main column — all the cards */}
         <div className="space-y-5">
           {/* 01 Personal */}
@@ -1595,58 +1595,6 @@ export default function NewEmployee() {
           </SectionCard>
         </div>
 
-        {/* Sticky right rail — progress + jump links (desktop only). On mobile
-            we rely on the sticky bottom bar. */}
-        <aside className="hidden lg:block">
-          <div className="sticky top-4 space-y-3">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground mb-2 tabular-nums">{progress.filled} / {progress.total} required sections</p>
-                <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all"
-                    style={{ width: `${(progress.filled / progress.total) * 100}%` }}
-                  />
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm">Jump to</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-1 text-xs">
-                {[
-                  ['01 Personal',     SECTION_IDS.personal],
-                  ['02 Contact',      SECTION_IDS.contact],
-                  ['03 Present Addr', SECTION_IDS.presentAddr],
-                  ['04 Permanent',    SECTION_IDS.permanentAddr],
-                  ['05 Employment',   SECTION_IDS.employment],
-                  ['06 Immigration',  SECTION_IDS.immigration],
-                  ['07 Identity',     SECTION_IDS.identity],
-                  ['08 Education',    SECTION_IDS.education],
-                  ['09 Experience',   SECTION_IDS.workHistory],
-                  ['10 Emergency',    SECTION_IDS.emergency],
-                  ['11 Payroll',      SECTION_IDS.payroll],
-                  ['12 Documents',    SECTION_IDS.documents],
-                  ['13 Review',       SECTION_IDS.review],
-                ].map(([label, id]) => (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => scrollToSection(id)}
-                    className="block w-full text-left px-2 py-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </aside>
       </div>
 
       {/* Sticky save bar */}
