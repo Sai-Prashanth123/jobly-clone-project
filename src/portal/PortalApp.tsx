@@ -83,6 +83,14 @@ export default function PortalApp() {
               }
             />
             <Route
+              path="employees/:id/edit"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <NewEmployee />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="employees/:id"
               element={
                 <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>

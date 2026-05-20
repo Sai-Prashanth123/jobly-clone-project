@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
   User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
+  AlertTriangle, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,10 +14,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '../components/shared/PageHeader';
-import { useCreateEmployee, useEmployees } from '../hooks/useEmployees';
+import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee } from '../hooks/useEmployees';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
+import { DOCUMENT_TYPES as DOC_TYPES } from '../lib/documentTypes';
 import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -47,8 +49,8 @@ const EMPLOYMENT_TYPE_OPTIONS = [
 ];
 
 const STATUS_OPTIONS = [
-  { value: 'onboarding', label: 'Onboarding' },
   { value: 'active',     label: 'Active' },
+  { value: 'onboarding', label: 'Onboarding (paperwork pending)' },
   { value: 'inactive',   label: 'Inactive' },
 ];
 
@@ -141,8 +143,6 @@ const IDENTITY_DOC_ROWS: Array<{
   { type: 'ead',            label: 'Employment Authorization Document', placeholder: 'EAC1234567890',
     hint: 'I-766 / EAD for visa holders.', hasExpiry: true },
 ];
-
-const DOC_TYPES = ['Resume', 'Offer Letter', 'ID Proof', 'Compliance Document', 'I-9 Form', 'Other'];
 
 const SECTION_IDS = {
   personal: 'sec-personal',
@@ -243,7 +243,11 @@ const defaultForm: FormState = {
   department: '', jobTitle: '',
   employmentType: 'w2',
   startDate: '',
-  status: 'onboarding',
+  // Default to Active so HR doesn't have to click "Approve Onboarding" on the
+  // detail page afterwards — credentials get sent at creation time, so the
+  // employee is immediately usable. HR can still pick Onboarding for cases
+  // where paperwork isn't done yet.
+  status: 'active' as Employee['status'],
   reportingManagerId: '',
   workLocation: '',
   visaType: '',
@@ -319,11 +323,100 @@ function RequiredMark() {
 
 export default function NewEmployee() {
   const navigate = useNavigate();
+  const params = useParams<{ id?: string }>();
+  const editId = params.id;
+  const isEditMode = !!editId;
+
   const createEmployee = useCreateEmployee();
+  const updateEmployee = useUpdateEmployee(editId ?? '');
+  const { data: existingEmployee, isLoading: loadingEmployee } = useEmployee(editId);
   const { data: employeesData } = useEmployees({ limit: 500 });
+
   const [form, setForm] = useState<FormState>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submitError, setSubmitError] = useState<string>('');
+  const [prefilled, setPrefilled] = useState(false);
   const submittingRef = useRef(false);
+
+  const submitMutation = isEditMode ? updateEmployee : createEmployee;
+
+  // Edit mode: prefill the whole form once the employee data lands. Skip the
+  // declaration prompt — for an edit, the data is already "owned" by HR.
+  useEffect(() => {
+    if (!isEditMode || !existingEmployee || prefilled) return;
+    const e = existingEmployee;
+    setForm({
+      firstName: e.firstName ?? '',
+      middleName: e.middleName ?? '',
+      lastName: e.lastName ?? '',
+      dob: e.dob ?? '',
+      gender: e.gender ?? '',
+      maritalStatus: e.maritalStatus ?? '',
+      bloodGroup: e.bloodGroup ?? '',
+      nationality: e.nationality ?? 'United States',
+      preferredLanguage: e.preferredLanguage ?? 'English',
+      languagesKnown: e.languagesKnown ?? '',
+      profilePhotoFile: null,
+      profilePhotoPreview: e.profilePhotoUrl ?? '',
+      email: e.email ?? '',
+      workEmail: e.workEmail ?? '',
+      phone: e.phone ?? '',
+      altPhone: e.altPhone ?? '',
+      linkedinUrl: e.linkedinUrl ?? '',
+      skypeId: e.skypeId ?? '',
+      address: {
+        street: e.address?.street ?? '',
+        city: e.address?.city ?? '',
+        state: e.address?.state ?? '',
+        zip: e.address?.zip ?? '',
+        country: e.address?.country ?? 'US',
+      },
+      permanentSameAsPresent: !e.permanentAddress,
+      permanentAddress: {
+        street: e.permanentAddress?.street ?? '',
+        city: e.permanentAddress?.city ?? '',
+        state: e.permanentAddress?.state ?? '',
+        zip: e.permanentAddress?.zip ?? '',
+        country: e.permanentAddress?.country ?? 'US',
+      },
+      department: e.department ?? '',
+      jobTitle: e.jobTitle ?? '',
+      employmentType: e.employmentType ?? 'w2',
+      startDate: e.startDate ?? '',
+      status: e.status ?? 'onboarding',
+      reportingManagerId: e.reportingManagerId ?? '',
+      workLocation: e.workLocation ?? '',
+      visaType: (e.visaType ?? '') as FormState['visaType'],
+      visaExpiry: e.visaExpiry ?? '',
+      i9Status: (e.i9Status ?? '') as FormState['i9Status'],
+      ssn: e.ssn ?? '',
+      identityDocuments: e.identityDocuments ?? [],
+      identityDocFiles: {},
+      education: e.education ?? [],
+      workHistory: e.workHistory ?? [],
+      totalExperienceYears: e.totalExperienceYears != null ? String(e.totalExperienceYears) : '',
+      experienceLevel: e.experienceLevel ?? '',
+      emergencyContact: {
+        name: e.emergencyContact?.name ?? '',
+        relationship: e.emergencyContact?.relationship ?? '',
+        phone: e.emergencyContact?.phone ?? '',
+        altPhone: e.emergencyContact?.altPhone ?? '',
+        address: e.emergencyContact?.address ?? '',
+      },
+      payRate: e.payRate != null ? String(e.payRate) : '',
+      payType: e.payType ?? 'hourly',
+      paymentType: (e.paymentType ?? '') as FormState['paymentType'],
+      taxFormType: (e.taxFormType ?? '') as FormState['taxFormType'],
+      bankName: e.bankName ?? '',
+      bankRoutingNumber: e.bankRoutingNumber ?? '',
+      bankAccountNumber: e.bankAccountNumber ?? '',
+      declarationAccepted: true,                   // already-saved data
+      signatureName: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim(),
+      signatureDate: todayIso(),
+      documents: [],
+    });
+    setPrefilled(true);
+  }, [isEditMode, existingEmployee, prefilled]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setForm(p => ({ ...p, [k]: v }));
@@ -398,8 +491,12 @@ export default function NewEmployee() {
     const payRateNum = parseNumberInput(form.payRate);
     if (payRateNum === undefined || payRateNum <= 0) flag('payRate', 'Pay rate must be greater than 0', SECTION_IDS.payroll);
 
-    if (!form.declarationAccepted) flag('declaration', 'Please accept the declaration', SECTION_IDS.review);
-    if (!form.signatureName.trim()) flag('signatureName', 'Type your full name as signature', SECTION_IDS.review);
+    // Declaration / signature are only collected on first-time onboarding,
+    // not when HR is editing an already-onboarded employee.
+    if (!isEditMode) {
+      if (!form.declarationAccepted) flag('declaration', 'Please accept the declaration', SECTION_IDS.review);
+      if (!form.signatureName.trim()) flag('signatureName', 'Type your full name as signature', SECTION_IDS.review);
+    }
 
     setErrors(e);
     return { ok: Object.keys(e).length === 0, firstErrorSectionId: firstSection };
@@ -479,6 +576,7 @@ export default function NewEmployee() {
   // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (submittingRef.current) return;
+    setSubmitError('');
     const { ok, firstErrorSectionId } = validate();
     if (!ok) {
       if (firstErrorSectionId) scrollToSection(firstErrorSectionId);
@@ -540,8 +638,18 @@ export default function NewEmployee() {
     };
 
     try {
-      const result = await createEmployee.mutateAsync(payload);
-      const emp = result.employee;
+      // Branch: edit re-uses the existing id, create returns a new one.
+      let emp: Employee;
+      let welcomeEmailSent = true;
+      let warning: string | undefined;
+      if (isEditMode && editId) {
+        emp = await updateEmployee.mutateAsync(payload);
+      } else {
+        const result = await createEmployee.mutateAsync(payload);
+        emp = result.employee;
+        welcomeEmailSent = result.welcomeEmailSent;
+        warning = result.warning;
+      }
 
       // Upload pending files in parallel (deferred until employee exists for
       // the FK). Three sources are merged here:
@@ -590,38 +698,101 @@ export default function NewEmployee() {
         }
       }
 
-      if (result.welcomeEmailSent) {
+      if (isEditMode) {
+        toast.success(`Employee ${emp.displayId ?? emp.id} updated.`);
+      } else if (welcomeEmailSent) {
         toast.success(`Employee ${emp.displayId ?? emp.id} created — welcome email sent.`);
       } else {
         toast.warning(
-          result.warning ?? `Employee ${emp.displayId ?? emp.id} created. Welcome email could not be delivered — use Resend Welcome Email on their detail page.`,
+          warning ?? `Employee ${emp.displayId ?? emp.id} created. Welcome email could not be delivered — use Resend Welcome Email on their detail page.`,
           { duration: 12000 },
         );
       }
       navigate(`/portal/employees/${emp.id}`, { replace: true });
     } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Failed to create employee', { duration: 8000 });
+      const msg = err?.response?.data?.error ?? (isEditMode ? 'Failed to update employee. Please try again.' : 'Failed to create employee. Please try again.');
+      // Persistent banner at the top of the form — the toast disappears after
+      // a few seconds but the banner stays until the user fixes the issue.
+      setSubmitError(msg);
+      toast.error(msg, { duration: 10000 });
+      // Scroll to the top so the banner is visible.
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       submittingRef.current = false;
     }
   };
 
-  // First-input auto-focus on mount (matches the HTML reference behavior).
+  // First-input auto-focus on mount — only in create mode, since edit mode
+  // already has the field filled and the user is more likely to be looking
+  // for a specific section to change.
   const firstNameRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { firstNameRef.current?.focus(); }, []);
+  useEffect(() => {
+    if (!isEditMode) firstNameRef.current?.focus();
+  }, [isEditMode]);
 
   // ── Render ───────────────────────────────────────────────────────────────
 
+  // Edit mode: show a loading state until the employee row arrives so we
+  // don't briefly render an empty form and then snap-in the prefill.
+  if (isEditMode && loadingEmployee) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (isEditMode && !existingEmployee && !loadingEmployee) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground">Employee not found.</p>
+        <Button variant="link" onClick={() => navigate('/portal/employees')}>← Back to Employees</Button>
+      </div>
+    );
+  }
+
+  const backTo = isEditMode && editId ? `/portal/employees/${editId}` : '/portal/employees';
+  const backLabel = isEditMode ? 'Back to employee' : 'Back to Employees';
+  const pageTitle = isEditMode
+    ? `Edit Employee — ${existingEmployee?.displayId ?? ''}`
+    : 'Add New Employee';
+  const pageDescription = isEditMode
+    ? 'Update any field below and click Save Changes. Photo and document uploads are appended; existing files stay.'
+    : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
+
   return (
     <div className="pb-32"> {/* leave room for sticky action bar */}
-      <Link to="/portal/employees" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3">
-        <ArrowLeft className="h-3 w-3" /> Back to Employees
+      <Link to={backTo} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3">
+        <ArrowLeft className="h-3 w-3" /> {backLabel}
       </Link>
       <PageHeader
-        eyebrow="HR · Onboarding"
-        title="Add New Employee"
-        description="Fill out each section to onboard a new hire. Required fields are marked with a red asterisk."
+        eyebrow={isEditMode ? 'HR · Edit' : 'HR · Onboarding'}
+        title={pageTitle}
+        description={pageDescription}
       />
+
+      {submitError && (
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 p-4 flex items-start gap-3 portal-animate-in"
+        >
+          <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-red-800">Couldn't create this employee</p>
+            <p className="text-sm text-red-700 mt-1 break-words">{submitError}</p>
+            <p className="text-xs text-red-600/80 mt-2">
+              Adjust the highlighted fields above and click <strong>Create Employee</strong> again.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSubmitError('')}
+            className="flex-shrink-0 p-1 rounded hover:bg-red-100 transition-colors text-red-600"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_240px] gap-4 lg:gap-6">
         {/* Main column — all the cards */}
@@ -951,7 +1122,7 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Visa Type <RequiredMark /></Label>
-                <Select value={form.visaType || undefined} onValueChange={v => set('visaType', v as FormState['visaType'])}>
+                <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {VISA_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -966,7 +1137,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>I-9 Status <RequiredMark /></Label>
-                <Select value={form.i9Status || undefined} onValueChange={v => set('i9Status', v as FormState['i9Status'])}>
+                <Select value={form.i9Status || ''} onValueChange={v => set('i9Status', v as FormState['i9Status'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {I9_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -1015,7 +1186,7 @@ export default function NewEmployee() {
                       />
                       {row.hasState && (
                         <Select
-                          value={doc.state || undefined}
+                          value={doc.state || ''}
                           onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
                         >
                           <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
@@ -1082,7 +1253,7 @@ export default function NewEmployee() {
                   <div key={idx} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-end p-3 bg-gray-50/60 rounded-md">
                     <div className="sm:col-span-2">
                       <Label className="text-[11px]">Level</Label>
-                      <Select value={row.level || undefined} onValueChange={v => updateEducation(idx, 'level', v)}>
+                      <Select value={row.level || ''} onValueChange={v => updateEducation(idx, 'level', v)}>
                         <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
                           {EDUCATION_LEVEL_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -1107,7 +1278,7 @@ export default function NewEmployee() {
                     </div>
                     <div>
                       <Label className="text-[11px]">Mode</Label>
-                      <Select value={row.mode || undefined} onValueChange={v => updateEducation(idx, 'mode', v)}>
+                      <Select value={row.mode || ''} onValueChange={v => updateEducation(idx, 'mode', v)}>
                         <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
                         <SelectContent>
                           {EDUCATION_MODE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -1201,7 +1372,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Experience Level</Label>
-                <Select value={form.experienceLevel || undefined} onValueChange={v => set('experienceLevel', v)}>
+                <Select value={form.experienceLevel || ''} onValueChange={v => set('experienceLevel', v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="fresher">Fresher</SelectItem>
@@ -1228,7 +1399,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Relationship</Label>
-                <Select value={form.emergencyContact.relationship || undefined} onValueChange={v => setEmergency('relationship', v)}>
+                <Select value={form.emergencyContact.relationship || ''} onValueChange={v => setEmergency('relationship', v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {RELATIONSHIP_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -1283,7 +1454,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Payment Type</Label>
-                <Select value={form.paymentType || undefined} onValueChange={v => set('paymentType', v as FormState['paymentType'])}>
+                <Select value={form.paymentType || ''} onValueChange={v => set('paymentType', v as FormState['paymentType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {PAYMENT_TYPE_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -1292,7 +1463,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Tax Form</Label>
-                <Select value={form.taxFormType || undefined} onValueChange={v => set('taxFormType', v as FormState['taxFormType'])}>
+                <Select value={form.taxFormType || ''} onValueChange={v => set('taxFormType', v as FormState['taxFormType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {TAX_FORM_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
@@ -1494,17 +1665,22 @@ export default function NewEmployee() {
               </div>
             </div>
           </div>
-          <Button variant="outline" onClick={() => navigate('/portal/employees')} disabled={createEmployee.isPending}>
+          <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending}>
             Cancel
           </Button>
-          <Button onClick={handleSubmit} loading={createEmployee.isPending} loadingText="Creating…" className="gap-2">
+          <Button
+            onClick={handleSubmit}
+            loading={submitMutation.isPending}
+            loadingText={isEditMode ? 'Saving…' : 'Creating…'}
+            className="gap-2"
+          >
             <CheckCircle2 className="h-4 w-4" />
-            Create Employee
+            {isEditMode ? 'Save Changes' : 'Create Employee'}
           </Button>
         </div>
       </div>
 
-      {createEmployee.isPending && (
+      {submitMutation.isPending && (
         <div className="fixed inset-0 bg-white/30 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
           <Loader2 className="h-8 w-8 animate-spin text-[#4069FF]" />
         </div>

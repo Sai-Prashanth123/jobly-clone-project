@@ -19,9 +19,10 @@ import {
 } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/utils';
+import { DOCUMENT_TYPES } from '../lib/documentTypes';
 import type { Employee } from '../types';
 
-const DOC_TYPES = ['Resume', 'Offer Letter', 'ID Proof', 'Compliance Document', 'Other'];
+const DOC_TYPES = DOCUMENT_TYPES;
 
 // Badge tone per document type. Keep keys exactly matching DOC_TYPES so the
 // pill colour matches what HR picked in the upload form.
