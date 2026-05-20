@@ -269,6 +269,8 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
         work_history:              input.workHistory ?? [],
         total_experience_years:    input.totalExperienceYears ?? null,
         experience_level:          input.experienceLevel ?? null,
+        blood_group:               input.bloodGroup ?? null,
+        identity_documents:        input.identityDocuments ?? [],
       })
       .select()
       .single();
@@ -371,10 +373,11 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
     bankAccountNumber: emp.bank_account_number ?? null,
     taxFormType: emp.tax_form_type ?? null,
     reportingManagerId: emp.reporting_manager_id ?? null,
-    // Onboarding-form extension fields (migration 005). issueCredentials only
-    // touches name/email/work_email so empty defaults are fine here.
+    // Onboarding-form extension fields. issueCredentials only touches
+    // name/email/work_email so empty defaults are fine here.
     education: [],
     workHistory: [],
+    identityDocuments: [],
   };
 
   const result = await issueCredentials(emp.id, emp, input);
@@ -456,6 +459,8 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.workHistory !== undefined)          patch.work_history          = input.workHistory;
   if (input.totalExperienceYears !== undefined) patch.total_experience_years = input.totalExperienceYears;
   if (input.experienceLevel !== undefined)      patch.experience_level      = input.experienceLevel;
+  if (input.bloodGroup !== undefined)           patch.blood_group           = input.bloodGroup;
+  if (input.identityDocuments !== undefined)    patch.identity_documents    = input.identityDocuments;
 
   const { data: emp, error } = await supabaseAdmin
     .from('employees')

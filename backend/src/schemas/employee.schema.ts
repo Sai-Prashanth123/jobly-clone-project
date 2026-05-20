@@ -21,6 +21,15 @@ export const workHistoryEntrySchema = z.object({
   lastAnnualSalary: z.number().nullable().optional(),
 });
 
+// US-issued identity documents (driver's license, passport, etc.). Numbers
+// only — file scans go in the documents table tagged with the matching type.
+export const identityDocumentEntrySchema = z.object({
+  type: z.string(),       // 'ssn' | 'driver_license' | 'state_id' | 'passport' | 'ead' | 'green_card' | 'other'
+  number: z.string().optional().default(''),
+  state: z.string().optional().default(''),    // e.g. issuing state for DL/State ID
+  expiry: z.string().optional().default(''),   // for passport / EAD
+});
+
 const permanentAddressSchema = z.object({
   street: z.string().optional().default(''),
   city: z.string().optional().default(''),
@@ -87,6 +96,8 @@ export const createEmployeeSchema = z.object({
   workHistory: z.array(workHistoryEntrySchema).optional().default([]),
   totalExperienceYears: z.number().nullable().optional(),
   experienceLevel: z.string().optional().nullable(),
+  bloodGroup: z.string().optional().nullable(),
+  identityDocuments: z.array(identityDocumentEntrySchema).optional().default([]),
 });
 
 // Update keeps every field optional and lenient — pre-existing employees
@@ -142,6 +153,8 @@ export const updateEmployeeSchema = z.object({
   workHistory: z.array(workHistoryEntrySchema).optional(),
   totalExperienceYears: z.number().nullable().optional(),
   experienceLevel: z.string().optional().nullable(),
+  bloodGroup: z.string().optional().nullable(),
+  identityDocuments: z.array(identityDocumentEntrySchema).optional(),
 });
 
 export const listEmployeesQuerySchema = z.object({
@@ -157,3 +170,4 @@ export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 export type ListEmployeesQuery = z.infer<typeof listEmployeesQuerySchema>;
 export type EducationEntryInput = z.infer<typeof educationEntrySchema>;
 export type WorkHistoryEntryInput = z.infer<typeof workHistoryEntrySchema>;
+export type IdentityDocumentEntryInput = z.infer<typeof identityDocumentEntrySchema>;

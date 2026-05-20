@@ -44,11 +44,12 @@ USER appuser
 ENV NODE_ENV=production
 ENV PORT=3001
 ENV FRONTEND_URL=https://yellow-sea-0a9088500.6.azurestaticapps.net
-ENV SUPABASE_URL=https://knwrmyprxclakidqlaqt.supabase.co
-ENV SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtud3JteXByeGNsYWtpZHFsYXF0Iiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDQwNjI2OSwiZXhwIjoyMDg5OTgyMjY5fQ.fwwl52fJDQXdZoGkPiryhnGdDu2gdBGRm2fyDc1hTaA
-ENV SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtud3JteXByeGNsYWtpZHFsYXF0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ0MDYyNjksImV4cCI6MjA4OTk4MjI2OX0.YOeCxtmYgMV-VOSJ7PhIkj8GglIRm2V6swTfhqsyafA
-ENV DATABASE_URL=postgresql://postgres:FoBzMXdZOegCid8H@db.knwrmyprxclakidqlaqt.supabase.co:5432/postgres
-ENV DIRECT_URL=postgresql://postgres:FoBzMXdZOegCid8H@db.knwrmyprxclakidqlaqt.supabase.co:5432/postgres
+ENV SUPABASE_URL=https://ufkrfrmqangydrjbzljo.supabase.co
+ENV SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVma3Jmcm1xYW5neWRyamJ6bGpvIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3OTEzNDA1NSwiZXhwIjoyMDk0NzEwMDU1fQ.vas0fMca0dBOjDpuFW83XaT4KmmTGDAqd9Ewft_SzmA
+ENV SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVma3Jmcm1xYW5neWRyamJ6bGpvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkxMzQwNTUsImV4cCI6MjA5NDcxMDA1NX0.TMmpWm6Nru8KgJMJy4eQbYUo4cQ6XebBuQvsEv4mhK0
+# Password "Jobly@123$!" url-encoded: @→%40, $→%24, !→%21
+ENV DATABASE_URL=postgresql://postgres:Jobly%40123%24%21@db.ufkrfrmqangydrjbzljo.supabase.co:5432/postgres
+ENV DIRECT_URL=postgresql://postgres:Jobly%40123%24%21@db.ufkrfrmqangydrjbzljo.supabase.co:5432/postgres
 ENV GMAIL_USER=saip00519@gmail.com
 ENV GMAIL_APP_PASSWORD="gsox vqdx akvi irrh"
 

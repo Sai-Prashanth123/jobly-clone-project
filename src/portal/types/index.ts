@@ -70,6 +70,16 @@ export interface EmergencyContact {
   address?: string;
 }
 
+// US-issued identity documents (driver's license, passport, EAD, etc.).
+// Stored as a JSONB array on the employee row. File scans live in the
+// existing `documents` table, tagged by docType matching `type` below.
+export interface IdentityDocumentEntry {
+  type: string;        // 'ssn' | 'driver_license' | 'state_id' | 'passport' | 'ead' | 'green_card' | 'other'
+  number?: string;
+  state?: string;      // issuing state for DL / state ID
+  expiry?: string;     // expiry for passport / EAD / green card
+}
+
 export interface ClientDocument {
   id: string;
   name: string;
@@ -131,6 +141,8 @@ export interface Employee {
   workHistory?: WorkHistoryEntry[];
   totalExperienceYears?: number;
   experienceLevel?: string;
+  bloodGroup?: string;
+  identityDocuments?: IdentityDocumentEntry[];
 
   createdAt: string;
   updatedAt: string;

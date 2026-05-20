@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase,
-  User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2,
+  ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
+  User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +17,7 @@ import { useCreateEmployee, useEmployees } from '../hooks/useEmployees';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
-import type { Employee, EducationEntry, WorkHistoryEntry } from '../types';
+import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -112,6 +112,36 @@ const RELATIONSHIP_OPTIONS = [
   { value: 'other',    label: 'Other' },
 ];
 
+const BLOOD_GROUP_OPTIONS = [
+  { value: 'A+',  label: 'A+'  }, { value: 'A-',  label: 'A−'  },
+  { value: 'B+',  label: 'B+'  }, { value: 'B-',  label: 'B−'  },
+  { value: 'AB+', label: 'AB+' }, { value: 'AB-', label: 'AB−' },
+  { value: 'O+',  label: 'O+'  }, { value: 'O-',  label: 'O−'  },
+];
+
+// US-issued identity documents employees may present for I-9 / payroll.
+const IDENTITY_DOC_ROWS: Array<{
+  type: string;
+  label: string;
+  placeholder: string;
+  hint?: string;
+  hasState?: boolean;
+  hasExpiry?: boolean;
+}> = [
+  { type: 'ssn',            label: 'Social Security Number',     placeholder: 'XXX-XX-XXXX',
+    hint: 'Full SSN. Stored securely; only the last 4 are shown after save.' },
+  { type: 'driver_license', label: "Driver's License",           placeholder: 'D1234567',
+    hint: 'Primary photo ID for I-9 List B.', hasState: true },
+  { type: 'state_id',       label: 'State-Issued ID',            placeholder: 'S1234567',
+    hint: 'Alternative to driver license for non-drivers.', hasState: true },
+  { type: 'passport',       label: 'US Passport',                placeholder: '123456789',
+    hint: 'I-9 List A — proves identity AND work authorization on its own.', hasExpiry: true },
+  { type: 'green_card',     label: 'Permanent Resident Card',    placeholder: 'A12345678',
+    hint: 'Green Card — also I-9 List A.', hasExpiry: true },
+  { type: 'ead',            label: 'Employment Authorization Document', placeholder: 'EAC1234567890',
+    hint: 'I-766 / EAD for visa holders.', hasExpiry: true },
+];
+
 const DOC_TYPES = ['Resume', 'Offer Letter', 'ID Proof', 'Compliance Document', 'I-9 Form', 'Other'];
 
 const SECTION_IDS = {
@@ -121,6 +151,7 @@ const SECTION_IDS = {
   permanentAddr: 'sec-permanent-address',
   employment: 'sec-employment',
   immigration: 'sec-immigration',
+  identity: 'sec-identity',
   education: 'sec-education',
   workHistory: 'sec-work-history',
   emergency: 'sec-emergency',
@@ -141,8 +172,10 @@ interface PendingDoc {
 interface FormState {
   // Personal
   firstName: string; middleName: string; lastName: string;
-  dob: string; gender: string; maritalStatus: string;
+  dob: string; gender: string; maritalStatus: string; bloodGroup: string;
   nationality: string; preferredLanguage: string; languagesKnown: string;
+  profilePhotoFile: File | null;        // staged for upload after employee is created
+  profilePhotoPreview: string;          // object URL for inline preview
   // Contact
   email: string; workEmail: string;
   phone: string; altPhone: string;
@@ -164,6 +197,10 @@ interface FormState {
   visaExpiry: string;
   i9Status: Employee['i9Status'] | '';
   ssn: string;
+  // Identity & Documents — numbers per US doc type
+  identityDocuments: IdentityDocumentEntry[];
+  // Map of identity-doc type → File staged for upload, keyed by `type`.
+  identityDocFiles: Record<string, File | null>;
   // Education + work
   education: EducationEntry[];
   workHistory: WorkHistoryEntry[];
@@ -194,8 +231,9 @@ function todayIso(): string {
 
 const defaultForm: FormState = {
   firstName: '', middleName: '', lastName: '',
-  dob: '', gender: '', maritalStatus: '',
+  dob: '', gender: '', maritalStatus: '', bloodGroup: '',
   nationality: 'United States', preferredLanguage: 'English', languagesKnown: '',
+  profilePhotoFile: null, profilePhotoPreview: '',
   email: '', workEmail: '',
   phone: '', altPhone: '',
   linkedinUrl: '', skypeId: '',
@@ -212,6 +250,8 @@ const defaultForm: FormState = {
   visaExpiry: '',
   i9Status: '',
   ssn: '',
+  identityDocuments: [],
+  identityDocFiles: {},
   education: [],
   workHistory: [],
   totalExperienceYears: '',
@@ -371,6 +411,36 @@ export default function NewEmployee() {
     if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
+  // ── Profile photo selection (deferred upload) ─────────────────────────────
+  const handleProfilePhotoChange = (file: File | null) => {
+    setForm(p => {
+      // Revoke the previous object URL to avoid leaks
+      if (p.profilePhotoPreview) URL.revokeObjectURL(p.profilePhotoPreview);
+      return {
+        ...p,
+        profilePhotoFile: file,
+        profilePhotoPreview: file ? URL.createObjectURL(file) : '',
+      };
+    });
+  };
+
+  // ── Identity document row mutations ──────────────────────────────────────
+  // Find an existing row by type or insert a new one with the given patch.
+  const upsertIdentityDoc = (type: string, patch: Partial<IdentityDocumentEntry>) => {
+    setForm(p => {
+      const next = [...(p.identityDocuments ?? [])];
+      const idx = next.findIndex(d => d.type === type);
+      if (idx >= 0) next[idx] = { ...next[idx], ...patch };
+      else next.push({ type, ...patch });
+      return { ...p, identityDocuments: next };
+    });
+  };
+  const getIdentityDoc = (type: string): IdentityDocumentEntry =>
+    form.identityDocuments.find(d => d.type === type) ?? { type };
+  const setIdentityDocFile = (type: string, file: File | null) => {
+    setForm(p => ({ ...p, identityDocFiles: { ...p.identityDocFiles, [type]: file } }));
+  };
+
   // ── Education + work-history row mutations ────────────────────────────────
   const addEducation = () => setForm(p => ({ ...p, education: [...(p.education ?? []), emptyEducation()] }));
   const removeEducation = (idx: number) => setForm(p => ({ ...p, education: p.education.filter((_, i) => i !== idx) }));
@@ -434,6 +504,7 @@ export default function NewEmployee() {
       dob: form.dob,
       gender: form.gender || undefined,
       maritalStatus: form.maritalStatus || undefined,
+      bloodGroup: form.bloodGroup || undefined,
       nationality: form.nationality || undefined,
       preferredLanguage: form.preferredLanguage || undefined,
       languagesKnown: form.languagesKnown || undefined,
@@ -464,21 +535,47 @@ export default function NewEmployee() {
       totalExperienceYears: parseNumberInput(form.totalExperienceYears),
       experienceLevel: form.experienceLevel || undefined,
       emergencyContact: form.emergencyContact,
+      // Only persist identity docs that have at least a number filled in.
+      identityDocuments: form.identityDocuments.filter(d => (d.number ?? '').trim() !== ''),
     };
 
     try {
       const result = await createEmployee.mutateAsync(payload);
       const emp = result.employee;
 
-      // Upload pending documents (deferred until employee exists for the FK).
-      const docsWithFiles = form.documents.filter(d => d.file);
-      if (docsWithFiles.length > 0) {
+      // Upload pending files in parallel (deferred until employee exists for
+      // the FK). Three sources are merged here:
+      //   - profile photo  → docType "Profile Photo"
+      //   - identity doc copies → docType matches the IDENTITY_DOC_ROWS label
+      //   - generic Documents section uploads → user-chosen docType
+      const uploads: { file: File; name: string; docType: string }[] = [];
+
+      if (form.profilePhotoFile) {
+        uploads.push({
+          file: form.profilePhotoFile,
+          name: form.profilePhotoFile.name,
+          docType: 'Profile Photo',
+        });
+      }
+
+      for (const row of IDENTITY_DOC_ROWS) {
+        const file = form.identityDocFiles[row.type];
+        if (file) {
+          uploads.push({ file, name: file.name, docType: row.label });
+        }
+      }
+
+      for (const d of form.documents) {
+        if (d.file) uploads.push({ file: d.file, name: d.file.name, docType: d.type });
+      }
+
+      if (uploads.length > 0) {
         try {
-          await Promise.all(docsWithFiles.map(d => {
+          await Promise.all(uploads.map(u => {
             const fd = new FormData();
-            fd.append('file', d.file!);
-            fd.append('name', d.file!.name);
-            fd.append('docType', d.type);
+            fd.append('file', u.file);
+            fd.append('name', u.name);
+            fd.append('docType', u.docType);
             return apiClient.post(`/employees/${emp.id}/documents`, fd, {
               headers: { 'Content-Type': 'multipart/form-data' },
             });
@@ -534,50 +631,107 @@ export default function NewEmployee() {
             id={SECTION_IDS.personal}
             num="01"
             title="Personal Information"
-            description="The basics. Photo upload is optional and can be added later."
+            description="The basics. Profile photo is optional but recommended for the directory."
             icon={<User className="h-4 w-4 text-[#4069FF]" />}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {/* Two-column: profile photo on the left, name + DOB block on the right */}
+            <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4 mb-4">
+              {/* Profile Photo upload tile (matches reference HTML) */}
               <div>
-                <Label>First Name <RequiredMark /></Label>
-                <Input ref={firstNameRef} value={form.firstName} onChange={e => set('firstName', e.target.value)} />
-                <FieldError msg={errors.firstName} />
-              </div>
-              <div>
-                <Label>Middle Name</Label>
-                <Input value={form.middleName} onChange={e => set('middleName', e.target.value)} />
-              </div>
-              <div>
-                <Label>Last Name <RequiredMark /></Label>
-                <Input value={form.lastName} onChange={e => set('lastName', e.target.value)} />
-                <FieldError msg={errors.lastName} />
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo</p>
+                <label
+                  htmlFor="profile-photo"
+                  className="block border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-[#4069FF] hover:bg-blue-50/40 transition-colors cursor-pointer text-center"
+                >
+                  <div className="w-20 h-20 mx-auto rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                    {form.profilePhotoPreview ? (
+                      <img src={form.profilePhotoPreview} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="h-7 w-7 text-gray-400" />
+                    )}
+                  </div>
+                  <p className="text-[11px] font-medium text-gray-700 mt-2">{form.profilePhotoFile ? 'Change Photo' : 'Upload Photo'}</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">JPG / PNG, max 2 MB</p>
+                </label>
+                <input
+                  id="profile-photo"
+                  type="file"
+                  accept="image/png,image/jpeg"
+                  className="hidden"
+                  onChange={e => {
+                    const file = e.target.files?.[0] ?? null;
+                    if (file && file.size > 2 * 1024 * 1024) {
+                      toast.error('Photo is larger than 2 MB — please pick a smaller image.');
+                      return;
+                    }
+                    handleProfilePhotoChange(file);
+                  }}
+                />
+                {form.profilePhotoFile && (
+                  <button
+                    type="button"
+                    className="text-[11px] text-red-600 hover:underline mt-1 block mx-auto"
+                    onClick={() => handleProfilePhotoChange(null)}
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
 
-              <div>
-                <Label>Date of Birth <RequiredMark /></Label>
-                <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
-                <FieldError msg={errors.dob} />
+              {/* Name + DOB + Age + Gender */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <Label>First Name <RequiredMark /></Label>
+                  <Input ref={firstNameRef} value={form.firstName} onChange={e => set('firstName', e.target.value)} />
+                  <FieldError msg={errors.firstName} />
+                </div>
+                <div>
+                  <Label>Middle Name</Label>
+                  <Input value={form.middleName} onChange={e => set('middleName', e.target.value)} />
+                </div>
+                <div>
+                  <Label>Last Name <RequiredMark /></Label>
+                  <Input value={form.lastName} onChange={e => set('lastName', e.target.value)} />
+                  <FieldError msg={errors.lastName} />
+                </div>
+                <div>
+                  <Label>Date of Birth <RequiredMark /></Label>
+                  <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
+                  <FieldError msg={errors.dob} />
+                </div>
+                <div>
+                  <Label>Age</Label>
+                  <Input value={age != null ? `${age} years` : ''} disabled placeholder="Auto" />
+                </div>
+                <div>
+                  <Label>Gender</Label>
+                  <Select value={form.gender} onValueChange={v => set('gender', v)}>
+                    <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
+                    <SelectContent>
+                      {GENDER_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div>
-                <Label>Age</Label>
-                <Input value={age != null ? `${age} years` : ''} disabled placeholder="Auto" />
-              </div>
-              <div>
-                <Label>Gender</Label>
-                <Select value={form.gender} onValueChange={v => set('gender', v)}>
-                  <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
-                  <SelectContent>
-                    {GENDER_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
+            </div>
 
+            {/* Demographics + language row */}
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div>
                 <Label>Marital Status</Label>
                 <Select value={form.maritalStatus} onValueChange={v => set('maritalStatus', v)}>
-                  <SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
                     {MARITAL_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>Blood Group</Label>
+                <Select value={form.bloodGroup} onValueChange={v => set('bloodGroup', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent>
+                    {BLOOD_GROUP_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
@@ -590,7 +744,7 @@ export default function NewEmployee() {
                 <Input value={form.preferredLanguage} onChange={e => set('preferredLanguage', e.target.value)} placeholder="English" />
               </div>
 
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-4">
                 <Label>Languages Known</Label>
                 <Input value={form.languagesKnown} onChange={e => set('languagesKnown', e.target.value)} placeholder="English, Spanish, Mandarin…" />
               </div>
@@ -834,10 +988,88 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 07 Education */}
+          {/* 07 Identity & Documents (US) */}
+          <SectionCard
+            id={SECTION_IDS.identity}
+            num="07"
+            title="Identity & Documents"
+            description="US-issued ID numbers + optional file copies. Used for I-9 verification and payroll tax forms."
+            icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
+          >
+            <div className="space-y-3">
+              {IDENTITY_DOC_ROWS.map(row => {
+                const doc = getIdentityDoc(row.type);
+                const file = form.identityDocFiles[row.type];
+                const inputId = `id-doc-file-${row.type}`;
+                return (
+                  <div key={row.type} className="grid grid-cols-1 sm:grid-cols-[170px_1fr_auto_auto] gap-2 sm:gap-3 items-start p-3 bg-gray-50/60 rounded-md">
+                    <div className="sm:pt-2">
+                      <p className="text-sm font-medium text-gray-800">{row.label}</p>
+                      {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px] gap-2">
+                      <Input
+                        value={doc.number ?? ''}
+                        onChange={e => upsertIdentityDoc(row.type, { number: e.target.value })}
+                        placeholder={row.placeholder}
+                      />
+                      {row.hasState && (
+                        <Select
+                          value={doc.state || undefined}
+                          onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
+                        >
+                          <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                          <SelectContent className="max-h-[280px]">
+                            {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      )}
+                      {row.hasExpiry && (
+                        <Input
+                          type="date"
+                          value={doc.expiry ?? ''}
+                          onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
+                          placeholder="Expiry"
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <label
+                        htmlFor={inputId}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        {file ? 'Replace' : 'Upload Copy'}
+                      </label>
+                      <input
+                        id={inputId}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
+                      />
+                    </div>
+                    <div className="flex sm:items-center">
+                      {file ? (
+                        <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
+                          Uploaded
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
+                          Pending
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SectionCard>
+
+          {/* 08 Education */}
           <SectionCard
             id={SECTION_IDS.education}
-            num="07"
+            num="08"
             title="Education"
             description="Add each qualification — most recent first."
             icon={<GraduationCap className="h-4 w-4 text-[#4069FF]" />}
@@ -896,10 +1128,10 @@ export default function NewEmployee() {
             </Button>
           </SectionCard>
 
-          {/* 08 Work History */}
+          {/* 09 Work History */}
           <SectionCard
             id={SECTION_IDS.workHistory}
-            num="08"
+            num="09"
             title="Work Experience"
             description="Past roles, most recent first. Total experience and level summarize the list."
             icon={<Briefcase className="h-4 w-4 text-[#4069FF]" />}
@@ -980,10 +1212,10 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 09 Emergency Contact */}
+          {/* 10 Emergency Contact */}
           <SectionCard
             id={SECTION_IDS.emergency}
-            num="09"
+            num="10"
             title="Emergency Contact"
             description="Used only if HR can't reach the employee in an emergency."
             icon={<HeartHandshake className="h-4 w-4 text-[#4069FF]" />}
@@ -1019,10 +1251,10 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 10 Payroll & Tax */}
+          {/* 11 Payroll & Tax */}
           <SectionCard
             id={SECTION_IDS.payroll}
-            num="10"
+            num="11"
             title="Payroll & Tax"
             description="Direct deposit details for ACH payroll. Have a void cheque or bank letter ready for verification."
             icon={<Wallet className="h-4 w-4 text-[#4069FF]" />}
@@ -1098,10 +1330,10 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 11 Documents */}
+          {/* 12 Documents */}
           <SectionCard
             id={SECTION_IDS.documents}
-            num="11"
+            num="12"
             title="Documents"
             description="Optional. Uploads happen after the employee is created."
             icon={<FileText className="h-4 w-4 text-[#4069FF]" />}
@@ -1151,10 +1383,10 @@ export default function NewEmployee() {
             )}
           </SectionCard>
 
-          {/* 12 Review */}
+          {/* 13 Review */}
           <SectionCard
             id={SECTION_IDS.review}
-            num="12"
+            num="13"
             title="Review & Submit"
             description="Confirm the information is correct before creating the employee."
             icon={<CheckCircle2 className="h-4 w-4 text-[#4069FF]" />}
@@ -1223,12 +1455,13 @@ export default function NewEmployee() {
                   ['04 Permanent',    SECTION_IDS.permanentAddr],
                   ['05 Employment',   SECTION_IDS.employment],
                   ['06 Immigration',  SECTION_IDS.immigration],
-                  ['07 Education',    SECTION_IDS.education],
-                  ['08 Experience',   SECTION_IDS.workHistory],
-                  ['09 Emergency',    SECTION_IDS.emergency],
-                  ['10 Payroll',      SECTION_IDS.payroll],
-                  ['11 Documents',    SECTION_IDS.documents],
-                  ['12 Review',       SECTION_IDS.review],
+                  ['07 Identity',     SECTION_IDS.identity],
+                  ['08 Education',    SECTION_IDS.education],
+                  ['09 Experience',   SECTION_IDS.workHistory],
+                  ['10 Emergency',    SECTION_IDS.emergency],
+                  ['11 Payroll',      SECTION_IDS.payroll],
+                  ['12 Documents',    SECTION_IDS.documents],
+                  ['13 Review',       SECTION_IDS.review],
                 ].map(([label, id]) => (
                   <button
                     key={id}

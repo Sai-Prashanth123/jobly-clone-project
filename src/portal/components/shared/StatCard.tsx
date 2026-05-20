@@ -104,58 +104,57 @@ export function StatCard({
 }: StatCardProps) {
   const body = (
     <div
-      className={`portal-glass-card portal-hover-lift p-5 min-h-[148px] flex flex-col h-full ${
+      className={`portal-glass-card portal-hover-lift p-3.5 flex flex-col h-full ${
         to ? 'group cursor-pointer' : ''
       } ${className ?? ''}`}
     >
-      <div className="flex items-start justify-between gap-3 flex-1">
-        <div className="flex-1 min-w-0">
-          <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.08em]">
-            {title}
-          </p>
-          <p className="text-[1.7rem] leading-tight font-semibold text-gray-900 mt-2 tabular-nums tracking-tight">
-            {value}
-          </p>
-          {description && (
-            <p className="text-[12px] text-gray-400 mt-1.5">{description}</p>
-          )}
-          {trend && (
-            <div className="flex items-center gap-1.5 mt-3">
-              {trend.value >= 0 ? (
-                <TrendingUp className="h-3 w-3 text-emerald-500" />
-              ) : (
-                <TrendingDown className="h-3 w-3 text-red-500" />
-              )}
-              <span
-                className={`text-xs font-semibold tabular-nums ${
-                  trend.value >= 0 ? 'text-emerald-600' : 'text-red-600'
-                }`}
-              >
-                {trend.value >= 0 ? '+' : ''}
-                {trend.value}%
-              </span>
-              <span className="text-xs text-gray-400">{trend.label}</span>
-            </div>
-          )}
-        </div>
-        <div className="flex flex-col items-end gap-2 flex-shrink-0">
-          {icon && (
-            <div
-              title={helper}
-              className={`w-10 h-10 rounded-xl ${ICON_BG[variant]} flex items-center justify-center`}
-            >
-              {icon}
-            </div>
-          )}
-          {sparkline && sparkline.length >= 2 && (
-            <Sparkline data={sparkline} color={SPARK_STROKE[variant]} />
-          )}
-        </div>
+      {/* Title row — icon + label on one line so the label has the full card width on the next line. */}
+      <div className="flex items-center justify-between gap-2 mb-1.5">
+        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-[0.08em] truncate flex-1 min-w-0">
+          {title}
+        </p>
+        {icon && (
+          <div
+            title={helper}
+            className={`w-7 h-7 rounded-lg ${ICON_BG[variant]} flex items-center justify-center flex-shrink-0 [&_svg]:h-4 [&_svg]:w-4`}
+          >
+            {icon}
+          </div>
+        )}
       </div>
+
+      {/* Value row */}
+      <div className="flex items-end justify-between gap-2">
+        <p className="text-[1.5rem] leading-none font-semibold text-gray-900 tabular-nums tracking-tight">
+          {value}
+        </p>
+        {sparkline && sparkline.length >= 2 && (
+          <Sparkline data={sparkline} color={SPARK_STROKE[variant]} />
+        )}
+      </div>
+
+      {description && (
+        <p className="text-[11px] text-gray-400 mt-1.5 line-clamp-1">{description}</p>
+      )}
+
+      {trend && (
+        <div className="flex items-center gap-1 mt-1.5">
+          {trend.value >= 0 ? (
+            <TrendingUp className="h-3 w-3 text-emerald-500" />
+          ) : (
+            <TrendingDown className="h-3 w-3 text-red-500" />
+          )}
+          <span className={`text-[11px] font-semibold tabular-nums ${trend.value >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+            {trend.value >= 0 ? '+' : ''}{trend.value}%
+          </span>
+          <span className="text-[11px] text-gray-400">{trend.label}</span>
+        </div>
+      )}
+
       {to && (
-        <div className="mt-3 pt-3 border-t border-gray-100/80 flex items-center justify-between text-[11px] font-medium text-gray-500 group-hover:text-[#4069FF] transition-colors">
-          <span>{linkLabel ?? 'View details'}</span>
-          <ChevronRight className="h-3.5 w-3.5 transform group-hover:translate-x-0.5 transition-transform" />
+        <div className="mt-2 pt-2 border-t border-gray-100/80 flex items-center justify-between text-[10px] font-medium text-gray-500 group-hover:text-[#4069FF] transition-colors">
+          <span>{linkLabel ?? 'View'}</span>
+          <ChevronRight className="h-3 w-3 transform group-hover:translate-x-0.5 transition-transform" />
         </div>
       )}
     </div>

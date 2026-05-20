@@ -80,6 +80,8 @@ function mapEmployee(raw: any): Employee {
     workHistory: Array.isArray(raw.work_history) ? raw.work_history : [],
     totalExperienceYears: raw.total_experience_years != null ? Number(raw.total_experience_years) : undefined,
     experienceLevel: raw.experience_level ?? undefined,
+    bloodGroup: raw.blood_group ?? undefined,
+    identityDocuments: Array.isArray(raw.identity_documents) ? raw.identity_documents : [],
 
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
@@ -256,5 +258,7 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.workHistory !== undefined && { workHistory: e.workHistory }),
     ...(e.totalExperienceYears !== undefined && { totalExperienceYears: e.totalExperienceYears }),
     ...(e.experienceLevel !== undefined && { experienceLevel: blank(e.experienceLevel) }),
+    ...(e.bloodGroup !== undefined && { bloodGroup: blank(e.bloodGroup) }),
+    ...(e.identityDocuments !== undefined && { identityDocuments: e.identityDocuments }),
   };
 }
