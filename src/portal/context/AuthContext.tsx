@@ -50,8 +50,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       return { success: true };
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-        ?? 'Invalid credentials. Please try again.';
+      // Distinguish a genuine bad password (401) from a transient backend
+      // problem (cold start / timeout / 5xx). The old code showed "Invalid
+      // credentials" for everything, so a server that was merely waking up
+      // looked like a wrong password.
+      const e = err as { response?: { status?: number; data?: { error?: string } }; request?: unknown; code?: string };
+      const status = e?.response?.status;
+      const serverMsg = e?.response?.data?.error;
+      let msg: string;
+      if (status === 401) {
+        msg = serverMsg ?? 'Invalid email or password. Please try again.';
+      } else if (!e?.response) {
+        // No response = network error / timeout / DNS — usually the app is
+        // cold-starting on the free tier.
+        msg = "Can't reach the server — it may be waking up. Please wait a few seconds and try again.";
+      } else if (status && status >= 500) {
+        msg = 'The server had a problem (it may be starting up). Please try again in a moment.';
+      } else {
+        msg = serverMsg ?? 'Sign-in failed. Please try again.';
+      }
       return { success: false, error: msg };
     }
   };
