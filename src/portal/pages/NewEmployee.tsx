@@ -710,13 +710,22 @@ export default function NewEmployee() {
       }
       navigate(`/portal/employees/${emp.id}`, { replace: true });
     } catch (err: any) {
+      const status = err?.response?.status;
       const msg = err?.response?.data?.error ?? (isEditMode ? 'Failed to update employee. Please try again.' : 'Failed to create employee. Please try again.');
       // Persistent banner at the top of the form — the toast disappears after
       // a few seconds but the banner stays until the user fixes the issue.
       setSubmitError(msg);
       toast.error(msg, { duration: 10000 });
-      // Scroll to the top so the banner is visible.
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (status === 409) {
+        // Duplicate email. Highlight the email field inline and jump the user
+        // straight to it so it's obvious what to change (and that nothing was
+        // created). The banner up top also makes the no-create state explicit.
+        setErrors(prev => ({ ...prev, email: 'This email is already used by another employee. Use a different one.' }));
+        scrollToSection(SECTION_IDS.contact);
+      } else {
+        // Scroll to the top so the banner is visible.
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     } finally {
       submittingRef.current = false;
     }
@@ -777,10 +786,12 @@ export default function NewEmployee() {
         >
           <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-red-800">Couldn't create this employee</p>
+            <p className="text-sm font-semibold text-red-800">
+              {isEditMode ? "Couldn't save your changes" : 'No new employee was created'}
+            </p>
             <p className="text-sm text-red-700 mt-1 break-words">{submitError}</p>
             <p className="text-xs text-red-600/80 mt-2">
-              Adjust the highlighted fields above and click <strong>Create Employee</strong> again.
+              Fix the highlighted field, then click <strong>{isEditMode ? 'Save Changes' : 'Create Employee'}</strong> again.
             </p>
           </div>
           <button

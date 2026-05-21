@@ -46,9 +46,12 @@ export default function EmployeeDetail() {
   const reportingManager = allEmployees.find(e => e.id === employee?.reportingManagerId);
 
   const Field = ({ label, value }: { label: string; value?: string | null }) => (
-    <div>
+    // min-w-0 lets the grid cell shrink below its content; break-words +
+    // overflow-wrap:anywhere force long unbroken strings (e.g. emails) to wrap
+    // instead of bleeding into the neighbouring column.
+    <div className="min-w-0">
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-gray-900 mt-0.5">{value || '—'}</p>
+      <p className="text-sm text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]">{value || '—'}</p>
     </div>
   );
 
@@ -99,23 +102,27 @@ export default function EmployeeDetail() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 [&>*]:w-full sm:[&>*]:w-auto">
-          {employee.status === 'onboarding' && (user?.role === 'admin' || user?.role === 'hr') && (
+          {(employee.status === 'onboarding' || employee.status === 'inactive') && (user?.role === 'admin' || user?.role === 'hr') && (
             <Button
               size="sm"
               className="gap-2 bg-green-600 hover:bg-green-700 text-white"
               loading={updateEmployee.isPending}
-              loadingText="Approving…"
+              loadingText={employee.status === 'inactive' ? 'Activating…' : 'Approving…'}
               onClick={async () => {
                 try {
                   await updateEmployee.mutateAsync({ status: 'active' } as any);
-                  toast.success('Employee onboarding approved — now Active');
+                  toast.success(
+                    employee.status === 'inactive'
+                      ? `${employee.firstName} is now Active`
+                      : 'Employee onboarding approved — now Active',
+                  );
                 } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to approve onboarding');
+                  toast.error(err?.response?.data?.error ?? 'Failed to activate employee');
                 }
               }}
             >
               <CheckCircle2 className="h-4 w-4" />
-              Approve Onboarding
+              {employee.status === 'inactive' ? 'Activate Employee' : 'Approve Onboarding'}
             </Button>
           )}
           {(user?.role === 'admin' || user?.role === 'hr') && (
