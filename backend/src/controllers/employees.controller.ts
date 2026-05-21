@@ -102,6 +102,19 @@ export async function uploadDoc(req: Request, res: Response, next: NextFunction)
   } catch (err) { next(err); }
 }
 
+export async function uploadPhoto(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const file = req.file;
+    if (!file) { res.status(400).json({ success: false, error: 'No file provided' }); return; }
+    // Employees may only set their own photo.
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only update their own photo');
+    }
+    const profilePhotoUrl = await storageSvc.uploadEmployeePhoto(req.params.id, file);
+    res.status(201).json({ success: true, profilePhotoUrl });
+  } catch (err) { next(err); }
+}
+
 export async function deleteDoc(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // Employees may only delete docs that belong to their own employee record.

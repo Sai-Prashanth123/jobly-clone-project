@@ -51,6 +51,37 @@ export async function uploadDocument(
   return doc;
 }
 
+// Profile photos live in a dedicated PUBLIC bucket so the URL is permanent and
+// renders in an <img> anywhere (employee list, detail header, sidebar, profile)
+// without auth or expiry. The URL is written back onto employees.profile_photo_url.
+export async function uploadEmployeePhoto(employeeId: string, file: Express.Multer.File) {
+  const bucket = 'employee-photos';
+  const ext = (file.originalname.split('.').pop() || '').toLowerCase()
+    || (file.mimetype === 'image/png' ? 'png' : 'jpg');
+  const storagePath = `${employeeId}/${Date.now()}.${ext}`;
+
+  const { error: uploadError } = await supabaseAdmin
+    .storage
+    .from(bucket)
+    .upload(storagePath, file.buffer, {
+      contentType: file.mimetype,
+      upsert: true,
+    });
+  if (uploadError) throw uploadError;
+
+  // Public bucket → permanent, unauthenticated URL (no expiry).
+  const { data: urlData } = supabaseAdmin.storage.from(bucket).getPublicUrl(storagePath);
+  const publicUrl = urlData.publicUrl;
+
+  const { error: updErr } = await supabaseAdmin
+    .from('employees')
+    .update({ profile_photo_url: publicUrl })
+    .eq('id', employeeId);
+  if (updErr) throw updErr;
+
+  return publicUrl;
+}
+
 export async function getDocumentSignedUrl(docId: string) {
   const { data: doc, error } = await supabaseAdmin
     .from('documents')

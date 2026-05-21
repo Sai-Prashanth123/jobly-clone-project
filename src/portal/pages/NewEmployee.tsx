@@ -6,6 +6,7 @@ import {
   AlertTriangle, X,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -327,6 +328,7 @@ export default function NewEmployee() {
   const location = useLocation();
   const params = useParams<{ id?: string }>();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Self-edit: an employee editing their own profile lands here via
   // /portal/profile/edit (no :id in the URL). Fall back to their own
@@ -664,50 +666,54 @@ export default function NewEmployee() {
       }
 
       // Upload pending files in parallel (deferred until employee exists for
-      // the FK). Three sources are merged here:
-      //   - profile photo  → docType "Profile Photo"
-      //   - identity doc copies → docType matches the IDENTITY_DOC_ROWS label
-      //   - generic Documents section uploads → user-chosen docType
-      const uploads: { file: File; name: string; docType: string }[] = [];
+      // the FK). The profile photo goes to a dedicated endpoint that stores it
+      // in a PUBLIC bucket and writes employees.profile_photo_url, so the avatar
+      // renders everywhere. Identity-doc copies + generic docs go to /documents.
+      const tasks: Promise<unknown>[] = [];
 
       if (form.profilePhotoFile) {
-        uploads.push({
-          file: form.profilePhotoFile,
-          name: form.profilePhotoFile.name,
-          docType: 'Profile Photo',
-        });
+        const fd = new FormData();
+        fd.append('file', form.profilePhotoFile);
+        tasks.push(apiClient.post(`/employees/${emp.id}/photo`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }));
       }
 
+      const uploads: { file: File; name: string; docType: string }[] = [];
       for (const row of IDENTITY_DOC_ROWS) {
         const file = form.identityDocFiles[row.type];
         if (file) {
           uploads.push({ file, name: file.name, docType: row.label });
         }
       }
-
       for (const d of form.documents) {
         if (d.file) uploads.push({ file: d.file, name: d.file.name, docType: d.type });
       }
+      for (const u of uploads) {
+        const fd = new FormData();
+        fd.append('file', u.file);
+        fd.append('name', u.name);
+        fd.append('docType', u.docType);
+        tasks.push(apiClient.post(`/employees/${emp.id}/documents`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }));
+      }
 
-      if (uploads.length > 0) {
+      if (tasks.length > 0) {
         try {
-          await Promise.all(uploads.map(u => {
-            const fd = new FormData();
-            fd.append('file', u.file);
-            fd.append('name', u.name);
-            fd.append('docType', u.docType);
-            return apiClient.post(`/employees/${emp.id}/documents`, fd, {
-              headers: { 'Content-Type': 'multipart/form-data' },
-            });
-          }));
+          await Promise.all(tasks);
         } catch (uploadErr: any) {
-          // Don't fail the whole create just because document upload failed —
+          // Don't fail the whole create just because an upload failed —
           // HR can re-upload on the detail page.
           toast.warning(
-            `Employee created, but one or more documents failed to upload: ${uploadErr?.response?.data?.error ?? 'unknown error'}`,
+            `Saved, but one or more files failed to upload: ${uploadErr?.response?.data?.error ?? 'unknown error'}`,
             { duration: 8000 },
           );
         }
+        // The photo/doc uploads happen after the create/update mutation already
+        // invalidated its queries, so refresh again to pull the new photo URL.
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employees', emp.id] });
       }
 
       if (isSelfEdit) {
