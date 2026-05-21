@@ -21,7 +21,12 @@ export async function getMyMonth(req: Request, res: Response, next: NextFunction
     const year = Number(req.query.year);
     const month = Number(req.query.month);
     if (!year || !month) { res.status(400).json({ success: false, error: 'year and month are required' }); return; }
-    const data = await svc.getMyMonth(req.user?.employeeId, year, month);
+    // Admin/HR may load any employee's month (to fill on their behalf); everyone
+    // else is scoped to their own linked employee record.
+    const requested = req.query.employeeId as string | undefined;
+    const isStaff = req.user!.role === 'admin' || req.user!.role === 'hr';
+    const employeeId = (isStaff && requested) ? requested : req.user?.employeeId;
+    const data = await svc.getMyMonth(employeeId, year, month);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

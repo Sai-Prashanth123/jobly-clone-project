@@ -181,7 +181,8 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
   if (!['draft', 'rejected'].includes(row.status)) {
     throw new ForbiddenError(`A '${row.status}' timesheet cannot be submitted.`);
   }
-  if (actorRole !== 'admin' && row.employee_id !== actorEmployeeId) {
+  // Employees may only submit their own; admin/HR may submit on an employee's behalf.
+  if (actorRole === 'employee' && row.employee_id !== actorEmployeeId) {
     throw new ForbiddenError('You can only submit your own timesheet.');
   }
 

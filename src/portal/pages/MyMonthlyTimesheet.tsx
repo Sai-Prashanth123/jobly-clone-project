@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
-  Info, Loader2, RotateCcw, Printer, Send, CheckCircle2, Save, Calendar,
+  Info, Loader2, RotateCcw, Printer, Send, CheckCircle2, Save, Calendar, Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,13 +15,13 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { EmptyState } from '../components/shared/EmptyState';
 import { useAuth } from '../hooks/useAuth';
-import { useEmployee } from '../hooks/useEmployees';
+import { useEmployee, useEmployees } from '../hooks/useEmployees';
 import {
   useMyMonth, useUpsertMonthlyTimesheet, useSubmitMonthlyTimesheet,
 } from '../hooks/useMonthlyTimesheets';
 import { apiClient } from '../lib/apiClient';
 import {
-  MONTHS, DAYS_SHORT, buildMonthSkeleton, computeHours, computeMonthlySummary,
+  MONTHS, buildMonthSkeleton, computeHours, computeMonthlySummary,
   currentMonth, monthInputValue, parseMonthInput, monthLabel,
 } from '../lib/monthUtils';
 import type { MonthlyTimesheet, MonthlyTimesheetEntry, MonthlyDayStatus } from '../types';
@@ -34,7 +33,6 @@ const DAY_STATUS_OPTIONS: { value: MonthlyDayStatus; label: string }[] = [
   { value: 'absent', label: 'Absent' },
 ];
 
-// Soft row tint per status — portal palette (replaces the reference navy/gold).
 const ROW_TINT: Record<string, string> = {
   weekend: 'bg-gray-50/70',
   holiday: 'bg-violet-50/60',
@@ -56,12 +54,22 @@ function DayStatusPill({ status }: { status: MonthlyDayStatus }) {
 
 export default function MyMonthlyTimesheet() {
   const { user } = useAuth();
-  const { data: employee } = useEmployee(user?.employeeId);
+  // Admin/HR fill on behalf of a selected employee; employees fill their own.
+  const isStaff = user?.role === 'admin' || user?.role === 'hr';
+  const ownEmployeeId = user?.employeeId;
 
-  const [period, setPeriod] = useState(() => currentMonth());          // the month input (draft)
-  const [loaded, setLoaded] = useState(() => currentMonth());          // the month actually loaded
+  const [selectedEmpId, setSelectedEmpId] = useState('');
+  const targetEmployeeId = isStaff ? selectedEmpId : (ownEmployeeId ?? '');
+
+  const { data: employeesData } = useEmployees({ limit: 500 }, { enabled: isStaff });
+  const { data: ownEmployee } = useEmployee(isStaff ? undefined : ownEmployeeId);
+  const employees = employeesData?.data ?? [];
+  const targetEmployee = isStaff ? employees.find(e => e.id === selectedEmpId) : ownEmployee;
+
+  const [period, setPeriod] = useState(() => currentMonth());
+  const [loaded, setLoaded] = useState(() => currentMonth());
   const { data: serverSheet, isLoading: loadingMonth, isFetching } =
-    useMyMonth(loaded.year, loaded.month, { enabled: !!user?.employeeId });
+    useMyMonth(loaded.year, loaded.month, targetEmployeeId || undefined, { enabled: !!targetEmployeeId });
 
   const upsert = useUpsertMonthlyTimesheet();
   const submit = useSubmitMonthlyTimesheet();
@@ -78,9 +86,10 @@ export default function MyMonthlyTimesheet() {
   const isLocked = sheet?.status === 'submitted' || sheet?.status === 'approved';
   const summary = useMemo(() => computeMonthlySummary(entries), [entries]);
 
-  // Hydrate the grid whenever the loaded month's data lands (existing sheet or skeleton).
+  // Hydrate the grid when the (employee, month) data lands.
   useEffect(() => {
-    const key = `${loaded.year}-${loaded.month}`;
+    if (!targetEmployeeId) return;
+    const key = `${targetEmployeeId}-${loaded.year}-${loaded.month}`;
     if (loadingMonth) return;
     if (hydratedKey.current === key) return;
     hydratedKey.current = key;
@@ -95,15 +104,15 @@ export default function MyMonthlyTimesheet() {
     }
     setDirty(false);
     setSaveState('idle');
-  }, [serverSheet, loadingMonth, loaded.year, loaded.month]);
+  }, [serverSheet, loadingMonth, loaded.year, loaded.month, targetEmployeeId]);
 
-  // Debounced draft auto-save (only while editable and after a real edit).
+  // Debounced draft auto-save (only while editable + after a real edit).
   useEffect(() => {
-    if (!user?.employeeId || isLocked || !dirty) return;
+    if (!targetEmployeeId || isLocked || !dirty) return;
     setSaveState('saving');
     const t = setTimeout(() => {
       upsert.mutate(
-        { year: loaded.year, month: loaded.month, entries, notes },
+        { employeeId: targetEmployeeId, year: loaded.year, month: loaded.month, entries, notes },
         {
           onSuccess: (saved) => { setSheet(saved); setDirty(false); setSaveState('saved'); },
           onError: () => setSaveState('idle'),
@@ -114,19 +123,14 @@ export default function MyMonthlyTimesheet() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [entries, notes, dirty]);
 
-  const handleLoad = () => {
-    hydratedKey.current = '';     // force re-hydrate even if same data object
-    setLoaded(period);
-  };
+  const handleLoad = () => { hydratedKey.current = ''; setLoaded(period); };
 
   const updateEntry = (idx: number, patch: Partial<MonthlyTimesheetEntry>) => {
     if (isLocked) return;
     setEntries(prev => prev.map((e, i) => {
       if (i !== idx) return e;
       const next = { ...e, ...patch };
-      if ('startTime' in patch || 'endTime' in patch) {
-        next.hours = computeHours(next.startTime, next.endTime);
-      }
+      if ('startTime' in patch || 'endTime' in patch) next.hours = computeHours(next.startTime, next.endTime);
       return next;
     }));
     setDirty(true);
@@ -134,7 +138,7 @@ export default function MyMonthlyTimesheet() {
 
   const ensureSaved = async (): Promise<MonthlyTimesheet | null> => {
     if (sheet && !dirty) return sheet;
-    const saved = await upsert.mutateAsync({ year: loaded.year, month: loaded.month, entries, notes });
+    const saved = await upsert.mutateAsync({ employeeId: targetEmployeeId, year: loaded.year, month: loaded.month, entries, notes });
     setSheet(saved); setDirty(false); setSaveState('saved');
     return saved;
   };
@@ -162,9 +166,7 @@ export default function MyMonthlyTimesheet() {
         if (url) { window.open(url, '_blank', 'noopener'); return; }
       }
       window.print();
-    } catch {
-      window.print();
-    }
+    } catch { window.print(); }
   };
 
   const handleClear = () => {
@@ -174,44 +176,49 @@ export default function MyMonthlyTimesheet() {
     setClearOpen(false);
   };
 
+  const employeeName = targetEmployee ? `${targetEmployee.firstName} ${targetEmployee.lastName}` : '';
   const reportText = useMemo(() => buildReportText({
-    employeeName: employee ? `${employee.firstName} ${employee.lastName}` : 'N/A',
-    employeeDisplayId: employee?.displayId ?? 'N/A',
-    department: employee?.department ?? 'N/A',
+    employeeName: employeeName || 'N/A',
+    employeeDisplayId: targetEmployee?.displayId ?? 'N/A',
+    department: targetEmployee?.department ?? 'N/A',
     monthLabel: monthLabel(loaded.year, loaded.month),
     entries, summary,
-  }), [employee, loaded, entries, summary]);
+  }), [employeeName, targetEmployee, loaded, entries, summary]);
 
-  // Users without an employee record (e.g. an admin) can't fill a personal sheet.
-  if (!user?.employeeId) {
+  // An employee-role account with no linked employee record is a dead end.
+  if (!isStaff && !ownEmployeeId) {
     return (
       <div className="space-y-6">
         <PageHeader eyebrow="Attendance" title="Employee Timesheet" description="Fill in your daily work hours and send the monthly report to HR." />
         <EmptyState
           icon={<Calendar className="h-6 w-6" />}
           title="No employee profile linked to your account"
-          description="This monthly timesheet is for employees. To review team submissions, open Attendance Review."
-          action={<Button asChild variant="outline"><Link to="/portal/attendance/review">Go to Attendance Review</Link></Button>}
+          description="This monthly timesheet is for employees. Please contact HR to link your account."
         />
       </div>
     );
   }
+
+  const showSheet = !!targetEmployeeId;
 
   return (
     <div className="space-y-5 pb-10">
       <PageHeader
         eyebrow="Attendance"
         title="Employee Timesheet"
-        description="Fill in your daily work hours and send the monthly report to HR."
+        description={isStaff
+          ? 'Select an employee, fill in their daily work hours, and submit the monthly report to HR.'
+          : 'Fill in your daily work hours and send the monthly report to HR.'}
         action={sheet ? <StatusBadge status={sheet.status} /> : undefined}
       />
 
-      {/* Note box (reference .note-box) */}
       <div className="portal-alert-callout text-amber-700 rounded-lg px-4 py-3 flex items-start gap-2 text-[13px]">
         <Info className="h-4 w-4 mt-0.5 flex-shrink-0" />
         <span>
-          Pick the month and enter your daily project, task, start &amp; end times. Click <strong>Send Monthly Report to HR</strong> to
-          submit — your reporting manager and HR are notified, HR receives a formatted email, and a PDF is generated.
+          {isStaff
+            ? 'Choose an employee and the month, enter daily project, task, start & end times, then '
+            : 'Pick the month and enter your daily project, task, start & end times, then '}
+          <strong>Send Monthly Report to HR</strong> to submit — the reporting manager &amp; HR are notified, HR gets a formatted email, and a PDF is generated.
         </span>
       </div>
 
@@ -219,16 +226,27 @@ export default function MyMonthlyTimesheet() {
       <Card>
         <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end pt-6">
           <div>
-            <Label className="text-[11px] uppercase tracking-wide text-gray-500">Employee Name</Label>
-            <Input value={employee ? `${employee.firstName} ${employee.lastName}` : ''} disabled />
+            <Label className="text-[11px] uppercase tracking-wide text-gray-500">Employee {isStaff && <span className="text-red-500">*</span>}</Label>
+            {isStaff ? (
+              <Select value={selectedEmpId} onValueChange={setSelectedEmpId}>
+                <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                <SelectContent className="max-h-[300px]">
+                  {employees.map(e => (
+                    <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName} {e.displayId ? `(${e.displayId})` : ''}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            ) : (
+              <Input value={employeeName} disabled />
+            )}
           </div>
           <div>
             <Label className="text-[11px] uppercase tracking-wide text-gray-500">Employee ID</Label>
-            <Input value={employee?.displayId ?? ''} disabled />
+            <Input value={targetEmployee?.displayId ?? ''} disabled />
           </div>
           <div>
             <Label className="text-[11px] uppercase tracking-wide text-gray-500">Department</Label>
-            <Input value={employee?.department ?? ''} disabled />
+            <Input value={targetEmployee?.department ?? ''} disabled />
           </div>
           <div className="flex items-end gap-2">
             <div className="flex-1">
@@ -236,173 +254,161 @@ export default function MyMonthlyTimesheet() {
               <Input
                 type="month"
                 value={monthInputValue(period.year, period.month)}
-                onChange={e => {
-                  const p = parseMonthInput(e.target.value);
-                  if (p) setPeriod(p);
-                }}
+                onChange={e => { const p = parseMonthInput(e.target.value); if (p) setPeriod(p); }}
               />
             </div>
-            <Button onClick={handleLoad} variant="outline" className="gap-1.5 flex-shrink-0" loading={isFetching} loadingText="Loading…">
+            <Button onClick={handleLoad} variant="outline" className="gap-1.5 flex-shrink-0" loading={isFetching} loadingText="Loading…" disabled={!targetEmployeeId}>
               <RotateCcw className="h-4 w-4" /> Load
             </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* Stats strip (reference .stats-strip) */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <StatCard title="Total Hours"    value={summary.totalHours.toFixed(1)} variant="blue"   icon={<Calendar />} description="Hours logged" />
-        <StatCard title="Expected Hours" value={summary.expectedHours}          variant="orange" icon={<Calendar />} description="Working days × 8" />
-        <StatCard title="Balance"        value={`${summary.balance >= 0 ? '+' : ''}${summary.balance.toFixed(1)}`} variant={summary.balance >= 0 ? 'green' : 'red'} icon={<Calendar />} description="Over / under" />
-        <StatCard title="Leave Days"     value={summary.leaveDays}              variant="purple" icon={<Calendar />} description="Marked as leave" />
-        <StatCard title="Working Days"   value={summary.workingDays}            variant="cyan"   icon={<Calendar />} description="In selected month" />
-      </div>
-
-      {/* Timesheet table card (reference .ts-card) */}
-      <Card className="overflow-hidden">
-        <CardHeader className="bg-gradient-to-r from-[#4069FF] to-[#32CDDC] py-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle className="text-white text-sm">{monthLabel(loaded.year, loaded.month)} — Timesheet</CardTitle>
-            <div className="flex items-center gap-3 text-white/85 text-[11px]">
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-emerald-300 inline-block" />Present</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-amber-300 inline-block" />Leave</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-violet-300 inline-block" />Holiday</span>
-              <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-gray-300 inline-block" />Weekend</span>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loadingMonth ? (
-            <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse text-sm">
-                <thead>
-                  <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
-                    <th className="px-3 py-2 text-left font-semibold w-10">#</th>
-                    <th className="px-3 py-2 text-left font-semibold w-24">Date</th>
-                    <th className="px-3 py-2 text-left font-semibold w-12">Day</th>
-                    <th className="px-3 py-2 text-left font-semibold w-32">Project</th>
-                    <th className="px-3 py-2 text-left font-semibold">Task Description</th>
-                    <th className="px-3 py-2 text-center font-semibold w-24">Start</th>
-                    <th className="px-3 py-2 text-center font-semibold w-24">End</th>
-                    <th className="px-3 py-2 text-center font-semibold w-16">Hours</th>
-                    <th className="px-3 py-2 text-center font-semibold w-28">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entries.map((e, idx) => {
-                    const isWeekend = e.status === 'weekend';
-                    const dayNum = Number(e.date.slice(-2));
-                    const monIdx = loaded.month - 1;
-                    const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[monIdx].slice(0, 3)}`;
-                    return (
-                      <tr key={e.date} className={`border-b border-gray-100 ${ROW_TINT[e.status] ?? ''}`}>
-                        <td className="px-3 py-1.5 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
-                        <td className="px-3 py-1.5 font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</td>
-                        <td className="px-3 py-1.5">
-                          <span className={`inline-block min-w-[34px] text-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>
-                            {e.dayOfWeek}
-                          </span>
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <Input value={e.project} disabled={isWeekend || isLocked} placeholder={isWeekend ? '—' : 'Project'} onChange={ev => updateEntry(idx, { project: ev.target.value })} className="h-8 text-xs" />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <Input value={e.task} disabled={isWeekend || isLocked} placeholder={isWeekend ? '—' : 'Task description'} onChange={ev => updateEntry(idx, { task: ev.target.value })} className="h-8 text-xs" />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <Input type="time" value={e.startTime} disabled={isWeekend || isLocked} onChange={ev => updateEntry(idx, { startTime: ev.target.value })} className="h-8 text-xs font-mono" />
-                        </td>
-                        <td className="px-2 py-1.5">
-                          <Input type="time" value={e.endTime} disabled={isWeekend || isLocked} onChange={ev => updateEntry(idx, { endTime: ev.target.value })} className="h-8 text-xs font-mono" />
-                        </td>
-                        <td className={`px-3 py-1.5 text-center font-mono text-xs font-semibold ${e.hours > 0 ? 'text-gray-900' : 'text-gray-400'}`}>
-                          {isWeekend ? '—' : e.hours > 0 ? e.hours.toFixed(1) : '0.0'}
-                        </td>
-                        <td className="px-2 py-1.5 text-center">
-                          {isWeekend ? (
-                            <DayStatusPill status="weekend" />
-                          ) : (
-                            <Select value={e.status} onValueChange={v => updateEntry(idx, { status: v as MonthlyDayStatus })} disabled={isLocked}>
-                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                {DAY_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-[#04213F] text-white font-semibold">
-                    <td colSpan={7} className="px-4 py-2.5 text-right text-xs uppercase tracking-wide">Monthly Total</td>
-                    <td className="px-3 py-2.5 text-center font-mono">{summary.totalHours.toFixed(1)}</td>
-                    <td />
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Notes */}
-      <div>
-        <Label className="text-[11px] uppercase tracking-wide text-gray-500">Notes (optional)</Label>
-        <textarea
-          value={notes}
-          disabled={isLocked}
-          onChange={e => { setNotes(e.target.value); setDirty(true); }}
-          rows={2}
-          className="w-full mt-1 rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#4069FF] disabled:bg-gray-50 disabled:text-gray-500"
-          placeholder="Anything HR should know about this month…"
+      {!showSheet ? (
+        <EmptyState
+          icon={<Users className="h-6 w-6" />}
+          title="Select an employee to begin"
+          description="Choose an employee above to load and fill their monthly timesheet."
         />
-      </div>
-
-      {/* Actions bar (reference .actions-bar) */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={handlePrint} className="gap-1.5"><Printer className="h-4 w-4" /> Print / Save PDF</Button>
-          <Button variant="outline" onClick={() => setClearOpen(true)} disabled={isLocked} className="gap-1.5"><RotateCcw className="h-4 w-4" /> Clear Entries</Button>
-          {!isLocked && (
-            <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-              {saveState === 'saving' ? <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
-                : saveState === 'saved' ? <><Save className="h-3 w-3 text-emerald-500" /> Draft saved</>
-                : null}
-            </span>
-          )}
-        </div>
-        {isLocked ? (
-          <div className="text-sm text-muted-foreground flex items-center gap-2">
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-            {sheet?.status === 'approved' ? 'Approved — locked.' : 'Submitted — awaiting review.'}
+      ) : (
+        <>
+          {/* Stats strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <StatCard title="Total Hours" value={summary.totalHours.toFixed(1)} variant="blue" icon={<Calendar />} description="Hours logged" />
+            <StatCard title="Expected Hours" value={summary.expectedHours} variant="orange" icon={<Calendar />} description="Working days × 8" />
+            <StatCard title="Balance" value={`${summary.balance >= 0 ? '+' : ''}${summary.balance.toFixed(1)}`} variant={summary.balance >= 0 ? 'green' : 'red'} icon={<Calendar />} description="Over / under" />
+            <StatCard title="Leave Days" value={summary.leaveDays} variant="purple" icon={<Calendar />} description="Marked as leave" />
+            <StatCard title="Working Days" value={summary.workingDays} variant="cyan" icon={<Calendar />} description="In selected month" />
           </div>
-        ) : (
-          <Button onClick={() => setPreviewOpen(true)} className="gap-2 portal-btn-gradient" disabled={summary.workingDays === 0}>
-            <Send className="h-4 w-4" /> Send Monthly Report to HR
-          </Button>
-        )}
-      </div>
 
-      {sheet?.status === 'rejected' && sheet.rejectionReason && (
-        <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <strong>Returned for correction:</strong> {sheet.rejectionReason} — fix the entries above and resend.
-        </div>
+          {/* Timesheet table card */}
+          <Card className="overflow-hidden">
+            <CardHeader className="bg-gradient-to-r from-[#4069FF] to-[#32CDDC] py-3">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <CardTitle className="text-white text-sm">{monthLabel(loaded.year, loaded.month)} — Timesheet</CardTitle>
+                <div className="flex items-center gap-3 text-white/85 text-[11px]">
+                  <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-emerald-300 inline-block" />Present</span>
+                  <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-amber-300 inline-block" />Leave</span>
+                  <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-violet-300 inline-block" />Holiday</span>
+                  <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-gray-300 inline-block" />Weekend</span>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {loadingMonth ? (
+                <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
+                        <th className="px-3 py-2 text-left font-semibold w-10">#</th>
+                        <th className="px-3 py-2 text-left font-semibold w-24">Date</th>
+                        <th className="px-3 py-2 text-left font-semibold w-12">Day</th>
+                        <th className="px-3 py-2 text-left font-semibold w-32">Project</th>
+                        <th className="px-3 py-2 text-left font-semibold">Task Description</th>
+                        <th className="px-3 py-2 text-center font-semibold w-24">Start</th>
+                        <th className="px-3 py-2 text-center font-semibold w-24">End</th>
+                        <th className="px-3 py-2 text-center font-semibold w-16">Hours</th>
+                        <th className="px-3 py-2 text-center font-semibold w-28">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {entries.map((e, idx) => {
+                        const isWeekend = e.status === 'weekend';
+                        const dayNum = Number(e.date.slice(-2));
+                        const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[loaded.month - 1].slice(0, 3)}`;
+                        return (
+                          <tr key={e.date} className={`border-b border-gray-100 ${ROW_TINT[e.status] ?? ''}`}>
+                            <td className="px-3 py-1.5 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
+                            <td className="px-3 py-1.5 font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</td>
+                            <td className="px-3 py-1.5">
+                              <span className={`inline-block min-w-[34px] text-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>{e.dayOfWeek}</span>
+                            </td>
+                            <td className="px-2 py-1.5"><Input value={e.project} disabled={isWeekend || isLocked} placeholder={isWeekend ? '—' : 'Project'} onChange={ev => updateEntry(idx, { project: ev.target.value })} className="h-8 text-xs" /></td>
+                            <td className="px-2 py-1.5"><Input value={e.task} disabled={isWeekend || isLocked} placeholder={isWeekend ? '—' : 'Task description'} onChange={ev => updateEntry(idx, { task: ev.target.value })} className="h-8 text-xs" /></td>
+                            <td className="px-2 py-1.5"><Input type="time" value={e.startTime} disabled={isWeekend || isLocked} onChange={ev => updateEntry(idx, { startTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
+                            <td className="px-2 py-1.5"><Input type="time" value={e.endTime} disabled={isWeekend || isLocked} onChange={ev => updateEntry(idx, { endTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
+                            <td className={`px-3 py-1.5 text-center font-mono text-xs font-semibold ${e.hours > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{isWeekend ? '—' : e.hours > 0 ? e.hours.toFixed(1) : '0.0'}</td>
+                            <td className="px-2 py-1.5 text-center">
+                              {isWeekend ? <DayStatusPill status="weekend" /> : (
+                                <Select value={e.status} onValueChange={v => updateEntry(idx, { status: v as MonthlyDayStatus })} disabled={isLocked}>
+                                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectContent>{DAY_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-[#04213F] text-white font-semibold">
+                        <td colSpan={7} className="px-4 py-2.5 text-right text-xs uppercase tracking-wide">Monthly Total</td>
+                        <td className="px-3 py-2.5 text-center font-mono">{summary.totalHours.toFixed(1)}</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <div>
+            <Label className="text-[11px] uppercase tracking-wide text-gray-500">Notes (optional)</Label>
+            <textarea
+              value={notes}
+              disabled={isLocked}
+              onChange={e => { setNotes(e.target.value); setDirty(true); }}
+              rows={2}
+              className="w-full mt-1 rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#4069FF] disabled:bg-gray-50 disabled:text-gray-500"
+              placeholder="Anything HR should know about this month…"
+            />
+          </div>
+
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={handlePrint} className="gap-1.5"><Printer className="h-4 w-4" /> Print / Save PDF</Button>
+              <Button variant="outline" onClick={() => setClearOpen(true)} disabled={isLocked} className="gap-1.5"><RotateCcw className="h-4 w-4" /> Clear Entries</Button>
+              {!isLocked && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1.5">
+                  {saveState === 'saving' ? <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
+                    : saveState === 'saved' ? <><Save className="h-3 w-3 text-emerald-500" /> Draft saved</>
+                    : null}
+                </span>
+              )}
+            </div>
+            {isLocked ? (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                {sheet?.status === 'approved' ? 'Approved — locked.' : 'Submitted — awaiting review.'}
+              </div>
+            ) : (
+              <Button onClick={() => setPreviewOpen(true)} className="gap-2 portal-btn-gradient" disabled={summary.workingDays === 0}>
+                <Send className="h-4 w-4" /> Send Monthly Report to HR
+              </Button>
+            )}
+          </div>
+
+          {sheet?.status === 'rejected' && sheet.rejectionReason && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              <strong>Returned for correction:</strong> {sheet.rejectionReason} — fix the entries above and resend.
+            </div>
+          )}
+        </>
       )}
 
-      {/* Preview modal (reference #modal) */}
+      {/* Preview modal */}
       <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Report Preview — Ready to Send</DialogTitle>
-            <DialogDescription>Review your monthly timesheet before sending it to HR.</DialogDescription>
+            <DialogDescription>Review the monthly timesheet before sending it to HR.</DialogDescription>
           </DialogHeader>
           <div className="rounded-md bg-cyan-50/70 border border-cyan-100 px-3 py-2 text-xs text-cyan-800 flex items-center gap-2">
             <Send className="h-3.5 w-3.5" />
-            Submitting notifies your reporting manager &amp; HR, emails HR a formatted report, and generates a PDF.
+            Submitting notifies the reporting manager &amp; HR, emails HR a formatted report, and generates a PDF.
           </div>
           <pre className="flex-1 overflow-auto rounded-md bg-gray-50 border border-gray-200 p-4 text-[11px] leading-relaxed font-mono whitespace-pre-wrap text-gray-800">{reportText}</pre>
           <DialogFooter>
@@ -418,7 +424,7 @@ export default function MyMonthlyTimesheet() {
         open={clearOpen}
         onOpenChange={setClearOpen}
         title="Clear all time entries?"
-        description="This resets the grid for this month back to defaults. Your employee details and the month stay."
+        description="This resets the grid for this month back to defaults. The employee details and the month stay."
         confirmLabel="Clear Entries"
         onConfirm={handleClear}
       />
@@ -426,7 +432,6 @@ export default function MyMonthlyTimesheet() {
   );
 }
 
-// Plain-text monthly report shown in the preview modal.
 function buildReportText(args: {
   employeeName: string; employeeDisplayId: string; department: string; monthLabel: string;
   entries: MonthlyTimesheetEntry[]; summary: ReturnType<typeof computeMonthlySummary>;

@@ -66,12 +66,17 @@ export function useMonthlyTimesheet(id: string | undefined) {
   });
 }
 
-/** Fetch the logged-in employee's sheet for a given month (may be null). */
-export function useMyMonth(year: number, month: number, options?: { enabled?: boolean }) {
+/**
+ * Fetch a monthly sheet for a given month (may be null). Employees get their own;
+ * admin/HR may pass a target employeeId to load/fill on that employee's behalf.
+ */
+export function useMyMonth(year: number, month: number, employeeId?: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['monthly-timesheets', 'me', year, month],
+    queryKey: ['monthly-timesheets', 'me', employeeId ?? 'self', year, month],
     queryFn: async () => {
-      const { data } = await apiClient.get('/monthly-timesheets/me', { params: { year, month } });
+      const params: Record<string, unknown> = { year, month };
+      if (employeeId) params.employeeId = employeeId;
+      const { data } = await apiClient.get('/monthly-timesheets/me', { params });
       return data.data ? mapMonthlyTimesheet(data.data) : null;
     },
     enabled: options?.enabled ?? true,
