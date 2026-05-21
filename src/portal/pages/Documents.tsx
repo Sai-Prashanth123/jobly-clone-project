@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { EmptyState } from '../components/shared/EmptyState';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import {
   useEmployee,
   useEmployees,
@@ -199,11 +200,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {doc.url && (
-                      <a href={doc.url} target="_blank" rel="noreferrer">
-                        <Button variant="outline" size="sm">Download</Button>
-                      </a>
-                    )}
+                    <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
                     <Button
                       variant="ghost"
                       size="sm"

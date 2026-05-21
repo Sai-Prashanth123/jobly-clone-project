@@ -6,6 +6,7 @@ import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2 } from 'lucide-rea
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
+import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials } from '../hooks/useEmployees';
 import { useAssignments } from '../hooks/useAssignments';
@@ -371,11 +372,7 @@ export default function EmployeeDetail() {
                     <p className="text-sm font-medium">{doc.name}</p>
                     <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
                   </div>
-                  {doc.url && (
-                    <a href={doc.url} target="_blank" rel="noreferrer">
-                      <Button variant="outline" size="sm">Download</Button>
-                    </a>
-                  )}
+                  <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
                 </div>
               ))}
             </div>

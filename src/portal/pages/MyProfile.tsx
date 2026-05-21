@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Edit, Loader2 } from 'lucide-react';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
+import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { useEmployee } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
@@ -262,11 +263,7 @@ export default function MyProfile() {
                     <p className="text-sm font-medium">{doc.name}</p>
                     <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
                   </div>
-                  {doc.url && (
-                    <a href={doc.url} target="_blank" rel="noreferrer">
-                      <Button variant="outline" size="sm">Download</Button>
-                    </a>
-                  )}
+                  <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
                 </div>
               ))}
             </div>
