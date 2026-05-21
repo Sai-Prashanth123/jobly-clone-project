@@ -57,6 +57,11 @@ export async function resendCredentials(req: Request, res: Response, next: NextF
 
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    // Employees may only edit their own profile — same ownership rule as getOne.
+    // This blocks one employee from updating another's pay, visa, status, etc.
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only edit their own profile');
+    }
     const data = await svc.updateEmployee(req.params.id, req.body as UpdateEmployeeInput, req.user?.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }

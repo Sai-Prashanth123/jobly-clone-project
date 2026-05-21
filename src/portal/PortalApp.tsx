@@ -246,6 +246,9 @@ export default function PortalApp() {
             />
 
             <Route path="profile" element={<MyProfile />} />
+            {/* Self-edit: employees edit their own record via the same card form
+                HR uses (NewEmployee resolves the id from the logged-in user). */}
+            <Route path="profile/edit" element={<NewEmployee />} />
 
             {/* Default portal redirect */}
             <Route index element={<Navigate to="dashboard" replace />} />

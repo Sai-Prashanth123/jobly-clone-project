@@ -1,0 +1,1106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Employee Timesheet — Unisys Infotech</title>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700&family=DM+Sans:wght@300;400;500&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --navy:      #0d1f3c;
+  --navy-mid:  #1a3560;
+  --navy-soft: #243f6e;
+  --gold:      #c8922a;
+  --gold-lt:   #f5e6cc;
+  --teal:      #1a7a6e;
+  --teal-lt:   #d4f0ec;
+  --red:       #c0392b;
+  --red-lt:    #fde8e6;
+  --amber:     #d97706;
+  --gray-50:   #f9f8f6;
+  --gray-100:  #f0eee9;
+  --gray-200:  #dedad2;
+  --gray-400:  #9e9890;
+  --gray-600:  #5c5750;
+  --gray-800:  #2a2723;
+  --white:     #ffffff;
+  --border:    1px solid #dedad2;
+  --shadow:    0 2px 12px rgba(13,31,60,.08);
+  --radius:    10px;
+}
+
+*{box-sizing:border-box;margin:0;padding:0}
+
+body{
+  font-family:'DM Sans',sans-serif;
+  background:var(--gray-50);
+  color:var(--gray-800);
+  font-size:14px;
+  line-height:1.6;
+  min-height:100vh;
+}
+
+/* ── TOP BAR ── */
+.top-bar{
+  background:var(--navy);
+  padding:0 32px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  height:58px;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow:0 2px 16px rgba(13,31,60,.3);
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+.brand-mark{
+  width:34px;height:34px;
+  background:linear-gradient(135deg,var(--gold),#e8b040);
+  border-radius:8px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Sora',sans-serif;
+  font-weight:700;
+  font-size:15px;
+  color:var(--navy);
+  letter-spacing:-1px;
+}
+
+.brand-name{
+  font-family:'Sora',sans-serif;
+  font-size:15px;
+  font-weight:600;
+  color:var(--white);
+  letter-spacing:.01em;
+}
+
+.brand-name span{
+  color:var(--gold);
+}
+
+.top-right{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.pill-badge{
+  background:rgba(200,146,42,.18);
+  color:var(--gold);
+  border:1px solid rgba(200,146,42,.3);
+  font-size:11px;
+  font-weight:500;
+  padding:3px 10px;
+  border-radius:20px;
+  font-family:'DM Mono',monospace;
+}
+
+/* ── MAIN WRAPPER ── */
+.wrap{
+  max-width:1180px;
+  margin:0 auto;
+  padding:28px 24px 60px;
+}
+
+/* ── PAGE TITLE ── */
+.page-title{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  margin-bottom:24px;
+  flex-wrap:wrap;
+  gap:12px;
+}
+
+.page-title h1{
+  font-family:'Sora',sans-serif;
+  font-size:24px;
+  font-weight:700;
+  color:var(--navy);
+  letter-spacing:-.02em;
+}
+
+.page-title h1 span{
+  color:var(--gold);
+}
+
+.page-title p{
+  font-size:13px;
+  color:var(--gray-400);
+  margin-top:2px;
+}
+
+/* ── EMPLOYEE CARD ── */
+.emp-card{
+  background:var(--white);
+  border:var(--border);
+  border-radius:var(--radius);
+  padding:18px 24px;
+  display:grid;
+  grid-template-columns:repeat(4,1fr) auto;
+  gap:16px;
+  align-items:end;
+  margin-bottom:20px;
+  box-shadow:var(--shadow);
+}
+
+.field-group{
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+}
+
+.field-label{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gray-400);
+}
+
+.field-input{
+  border:1px solid var(--gray-200);
+  border-radius:7px;
+  padding:8px 12px;
+  font-size:13px;
+  font-family:'DM Sans',sans-serif;
+  color:var(--gray-800);
+  background:var(--gray-50);
+  outline:none;
+  transition:border-color .15s,background .15s;
+  width:100%;
+}
+
+.field-input:focus{
+  border-color:var(--navy-soft);
+  background:var(--white);
+}
+
+select.field-input{cursor:pointer}
+
+/* ── STATS STRIP ── */
+.stats-strip{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:12px;
+  margin-bottom:20px;
+}
+
+.stat-box{
+  background:var(--white);
+  border:var(--border);
+  border-radius:var(--radius);
+  padding:14px 16px;
+  box-shadow:var(--shadow);
+  position:relative;
+  overflow:hidden;
+}
+
+.stat-box::before{
+  content:'';
+  position:absolute;
+  top:0;left:0;
+  width:4px;height:100%;
+  background:var(--gray-200);
+  border-radius:2px 0 0 2px;
+}
+
+.stat-box.total-hours::before{background:var(--navy);}
+.stat-box.expected::before{background:var(--gold);}
+.stat-box.balance::before{background:var(--teal);}
+.stat-box.leave::before{background:var(--amber);}
+.stat-box.submitted::before{background:var(--gray-400);}
+
+.stat-label{
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--gray-400);
+  margin-bottom:4px;
+}
+
+.stat-val{
+  font-family:'Sora',sans-serif;
+  font-size:22px;
+  font-weight:700;
+  color:var(--navy);
+  letter-spacing:-.03em;
+}
+
+.stat-val.green{color:var(--teal);}
+.stat-val.red  {color:var(--red);}
+.stat-val.gold {color:var(--gold);}
+.stat-sub{font-size:10px;color:var(--gray-400);margin-top:1px;}
+
+/* ── TIMESHEET TABLE ── */
+.ts-card{
+  background:var(--white);
+  border:var(--border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  margin-bottom:20px;
+}
+
+.ts-card-head{
+  background:var(--navy);
+  padding:12px 20px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.ts-card-head h2{
+  font-family:'Sora',sans-serif;
+  font-size:14px;
+  font-weight:600;
+  color:var(--white);
+  letter-spacing:.01em;
+}
+
+.legend{
+  display:flex;
+  gap:14px;
+  align-items:center;
+}
+
+.legend-item{
+  display:flex;align-items:center;gap:5px;
+  font-size:11px;color:rgba(255,255,255,.7);
+}
+
+.legend-dot{
+  width:8px;height:8px;
+  border-radius:50%;
+}
+
+.ts-table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+.ts-table th{
+  background:var(--gray-50);
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.07em;
+  text-transform:uppercase;
+  color:var(--gray-400);
+  padding:9px 12px;
+  text-align:left;
+  border-bottom:var(--border);
+  white-space:nowrap;
+}
+
+.ts-table th.center,.ts-table td.center{text-align:center;}
+.ts-table th.right,.ts-table td.right{text-align:right;}
+
+.ts-table td{
+  padding:6px 10px;
+  border-bottom:1px solid var(--gray-100);
+  vertical-align:middle;
+}
+
+/* Row types */
+.row-weekend td{background:#fafaf8;}
+.row-weekend .day-badge{color:var(--gray-400);}
+
+.row-holiday td{background:#fff9f0;}
+.row-leave   td{background:#fff5e0;}
+
+.row-total td{
+  background:var(--navy);
+  color:var(--white);
+  font-weight:600;
+  font-size:13px;
+  padding:12px 12px;
+  border-bottom:none;
+}
+
+/* Cell components */
+.date-cell{
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  color:var(--gray-600);
+  white-space:nowrap;
+}
+
+.day-badge{
+  font-size:11px;
+  font-weight:600;
+  padding:2px 7px;
+  border-radius:4px;
+  background:var(--navy);
+  color:var(--white);
+  display:inline-block;
+  min-width:32px;
+  text-align:center;
+}
+
+.day-badge.sat,.day-badge.sun{
+  background:var(--gray-200);
+  color:var(--gray-600);
+}
+
+.day-badge.hol{
+  background:var(--gold-lt);
+  color:var(--gold);
+}
+
+.ts-input{
+  border:1px solid var(--gray-200);
+  border-radius:5px;
+  padding:5px 8px;
+  font-size:12px;
+  font-family:'DM Sans',sans-serif;
+  color:var(--gray-800);
+  background:var(--white);
+  width:100%;
+  outline:none;
+  transition:border-color .15s;
+}
+
+.ts-input:focus{border-color:var(--navy-soft);}
+
+.ts-input[type="time"]{
+  font-family:'DM Mono',monospace;
+  font-size:12px;
+  width:90px;
+}
+
+.ts-input.project-input{width:130px;}
+.ts-input.desc-input   {width:100%;min-width:180px;}
+
+.hours-cell{
+  font-family:'DM Mono',monospace;
+  font-size:13px;
+  font-weight:600;
+  color:var(--navy);
+  text-align:center;
+}
+
+.hours-cell.zero{color:var(--gray-400);}
+
+/* Status select */
+.status-select{
+  border:1px solid var(--gray-200);
+  border-radius:5px;
+  padding:4px 6px;
+  font-size:11px;
+  font-weight:500;
+  font-family:'DM Sans',sans-serif;
+  background:var(--white);
+  color:var(--gray-800);
+  outline:none;
+  cursor:pointer;
+  width:90px;
+}
+
+.status-badge{
+  display:inline-block;
+  padding:2px 9px;
+  border-radius:20px;
+  font-size:10px;
+  font-weight:600;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+}
+.sb-present {background:var(--teal-lt); color:var(--teal);}
+.sb-absent  {background:var(--red-lt);  color:var(--red);}
+.sb-leave   {background:var(--gold-lt); color:var(--gold);}
+.sb-holiday {background:#eef0ff;        color:#4257b2;}
+.sb-weekend {background:var(--gray-100);color:var(--gray-400);}
+
+/* ── ACTIONS BAR ── */
+.actions-bar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  flex-wrap:wrap;
+}
+
+.actions-left{
+  display:flex;gap:10px;align-items:center;
+}
+
+.btn{
+  padding:10px 22px;
+  border-radius:8px;
+  font-size:13px;
+  font-weight:500;
+  cursor:pointer;
+  font-family:'DM Sans',sans-serif;
+  border:none;
+  transition:all .15s;
+  display:inline-flex;
+  align-items:center;
+  gap:7px;
+}
+
+.btn svg{width:15px;height:15px;stroke-width:2;fill:none;flex-shrink:0;}
+
+.btn-ghost{
+  background:var(--white);
+  border:1px solid var(--gray-200);
+  color:var(--gray-600);
+}
+.btn-ghost:hover{background:var(--gray-100);}
+
+.btn-navy{
+  background:var(--navy-mid);
+  color:var(--white);
+}
+.btn-navy:hover{background:var(--navy);}
+
+.btn-send{
+  background:linear-gradient(135deg,#1a6e60,var(--teal));
+  color:var(--white);
+  box-shadow:0 3px 12px rgba(26,122,110,.3);
+  padding:11px 28px;
+  font-size:14px;
+  font-weight:600;
+}
+.btn-send:hover{
+  background:linear-gradient(135deg,#125048,#157a6e);
+  box-shadow:0 4px 18px rgba(26,122,110,.4);
+  transform:translateY(-1px);
+}
+
+/* ── PREVIEW MODAL ── */
+.modal-bg{
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(13,31,60,.55);
+  z-index:200;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+  backdrop-filter:blur(3px);
+}
+
+.modal-bg.open{display:flex;}
+
+.modal{
+  background:var(--white);
+  border-radius:14px;
+  box-shadow:0 24px 80px rgba(13,31,60,.25);
+  width:100%;
+  max-width:760px;
+  max-height:90vh;
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+
+.modal-head{
+  background:var(--navy);
+  padding:16px 24px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+.modal-head h3{
+  font-family:'Sora',sans-serif;
+  font-size:16px;
+  font-weight:600;
+  color:var(--white);
+}
+
+.modal-head p{font-size:12px;color:rgba(255,255,255,.6);margin-top:2px;}
+
+.btn-close{
+  background:rgba(255,255,255,.1);
+  border:none;
+  width:30px;height:30px;
+  border-radius:6px;
+  color:var(--white);
+  font-size:18px;
+  cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:background .15s;
+}
+.btn-close:hover{background:rgba(255,255,255,.2);}
+
+.modal-body{
+  padding:20px 24px;
+  overflow-y:auto;
+  flex:1;
+}
+
+/* Report preview inside modal */
+.report-preview{
+  background:var(--gray-50);
+  border:var(--border);
+  border-radius:8px;
+  padding:20px;
+  font-family:'DM Mono',monospace;
+  font-size:11px;
+  color:var(--gray-800);
+  white-space:pre-wrap;
+  line-height:1.8;
+  max-height:360px;
+  overflow-y:auto;
+}
+
+.modal-foot{
+  padding:16px 24px;
+  border-top:var(--border);
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  background:var(--gray-50);
+}
+
+/* ── NOTE BOX ── */
+.note-box{
+  background:#fff9ed;
+  border:1px solid #f5d99a;
+  border-radius:8px;
+  padding:12px 16px;
+  font-size:12px;
+  color:#7a5c1a;
+  margin-bottom:20px;
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+}
+
+/* ── PRINT ── */
+@media print{
+  @page{size:A4 landscape;margin:12mm;}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  body{background:white;}
+  .top-bar,.actions-bar,.note-box,.modal-bg{display:none!important;}
+  .wrap{padding:0;max-width:100%;}
+  .ts-table td,.ts-table th{padding:5px 8px;font-size:9pt;}
+  .ts-input,.status-select{border:none;background:transparent;padding:0;font-size:9pt;}
+  .ts-input[type="time"]{font-size:9pt;}
+  .emp-card{border:1pt solid #ccc;border-radius:4pt;padding:10px;}
+  .stats-strip{gap:8px;}
+  .stat-box{border:1pt solid #ccc;border-radius:4pt;padding:8px;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="top-bar">
+  <div class="brand">
+    <div class="brand-mark">UI</div>
+    <div>
+      <div class="brand-name">Unisys <span>Infotech</span></div>
+    </div>
+  </div>
+  <div class="top-right">
+    <span class="pill-badge" id="current-date-badge"></span>
+    <span class="pill-badge">TIMESHEET PORTAL</span>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="wrap">
+
+  <!-- TITLE -->
+  <div class="page-title">
+    <div>
+      <h1>Employee <span>Timesheet</span></h1>
+      <p>Fill in your daily work hours and send the monthly report to HR</p>
+    </div>
+  </div>
+
+  <!-- NOTE -->
+  <div class="note-box">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span>Fill employee details and select the month. Enter your daily project, task, start &amp; end times. Click <strong>Send to HR</strong> to open your email with a formatted monthly report pre-filled and ready to send to <strong>hr@unisysinfotech.com</strong>.</span>
+  </div>
+
+  <!-- EMPLOYEE INFO -->
+  <div class="emp-card">
+    <div class="field-group">
+      <span class="field-label">Employee Name</span>
+      <input class="field-input" id="emp-name" type="text" placeholder="Full Name">
+    </div>
+    <div class="field-group">
+      <span class="field-label">Employee ID</span>
+      <input class="field-input" id="emp-id" type="text" placeholder="EMP-001">
+    </div>
+    <div class="field-group">
+      <span class="field-label">Department</span>
+      <input class="field-input" id="emp-dept" type="text" placeholder="e.g. Development">
+    </div>
+    <div class="field-group">
+      <span class="field-label">Month &amp; Year</span>
+      <input class="field-input" id="month-picker" type="month">
+    </div>
+    <button class="btn btn-navy" onclick="buildSheet()">
+      <svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+      Load
+    </button>
+  </div>
+
+  <!-- STATS STRIP -->
+  <div class="stats-strip">
+    <div class="stat-box total-hours">
+      <div class="stat-label">Total Hours</div>
+      <div class="stat-val" id="stat-total">0.0</div>
+      <div class="stat-sub">hours logged</div>
+    </div>
+    <div class="stat-box expected">
+      <div class="stat-label">Expected Hours</div>
+      <div class="stat-val gold" id="stat-expected">0</div>
+      <div class="stat-sub">working days × 8</div>
+    </div>
+    <div class="stat-box balance">
+      <div class="stat-label">Balance</div>
+      <div class="stat-val" id="stat-balance">0.0</div>
+      <div class="stat-sub">over / under</div>
+    </div>
+    <div class="stat-box leave">
+      <div class="stat-label">Leave Days</div>
+      <div class="stat-val gold" id="stat-leave">0</div>
+      <div class="stat-sub">marked as leave</div>
+    </div>
+    <div class="stat-box submitted">
+      <div class="stat-label">Working Days</div>
+      <div class="stat-val" id="stat-wdays">0</div>
+      <div class="stat-sub">in selected month</div>
+    </div>
+  </div>
+
+  <!-- TIMESHEET TABLE -->
+  <div class="ts-card">
+    <div class="ts-card-head">
+      <div>
+        <h2 id="ts-title">Monthly Timesheet</h2>
+      </div>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#1a7a6e"></div>Present</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#d97706"></div>Leave</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#4257b2"></div>Holiday</div>
+        <div class="legend-item"><div class="legend-dot" style="background:#9e9890"></div>Weekend</div>
+      </div>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="ts-table" id="ts-table">
+        <thead>
+          <tr>
+            <th style="width:40px">#</th>
+            <th style="width:90px">Date</th>
+            <th style="width:44px">Day</th>
+            <th style="width:130px">Project</th>
+            <th>Task Description</th>
+            <th style="width:95px" class="center">Start Time</th>
+            <th style="width:95px" class="center">End Time</th>
+            <th style="width:70px" class="center">Hours</th>
+            <th style="width:95px" class="center">Status</th>
+          </tr>
+        </thead>
+        <tbody id="ts-body">
+          <tr>
+            <td colspan="9" style="text-align:center;padding:40px;color:var(--gray-400);font-size:13px">
+              Select a month above and click <strong>Load</strong> to generate your timesheet.
+            </td>
+          </tr>
+        </tbody>
+        <tfoot id="ts-foot"></tfoot>
+      </table>
+    </div>
+  </div>
+
+  <!-- ACTIONS -->
+  <div class="actions-bar">
+    <div class="actions-left">
+      <button class="btn btn-ghost" onclick="window.print()">
+        <svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+        Print / Save PDF
+      </button>
+      <button class="btn btn-ghost" onclick="clearSheet()">
+        <svg viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3.51"/></svg>
+        Clear Entries
+      </button>
+    </div>
+    <button class="btn btn-send" onclick="previewReport()">
+      <svg viewBox="0 0 24 24" stroke="white"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      Send Monthly Report to HR
+    </button>
+  </div>
+
+</div>
+
+<!-- PREVIEW MODAL -->
+<div class="modal-bg" id="modal">
+  <div class="modal">
+    <div class="modal-head">
+      <div>
+        <h3>📋 Report Preview — Ready to Send</h3>
+        <p>Review your monthly timesheet report before sending to HR</p>
+      </div>
+      <button class="btn-close" onclick="closeModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex;gap:12px;margin-bottom:14px;padding:12px 16px;background:var(--teal-lt);border-radius:8px;align-items:center">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--teal)" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        <div>
+          <div style="font-size:12px;font-weight:600;color:var(--teal)">Sending to: hr@unisysinfotech.com</div>
+          <div style="font-size:11px;color:var(--gray-400)" id="modal-subject-preview"></div>
+        </div>
+      </div>
+      <pre class="report-preview" id="report-text"></pre>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-send" onclick="sendEmail()">
+        <svg viewBox="0 0 24 24" stroke="white" fill="none" width="15" height="15" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        Open Email &amp; Send
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ──────────────────────────────────────────────
+// STATE
+// ──────────────────────────────────────────────
+const HR_EMAIL   = 'hr@unisysinfotech.com';
+const WORK_HRS   = 8;
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS     = ['January','February','March','April','May','June',
+                    'July','August','September','October','November','December'];
+
+// Persisted row data  { rowId: {project, desc, start, end, status} }
+let rowData = {};
+
+// ──────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────
+(function init(){
+  // Set default month to current
+  const now = new Date();
+  document.getElementById('month-picker').value =
+    now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0');
+
+  // Date badge
+  document.getElementById('current-date-badge').textContent =
+    now.toLocaleDateString('en-IN',{weekday:'short',day:'2-digit',month:'short',year:'numeric'});
+})();
+
+// ──────────────────────────────────────────────
+// BUILD SHEET
+// ──────────────────────────────────────────────
+function buildSheet(){
+  const monthVal = document.getElementById('month-picker').value;
+  if(!monthVal){ alert('Please select a month first.'); return; }
+
+  const [yr, mo] = monthVal.split('-').map(Number);
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+
+  // Update title
+  document.getElementById('ts-title').textContent =
+    MONTHS[mo-1] + ' ' + yr + ' — Timesheet';
+
+  // Count working days
+  let wdays = 0;
+  for(let d=1; d<=daysInMonth; d++){
+    const dow = new Date(yr, mo-1, d).getDay();
+    if(dow !== 0 && dow !== 6) wdays++;
+  }
+
+  let html = '';
+  let rowNum = 0;
+  for(let d=1; d<=daysInMonth; d++){
+    const date   = new Date(yr, mo-1, d);
+    const dow    = date.getDay();
+    const isWeekend = (dow===0||dow===6);
+    const rowId  = `${yr}-${mo}-${d}`;
+    const rd     = rowData[rowId] || {};
+
+    // Default status
+    if(!rd.status) rd.status = isWeekend ? 'weekend' : 'present';
+    rowData[rowId] = rd;
+
+    const dayLabel = DAYS_SHORT[dow];
+    const dateStr  = String(d).padStart(2,'0') + ' ' + MONTHS[mo-1].slice(0,3);
+    const rowClass = rd.status === 'weekend' ? 'row-weekend'
+                   : rd.status === 'holiday' ? 'row-holiday'
+                   : rd.status === 'leave'   ? 'row-leave'
+                   : '';
+    const dayBadgeClass = isWeekend ? (dow===6?'sat':'sun')
+                        : rd.status==='holiday' ? 'hol' : '';
+
+    rowNum++;
+
+    html += `<tr class="${rowClass}" id="row-${rowId}" data-row="${rowId}">
+      <td class="date-cell" style="color:var(--gray-400);font-size:11px">${rowNum}</td>
+      <td class="date-cell">${dateStr}</td>
+      <td><span class="day-badge ${dayBadgeClass}">${dayLabel}</span></td>
+      <td><input class="ts-input project-input" type="text" placeholder="${isWeekend?'—':'Project'}"
+            value="${rd.project||''}"
+            ${isWeekend?'disabled':''} oninput="save('${rowId}','project',this.value)"></td>
+      <td><input class="ts-input desc-input" type="text" placeholder="${isWeekend?'—':'Task description'}"
+            value="${rd.desc||''}"
+            ${isWeekend?'disabled':''} oninput="save('${rowId}','desc',this.value)"></td>
+      <td class="center"><input class="ts-input" type="time"
+            value="${rd.start||(!isWeekend?'09:00':'')}"
+            ${isWeekend?'disabled':''}
+            oninput="save('${rowId}','start',this.value);calcRow('${rowId}')"></td>
+      <td class="center"><input class="ts-input" type="time"
+            value="${rd.end||(!isWeekend?'17:30':'')}"
+            ${isWeekend?'disabled':''}
+            oninput="save('${rowId}','end',this.value);calcRow('${rowId}')"></td>
+      <td class="hours-cell${!calcHours(rd.start||'09:00',rd.end||'17:30')&&isWeekend?' zero':''}"
+          id="hrs-${rowId}">${isWeekend?'—':fmtH(calcHours(rd.start||'09:00',rd.end||'17:30'))}</td>
+      <td class="center">
+        <select class="status-select" ${isWeekend?'disabled':''}
+          onchange="save('${rowId}','status',this.value);buildSheet()">
+          ${optionHTML(rd.status, isWeekend)}
+        </select>
+      </td>
+    </tr>`;
+  }
+
+  document.getElementById('ts-body').innerHTML = html;
+  updateStats(yr, mo);
+}
+
+function optionHTML(current, isWeekend){
+  if(isWeekend){
+    return `<option value="weekend" selected>Weekend</option>`;
+  }
+  const opts = [
+    {v:'present', l:'Present'},
+    {v:'leave',   l:'Leave'},
+    {v:'holiday', l:'Holiday'},
+    {v:'absent',  l:'Absent'},
+  ];
+  return opts.map(o=>`<option value="${o.v}"${current===o.v?' selected':''}>${o.l}</option>`).join('');
+}
+
+// ──────────────────────────────────────────────
+// CALCULATIONS
+// ──────────────────────────────────────────────
+function calcHours(start, end){
+  if(!start||!end) return 0;
+  const [sh,sm] = start.split(':').map(Number);
+  const [eh,em] = end.split(':').map(Number);
+  const diff = (eh*60+em) - (sh*60+sm);
+  return diff > 0 ? diff/60 : 0;
+}
+
+function calcRow(rowId){
+  const rd = rowData[rowId];
+  if(!rd) return;
+  const h = calcHours(rd.start, rd.end);
+  const el = document.getElementById('hrs-'+rowId);
+  if(el){ el.textContent = fmtH(h); el.className = 'hours-cell'+(h===0?' zero':''); }
+  const monthVal = document.getElementById('month-picker').value;
+  if(monthVal){
+    const [yr,mo] = monthVal.split('-').map(Number);
+    updateStats(yr, mo);
+  }
+}
+
+function fmtH(h){ return h > 0 ? h.toFixed(1) : '0.0'; }
+
+function updateStats(yr, mo){
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  let totalHrs=0, wdays=0, leaveDays=0;
+
+  for(let d=1; d<=daysInMonth; d++){
+    const dow = new Date(yr, mo-1, d).getDay();
+    const isWeekend = (dow===0||dow===6);
+    const rowId = `${yr}-${mo}-${d}`;
+    const rd = rowData[rowId]||{};
+    if(!isWeekend && rd.status!=='holiday'){
+      wdays++;
+      if(rd.status==='leave') leaveDays++;
+    }
+    const h = (!isWeekend && rd.status==='present')
+              ? calcHours(rd.start||'09:00', rd.end||'17:30')
+              : 0;
+    totalHrs += h;
+  }
+
+  const expected = wdays * WORK_HRS;
+  const balance  = totalHrs - expected;
+  const balEl    = document.getElementById('stat-balance');
+  balEl.textContent = (balance>=0?'+':'')+fmtH(balance);
+  balEl.className   = 'stat-val '+(balance>=0?'green':'red');
+
+  document.getElementById('stat-total').textContent    = fmtH(totalHrs);
+  document.getElementById('stat-expected').textContent = expected;
+  document.getElementById('stat-leave').textContent    = leaveDays;
+  document.getElementById('stat-wdays').textContent    = wdays;
+
+  // Footer total row
+  document.getElementById('ts-foot').innerHTML = `
+    <tr class="row-total">
+      <td colspan="7" style="padding-left:16px">MONTHLY TOTAL</td>
+      <td class="center" style="font-size:15px">${fmtH(totalHrs)}</td>
+      <td></td>
+    </tr>`;
+}
+
+// ──────────────────────────────────────────────
+// DATA
+// ──────────────────────────────────────────────
+function save(rowId, field, val){
+  if(!rowData[rowId]) rowData[rowId]={};
+  rowData[rowId][field] = val;
+}
+
+function clearSheet(){
+  if(!confirm('Clear all time entries? Employee details will be kept.')) return;
+  rowData = {};
+  buildSheet();
+}
+
+// ──────────────────────────────────────────────
+// REPORT GENERATION
+// ──────────────────────────────────────────────
+function buildReportText(){
+  const name   = document.getElementById('emp-name').value || 'N/A';
+  const empId  = document.getElementById('emp-id').value   || 'N/A';
+  const dept   = document.getElementById('emp-dept').value || 'N/A';
+  const monthVal = document.getElementById('month-picker').value;
+  if(!monthVal) return null;
+
+  const [yr, mo] = monthVal.split('-').map(Number);
+  const daysInMonth = new Date(yr, mo, 0).getDate();
+  const monthLabel = MONTHS[mo-1] + ' ' + yr;
+
+  let totalHrs = 0;
+  let wdays=0, leaveDays=0, holidayDays=0;
+  let rows = [];
+
+  for(let d=1; d<=daysInMonth; d++){
+    const date   = new Date(yr, mo-1, d);
+    const dow    = date.getDay();
+    const isWeekend = (dow===0||dow===6);
+    const rowId  = `${yr}-${mo}-${d}`;
+    const rd     = rowData[rowId]||{};
+    const status = rd.status || (isWeekend?'weekend':'present');
+    const dayLabel = DAYS_SHORT[dow];
+    const dateStr  = String(d).padStart(2,'0') + '-' + MONTHS[mo-1].slice(0,3) + '-' + yr;
+
+    if(!isWeekend && status!=='holiday') wdays++;
+    if(status==='leave')   leaveDays++;
+    if(status==='holiday') holidayDays++;
+
+    const h = (status==='present' && !isWeekend)
+              ? calcHours(rd.start||'09:00', rd.end||'17:30') : 0;
+    totalHrs += h;
+
+    if(!isWeekend){
+      rows.push({
+        date:dateStr, day:dayLabel,
+        project: rd.project||'',
+        desc:    rd.desc||'',
+        start:   rd.start||'09:00',
+        end:     rd.end||'17:30',
+        hrs:     h,
+        status:  status.charAt(0).toUpperCase()+status.slice(1)
+      });
+    }
+  }
+
+  const sep  = '─'.repeat(110);
+  const sep2 = '═'.repeat(110);
+
+  let report = `
+╔══════════════════════════════════════════════════════════════════════════════╗
+║          UNISYS INFOTECH — MONTHLY TIMESHEET REPORT                        ║
+╚══════════════════════════════════════════════════════════════════════════════╝
+
+  Employee Name   : ${name}
+  Employee ID     : ${empId}
+  Department      : ${dept}
+  Month / Year    : ${monthLabel}
+  Report Date     : ${new Date().toLocaleDateString('en-IN',{day:'2-digit',month:'long',year:'numeric'})}
+  Submitted To    : HR Department — ${HR_EMAIL}
+
+${sep2}
+  DATE            DAY   PROJECT         TASK DESCRIPTION              START   END     HOURS   STATUS
+${sep}`;
+
+  rows.forEach(r=>{
+    const d  = r.date.padEnd(16);
+    const dy = r.day.padEnd(6);
+    const pr = (r.project||'—').slice(0,15).padEnd(16);
+    const ds = (r.desc||'—').slice(0,30).padEnd(32);
+    const st = (r.start||'—').padEnd(8);
+    const en = (r.end  ||'—').padEnd(8);
+    const h  = (r.hrs>0 ? r.hrs.toFixed(1) : '—').padStart(6);
+    const s  = r.status.padEnd(12);
+    report += `\n  ${d}${dy}${pr}${ds}${st}${en}${h}   ${s}`;
+  });
+
+  const expected = wdays * WORK_HRS;
+  const balance  = totalHrs - expected;
+
+  report += `\n${sep2}
+
+  SUMMARY
+  ─────────────────────────────────
+  Total Working Days    : ${wdays}
+  Total Hours Logged    : ${totalHrs.toFixed(1)} hrs
+  Expected Hours        : ${expected} hrs  (${wdays} days × ${WORK_HRS} hrs)
+  Balance               : ${balance>=0?'+':''}${balance.toFixed(1)} hrs
+  Leave Days            : ${leaveDays}
+  Holidays              : ${holidayDays}
+
+  This is a system-generated timesheet report from Unisys Infotech Timesheet Portal.
+  Please contact ${HR_EMAIL} for any queries.
+`;
+
+  return { text: report, monthLabel, name, empId };
+}
+
+// ──────────────────────────────────────────────
+// MODAL
+// ──────────────────────────────────────────────
+function previewReport(){
+  const result = buildReportText();
+  if(!result){ alert('Please select a month and load the timesheet first.'); return; }
+
+  const subject = `Monthly Timesheet — ${result.name} (${result.empId}) — ${result.monthLabel}`;
+  document.getElementById('report-text').textContent    = result.text;
+  document.getElementById('modal-subject-preview').textContent = 'Subject: ' + subject;
+  document.getElementById('modal').classList.add('open');
+}
+
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+}
+
+function sendEmail(){
+  const result = buildReportText();
+  if(!result) return;
+
+  const subject = `Monthly Timesheet — ${result.name} (${result.empId}) — ${result.monthLabel}`;
+  const body    = result.text;
+
+  const mailto = `mailto:${HR_EMAIL}`
+    + `?subject=${encodeURIComponent(subject)}`
+    + `&body=${encodeURIComponent(body)}`;
+
+  window.location.href = mailto;
+  closeModal();
+}
+
+// Close modal on background click
+document.getElementById('modal').addEventListener('click', function(e){
+  if(e.target === this) closeModal();
+});
+</script>
+</body>
+</html>

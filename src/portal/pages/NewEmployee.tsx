@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
   User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee } from '../hooks/useEmployees';
+import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
@@ -323,14 +324,25 @@ function RequiredMark() {
 
 export default function NewEmployee() {
   const navigate = useNavigate();
+  const location = useLocation();
   const params = useParams<{ id?: string }>();
-  const editId = params.id;
+  const { user } = useAuth();
+
+  // Self-edit: an employee editing their own profile lands here via
+  // /portal/profile/edit (no :id in the URL). Fall back to their own
+  // employeeId so the form prefills and saves against their own record.
+  const isSelfEdit = !params.id && location.pathname.startsWith('/portal/profile');
+  const editId = params.id ?? (isSelfEdit ? user?.employeeId : undefined);
   const isEditMode = !!editId;
+
+  // Only admin/hr/operations can list the full roster (the reporting-manager
+  // dropdown). For a self-editing employee the call would 403, so skip it.
+  const canListEmployees = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'operations';
 
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee(editId ?? '');
   const { data: existingEmployee, isLoading: loadingEmployee } = useEmployee(editId);
-  const { data: employeesData } = useEmployees({ limit: 500 });
+  const { data: employeesData } = useEmployees({ limit: 500 }, { enabled: canListEmployees });
 
   const [form, setForm] = useState<FormState>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -698,6 +710,11 @@ export default function NewEmployee() {
         }
       }
 
+      if (isSelfEdit) {
+        toast.success('Your profile was updated.');
+        navigate('/portal/profile', { replace: true });
+        return;
+      }
       if (isEditMode) {
         toast.success(`Employee ${emp.displayId ?? emp.id} updated.`);
       } else if (welcomeEmailSent) {
@@ -750,20 +767,34 @@ export default function NewEmployee() {
       </div>
     );
   }
+  if (isSelfEdit && !user?.employeeId) {
+    return (
+      <div className="text-center py-20">
+        <p className="text-muted-foreground">No profile is linked to your account. Please contact HR.</p>
+        <Button variant="link" onClick={() => navigate('/portal/profile')}>← Back to my profile</Button>
+      </div>
+    );
+  }
   if (isEditMode && !existingEmployee && !loadingEmployee) {
     return (
       <div className="text-center py-20">
         <p className="text-muted-foreground">Employee not found.</p>
-        <Button variant="link" onClick={() => navigate('/portal/employees')}>← Back to Employees</Button>
+        <Button variant="link" onClick={() => navigate(isSelfEdit ? '/portal/profile' : '/portal/employees')}>← Back</Button>
       </div>
     );
   }
 
-  const backTo = isEditMode && editId ? `/portal/employees/${editId}` : '/portal/employees';
-  const backLabel = isEditMode ? 'Back to employee' : 'Back to Employees';
-  const pageTitle = isEditMode
-    ? `Edit Employee — ${existingEmployee?.displayId ?? ''}`
-    : 'Add New Employee';
+  const backTo = isSelfEdit
+    ? '/portal/profile'
+    : isEditMode && editId
+      ? `/portal/employees/${editId}`
+      : '/portal/employees';
+  const backLabel = isSelfEdit ? 'Back to my profile' : isEditMode ? 'Back to employee' : 'Back to Employees';
+  const pageTitle = isSelfEdit
+    ? 'Edit My Profile'
+    : isEditMode
+      ? `Edit Employee — ${existingEmployee?.displayId ?? ''}`
+      : 'Add New Employee';
   const pageDescription = isEditMode
     ? 'Update any field below and click Save Changes. Photo and document uploads are appended; existing files stay.'
     : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
@@ -774,7 +805,7 @@ export default function NewEmployee() {
         <ArrowLeft className="h-3 w-3" /> {backLabel}
       </Link>
       <PageHeader
-        eyebrow={isEditMode ? 'HR · Edit' : 'HR · Onboarding'}
+        eyebrow={isSelfEdit ? 'My Profile' : isEditMode ? 'HR · Edit' : 'HR · Onboarding'}
         title={pageTitle}
         description={pageDescription}
       />

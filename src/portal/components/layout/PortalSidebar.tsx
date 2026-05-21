@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
+import { useEmployee } from '../../hooks/useEmployees';
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../../hooks/useNotifications';
 import type { UserRole } from '../../types';
 
@@ -70,6 +71,10 @@ export function PortalSidebar() {
   const { data: notifications = [] } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
+  // The logged-in user's own employee record (when they have one) drives the
+  // profile photo in the identity chip below.
+  const { data: selfEmployee } = useEmployee(user?.employeeId);
+  const selfPhotoUrl = selfEmployee?.profilePhotoUrl;
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -275,11 +280,15 @@ export function PortalSidebar() {
         {/* User identity card */}
         <div className="flex items-center gap-3 px-2 py-2 mb-1 rounded-lg">
           <div
-            className={`w-9 h-9 rounded-full bg-gradient-to-br ${roleGradient} flex items-center justify-center flex-shrink-0 ring-1 ring-white shadow-sm`}
+            className={`w-9 h-9 rounded-full ${selfPhotoUrl ? 'bg-gray-100' : `bg-gradient-to-br ${roleGradient}`} flex items-center justify-center flex-shrink-0 ring-1 ring-white shadow-sm overflow-hidden`}
           >
-            <span className="text-white text-[11px] font-semibold tracking-wide">
-              {user?.avatarInitials ?? '?'}
-            </span>
+            {selfPhotoUrl ? (
+              <img src={selfPhotoUrl} alt={user?.name ?? ''} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-white text-[11px] font-semibold tracking-wide">
+                {user?.avatarInitials ?? '?'}
+              </span>
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[13px] font-medium text-gray-900 truncate leading-tight">

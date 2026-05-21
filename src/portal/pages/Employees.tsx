@@ -5,6 +5,7 @@ import { UserPlus, Loader2 } from 'lucide-react';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
+import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { useEmployees } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/utils';
@@ -42,9 +43,12 @@ export default function Employees() {
       key: 'name',
       header: 'Name',
       render: e => (
-        <div>
-          <p className="font-medium">{e.firstName} {e.lastName}</p>
-          <p className="text-xs text-muted-foreground">{e.email}</p>
+        <div className="flex items-center gap-2.5">
+          <EmployeeAvatar photoUrl={e.profilePhotoUrl} name={`${e.firstName} ${e.lastName}`} size="sm" />
+          <div className="min-w-0">
+            <p className="font-medium truncate">{e.firstName} {e.lastName}</p>
+            <p className="text-xs text-muted-foreground truncate">{e.email}</p>
+          </div>
         </div>
       ),
       getValue: e => `${e.firstName} ${e.lastName}`,

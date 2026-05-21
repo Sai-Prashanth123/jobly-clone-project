@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
+import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials } from '../hooks/useEmployees';
 import { useAssignments } from '../hooks/useAssignments';
@@ -64,7 +65,6 @@ export default function EmployeeDetail() {
     green_card: 'Permanent Resident Card',
     ead: 'Employment Authorization Document',
   };
-  const initials = `${employee.firstName?.[0] ?? ''}${employee.lastName?.[0] ?? ''}`.toUpperCase() || '?';
   const hasPermAddr = !!employee.permanentAddress && (
     employee.permanentAddress.street || employee.permanentAddress.city || employee.permanentAddress.state
   );
@@ -82,14 +82,12 @@ export default function EmployeeDetail() {
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
-          {/* Profile photo / initials avatar */}
-          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center text-sm font-semibold text-blue-700 flex-shrink-0 overflow-hidden">
-            {employee.profilePhotoUrl ? (
-              <img src={employee.profilePhotoUrl} alt="" className="w-full h-full object-cover" />
-            ) : (
-              initials
-            )}
-          </div>
+          {/* Profile photo, or a default human silhouette when none is set */}
+          <EmployeeAvatar
+            photoUrl={employee.profilePhotoUrl}
+            name={`${employee.firstName} ${employee.lastName}`}
+            size="md"
+          />
           <div className="min-w-0">
             <h1 className="text-xl sm:text-2xl font-semibold truncate">
               {employee.firstName}{employee.middleName ? ` ${employee.middleName}` : ''} {employee.lastName}

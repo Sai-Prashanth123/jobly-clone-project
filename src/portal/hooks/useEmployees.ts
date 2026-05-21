@@ -96,7 +96,7 @@ interface ListParams {
   limit?: number;
 }
 
-export function useEmployees(params?: ListParams) {
+export function useEmployees(params?: ListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['employees', params],
     queryFn: async () => {
@@ -106,6 +106,9 @@ export function useEmployees(params?: ListParams) {
         total: data.total as number,
       };
     },
+    // Employees can't list the full roster (the API returns 403). Callers that
+    // only need the list for an admin/hr feature pass enabled:false otherwise.
+    enabled: options?.enabled ?? true,
   });
 }
 

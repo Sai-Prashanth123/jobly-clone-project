@@ -15,7 +15,9 @@ router.get('/', requireRole('admin','hr','operations','finance','employee'), val
 router.post('/', requireRole('admin','hr'), validateBody(createEmployeeSchema), ctrl.create);
 router.get('/export', requireRole('admin', 'hr', 'operations'), ctrl.exportEmployees);
 router.get('/:id', requireRole('admin','hr','operations','finance','employee'), ctrl.getOne);
-router.put('/:id', requireRole('admin','hr'), validateBody(updateEmployeeSchema), ctrl.update);
+// 'employee' is allowed so a user can edit their own profile; the controller
+// enforces that an employee may only update their OWN record (ownership check).
+router.put('/:id', requireRole('admin','hr','employee'), validateBody(updateEmployeeSchema), ctrl.update);
 router.delete('/:id', requireRole('admin'), ctrl.remove);
 router.post('/:id/resend-credentials', requireRole('admin','hr'), ctrl.resendCredentials);
 
