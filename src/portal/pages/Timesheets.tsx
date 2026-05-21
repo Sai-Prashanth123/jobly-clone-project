@@ -21,7 +21,10 @@ function NewTimesheetForm({ onSubmit, onCancel }: {
   onCancel: () => void;
 }) {
   const { user } = useAuth();
-  const { data: assignmentsData } = useAssignments({ status: 'active', limit: 100 });
+  // Include active AND pending assignments — a freshly-created assignment is
+  // often still 'pending', and excluding it left the dropdown confusingly empty.
+  // Only completed/terminated assignments are hidden from new timesheets.
+  const { data: assignmentsData } = useAssignments({ limit: 200 });
   const { data: employeesData } = useEmployees({ limit: 200 });
   const [assignmentId, setAssignmentId] = useState('');
   const [weekStart, setWeekStart] = useState(() => {
@@ -32,9 +35,10 @@ function NewTimesheetForm({ onSubmit, onCancel }: {
   const assignments = assignmentsData?.data ?? [];
   const employees = employeesData?.data ?? [];
 
+  const selectable = assignments.filter(a => a.status === 'active' || a.status === 'pending');
   const myAssignments = user?.role === 'employee'
-    ? assignments.filter(a => a.employeeId === user.employeeId)
-    : assignments;
+    ? selectable.filter(a => a.employeeId === user.employeeId)
+    : selectable;
 
   const selectedAsgn = myAssignments.find(a => a.id === assignmentId);
 
