@@ -862,9 +862,10 @@ export default function NewEmployee() {
                   htmlFor="profile-photo"
                   className="block border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-[#4069FF] hover:bg-blue-50/40 transition-colors cursor-pointer text-center"
                 >
-                  <div className="w-20 h-20 mx-auto rounded-full bg-gray-100 flex items-center justify-center overflow-hidden">
+                  <div className={`w-28 h-28 mx-auto rounded-full flex items-center justify-center overflow-hidden ${form.profilePhotoPreview ? 'bg-white ring-1 ring-gray-200' : 'bg-gray-100'}`}>
                     {form.profilePhotoPreview ? (
-                      <img src={form.profilePhotoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      // object-contain → the whole image is visible, scaled to fit.
+                      <img src={form.profilePhotoPreview} alt="Preview" className="w-full h-full object-contain" />
                     ) : (
                       <Camera className="h-7 w-7 text-gray-400" />
                     )}

@@ -35,13 +35,17 @@ export function EmployeeAvatar({
 }) {
   return (
     <div
-      className={`${BOX[size]} rounded-full overflow-hidden bg-gradient-to-br from-blue-100 to-cyan-100 flex items-center justify-center flex-shrink-0 ${className}`}
+      className={`${BOX[size]} rounded-full overflow-hidden flex items-center justify-center flex-shrink-0 ${
+        photoUrl ? 'bg-white ring-1 ring-gray-200' : 'bg-gradient-to-br from-blue-100 to-cyan-100'
+      } ${className}`}
     >
       {photoUrl ? (
+        // object-contain so the WHOLE image is visible (scaled to fit) instead
+        // of being cropped to fill the circle — works for logos and any aspect.
         <img
           src={photoUrl}
           alt={name ? `${name}` : 'Profile photo'}
-          className="w-full h-full object-cover"
+          className="w-full h-full object-contain"
         />
       ) : (
         <UserRound className={`${ICON[size]} text-blue-400`} aria-hidden />
