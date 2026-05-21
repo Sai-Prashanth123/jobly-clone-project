@@ -16,9 +16,10 @@ import { useAuth } from '../hooks/useAuth';
 import { formatDate, getMondayOfWeek } from '../lib/utils';
 import type { Timesheet } from '../types';
 
-function NewTimesheetForm({ onSubmit, onCancel }: {
+function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
   onSubmit: (data: { employeeId: string; assignmentId: string; clientId: string; weekStartDate: string; weekEndDate: string; entries: { entryDate: string; dayOfWeek: string; hours: number; isBillable: boolean }[] }) => void;
   onCancel: () => void;
+  isPending?: boolean;
 }) {
   const { user } = useAuth();
   // Include active AND pending assignments — a freshly-created assignment is
@@ -94,8 +95,10 @@ function NewTimesheetForm({ onSubmit, onCancel }: {
         />
       </div>
       <div className="flex justify-end gap-3 pt-2">
-        <Button variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={handleCreate} disabled={!assignmentId}>Create Timesheet</Button>
+        <Button variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+        <Button onClick={handleCreate} disabled={!assignmentId || isPending} loading={isPending} loadingText="Creating…">
+          Create Timesheet
+        </Button>
       </div>
     </div>
   );
@@ -325,6 +328,7 @@ export default function Timesheets() {
               }
             }}
             onCancel={() => setShowForm(false)}
+            isPending={createTimesheet.isPending}
           />
         </DialogContent>
       </Dialog>
