@@ -48,6 +48,7 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
     if (!form.employeeId) errs.employeeId = 'Employee is required';
     if (!form.clientId) errs.clientId = 'Client is required';
     if (!form.projectName.trim()) errs.projectName = 'Project name is required';
+    if (!form.role.trim()) errs.role = 'Role is required';
     if (!form.startDate) errs.startDate = 'Start date is required';
     if (form.billRate <= 0) errs.billRate = 'Bill rate must be greater than 0';
     if (form.payRate <= 0) errs.payRate = 'Pay rate must be greater than 0';
@@ -108,8 +109,9 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
           </div>
 
           <div className="space-y-2">
-            <Label>Role / Position</Label>
-            <Input value={form.role} onChange={e => set('role', e.target.value)} />
+            <Label>Role / Position *</Label>
+            <Input value={form.role} onChange={e => set('role', e.target.value)} placeholder="e.g. Software Engineer" />
+            {errors.role && <p className="text-xs text-red-500">{errors.role}</p>}
           </div>
 
           <div className="space-y-2">
