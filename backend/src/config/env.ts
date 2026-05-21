@@ -14,6 +14,9 @@ const EnvSchema = z.object({
   // Optional — if unset, welcome/invoice emails are disabled with a warning.
   GMAIL_USER: z.string().optional(),
   GMAIL_APP_PASSWORD: z.string().optional(),
+  // Optional fallback recipient for monthly-timesheet reports when no HR
+  // portal_users exist. If unset and there are no HR users, the email is skipped.
+  HR_FALLBACK_EMAIL: z.string().email().optional(),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

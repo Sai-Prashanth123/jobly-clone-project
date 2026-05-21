@@ -9,6 +9,47 @@ export type BillingType = 'hourly' | 'monthly' | 'milestone';
 export type VisaType = 'h1b' | 'l1' | 'opt' | 'stem_opt' | 'tn' | 'gc' | 'citizen' | 'other';
 export type I9Status = 'pending' | 'complete' | 'expired';
 
+// ── Monthly attendance timesheet (separate from the weekly billing Timesheet) ──
+export type MonthlyTimesheetStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
+export type MonthlyDayStatus = 'present' | 'leave' | 'holiday' | 'absent' | 'weekend';
+
+export interface MonthlyTimesheetEntry {
+  date: string;        // YYYY-MM-DD
+  dayOfWeek: string;   // 'Mon', 'Tue', …
+  project: string;
+  task: string;
+  startTime: string;   // 'HH:MM'
+  endTime: string;
+  hours: number;
+  status: MonthlyDayStatus;
+}
+
+export interface MonthlyTimesheet {
+  id: string;
+  displayId?: string;
+  employeeId: string;
+  year: number;
+  month: number;       // 1-12
+  entries: MonthlyTimesheetEntry[];
+  totalHours: number;
+  expectedHours: number;
+  workingDays: number;
+  leaveDays: number;
+  status: MonthlyTimesheetStatus;
+  notes?: string;
+  rejectionReason?: string;
+  pdfUrl?: string;
+  submittedAt?: string;
+  reviewedAt?: string;
+  reviewedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+  // Joined from the employees table on list/detail responses (read-only).
+  employeeName?: string;
+  employeeDisplayId?: string;
+  department?: string;
+}
+
 export interface PortalUser {
   id: string;
   email: string;

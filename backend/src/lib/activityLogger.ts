@@ -3,7 +3,7 @@ import { supabaseAdmin } from '../config/supabase';
 export async function logActivity(
   actorId: string | null,
   action: 'created' | 'updated' | 'deleted' | 'status_changed',
-  entityType: 'employee' | 'client' | 'assignment' | 'timesheet' | 'invoice' | 'portal_user',
+  entityType: 'employee' | 'client' | 'assignment' | 'timesheet' | 'monthly_timesheet' | 'invoice' | 'portal_user',
   entityId: string,
   entityLabel: string,
   metadata?: object,

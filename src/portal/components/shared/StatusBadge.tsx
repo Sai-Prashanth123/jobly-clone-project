@@ -22,6 +22,8 @@ const STATUS_MAP: Record<string, { label: string; className: string; meaning: st
                       meaning: 'Client approved — these hours are eligible to be invoiced.' },
   rejected:         { label: 'Rejected',    className: 'bg-red-100    text-red-700     border border-red-200',
                       meaning: 'Returned to the employee for correction. Once edited, it can be re-submitted.' },
+  approved:         { label: 'Approved',    className: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+                      meaning: 'Reviewed and approved by your reporting manager or HR.' },
 
   // Invoice
   sent:             { label: 'Sent',        className: 'bg-blue-100   text-blue-700    border border-blue-200',

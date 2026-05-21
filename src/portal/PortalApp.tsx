@@ -39,6 +39,11 @@ const HrI9StatusEmployees = lazy(() => import('./pages/hr/I9StatusEmployees'));
 // New card-per-section Add Employee onboarding page
 const NewEmployee = lazy(() => import('./pages/NewEmployee'));
 
+// Monthly attendance timesheet (separate from the weekly billing Timesheets)
+const MyMonthlyTimesheet = lazy(() => import('./pages/MyMonthlyTimesheet'));
+const MonthlyTimesheets = lazy(() => import('./pages/MonthlyTimesheets'));
+const MonthlyTimesheetDetail = lazy(() => import('./pages/MonthlyTimesheetDetail'));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -181,6 +186,32 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
                   <Documents />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Monthly attendance timesheet (independent of weekly billing timesheets) */}
+            <Route
+              path="attendance"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'admin', 'hr']}>
+                  <MyMonthlyTimesheet />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="attendance/review"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'employee']}>
+                  <MonthlyTimesheets />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="attendance/:id"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'employee']}>
+                  <MonthlyTimesheetDetail />
                 </ProtectedRoute>
               }
             />

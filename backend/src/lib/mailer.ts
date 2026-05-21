@@ -328,3 +328,127 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
     html,
   });
 }
+
+export interface MonthlyTimesheetEmailPayload {
+  to: string | string[];
+  employeeName: string;
+  employeeDisplayId: string;
+  department?: string;
+  monthLabel: string;
+  totalHours: number;
+  expectedHours: number;
+  balance: number;
+  workingDays: number;
+  leaveDays: number;
+  status: string;
+  pdfUrl?: string;
+  rows: { date: string; day: string; project: string; task: string; start: string; end: string; hours: number; status: string }[];
+}
+
+export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPayload): Promise<void> {
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured on the server. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
+  }
+  const {
+    to, employeeName, employeeDisplayId, department, monthLabel,
+    totalHours, expectedHours, balance, workingDays, leaveDays, status, pdfUrl, rows,
+  } = payload;
+
+  const fmtH = (n: number) => (Number(n) || 0).toFixed(1);
+  const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : '');
+
+  const summaryCell = (label: string, value: string, color = '#111827') => `
+    <td style="padding:12px 14px;border:1px solid #e5e7eb;text-align:center;">
+      <div style="font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;">${esc(label)}</div>
+      <div style="font-size:18px;font-weight:700;color:${color};margin-top:2px;">${esc(value)}</div>
+    </td>`;
+
+  const lineRows = rows.map(r => `
+    <tr>
+      <td style="padding:7px 10px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${esc(r.date)}</td>
+      <td style="padding:7px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;">${esc(r.day)}</td>
+      <td style="padding:7px 10px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;">${esc(r.project || '—')}</td>
+      <td style="padding:7px 10px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;">${esc(r.task || '—')}</td>
+      <td style="padding:7px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;text-align:center;">${esc(r.start || '—')}</td>
+      <td style="padding:7px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;text-align:center;">${esc(r.end || '—')}</td>
+      <td style="padding:7px 10px;font-size:12px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;text-align:center;">${r.hours > 0 ? fmtH(r.hours) : '—'}</td>
+      <td style="padding:7px 10px;font-size:11px;color:#6b7280;border-bottom:1px solid #f3f4f6;text-align:center;">${esc(cap(r.status))}</td>
+    </tr>`).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
+    <tr><td align="center">
+      <table width="680" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Monthly Timesheet — ${esc(monthLabel)}</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${esc(employeeName)} · ${esc(employeeDisplayId)}${department ? ` · ${esc(department)}` : ''}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:28px 40px;">
+            <p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.6;">
+              <strong>${esc(employeeName)}</strong> submitted their attendance timesheet for <strong>${esc(monthLabel)}</strong>. Summary below; the full PDF is attached via the button.
+            </p>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
+              <tr>
+                ${summaryCell('Total Hours', fmtH(totalHours), '#4069FF')}
+                ${summaryCell('Expected', fmtH(expectedHours), '#d97706')}
+                ${summaryCell('Balance', `${balance >= 0 ? '+' : ''}${fmtH(balance)}`, balance >= 0 ? '#059669' : '#dc2626')}
+                ${summaryCell('Working Days', String(workingDays))}
+                ${summaryCell('Leave Days', String(leaveDays))}
+              </tr>
+            </table>
+
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;">
+              <thead>
+                <tr style="background:#f9fafb;">
+                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Date</th>
+                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Day</th>
+                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Project</th>
+                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Task</th>
+                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Start</th>
+                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">End</th>
+                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Hours</th>
+                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Status</th>
+                </tr>
+              </thead>
+              <tbody>${lineRows}</tbody>
+            </table>
+
+            ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td align="center" style="padding:4px 0 16px;">
+                <a href="${esc(pdfUrl)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
+                  Download Timesheet PDF →
+                </a>
+              </td></tr>
+            </table>` : ''}
+
+            <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">
+              Review this timesheet in the Jobly Portal under <strong>Attendance Review</strong>. Current status: <strong>${esc(cap(status))}</strong>.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
+            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · Workforce Management Portal</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await transporter.sendMail({
+    from: FROM,
+    to,
+    subject: `Monthly Timesheet — ${employeeName} (${employeeDisplayId}) — ${monthLabel}`,
+    html,
+  });
+}

@@ -151,3 +151,120 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
 function formatDate(dateStr: string): string {
   return formatDateSafe(dateStr, { long: true }) || dateStr;
 }
+
+export interface MonthlyTimesheetPDFData {
+  displayId: string;
+  employeeName: string;
+  employeeDisplayId: string;
+  department?: string;
+  monthLabel: string;
+  rows: Array<{ date: string; day: string; project: string; task: string; start: string; end: string; hours: number; status: string }>;
+  totalHours: number;
+  expectedHours: number;
+  balance: number;
+  workingDays: number;
+  leaveDays: number;
+  notes?: string;
+}
+
+export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    // A4 landscape so the wide attendance table fits.
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    const blue = '#4069FF';
+    const navy = '#04213F';
+    const gray = '#6B7280';
+    const pageRight = doc.page.width - 40;
+    const contentW = doc.page.width - 80;
+
+    // Header bar
+    doc.rect(0, 0, doc.page.width, 72).fill(navy);
+    doc.fillColor('#ffffff').fontSize(20).font('Helvetica-Bold').text('JOBLY SOLUTIONS', 40, 22);
+    doc.fontSize(9).font('Helvetica').fillColor('rgba(255,255,255,0.7)').text('Monthly Timesheet', 40, 48);
+    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
+      .text(data.monthLabel, pageRight - 220, 26, { width: 220, align: 'right' });
+
+    // Employee meta
+    doc.fillColor(navy).fontSize(11).font('Helvetica-Bold').text(data.employeeName, 40, 90);
+    doc.fillColor(gray).fontSize(10).font('Helvetica')
+      .text(`${data.employeeDisplayId}${data.department ? '  ·  ' + data.department : ''}  ·  Sheet ${data.displayId}`, 40, 106);
+
+    // Table
+    const tableTop = 132;
+    const cols = [
+      { h: 'Date', w: 80, align: 'left' as const },
+      { h: 'Day', w: 45, align: 'left' as const },
+      { h: 'Project', w: 130, align: 'left' as const },
+      { h: 'Task', w: 230, align: 'left' as const },
+      { h: 'Start', w: 55, align: 'center' as const },
+      { h: 'End', w: 55, align: 'center' as const },
+      { h: 'Hours', w: 55, align: 'center' as const },
+      { h: 'Status', w: 65, align: 'center' as const },
+    ];
+    const tableLeft = 40;
+    const colX: number[] = [tableLeft];
+    for (let i = 1; i < cols.length; i++) colX.push(colX[i - 1] + cols[i - 1].w);
+
+    const drawHeader = (y: number) => {
+      doc.rect(tableLeft, y, contentW, 22).fill(blue);
+      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
+      cols.forEach((c, i) => doc.text(c.h, colX[i] + 6, y + 7, { width: c.w - 12, align: c.align }));
+    };
+    drawHeader(tableTop);
+
+    let y = tableTop + 22;
+    doc.fontSize(8.5);
+    data.rows.forEach((r, idx) => {
+      if (y > doc.page.height - 110) {            // new page
+        doc.addPage();
+        y = 40;
+        drawHeader(y);
+        y += 22;
+      }
+      const bg = idx % 2 === 0 ? '#F9FAFB' : '#FFFFFF';
+      doc.rect(tableLeft, y, contentW, 20).fill(bg);
+      doc.fillColor('#111827').font('Helvetica');
+      const vals = [
+        r.date, r.day, r.project || '—', r.task || '—',
+        r.start || '—', r.end || '—', r.hours > 0 ? r.hours.toFixed(1) : '—',
+        r.status.charAt(0).toUpperCase() + r.status.slice(1),
+      ];
+      cols.forEach((c, i) => doc.text(String(vals[i]), colX[i] + 6, y + 6, { width: c.w - 12, align: c.align, ellipsis: true }));
+      y += 20;
+    });
+
+    // Summary block
+    y += 16;
+    if (y > doc.page.height - 90) { doc.addPage(); y = 50; }
+    doc.fillColor(navy).fontSize(11).font('Helvetica-Bold').text('Summary', 40, y);
+    y += 18;
+    const sum: Array<[string, string]> = [
+      ['Total Hours Logged', `${data.totalHours.toFixed(1)} hrs`],
+      ['Expected Hours', `${data.expectedHours.toFixed(1)} hrs`],
+      ['Balance', `${data.balance >= 0 ? '+' : ''}${data.balance.toFixed(1)} hrs`],
+      ['Working Days', String(data.workingDays)],
+      ['Leave Days', String(data.leaveDays)],
+    ];
+    doc.fontSize(10).font('Helvetica');
+    sum.forEach(([label, value]) => {
+      doc.fillColor(gray).text(label, 40, y, { width: 160, align: 'left', continued: false });
+      doc.fillColor('#111827').font('Helvetica-Bold').text(value, 200, y, { width: 120, align: 'left' });
+      doc.font('Helvetica');
+      y += 16;
+    });
+
+    if (data.notes) {
+      y += 10;
+      doc.fillColor(navy).fontSize(10).font('Helvetica-Bold').text('Notes:', 40, y);
+      y += 14;
+      doc.fillColor(gray).fontSize(9).font('Helvetica').text(data.notes, 40, y, { width: contentW });
+    }
+
+    doc.end();
+  });
+}
