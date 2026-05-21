@@ -34,13 +34,10 @@ export function DocumentDownloadButton({
       }
       if (win) win.location.href = url;
       else window.location.href = url;
-    } catch (err: any) {
-      if (fallbackUrl && win) {
-        win.location.href = fallbackUrl;
-      } else {
-        win?.close();
-        toast.error(err?.response?.data?.error ?? 'Download failed. Please try again.');
-      }
+    } catch {
+      // The failed GET is already surfaced as a toast by apiClient's global
+      // interceptor — just close the blank tab we opened for it.
+      win?.close();
     } finally {
       setLoading(false);
     }

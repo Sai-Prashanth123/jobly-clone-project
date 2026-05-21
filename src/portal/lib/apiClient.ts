@@ -1,4 +1,6 @@
 import axios from 'axios';
+import { toast } from 'sonner';
+import { getApiErrorMessage } from './apiError';
 
 // Base URL comes from VITE_API_URL in .env.local (see CLAUDE.md).
 // Falls back to the Azure deployment if the env var is missing so that
@@ -27,7 +29,8 @@ let redirecting = false;
 apiClient.interceptors.response.use(
   res => res,
   err => {
-    if (err.response?.status === 401 && !redirecting) {
+    const status = err.response?.status;
+    if (status === 401 && !redirecting) {
       redirecting = true;
       sessionStorage.clear();
       const here = window.location.pathname + window.location.search;
@@ -37,7 +40,21 @@ apiClient.interceptors.response.use(
           ? `?redirect=${encodeURIComponent(here)}`
           : '';
       window.location.href = `/portal/login${redirectParam}`;
+      return Promise.reject(err);
     }
+
+    // Surface failed DATA LOADS (GET) as a clear popup so the user always knows
+    // why something didn't load (403/404/409/500/offline). Mutations
+    // (POST/PUT/DELETE) already toast at the call site, so we skip them here to
+    // avoid double toasts. 401 is handled by the redirect above. A request can
+    // opt out by sending the header 'X-Silent-Error'.
+    const method = (err.config?.method ?? '').toLowerCase();
+    const silent = !!err.config?.headers?.['X-Silent-Error'];
+    if (status !== 401 && method === 'get' && !silent) {
+      const { title, description } = getApiErrorMessage(err);
+      toast.error(title, { description, id: `api-${status ?? 'net'}-${description}` });
+    }
+
     return Promise.reject(err);
   },
 );

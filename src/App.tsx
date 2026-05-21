@@ -24,7 +24,10 @@ const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
       <Toaster />
-      <Sonner />
+      {/* Prominent, hard-to-miss toasts: top-center, colored by type (red for
+          errors), with a close button and a longer dwell so users actually see
+          API error reasons (e.g. a 403 on page load) instead of a 4s flash. */}
+      <Sonner position="top-center" richColors closeButton duration={6000} />
       <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <ScrollToTop />
         <Routes>
