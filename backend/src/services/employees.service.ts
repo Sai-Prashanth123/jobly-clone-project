@@ -497,6 +497,22 @@ export async function deleteEmployee(id: string, actorId?: string) {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
 
+  // Remove the linked portal login + auth user. Without this the deleted
+  // employee could still sign in, and their session keeps fetching this
+  // now-404 record (sidebar avatar, My Profile) — the "random 404s". Best-effort:
+  // a cleanup failure must not abort the delete. portal_users.id === auth user id.
+  try {
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id').eq('employee_id', id).maybeSingle();
+    if (pu?.id) {
+      await supabaseAdmin.from('portal_users').delete().eq('id', pu.id);
+      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(pu.id);
+      if (authErr) console.error('[deleteEmployee] auth.deleteUser failed for', pu.id, authErr);
+    }
+  } catch (err) {
+    console.error('[deleteEmployee] login cleanup failed for employee', id, err);
+  }
+
   logActivity(actorId ?? null, 'deleted', 'employee', id, existing.display_id ?? id.slice(0, 8));
 }
 
