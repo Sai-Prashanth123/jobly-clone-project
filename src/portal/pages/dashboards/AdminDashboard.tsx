@@ -94,15 +94,16 @@ export function AdminDashboard() {
 
   const kpiCards = [
     { title: 'Total Employees', value: totalEmployees, icon: <Users className="h-5 w-5" />, variant: 'blue' as const,
-      description: `${employees.filter(e => e.status === 'active').length} active`, sparkline: hireSpark },
+      description: `${employees.filter(e => e.status === 'active').length} active`, sparkline: hireSpark,
+      to: '/portal/employees', linkLabel: 'View employees' },
     { title: 'Active Clients', value: activeClients, icon: <Building2 className="h-5 w-5" />, variant: 'cyan' as const,
-      description: `of ${clients.length} total` },
+      description: `of ${clients.length} total`, to: '/portal/clients', linkLabel: 'View clients' },
     { title: 'Active Projects', value: activeProjects, icon: <Briefcase className="h-5 w-5" />, variant: 'purple' as const,
-      description: 'Open assignments' },
+      description: 'Open assignments', to: '/portal/assignments', linkLabel: 'View assignments' },
     { title: 'Revenue This Month', value: formatCurrency(revenueThisMonth), icon: <TrendingUp className="h-5 w-5" />, variant: 'green' as const,
-      description: 'Paid invoices', sparkline: revenueSpark },
+      description: 'Paid invoices', sparkline: revenueSpark, to: '/portal/invoices', linkLabel: 'View invoices' },
     { title: 'Pending Approvals', value: pendingApprovals, icon: <Clock className="h-5 w-5" />, variant: 'orange' as const,
-      description: 'Awaiting manager approval' },
+      description: 'Awaiting manager approval', to: '/portal/timesheets', linkLabel: 'View timesheets' },
   ];
 
   return (
@@ -182,13 +183,16 @@ export function AdminDashboard() {
       {/* Secondary metrics row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <StatCard title="Outstanding Revenue" value={formatCurrency(totalOutstanding)}
-          icon={<DollarSign className="h-5 w-5" />} variant="blue" description="Sent & overdue invoices" />
+          icon={<DollarSign className="h-5 w-5" />} variant="blue" description="Sent & overdue invoices"
+          to="/portal/invoices" linkLabel="View invoices" />
         <StatCard title="Overdue Invoices" value={overdueInvoices.length}
           icon={<AlertTriangle className="h-5 w-5" />}
           variant={overdueInvoices.length > 0 ? 'red' : 'green'}
-          description={overdueInvoices.length > 0 ? 'Needs attention' : 'None overdue'} />
+          description={overdueInvoices.length > 0 ? 'Needs attention' : 'None overdue'}
+          to="/portal/invoices" linkLabel="View invoices" />
         <StatCard title="Employees Onboarding" value={employees.filter(e => e.status === 'onboarding').length}
-          icon={<CheckCircle className="h-5 w-5" />} variant="purple" description="In progress" />
+          icon={<CheckCircle className="h-5 w-5" />} variant="purple" description="In progress"
+          to="/portal/employees" linkLabel="View employees" />
       </div>
 
       {/* Refined alert callouts */}

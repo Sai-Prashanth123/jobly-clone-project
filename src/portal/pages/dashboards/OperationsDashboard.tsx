@@ -89,10 +89,10 @@ export function OperationsDashboard() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {[
-          { title: 'Active Assignments', value: activeAssignments.length, icon: <Briefcase className="h-5 w-5" />, variant: 'blue' as const },
-          { title: 'Awaiting Approval', value: pendingTimesheets.length, icon: <Clock className="h-5 w-5" />, variant: 'orange' as const, description: 'Submitted timesheets' },
-          { title: 'Manager Approved', value: approvedThisWeek.length, icon: <CheckCircle className="h-5 w-5" />, variant: 'green' as const, description: 'Awaiting client approval', sparkline: velocitySeries.map(v => v.approved) },
-          { title: 'Rejected', value: rejectedTimesheets.length, icon: <XCircle className="h-5 w-5" />, variant: 'red' as const, description: 'Need resubmission' },
+          { title: 'Active Assignments', value: activeAssignments.length, icon: <Briefcase className="h-5 w-5" />, variant: 'blue' as const, to: '/portal/assignments', linkLabel: 'View assignments' },
+          { title: 'Awaiting Approval', value: pendingTimesheets.length, icon: <Clock className="h-5 w-5" />, variant: 'orange' as const, description: 'Submitted timesheets', to: '/portal/timesheets', linkLabel: 'View timesheets' },
+          { title: 'Manager Approved', value: approvedThisWeek.length, icon: <CheckCircle className="h-5 w-5" />, variant: 'green' as const, description: 'Awaiting client approval', sparkline: velocitySeries.map(v => v.approved), to: '/portal/timesheets', linkLabel: 'View timesheets' },
+          { title: 'Rejected', value: rejectedTimesheets.length, icon: <XCircle className="h-5 w-5" />, variant: 'red' as const, description: 'Need resubmission', to: '/portal/timesheets', linkLabel: 'View timesheets' },
         ].map((c, i) => (
           <div key={c.title} className="portal-stagger" style={{ animationDelay: `${i * 60}ms` }}>
             <StatCard {...c} />

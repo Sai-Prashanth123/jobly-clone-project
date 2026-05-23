@@ -88,12 +88,14 @@ export function EmployeeDashboard() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {[
           { title: 'Assigned Client', value: assignedClientName, icon: <Building2 className="h-5 w-5" />, variant: 'cyan' as const,
-            description: myAssignments.length > 1 ? `+${myAssignments.length - 1} more assignment${myAssignments.length > 2 ? 's' : ''}` : primaryAssignment?.projectName ?? 'No active project' },
+            description: myAssignments.length > 1 ? `+${myAssignments.length - 1} more assignment${myAssignments.length > 2 ? 's' : ''}` : primaryAssignment?.projectName ?? 'No active project',
+            to: '/portal/assignments', linkLabel: 'View assignments' },
           { title: 'Pending Timesheets', value: pendingTimesheets, icon: <Clock className="h-5 w-5" />,
             variant: (pendingTimesheets > 0 ? 'orange' : 'green') as 'orange' | 'green',
-            description: pendingTimesheets > 0 ? 'Awaiting approval' : 'All up to date' },
+            description: pendingTimesheets > 0 ? 'Awaiting approval' : 'All up to date',
+            to: '/portal/timesheets', linkLabel: 'View timesheets' },
           { title: 'Approved Hours', value: `${approvedHours} hrs`, icon: <CheckCircle className="h-5 w-5" />, variant: 'green' as const,
-            description: 'Client-approved', sparkline: hoursSpark },
+            description: 'Client-approved', sparkline: hoursSpark, to: '/portal/timesheets', linkLabel: 'View timesheets' },
         ].map((c, i) => (
           <div key={c.title} className="portal-stagger" style={{ animationDelay: `${i * 60}ms` }}>
             <StatCard {...c} />

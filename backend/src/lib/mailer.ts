@@ -23,7 +23,43 @@ export const mailerConfigured = !!(GMAIL_USER && GMAIL_APP_PASSWORD);
 const transporter = nodemailer.createTransport({
   service: 'gmail',
   auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+  // Pool + rate-limit so a burst of creates (e.g. HR adding several hires)
+  // doesn't trip Gmail's "too many connections / 421 try again later" throttle,
+  // which was silently dropping some of the emails.
+  pool: true,
+  maxConnections: 3,
+  maxMessages: 50,
+  rateDelta: 1000,
+  rateLimit: 5,
 });
+
+// Trim recipient(s) — a stray leading/trailing space makes Gmail reject the address.
+function trimRecipient(to: string | string[]): string | string[] {
+  return Array.isArray(to) ? to.map(t => t.trim()).filter(Boolean) : to.trim();
+}
+
+// Retry transient SMTP failures (timeouts, 4xx greylisting, Gmail throttling)
+// with exponential backoff. Hard failures (bad address, auth) throw immediately.
+async function sendWithRetry(mail: nodemailer.SendMailOptions, tries = 3): Promise<void> {
+  mail = { ...mail, to: mail.to ? trimRecipient(mail.to as string | string[]) : mail.to };
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      await transporter.sendMail(mail);
+      return;
+    } catch (err: any) {
+      const code = String(err?.code ?? err?.responseCode ?? '');
+      const transient =
+        /ETIMEDOUT|ECONNRESET|ESOCKET|ECONNECTION|EDNS/i.test(code) ||
+        /^4\d\d$/.test(code) ||
+        /timeout|try again|temporarily/i.test(String(err?.message ?? ''));
+      console.error(`[mailer] send attempt ${attempt}/${tries} to ${JSON.stringify(mail.to)} failed:`, {
+        code: err?.code, responseCode: err?.responseCode, response: err?.response, message: err?.message,
+      });
+      if (!transient || attempt === tries) throw err;
+      await new Promise(r => setTimeout(r, 2 ** (attempt - 1) * 1000));
+    }
+  }
+}
 
 const FROM = GMAIL_USER ? `Jobly HR <${GMAIL_USER}>` : 'Jobly HR <noreply@jobly.com>';
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
@@ -188,7 +224,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
   if (!mailerConfigured) {
     throw new Error('Email is not configured on the server. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
   }
-  await transporter.sendMail({
+  await sendWithRetry({
     from: FROM,
     to,
     subject: `Welcome to Jobly Portal — ${displayId}`,
@@ -321,7 +357,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
 </body>
 </html>`;
 
-  await transporter.sendMail({
+  await sendWithRetry({
     from: FROM,
     to,
     subject: `Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`,
@@ -445,7 +481,7 @@ export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPa
 </body>
 </html>`;
 
-  await transporter.sendMail({
+  await sendWithRetry({
     from: FROM,
     to,
     subject: `Monthly Timesheet — ${employeeName} (${employeeDisplayId}) — ${monthLabel}`,

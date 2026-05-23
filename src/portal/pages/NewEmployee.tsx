@@ -289,19 +289,20 @@ function ageFromDob(dob: string): number | null {
 // ── Small reusable bits ─────────────────────────────────────────────────────
 
 function SectionCard({
-  id, num, title, description, icon, children,
-}: { id: string; num: string; title: string; description?: string; icon: React.ReactNode; children: React.ReactNode }) {
+  id, num, title, description, icon, children, complete,
+}: { id: string; num: string; title: string; description?: string; icon: React.ReactNode; children: React.ReactNode; complete?: boolean }) {
   return (
     <Card id={id} className="scroll-mt-24 portal-animate-in">
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0">
-            {num}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0 transition-colors ${complete ? 'bg-emerald-500 text-white' : 'bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white'}`}>
+            {complete ? <CheckCircle2 className="h-5 w-5" /> : num}
           </div>
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base flex items-center gap-2">
               {icon}
               {title}
+              {complete && <span className="ml-1 text-[11px] font-medium text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Complete</span>}
             </CardTitle>
             {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
           </div>
@@ -437,14 +438,22 @@ export default function NewEmployee() {
     if (errors[k as string]) setErrors(p => ({ ...p, [k as string]: '' }));
   };
 
+  // Nested setters must clear their own flattened error key (e.g. 'street' →
+  // 'addressStreet') — otherwise a once-flagged required error stays red even
+  // after the user fills the field.
+  const clearErr = (key: string) => { if (errors[key]) setErrors(p => ({ ...p, [key]: '' })); };
+  const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
   const setAddress = (k: keyof FormState['address'], v: string) => {
     setForm(p => ({ ...p, address: { ...p.address, [k]: v } }));
+    clearErr(`address${cap(k)}`);
   };
   const setPermanentAddress = (k: keyof FormState['permanentAddress'], v: string) => {
     setForm(p => ({ ...p, permanentAddress: { ...p.permanentAddress, [k]: v } }));
+    clearErr(`permanentAddress${cap(k)}`);
   };
   const setEmergency = (k: keyof FormState['emergencyContact'], v: string) => {
     setForm(p => ({ ...p, emergencyContact: { ...p.emergencyContact, [k]: v } }));
+    clearErr(`emergency${cap(k)}`);
   };
 
   const activeEmployees = employeesData?.data ?? [];
@@ -468,6 +477,19 @@ export default function NewEmployee() {
     const filled = checks.filter(Boolean).length;
     return { filled, total: checks.length };
   }, [form]);
+
+  // Per-section completion — drives the green check shown on each section header
+  // so the user gets positive "this section is done" feedback as they fill it.
+  const sectionComplete: Record<string, boolean> = {
+    [SECTION_IDS.personal]:    !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob,
+    [SECTION_IDS.contact]:     !!form.email.trim() && !!form.phone.trim(),
+    [SECTION_IDS.presentAddr]: !!form.address.street.trim() && !!form.address.city.trim() && !!form.address.state.trim() && !!form.address.zip.trim(),
+    [SECTION_IDS.employment]:  !!form.startDate,
+    [SECTION_IDS.immigration]: !!form.visaType && !!form.visaExpiry && !!form.i9Status && /^\d{4}$/.test(form.ssn),
+    [SECTION_IDS.emergency]:   !!form.emergencyContact.name.trim() && !!form.emergencyContact.phone.trim(),
+    [SECTION_IDS.payroll]:     (parseNumberInput(form.payRate) ?? 0) > 0,
+    [SECTION_IDS.review]:      isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
+  };
 
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = (): { ok: boolean; firstErrorSectionId?: string } => {
@@ -848,6 +870,7 @@ export default function NewEmployee() {
           {/* 01 Personal */}
           <SectionCard
             id={SECTION_IDS.personal}
+            complete={sectionComplete[SECTION_IDS.personal]}
             num="01"
             title="Personal Information"
             description="The basics. Profile photo is optional but recommended for the directory."
@@ -974,6 +997,7 @@ export default function NewEmployee() {
           {/* 02 Contact */}
           <SectionCard
             id={SECTION_IDS.contact}
+            complete={sectionComplete[SECTION_IDS.contact]}
             num="02"
             title="Contact Details"
             description="Personal email receives the login credentials. Work email becomes the portal username if provided."
@@ -1017,6 +1041,7 @@ export default function NewEmployee() {
           {/* 03 Present Address */}
           <SectionCard
             id={SECTION_IDS.presentAddr}
+            complete={sectionComplete[SECTION_IDS.presentAddr]}
             num="03"
             title="Present Address"
             description="Where the employee currently lives."
@@ -1105,6 +1130,7 @@ export default function NewEmployee() {
           {/* 05 Employment */}
           <SectionCard
             id={SECTION_IDS.employment}
+            complete={sectionComplete[SECTION_IDS.employment]}
             num="05"
             title="Employment Details"
             description="Where this person fits in the company."
@@ -1163,6 +1189,7 @@ export default function NewEmployee() {
           {/* 06 Immigration */}
           <SectionCard
             id={SECTION_IDS.immigration}
+            complete={sectionComplete[SECTION_IDS.immigration]}
             num="06"
             title="Immigration & Work Authorization"
             description="Captured for I-9 compliance. SSN is stored as last-4 only."
@@ -1435,6 +1462,7 @@ export default function NewEmployee() {
           {/* 10 Emergency Contact */}
           <SectionCard
             id={SECTION_IDS.emergency}
+            complete={sectionComplete[SECTION_IDS.emergency]}
             num="10"
             title="Emergency Contact"
             description="Used only if HR can't reach the employee in an emergency."
@@ -1474,6 +1502,7 @@ export default function NewEmployee() {
           {/* 11 Payroll & Tax */}
           <SectionCard
             id={SECTION_IDS.payroll}
+            complete={sectionComplete[SECTION_IDS.payroll]}
             num="11"
             title="Payroll & Tax"
             description="Direct deposit details for ACH payroll. Have a void cheque or bank letter ready for verification."
@@ -1606,6 +1635,7 @@ export default function NewEmployee() {
           {/* 13 Review */}
           <SectionCard
             id={SECTION_IDS.review}
+            complete={sectionComplete[SECTION_IDS.review]}
             num="13"
             title="Review & Submit"
             description="Confirm the information is correct before creating the employee."

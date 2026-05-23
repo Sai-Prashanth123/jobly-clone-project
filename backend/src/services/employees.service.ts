@@ -148,10 +148,11 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
     };
   }
 
+  const recipientEmail = (input.email ?? '').trim();
   try {
     // Send credentials to personal email (input.email), login is portalLoginEmail
     await sendWelcomeEmail({
-      to: input.email,
+      to: recipientEmail,
       firstName: input.firstName,
       lastName: input.lastName,
       displayId: emp.display_id ?? emp.id?.slice(0, 8) ?? empId.slice(0, 8),
@@ -164,10 +165,15 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       loginEmail: portalLoginEmail,
       tempPassword,
     });
-    console.log('[mailer] credentials email sent to', input.email, '(login:', portalLoginEmail, ')');
+    console.log('[mailer] credentials email sent to', recipientEmail, '(login:', portalLoginEmail, ')');
     return { credentialsReady: true, emailSent: true, loginEmail: portalLoginEmail };
   } catch (err: any) {
-    console.error('[mailer] credentials email failed for', input.email, err);
+    // Rich detail so ops can see WHY a specific recipient failed (bad address vs
+    // throttle vs auth) — the generic message alone made this undiagnosable.
+    console.error('[mailer] credentials email FAILED for', recipientEmail, {
+      code: err?.code, responseCode: err?.responseCode, response: err?.response,
+      rejected: err?.rejected, message: err?.message,
+    });
     return {
       credentialsReady: true,
       emailSent: false,
