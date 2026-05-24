@@ -9,7 +9,7 @@ const upload = documentUpload;
 
 router.use(authenticate);
 
-router.post('/upload', upload.single('file'), ctrl.upload);
+router.post('/upload', requireRole('admin', 'hr', 'operations'), upload.single('file'), ctrl.upload);
 router.get('/:id/url', ctrl.getSignedUrl);
 router.delete('/:id', requireRole('admin', 'hr', 'operations'), ctrl.remove);
 

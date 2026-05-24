@@ -42,7 +42,7 @@ export function AdminDashboard() {
   const activeProjects = assignments.filter(a => a.status === 'active').length;
   const pendingApprovals = timesheets.filter(t => t.status === 'submitted').length;
 
-  const currentMonthPrefix = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const currentMonthPrefix = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
   const revenueThisMonth = invoices
     .filter(i => i.paidAt?.startsWith(currentMonthPrefix))
     .reduce((s, i) => s + i.totalAmount, 0);
@@ -50,9 +50,9 @@ export function AdminDashboard() {
   // 6-month series for revenue trend + employee growth
   const months: { key: string; label: string }[] = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-    months.push({ key, label: MONTH_LABELS[d.getMonth()] });
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    months.push({ key, label: MONTH_LABELS[d.getUTCMonth()] });
   }
 
   const revenueSeries = months.map(({ key, label }) => ({
@@ -77,8 +77,7 @@ export function AdminDashboard() {
     .filter(i => i.status === 'sent' || i.status === 'overdue')
     .reduce((s, i) => s + i.totalAmount, 0);
 
-  const in30Days = new Date(now);
-  in30Days.setDate(now.getDate() + 30);
+  const in30Days = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30));
   const expiringContracts = clients.filter(c => {
     if (!c.contractEndDate || c.status !== 'active') return false;
     const end = new Date(c.contractEndDate);

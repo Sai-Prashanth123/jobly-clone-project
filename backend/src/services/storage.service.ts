@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ForbiddenError } from '../lib/errors';
 
 const BUCKET_MAP: Record<string, string> = {
   employee: 'employee-docs',
@@ -82,7 +82,10 @@ export async function uploadEmployeePhoto(employeeId: string, file: Express.Mult
   return publicUrl;
 }
 
-export async function getDocumentSignedUrl(docId: string) {
+export async function getDocumentSignedUrl(
+  docId: string,
+  user: { role: string; employeeId?: string | null },
+) {
   const { data: doc, error } = await supabaseAdmin
     .from('documents')
     .select('*')
@@ -90,6 +93,15 @@ export async function getDocumentSignedUrl(docId: string) {
     .single();
 
   if (error || !doc) throw new NotFoundError('Document not found');
+
+  // Authorization: an employee may only fetch documents attached to their own
+  // employee record. Staff (admin/hr/operations/finance) may fetch any document.
+  // Without this check, any authenticated user could mint a signed URL for any
+  // document (incl. SSN/ID scans in the private employee-docs bucket) by UUID.
+  if (user.role === 'employee') {
+    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
+    if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
+  }
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
   const { data } = await supabaseAdmin

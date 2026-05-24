@@ -34,10 +34,10 @@ export function FinanceDashboard() {
   const now = new Date();
   const months: { key: string; label: string }[] = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
     months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: MONTH_LABELS[d.getMonth()],
+      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+      label: MONTH_LABELS[d.getUTCMonth()],
     });
   }
 

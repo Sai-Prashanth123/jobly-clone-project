@@ -39,7 +39,7 @@ export function OperationsDashboard() {
   // Approval velocity over the last 8 weeks (count of manager-approved per week)
   const now = new Date();
   const weekKey = (d: Date) => {
-    const dt = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+    const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
     const day = dt.getUTCDay() || 7;
     dt.setUTCDate(dt.getUTCDate() + 4 - day);
     const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
@@ -48,8 +48,7 @@ export function OperationsDashboard() {
   };
   const weeks: { key: string; label: string }[] = [];
   for (let i = 7; i >= 0; i--) {
-    const d = new Date(now);
-    d.setDate(now.getDate() - i * 7);
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i * 7));
     weeks.push({ key: weekKey(d), label: `W${weekKey(d).split('-W')[1]}` });
   }
   const velocitySeries = weeks.map(({ key, label }) => ({

@@ -37,10 +37,10 @@ export function HRDashboard() {
   // 6-month hire trend
   const months: { key: string; label: string }[] = [];
   for (let i = 5; i >= 0; i--) {
-    const d = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1));
     months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: MONTH_LABELS[d.getMonth()],
+      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+      label: MONTH_LABELS[d.getUTCMonth()],
     });
   }
   const hireSeries = months.map(({ key, label }) => ({

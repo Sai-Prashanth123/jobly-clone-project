@@ -102,7 +102,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       );
       if (updateErr) throw updateErr;
 
-      await supabaseAdmin.from('portal_users').upsert({
+      const { error: upsertErr } = await supabaseAdmin.from('portal_users').upsert({
         id: portalUserId,
         email: portalLoginEmail,
         name: `${input.firstName} ${input.lastName}`,
@@ -110,6 +110,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
         employee_id: empId,
         avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
       }, { onConflict: 'id' });
+      if (upsertErr) throw upsertErr;
 
       credentialsReady = true;
     } else {
@@ -122,7 +123,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       if (authError) throw authError;
 
       if (authData?.user) {
-        await supabaseAdmin.from('portal_users').insert({
+        const { error: insertErr } = await supabaseAdmin.from('portal_users').insert({
           id: authData.user.id,
           email: portalLoginEmail,
           name: `${input.firstName} ${input.lastName}`,
@@ -130,6 +131,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
           employee_id: empId,
           avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
         });
+        if (insertErr) throw insertErr;
         credentialsReady = true;
       }
     }

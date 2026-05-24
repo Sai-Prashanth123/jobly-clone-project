@@ -19,7 +19,7 @@ export async function upload(req: Request, res: Response, next: NextFunction): P
 
 export async function getSignedUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const url = await storageSvc.getDocumentSignedUrl(req.params.id);
+    const url = await storageSvc.getDocumentSignedUrl(req.params.id, req.user!);
     res.json({ success: true, data: { url } });
   } catch (err) { next(err); }
 }

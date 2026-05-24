@@ -8,7 +8,7 @@ export async function createNotification(
   entityType?: string,
   entityId?: string,
 ) {
-  await supabaseAdmin.from('notifications').insert({
+  const { error } = await supabaseAdmin.from('notifications').insert({
     user_id: userId,
     title,
     message,
@@ -16,6 +16,9 @@ export async function createNotification(
     entity_type: entityType ?? null,
     entity_id: entityId ?? null,
   });
+  // Best-effort: a failed notification must not break the calling flow, but log
+  // it so silent delivery failures are visible in the server logs.
+  if (error) console.warn('[notifications.service] createNotification failed:', error.message);
 }
 
 export async function listNotifications(userId: string) {

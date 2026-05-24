@@ -16,6 +16,13 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
 export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.getAssignment(req.params.id);
+    // An employee may only view their own assignment (bill/pay rates are sensitive).
+    // The list endpoint already scopes employees to their own rows; this guards the
+    // single-get so an employee can't read another's assignment by UUID.
+    if (req.user!.role === 'employee' && data.employee_id !== req.user!.employeeId) {
+      res.status(403).json({ success: false, error: 'You may only view your own assignments' });
+      return;
+    }
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
