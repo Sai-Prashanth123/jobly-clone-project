@@ -32,10 +32,15 @@ export function PortalLayout() {
         <PortalSidebar />
         <SidebarInset className="bg-gray-50">
           <main className="p-3 sm:p-4 md:p-6 pb-16">
-            <MailerStatusBanner />
-            <ErrorBoundary>
-              <Outlet />
-            </ErrorBoundary>
+            {/* One fluid, centered container for every page: fills all laptop
+                widths and only bounds ultra-wide monitors (max-w-screen-2xl =
+                1536px). Replaces the inconsistent per-page max-w-4xl/5xl caps. */}
+            <div className="mx-auto w-full max-w-screen-2xl">
+              <MailerStatusBanner />
+              <ErrorBoundary>
+                <Outlet />
+              </ErrorBoundary>
+            </div>
           </main>
         </SidebarInset>
       </SidebarProvider>

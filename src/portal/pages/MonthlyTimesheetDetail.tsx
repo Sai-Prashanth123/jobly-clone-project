@@ -87,7 +87,7 @@ export default function MonthlyTimesheetDetail() {
   };
 
   return (
-    <div className="space-y-5 max-w-5xl pb-10">
+    <div className="space-y-5 pb-10">
       <button onClick={() => navigate('/portal/attendance/review')} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-3 w-3" /> Back to Attendance Review
       </button>

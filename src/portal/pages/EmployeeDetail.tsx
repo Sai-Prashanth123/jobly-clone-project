@@ -76,7 +76,7 @@ export default function EmployeeDetail() {
   const workList = employee.workHistory ?? [];
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-5xl">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/employees')} className="gap-1 flex-shrink-0">
@@ -170,7 +170,7 @@ export default function EmployeeDetail() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="md:col-span-2 lg:col-span-2">
           <CardHeader><CardTitle className="text-base">Personal Information</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             <Field label="Personal Email" value={employee.email} />
             <Field label="Work Email" value={employee.workEmail} />
             <Field label="Mobile Phone" value={employee.phone} />
@@ -184,7 +184,7 @@ export default function EmployeeDetail() {
             <Field label="Languages Known" value={employee.languagesKnown} />
             <Field label="LinkedIn" value={employee.linkedinUrl} />
             <Field label="Skype / Teams" value={employee.skypeId} />
-            <div className="sm:col-span-3">
+            <div className="sm:col-span-3 xl:col-span-4">
               <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Present Address</p>
               <p className="text-sm text-gray-900 mt-0.5">
                 {[employee.address.street, employee.address.city, employee.address.state, employee.address.zip, employee.address.country]
@@ -192,7 +192,7 @@ export default function EmployeeDetail() {
               </p>
             </div>
             {hasPermAddr && (
-              <div className="sm:col-span-3">
+              <div className="sm:col-span-3 xl:col-span-4">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Permanent Address</p>
                 <p className="text-sm text-gray-900 mt-0.5">
                   {[employee.permanentAddress!.street, employee.permanentAddress!.city, employee.permanentAddress!.state, employee.permanentAddress!.zip, employee.permanentAddress!.country]

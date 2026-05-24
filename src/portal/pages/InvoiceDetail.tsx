@@ -42,7 +42,7 @@ export default function InvoiceDetail() {
   }
 
   return (
-    <div className="space-y-4 sm:space-y-6 max-w-4xl">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 portal-no-print">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/invoices')} className="gap-1 flex-shrink-0">
