@@ -50,6 +50,9 @@ ENV SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 # Password "Jobly@123$!" url-encoded: @→%40, $→%24, !→%21
 ENV DATABASE_URL=postgresql://postgres:Jobly%40123%24%21@db.ufkrfrmqangydrjbzljo.supabase.co:5432/postgres
 ENV DIRECT_URL=postgresql://postgres:Jobly%40123%24%21@db.ufkrfrmqangydrjbzljo.supabase.co:5432/postgres
+# Email transport (SMTP_HOST/SMTP_PORT/SMTP_USER/SMTP_PASS/MAIL_FROM) is provided
+# at runtime via Azure App Settings — kept OUT of the image so no secret lands in
+# the public repo. Legacy Gmail fallback below (unused once SMTP_* are set).
 ENV GMAIL_USER=saip00519@gmail.com
 ENV GMAIL_APP_PASSWORD="gsox vqdx akvi irrh"
 

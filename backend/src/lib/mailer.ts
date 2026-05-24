@@ -12,26 +12,29 @@ function esc(value: unknown): string {
   return String(value).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
-// Gmail SMTP — set GMAIL_USER and GMAIL_APP_PASSWORD in env
-// Generate an App Password at: myaccount.google.com → Security → 2-Step Verification → App passwords
-// nodemailer accepts the app password with or without spaces, but we strip them defensively.
+// Provider-agnostic SMTP. Preferred: a transactional provider (Brevo / SendGrid)
+// via SMTP_* env — better deliverability to Gmail/Outlook than relaying personal
+// Gmail, and no Gmail "App Password" needed (just an SMTP key from the provider).
+//   Brevo:    SMTP_HOST=smtp-relay.brevo.com  SMTP_PORT=587  SMTP_USER=<login>  SMTP_PASS=<smtp key>
+//   SendGrid: SMTP_HOST=smtp.sendgrid.net      SMTP_PORT=587  SMTP_USER=apikey   SMTP_PASS=<api key>
+// MAIL_FROM must be a VERIFIED sender on that provider, e.g. "Jobly HR <you@gmail.com>".
+// Falls back to the old Gmail config if SMTP_* aren't set (backward compatible).
+const SMTP_HOST = process.env.SMTP_HOST?.trim();
+const SMTP_PORT = Number(process.env.SMTP_PORT ?? '587');
+const SMTP_USER = process.env.SMTP_USER?.trim();
+const SMTP_PASS = process.env.SMTP_PASS?.replace(/\s+/g, '');
 const GMAIL_USER = process.env.GMAIL_USER?.trim();
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
 
-export const mailerConfigured = !!(GMAIL_USER && GMAIL_APP_PASSWORD);
+const useSmtp = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
+export const mailerConfigured = useSmtp || !!(GMAIL_USER && GMAIL_APP_PASSWORD);
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
-  // Pool + rate-limit so a burst of creates (e.g. HR adding several hires)
-  // doesn't trip Gmail's "too many connections / 421 try again later" throttle,
-  // which was silently dropping some of the emails.
-  pool: true,
-  maxConnections: 3,
-  maxMessages: 50,
-  rateDelta: 1000,
-  rateLimit: 5,
-});
+const POOL = { pool: true, maxConnections: 3, maxMessages: 50, rateDelta: 1000, rateLimit: 5 } as const;
+const transporter = nodemailer.createTransport(
+  useSmtp
+    ? { host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465, auth: { user: SMTP_USER, pass: SMTP_PASS }, ...POOL }
+    : { service: 'gmail', auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD }, ...POOL },
+);
 
 // Trim recipient(s) — a stray leading/trailing space makes Gmail reject the address.
 function trimRecipient(to: string | string[]): string | string[] {
@@ -61,22 +64,25 @@ async function sendWithRetry(mail: nodemailer.SendMailOptions, tries = 3): Promi
   }
 }
 
-const FROM = GMAIL_USER ? `Jobly HR <${GMAIL_USER}>` : 'Jobly HR <noreply@jobly.com>';
+// FROM must be a verified sender on the active provider. MAIL_FROM wins; else
+// fall back to the Gmail address (legacy) or a placeholder.
+const FROM = (process.env.MAIL_FROM?.trim())
+  || (GMAIL_USER ? `Jobly HR <${GMAIL_USER}>` : 'Jobly HR <noreply@jobly.com>');
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
+const ACTIVE_TRANSPORT = useSmtp ? `SMTP ${SMTP_HOST}:${SMTP_PORT}` : 'Gmail service';
 
 // Run once at boot so operators see immediately whether SMTP works.
-// Gmail returns auth errors as code "EAUTH"; transient network failures as "ETIMEDOUT".
 export async function verifyMailer(): Promise<void> {
   if (!mailerConfigured) {
-    console.warn('[mailer] GMAIL_USER or GMAIL_APP_PASSWORD not set — welcome/invoice emails will be disabled. Set both on your host environment.');
+    console.warn('[mailer] No email transport configured — set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD. Emails are disabled.');
     return;
   }
   try {
     await transporter.verify();
-    console.log(`[mailer] ✓ Gmail SMTP authenticated as ${GMAIL_USER}`);
+    console.log(`[mailer] ✓ ${ACTIVE_TRANSPORT} authenticated; sending as "${FROM}"`);
   } catch (err: any) {
-    console.error(`[mailer] ✗ Gmail SMTP verification FAILED: ${err?.code ?? ''} ${err?.message ?? err}`);
-    console.error('[mailer]   → Check that GMAIL_USER is the full address and GMAIL_APP_PASSWORD is a current App Password (not the regular Google password).');
+    console.error(`[mailer] ✗ ${ACTIVE_TRANSPORT} verification FAILED: ${err?.code ?? ''} ${err?.message ?? err}`);
+    console.error('[mailer]   → Check SMTP_USER/SMTP_PASS (provider SMTP key) and that MAIL_FROM is a VERIFIED sender on the provider.');
   }
 }
 
@@ -222,7 +228,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
 </html>`;
 
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
   }
   await sendWithRetry({
     from: FROM,
@@ -252,7 +258,7 @@ export interface InvoiceEmailPayload {
 
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
   }
   const {
     to, clientName, contactName, invoiceNumber,
@@ -383,7 +389,7 @@ export interface MonthlyTimesheetEmailPayload {
 
 export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set GMAIL_USER and GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
   }
   const {
     to, employeeName, employeeDisplayId, department, monthLabel,

@@ -477,6 +477,30 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 
   if (error) throw error;
 
+  // Keep the portal login in sync when the login email changes. The login email
+  // is the work email if set, otherwise the personal email. Without this, editing
+  // the email updated only the employees table — the old address stayed the login
+  // and the new one couldn't sign in (and HR thought "the email didn't work").
+  if (input.workEmail !== undefined || input.email !== undefined) {
+    try {
+      const newLoginEmail = ((emp.work_email ?? emp.email) ?? '').trim();
+      if (newLoginEmail) {
+        const { data: pu } = await supabaseAdmin
+          .from('portal_users').select('id, email').eq('employee_id', id).maybeSingle();
+        if (pu?.id && pu.email !== newLoginEmail) {
+          const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(pu.id, {
+            email: newLoginEmail, email_confirm: true,
+          });
+          if (authErr) throw authErr;
+          await supabaseAdmin.from('portal_users').update({ email: newLoginEmail }).eq('id', pu.id);
+          console.log('[updateEmployee] synced login email for', id, '→', newLoginEmail);
+        }
+      }
+    } catch (err) {
+      console.error('[updateEmployee] login email sync failed for', id, err);
+    }
+  }
+
   logActivity(actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8));
   return serializeEmployee(emp);
 }
