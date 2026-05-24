@@ -70,30 +70,40 @@ export interface CredentialsResult {
 }
 
 async function issueCredentials(empId: string, emp: any, input: CreateEmployeeInput): Promise<CredentialsResult> {
-  // workEmail = portal login credential; email = personal email to receive credentials
-  const portalLoginEmail = input.workEmail ?? input.email;
+  // Login = work email if provided, else personal. The credentials email is
+  // sent to BOTH the personal and work addresses (deduped) so the employee
+  // receives it wherever they check (e.g. Gmail + Outlook). If only one is
+  // given, it goes to that one.
+  const personalEmail = (input.email ?? '').trim();
+  const workEmail = (input.workEmail ?? '').trim();
+  const portalLoginEmail = workEmail || personalEmail;
   const tempPassword = 'Jobly@' + Math.random().toString(36).slice(2, 8).toUpperCase();
   let credentialsReady = false;
   let credentialsError: any = null;
 
   try {
-    // First check portal_users by email — this is an indexed lookup and
-    // avoids the O(N)-in-all-auth-users `listUsers({ perPage: 1000 })` call
-    // that used to run on every employee create.
-    const { data: existingPortal } = await supabaseAdmin
-      .from('portal_users')
-      .select('id')
-      .eq('email', portalLoginEmail)
-      .maybeSingle();
+    // Prefer linking by employee_id — this survives email edits (looking up by
+    // email would miss the existing login after the address changed and spawn a
+    // duplicate auth user). Fall back to the login email, else create fresh.
+    let portalUserId: string | null = null;
+    const { data: byEmp } = await supabaseAdmin
+      .from('portal_users').select('id').eq('employee_id', empId).maybeSingle();
+    if (byEmp?.id) portalUserId = byEmp.id;
+    if (!portalUserId && portalLoginEmail) {
+      const { data: byEmail } = await supabaseAdmin
+        .from('portal_users').select('id').eq('email', portalLoginEmail).maybeSingle();
+      if (byEmail?.id) portalUserId = byEmail.id;
+    }
 
-    if (existingPortal?.id) {
+    if (portalUserId) {
+      // Update the existing login — email (in case it changed) + new password.
       const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
-        existingPortal.id, { password: tempPassword }
+        portalUserId, { email: portalLoginEmail, password: tempPassword, email_confirm: true },
       );
       if (updateErr) throw updateErr;
 
       await supabaseAdmin.from('portal_users').upsert({
-        id: existingPortal.id,
+        id: portalUserId,
         email: portalLoginEmail,
         name: `${input.firstName} ${input.lastName}`,
         role: 'employee',
@@ -148,11 +158,18 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
     };
   }
 
-  const recipientEmail = (input.email ?? '').trim();
+  // Send to personal + work (deduped). Both belong to the same employee.
+  const recipients = [...new Set([personalEmail, workEmail].filter(Boolean))];
+  if (recipients.length === 0) {
+    return {
+      credentialsReady: true, emailSent: false,
+      warning: 'Login was created but there is no email address to send the credentials to.',
+      loginEmail: portalLoginEmail, tempPassword,
+    };
+  }
   try {
-    // Send credentials to personal email (input.email), login is portalLoginEmail
     await sendWelcomeEmail({
-      to: recipientEmail,
+      to: recipients,
       firstName: input.firstName,
       lastName: input.lastName,
       displayId: emp.display_id ?? emp.id?.slice(0, 8) ?? empId.slice(0, 8),
@@ -165,12 +182,12 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       loginEmail: portalLoginEmail,
       tempPassword,
     });
-    console.log('[mailer] credentials email sent to', recipientEmail, '(login:', portalLoginEmail, ')');
+    console.log('[mailer] credentials email sent to', recipients.join(', '), '(login:', portalLoginEmail, ')');
     return { credentialsReady: true, emailSent: true, loginEmail: portalLoginEmail };
   } catch (err: any) {
-    // Rich detail so ops can see WHY a specific recipient failed (bad address vs
-    // throttle vs auth) — the generic message alone made this undiagnosable.
-    console.error('[mailer] credentials email FAILED for', recipientEmail, {
+    // Rich detail so ops can see WHY a recipient failed (bad address vs throttle
+    // vs auth) — the generic message alone made this undiagnosable.
+    console.error('[mailer] credentials email FAILED for', recipients.join(', '), {
       code: err?.code, responseCode: err?.responseCode, response: err?.response,
       rejected: err?.rejected, message: err?.message,
     });
@@ -396,7 +413,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string) {
   const { data: existing, error: findErr } = await supabaseAdmin
     .from('employees')
-    .select('id, display_id')
+    .select('id, display_id, email, work_email')
     .eq('id', id)
     .is('deleted_at', null)
     .single();
@@ -477,27 +494,20 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 
   if (error) throw error;
 
-  // Keep the portal login in sync when the login email changes. The login email
-  // is the work email if set, otherwise the personal email. Without this, editing
-  // the email updated only the employees table — the old address stayed the login
-  // and the new one couldn't sign in (and HR thought "the email didn't work").
-  if (input.workEmail !== undefined || input.email !== undefined) {
+  // If an email changed, automatically (re-)send the credentials to the new
+  // address(es). resendCredentials → issueCredentials links the login by
+  // employee_id, so it updates the existing login's email + password and emails
+  // BOTH the personal and work addresses. This is what HR expects: "edit the
+  // email → the new mailbox gets the login credentials." Best-effort; a send
+  // failure must not fail the update.
+  const personalChanged = input.email !== undefined && (input.email ?? '') !== (existing.email ?? '');
+  const workChanged     = input.workEmail !== undefined && (input.workEmail ?? '') !== (existing.work_email ?? '');
+  if (personalChanged || workChanged) {
     try {
-      const newLoginEmail = ((emp.work_email ?? emp.email) ?? '').trim();
-      if (newLoginEmail) {
-        const { data: pu } = await supabaseAdmin
-          .from('portal_users').select('id, email').eq('employee_id', id).maybeSingle();
-        if (pu?.id && pu.email !== newLoginEmail) {
-          const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(pu.id, {
-            email: newLoginEmail, email_confirm: true,
-          });
-          if (authErr) throw authErr;
-          await supabaseAdmin.from('portal_users').update({ email: newLoginEmail }).eq('id', pu.id);
-          console.log('[updateEmployee] synced login email for', id, '→', newLoginEmail);
-        }
-      }
+      await resendCredentials(id, actorId);
+      console.log('[updateEmployee] email changed → re-sent credentials for', id);
     } catch (err) {
-      console.error('[updateEmployee] login email sync failed for', id, err);
+      console.error('[updateEmployee] auto-resend credentials failed for', id, err);
     }
   }
 

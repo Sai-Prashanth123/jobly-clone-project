@@ -87,7 +87,7 @@ export async function verifyMailer(): Promise<void> {
 }
 
 export interface WelcomeEmailPayload {
-  to: string;
+  to: string | string[];
   firstName: string;
   lastName: string;
   displayId: string;
