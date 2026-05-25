@@ -12,6 +12,8 @@ interface AuthContextValue {
   // Called after a successful (forced) password reset so the in-memory + stored
   // session reflects that the user no longer needs to reset.
   markPasswordResetComplete: () => void;
+  // Called after the employee finishes self-onboarding so the gate releases.
+  markOnboardingComplete: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -85,6 +87,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   };
 
+  const markOnboardingComplete = () => {
+    setSession(prev => {
+      if (!prev) return prev;
+      const updated = { ...prev, user: { ...prev.user, onboardingComplete: true } };
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const logout = () => {
     apiClient.post('/auth/logout').catch(err => console.warn('[auth] logout endpoint failed', err));
     setSession(null);
@@ -104,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         login,
         logout,
         markPasswordResetComplete,
+        markOnboardingComplete,
       }}
     >
       {children}

@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
+import { OnboardingBar } from '../../components/employees/OnboardingProgress';
 import { formatDate } from '../../lib/utils';
 import { useEmployees } from '../../hooks/useEmployees';
 import {
@@ -286,6 +287,9 @@ export function HRDashboard() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
+                  {emp.status === 'onboarding' && emp.onboarding && (
+                    <div className="hidden sm:block w-24"><OnboardingBar onboarding={emp.onboarding} /></div>
+                  )}
                   <div>
                     <p className="text-xs text-muted-foreground">Started</p>
                     <p className="text-xs font-medium">{formatDate(emp.startDate)}</p>

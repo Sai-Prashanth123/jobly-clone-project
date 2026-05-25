@@ -35,6 +35,15 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       throw new UnauthorizedError('User profile not found. Contact your administrator.');
     }
 
+    // Employees must finish self-onboarding before full access; everyone else is
+    // never gated. Surfaced to the frontend gate (mirrors mustResetPassword).
+    let onboardingComplete = true;
+    if (portalUser.role === 'employee' && portalUser.employee_id) {
+      const { data: emp } = await supabaseAdmin
+        .from('employees').select('onboarding_completed_at').eq('id', portalUser.employee_id).maybeSingle();
+      onboardingComplete = !!emp?.onboarding_completed_at;
+    }
+
     res.json({
       success: true,
       data: {
@@ -49,6 +58,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
           employeeId: portalUser.employee_id ?? undefined,
           avatarInitials: portalUser.avatar_initials,
           mustResetPassword: portalUser.must_reset_password ?? false,
+          onboardingComplete,
         },
       },
     });

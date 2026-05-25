@@ -62,7 +62,14 @@ export async function update(req: Request, res: Response, next: NextFunction): P
     if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
       throw new ForbiddenError('Employees may only edit their own profile');
     }
-    const data = await svc.updateEmployee(req.params.id, req.body as UpdateEmployeeInput, req.user?.id);
+    const data = await svc.updateEmployee(req.params.id, req.body as UpdateEmployeeInput, req.user?.id, req.user?.role);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function completeOnboarding(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.completeOnboarding(req.params.id, req.user!.role, req.user?.employeeId, req.user?.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

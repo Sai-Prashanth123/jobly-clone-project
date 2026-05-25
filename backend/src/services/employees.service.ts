@@ -1,8 +1,9 @@
 import { supabaseAdmin } from '../config/supabase';
-import { ConflictError, NotFoundError } from '../lib/errors';
+import { ConflictError, NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
+import { computeOnboarding } from '../lib/onboarding';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
@@ -35,7 +36,30 @@ export async function listEmployees(query: ListEmployeesQuery) {
   const { data, error, count } = await q;
   if (error) throw error;
 
-  return { data: (data ?? []).map(serializeEmployee), total: count ?? 0 };
+  const rows = data ?? [];
+  // One aggregate query for the page's document types so each row can carry its
+  // onboarding completeness % (list rows don't otherwise include documents).
+  const ids = rows.map(r => r.id);
+  const typesByEmp = new Map<string, Set<string>>();
+  if (ids.length) {
+    const { data: docs } = await supabaseAdmin
+      .from('documents')
+      .select('entity_id, type')
+      .eq('entity_type', 'employee')
+      .in('entity_id', ids);
+    for (const d of docs ?? []) {
+      if (!typesByEmp.has(d.entity_id)) typesByEmp.set(d.entity_id, new Set());
+      typesByEmp.get(d.entity_id)!.add(d.type);
+    }
+  }
+
+  return {
+    data: rows.map(r => ({
+      ...serializeEmployee(r),
+      onboarding: computeOnboarding(r, typesByEmp.get(r.id) ?? new Set()),
+    })),
+    total: count ?? 0,
+  };
 }
 
 // ── getOne ───────────────────────────────────────────────────────────────────
@@ -56,7 +80,13 @@ export async function getEmployee(id: string) {
     .eq('entity_type', 'employee')
     .eq('entity_id', id);
 
-  return { ...serializeEmployee(emp), documents: docs ?? [] };
+  const docList = docs ?? [];
+  const docTypes = new Set<string>(docList.map((d: any) => d.type));
+  return {
+    ...serializeEmployee(emp),
+    documents: docList,
+    onboarding: computeOnboarding(emp, docTypes),
+  };
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────
@@ -453,7 +483,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
 
 // ── update ───────────────────────────────────────────────────────────────────
 
-export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string) {
+export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, actorRole?: string) {
   const { data: existing, error: findErr } = await supabaseAdmin
     .from('employees')
     .select('id, display_id, email, work_email')
@@ -528,6 +558,19 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.bloodGroup !== undefined)           patch.blood_group           = input.bloodGroup;
   if (input.identityDocuments !== undefined)    patch.identity_documents    = input.identityDocuments;
 
+  // When an EMPLOYEE edits their own record (self-onboarding / profile edit),
+  // HR/legal/pay fields are off-limits — strip them so a self-update can never
+  // change pay, SSN, visa, I-9, status, employment terms, or the login email.
+  if (actorRole === 'employee') {
+    const HR_ONLY = [
+      'pay_rate', 'pay_type', 'payment_type', 'bank_name', 'bank_routing_number',
+      'bank_account_number', 'tax_form_type', 'ssn', 'visa_type', 'visa_expiry',
+      'i9_status', 'employment_type', 'status', 'reporting_manager_id',
+      'department', 'job_title', 'start_date', 'work_location', 'email', 'work_email',
+    ];
+    for (const k of HR_ONLY) delete patch[k];
+  }
+
   const { data: emp, error } = await supabaseAdmin
     .from('employees')
     .update(patch)
@@ -544,7 +587,9 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   // notifying them of the change. Best-effort; a failure must not fail the update.
   const personalChanged = input.email !== undefined && (input.email ?? '') !== (existing.email ?? '');
   const workChanged     = input.workEmail !== undefined && (input.workEmail ?? '') !== (existing.work_email ?? '');
-  if (personalChanged || workChanged) {
+  // Email is HR-owned (stripped from an employee's own patch above), so only act
+  // on a real email change made by HR/admin.
+  if ((personalChanged || workChanged) && actorRole !== 'employee') {
     try {
       const { data: pu } = await supabaseAdmin
         .from('portal_users')
@@ -601,6 +646,41 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 
   logActivity(actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8));
   return serializeEmployee(emp);
+}
+
+// ── onboarding completion ──────────────────────────────────────────────────────
+// Finalizes self-onboarding: server-side re-validates the full checklist (so the
+// gate can't be skipped), stamps onboarding_completed_at, and auto-activates the
+// employee (status onboarding → active). An employee may only complete their own.
+export async function completeOnboarding(id: string, actorRole?: string, actorEmployeeId?: string, actorId?: string) {
+  if (actorRole === 'employee' && actorEmployeeId !== id) {
+    throw new ForbiddenError('You may only complete your own onboarding');
+  }
+
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('*').eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+
+  const { data: docs } = await supabaseAdmin
+    .from('documents').select('type').eq('entity_type', 'employee').eq('entity_id', id);
+  const docTypes = new Set<string>((docs ?? []).map((d: any) => d.type));
+
+  const result = computeOnboarding(emp, docTypes);
+  if (!result.complete) {
+    throw new ValidationError(`Onboarding is incomplete. Still required: ${result.missing.join(', ')}`);
+  }
+
+  const patch: Record<string, any> = { onboarding_completed_at: new Date().toISOString() };
+  if (emp.status === 'onboarding') patch.status = 'active'; // auto-activate on completion
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from('employees').update(patch).eq('id', id).select().single();
+  if (updErr) throw updErr;
+
+  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'onboarding_completed' });
+
+  const { data: docList } = await supabaseAdmin
+    .from('documents').select('*').eq('entity_type', 'employee').eq('entity_id', id);
+  return { ...serializeEmployee(updated), documents: docList ?? [], onboarding: computeOnboarding(updated, docTypes) };
 }
 
 // ── delete ───────────────────────────────────────────────────────────────────

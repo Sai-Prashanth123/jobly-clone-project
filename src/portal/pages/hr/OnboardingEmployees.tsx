@@ -6,6 +6,7 @@ import { DataTable, type Column } from '../../components/shared/DataTable';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { useEmployees } from '../../hooks/useEmployees';
 import { isOnboarding } from '../../lib/employeeSegments';
+import { OnboardingBar } from '../../components/employees/OnboardingProgress';
 import { formatDate } from '../../lib/utils';
 import type { Employee } from '../../types';
 
@@ -31,6 +32,13 @@ export default function OnboardingEmployees() {
         </div>
       ),
       getValue: e => `${e.firstName} ${e.lastName}`,
+      sortable: true,
+    },
+    {
+      key: 'profile',
+      header: 'Profile %',
+      render: e => <OnboardingBar onboarding={e.onboarding} />,
+      getValue: e => String(e.onboarding?.percent ?? 0),
       sortable: true,
     },
     {

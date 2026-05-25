@@ -8,6 +8,7 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { useEmployees } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
+import { OnboardingBar } from '../components/employees/OnboardingProgress';
 import { formatDate } from '../lib/utils';
 import type { Employee } from '../types';
 
@@ -81,6 +82,14 @@ export default function Employees() {
       header: 'Status',
       render: e => <StatusBadge status={e.status} />,
       getValue: e => e.status,
+      sortable: true,
+    },
+    {
+      key: 'profile',
+      header: 'Profile',
+      hideOnMobile: true,
+      render: e => <OnboardingBar onboarding={e.onboarding} />,
+      getValue: e => String(e.onboarding?.percent ?? 0),
       sortable: true,
     },
   ];

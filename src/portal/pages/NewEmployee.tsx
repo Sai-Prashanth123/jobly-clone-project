@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
   User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
-  AlertTriangle, X,
+  AlertTriangle, X, LogOut,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '../components/shared/PageHeader';
-import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee } from '../hooks/useEmployees';
+import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput } from '../lib/utils';
@@ -328,13 +328,16 @@ export default function NewEmployee() {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams<{ id?: string }>();
-  const { user } = useAuth();
+  const { user, logout, markOnboardingComplete } = useAuth();
   const queryClient = useQueryClient();
 
   // Self-edit: an employee editing their own profile lands here via
   // /portal/profile/edit (no :id in the URL). Fall back to their own
   // employeeId so the form prefills and saves against their own record.
-  const isSelfEdit = !params.id && location.pathname.startsWith('/portal/profile');
+  // Onboarding mode: a new hire completing their own profile at /portal/onboarding
+  // (full-screen, outside the layout). Treated as a self-edit of their own record.
+  const isOnboarding = location.pathname.replace(/\/$/, '') === '/portal/onboarding';
+  const isSelfEdit = isOnboarding || (!params.id && location.pathname.startsWith('/portal/profile'));
   const editId = params.id ?? (isSelfEdit ? user?.employeeId : undefined);
   const isEditMode = !!editId;
 
@@ -344,6 +347,7 @@ export default function NewEmployee() {
 
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee(editId ?? '');
+  const completeOnboarding = useCompleteOnboarding(editId ?? '');
   const { data: existingEmployee, isLoading: loadingEmployee } = useEmployee(editId);
   const { data: employeesData } = useEmployees({ limit: 500 }, { enabled: canListEmployees });
 
@@ -738,6 +742,24 @@ export default function NewEmployee() {
         queryClient.invalidateQueries({ queryKey: ['employees', emp.id] });
       }
 
+      if (isOnboarding) {
+        // Finalize onboarding — the backend re-validates the full checklist and
+        // auto-activates. On success the gate releases; on incomplete it returns
+        // the exact list of what's still missing.
+        try {
+          await completeOnboarding.mutateAsync();
+          markOnboardingComplete();
+          toast.success('Profile complete — welcome aboard!');
+          navigate('/portal/dashboard', { replace: true });
+        } catch (e: any) {
+          const msg = e?.response?.data?.error
+            ?? 'Some required details are still missing. Please complete every section, then click Finish.';
+          setSubmitError(msg);
+          toast.error(msg, { duration: 12000 });
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+        return;
+      }
       if (isSelfEdit) {
         toast.success('Your profile was updated.');
         navigate('/portal/profile', { replace: true });
@@ -790,7 +812,7 @@ export default function NewEmployee() {
   // don't briefly render an empty form and then snap-in the prefill.
   if (isEditMode && loadingEmployee) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className={isOnboarding ? 'portal-scope min-h-screen flex items-center justify-center bg-gray-50' : 'flex items-center justify-center py-20'}>
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
       </div>
     );
@@ -828,15 +850,49 @@ export default function NewEmployee() {
     : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
 
   return (
-    <div className="pb-32"> {/* leave room for sticky action bar */}
-      <Link to={backTo} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3">
-        <ArrowLeft className="h-3 w-3" /> {backLabel}
-      </Link>
-      <PageHeader
-        eyebrow={isSelfEdit ? 'My Profile' : isEditMode ? 'HR · Edit' : 'HR · Onboarding'}
-        title={pageTitle}
-        description={pageDescription}
-      />
+    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-32' : 'pb-32'}>
+      {isOnboarding ? (
+        <div className="mb-5">
+          <div className="flex items-start justify-between gap-3 mb-3">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#4069FF]">Welcome to Jobly</p>
+              <h1 className="text-xl font-semibold text-gray-900">Complete your profile</h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                Fill in the sections below, then click <strong>Finish onboarding</strong>. This one-time step is
+                required before you can use the portal.
+              </p>
+            </div>
+            <Button variant="ghost" size="sm" onClick={logout} className="gap-1.5 text-muted-foreground flex-shrink-0">
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
+          </div>
+          {existingEmployee?.onboarding && (
+            <div className="rounded-xl border border-gray-200 bg-white p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Profile completion</span>
+                <span className="text-sm font-bold tabular-nums text-[#4069FF]">{existingEmployee.onboarding.percent}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all" style={{ width: `${existingEmployee.onboarding.percent}%` }} />
+              </div>
+              {existingEmployee.onboarding.missing.length > 0 && (
+                <p className="text-xs text-muted-foreground mt-2">Still needed: {existingEmployee.onboarding.missing.join(' · ')}</p>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <Link to={backTo} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3">
+            <ArrowLeft className="h-3 w-3" /> {backLabel}
+          </Link>
+          <PageHeader
+            eyebrow={isSelfEdit ? 'My Profile' : isEditMode ? 'HR · Edit' : 'HR · Onboarding'}
+            title={pageTitle}
+            description={pageDescription}
+          />
+        </>
+      )}
 
       {submitError && (
         <div
@@ -1692,17 +1748,19 @@ export default function NewEmployee() {
               </div>
             </div>
           </div>
-          <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending}>
-            Cancel
-          </Button>
+          {!isOnboarding && (
+            <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending}>
+              Cancel
+            </Button>
+          )}
           <Button
             onClick={handleSubmit}
-            loading={submitMutation.isPending}
-            loadingText={isEditMode ? 'Saving…' : 'Creating…'}
+            loading={submitMutation.isPending || completeOnboarding.isPending}
+            loadingText={isOnboarding ? 'Finishing…' : isEditMode ? 'Saving…' : 'Creating…'}
             className="gap-2"
           >
             <CheckCircle2 className="h-4 w-4" />
-            {isEditMode ? 'Save Changes' : 'Create Employee'}
+            {isOnboarding ? 'Finish onboarding' : isEditMode ? 'Save Changes' : 'Create Employee'}
           </Button>
         </div>
       </div>

@@ -14,6 +14,9 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   const location = useLocation();
   const mustReset = !!user?.mustResetPassword;
   const isForceResetRoute = location.pathname.endsWith('/force-password-reset');
+  // Exact match — '/portal/hr/onboarding' (HR drill-down) must NOT count here.
+  const isOnboardingRoute = location.pathname.replace(/\/$/, '') === '/portal/onboarding';
+  const needsOnboarding = user?.role === 'employee' && user?.onboardingComplete === false;
   const denied = !!(allowedRoles && user && !allowedRoles.includes(user.role));
   const toastShown = useRef(false);
 
@@ -38,6 +41,15 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }
   // Once they've reset, don't let them linger on the force-reset screen.
   if (!mustReset && isForceResetRoute) {
+    return <Navigate to="/portal/dashboard" replace />;
+  }
+
+  // After the password reset, a new hire must finish self-onboarding before
+  // reaching anything else; once done, don't keep them on the onboarding screen.
+  if (!mustReset && needsOnboarding && !isOnboardingRoute) {
+    return <Navigate to="/portal/onboarding" replace />;
+  }
+  if (!needsOnboarding && isOnboardingRoute) {
     return <Navigate to="/portal/dashboard" replace />;
   }
 

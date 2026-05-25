@@ -61,6 +61,9 @@ export interface PortalUser {
   // their own before getting any other access (enforced by the backend gate +
   // the ProtectedRoute force-reset redirect).
   mustResetPassword?: boolean;
+  // False while an employee still has to finish self-onboarding (gates the
+  // dashboard via ProtectedRoute). Always true/undefined for non-employee roles.
+  onboardingComplete?: boolean;
 }
 
 // Added for real backend: UUID is the primary id, displayId is human-readable (EMP-0001)
@@ -76,6 +79,19 @@ export interface EmployeeDocument {
   type: string;
   uploadedAt: string;
   url?: string;
+}
+
+export interface OnboardingChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+}
+
+export interface OnboardingStatus {
+  percent: number;       // 0..100
+  complete: boolean;
+  missing: string[];     // labels of incomplete required items
+  items: OnboardingChecklistItem[];
 }
 
 // Onboarding-form education + work-history rows. Stored as JSONB on the
@@ -168,6 +184,9 @@ export interface Employee {
   reportingManagerId?: string;
   workEmail?: string;
   documents: EmployeeDocument[];
+
+  // Onboarding completeness (computed server-side). Present on list + detail.
+  onboarding?: OnboardingStatus;
 
   // Onboarding-form extension fields (migration 005). All optional.
   middleName?: string;

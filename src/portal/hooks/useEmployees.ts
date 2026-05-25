@@ -83,6 +83,8 @@ function mapEmployee(raw: any): Employee {
     bloodGroup: raw.blood_group ?? undefined,
     identityDocuments: Array.isArray(raw.identity_documents) ? raw.identity_documents : [],
 
+    onboarding: raw.onboarding ?? undefined,
+
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };
@@ -174,6 +176,22 @@ export function useDeleteEmployee() {
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/employees/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+  });
+}
+
+// Finalize self-onboarding — backend re-validates the checklist and auto-activates.
+// Throws (400) with a message listing what's still missing if incomplete.
+export function useCompleteOnboarding(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post(`/employees/${id}/onboarding/complete`, {});
+      return mapEmployee(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees', id] });
+    },
   });
 }
 

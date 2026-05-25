@@ -75,6 +75,18 @@ export default function PortalApp() {
             }
           />
 
+          {/* Authenticated but OUTSIDE the layout — the forced self-onboarding
+              flow. NewEmployee renders in "onboarding mode" (full-screen, self-
+              edit). ProtectedRoute pins incomplete employees here. */}
+          <Route
+            path="onboarding"
+            element={
+              <ProtectedRoute>
+                <NewEmployee />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Protected — wrapped in layout */}
           <Route
             element={

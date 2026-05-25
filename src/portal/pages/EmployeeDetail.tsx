@@ -12,6 +12,7 @@ import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useRes
 import { useAssignments } from '../hooks/useAssignments';
 import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
+import { OnboardingChecklist } from '../components/employees/OnboardingProgress';
 import { formatDate, formatCurrency } from '../lib/utils';
 
 export default function EmployeeDetail() {
@@ -166,6 +167,13 @@ export default function EmployeeDetail() {
           )}
         </div>
       </div>
+
+      {employee.onboarding && (employee.status === 'onboarding' || !employee.onboarding.complete) && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">Onboarding</CardTitle></CardHeader>
+          <CardContent><OnboardingChecklist onboarding={employee.onboarding} /></CardContent>
+        </Card>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="md:col-span-2 lg:col-span-2">
