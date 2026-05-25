@@ -245,11 +245,9 @@ const defaultForm: FormState = {
   department: '', jobTitle: '',
   employmentType: 'w2',
   startDate: '',
-  // Default to Active so HR doesn't have to click "Approve Onboarding" on the
-  // detail page afterwards — credentials get sent at creation time, so the
-  // employee is immediately usable. HR can still pick Onboarding for cases
-  // where paperwork isn't done yet.
-  status: 'active' as Employee['status'],
+  // New hires start in Onboarding — they self-complete their profile after
+  // logging in and then auto-activate. (The backend also forces this on create.)
+  status: 'onboarding' as Employee['status'],
   reportingManagerId: '',
   workLocation: '',
   visaType: '',
@@ -504,39 +502,18 @@ export default function NewEmployee() {
       if (!firstSection) firstSection = section;
     };
 
+    // HR only has to provide first name, last name, and personal email at
+    // creation. Everything else is completed by the employee during
+    // self-onboarding (or by HR later via edit), so it's optional here.
     if (!form.firstName.trim()) flag('firstName', 'First name is required', SECTION_IDS.personal);
     if (!form.lastName.trim())  flag('lastName',  'Last name is required',  SECTION_IDS.personal);
-    if (!form.dob)              flag('dob',       'Date of birth is required', SECTION_IDS.personal);
 
     if (!form.email.trim())     flag('email',     'Personal email is required', SECTION_IDS.contact);
     else if (!/^\S+@\S+\.\S+$/.test(form.email)) flag('email', 'Enter a valid email', SECTION_IDS.contact);
-    if (form.workEmail && !/^\S+@\S+\.\S+$/.test(form.workEmail)) flag('workEmail', 'Enter a valid email', SECTION_IDS.contact);
-    if (!form.phone.trim())     flag('phone',     'Phone is required',      SECTION_IDS.contact);
+    if (form.workEmail && !/^\S+@\S+\.\S+$/.test(form.workEmail)) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
 
-    if (!form.address.street.trim()) flag('addressStreet', 'Street is required', SECTION_IDS.presentAddr);
-    if (!form.address.city.trim())   flag('addressCity',   'City is required',   SECTION_IDS.presentAddr);
-    if (!form.address.state.trim())  flag('addressState',  'State is required',  SECTION_IDS.presentAddr);
-    if (!form.address.zip.trim())    flag('addressZip',    'ZIP is required',    SECTION_IDS.presentAddr);
-
-    if (!form.startDate)        flag('startDate', 'Start date is required', SECTION_IDS.employment);
-
-    if (!form.visaType)         flag('visaType',  'Visa type is required',  SECTION_IDS.immigration);
-    if (!form.visaExpiry)       flag('visaExpiry','Work authorization expiry is required', SECTION_IDS.immigration);
-    if (!form.i9Status)         flag('i9Status',  'I-9 status is required', SECTION_IDS.immigration);
-    if (!/^\d{4}$/.test(form.ssn)) flag('ssn',    'SSN must be exactly 4 digits', SECTION_IDS.immigration);
-
-    if (!form.emergencyContact.name.trim())  flag('emergencyName',  'Emergency contact name is required',  SECTION_IDS.emergency);
-    if (!form.emergencyContact.phone.trim()) flag('emergencyPhone', 'Emergency contact phone is required', SECTION_IDS.emergency);
-
-    const payRateNum = parseNumberInput(form.payRate);
-    if (payRateNum === undefined || payRateNum <= 0) flag('payRate', 'Pay rate must be greater than 0', SECTION_IDS.payroll);
-
-    // Declaration / signature are only collected on first-time onboarding,
-    // not when HR is editing an already-onboarded employee.
-    if (!isEditMode) {
-      if (!form.declarationAccepted) flag('declaration', 'Please accept the declaration', SECTION_IDS.review);
-      if (!form.signatureName.trim()) flag('signatureName', 'Type your full name as signature', SECTION_IDS.review);
-    }
+    // Optional fields: only validate format when actually filled in.
+    if (form.ssn && !/^\d{4}$/.test(form.ssn)) flag('ssn', 'SSN must be exactly 4 digits', SECTION_IDS.immigration);
 
     setErrors(e);
     return { ok: Object.keys(e).length === 0, firstErrorSectionId: firstSection };
@@ -994,7 +971,7 @@ export default function NewEmployee() {
                   <FieldError msg={errors.lastName} />
                 </div>
                 <div>
-                  <Label>Date of Birth <RequiredMark /></Label>
+                  <Label>Date of Birth</Label>
                   <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
                   <FieldError msg={errors.dob} />
                 </div>
@@ -1074,7 +1051,7 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>Mobile Phone <RequiredMark /></Label>
+                <Label>Mobile Phone</Label>
                 <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
                 <FieldError msg={errors.phone} />
               </div>
@@ -1105,17 +1082,17 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
               <div className="sm:col-span-6">
-                <Label>Street Address <RequiredMark /></Label>
+                <Label>Street Address</Label>
                 <Input value={form.address.street} onChange={e => setAddress('street', e.target.value)} />
                 <FieldError msg={errors.addressStreet} />
               </div>
               <div className="sm:col-span-3">
-                <Label>City <RequiredMark /></Label>
+                <Label>City</Label>
                 <Input value={form.address.city} onChange={e => setAddress('city', e.target.value)} />
                 <FieldError msg={errors.addressCity} />
               </div>
               <div className="sm:col-span-2">
-                <Label>State <RequiredMark /></Label>
+                <Label>State</Label>
                 <Select value={form.address.state} onValueChange={v => setAddress('state', v)}>
                   <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
                   <SelectContent className="max-h-[280px]">
@@ -1125,7 +1102,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.addressState} />
               </div>
               <div className="sm:col-span-1">
-                <Label>ZIP <RequiredMark /></Label>
+                <Label>ZIP</Label>
                 <Input value={form.address.zip} onChange={e => setAddress('zip', e.target.value)} placeholder="94103" />
                 <FieldError msg={errors.addressZip} />
               </div>
@@ -1211,7 +1188,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Start Date <RequiredMark /></Label>
+                <Label>Start Date</Label>
                 <Input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
                 <FieldError msg={errors.startDate} />
               </div>
@@ -1253,7 +1230,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Visa Type <RequiredMark /></Label>
+                <Label>Visa Type</Label>
                 <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1263,12 +1240,12 @@ export default function NewEmployee() {
                 <FieldError msg={errors.visaType} />
               </div>
               <div>
-                <Label>Work Authorization Expiry <RequiredMark /></Label>
+                <Label>Work Authorization Expiry</Label>
                 <Input type="date" value={form.visaExpiry} onChange={e => set('visaExpiry', e.target.value)} />
                 <FieldError msg={errors.visaExpiry} />
               </div>
               <div>
-                <Label>I-9 Status <RequiredMark /></Label>
+                <Label>I-9 Status</Label>
                 <Select value={form.i9Status || ''} onValueChange={v => set('i9Status', v as FormState['i9Status'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1278,7 +1255,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.i9Status} />
               </div>
               <div>
-                <Label>SSN — Last 4 digits <RequiredMark /></Label>
+                <Label>SSN — Last 4 digits</Label>
                 <Input
                   value={form.ssn}
                   onChange={e => set('ssn', e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -1526,7 +1503,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Contact Name <RequiredMark /></Label>
+                <Label>Contact Name</Label>
                 <Input value={form.emergencyContact.name} onChange={e => setEmergency('name', e.target.value)} />
                 <FieldError msg={errors.emergencyName} />
               </div>
@@ -1540,7 +1517,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Mobile Phone <RequiredMark /></Label>
+                <Label>Mobile Phone</Label>
                 <Input value={form.emergencyContact.phone} onChange={e => setEmergency('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
                 <FieldError msg={errors.emergencyPhone} />
               </div>
@@ -1566,7 +1543,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Pay Rate (USD) <RequiredMark /></Label>
+                <Label>Pay Rate (USD)</Label>
                 <Input
                   type="number"
                   min={0}
@@ -1717,7 +1694,7 @@ export default function NewEmployee() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label>Signature (full name) <RequiredMark /></Label>
+                  <Label>Signature (full name)</Label>
                   <Input value={form.signatureName} onChange={e => set('signatureName', e.target.value)} placeholder="Type your full name" />
                   <FieldError msg={errors.signatureName} />
                 </div>

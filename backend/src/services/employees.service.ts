@@ -283,14 +283,17 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
         address_country:   input.address?.country ?? 'US',
         department:        input.department ?? '',
         job_title:         input.jobTitle ?? '',
-        employment_type:   input.employmentType,
-        start_date:        input.startDate,
-        status:            input.status ?? 'onboarding',
+        employment_type:   input.employmentType ?? 'contract',
+        // start_date is NOT NULL; default to today when HR didn't set it.
+        start_date:        input.startDate || new Date().toISOString().slice(0, 10),
+        // New hires ALWAYS start in onboarding — they auto-activate only after
+        // completing self-onboarding. (Ignore any status the form sent.)
+        status:            'onboarding',
         visa_type:         input.visaType ?? null,
         visa_expiry:       input.visaExpiry || null,
         i9_status:         input.i9Status ?? null,
-        pay_rate:          input.payRate,
-        pay_type:          input.payType,
+        pay_rate:          input.payRate ?? 0,
+        pay_type:          input.payType ?? 'hourly',
         work_location:     input.workLocation ?? null,
         ssn:               input.ssn ?? null,
         payment_type:      input.paymentType ?? null,
