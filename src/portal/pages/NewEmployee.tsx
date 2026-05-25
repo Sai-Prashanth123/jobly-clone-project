@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '../components/shared/PageHeader';
+import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
@@ -287,20 +288,24 @@ function ageFromDob(dob: string): number | null {
 // ── Small reusable bits ─────────────────────────────────────────────────────
 
 function SectionCard({
-  id, num, title, description, icon, children, complete,
-}: { id: string; num: string; title: string; description?: string; icon: React.ReactNode; children: React.ReactNode; complete?: boolean }) {
+  id, num, title, description, icon, children, complete, attention,
+}: { id: string; num: string; title: string; description?: string; icon: React.ReactNode; children: React.ReactNode; complete?: boolean; attention?: boolean }) {
+  // `attention` (a required onboarding item is still missing) takes visual
+  // precedence over `complete` so a section can't show green + red at once.
+  const needs = attention && !complete;
   return (
-    <Card id={id} className="scroll-mt-24 portal-animate-in">
+    <Card id={id} className={`scroll-mt-24 portal-animate-in ${needs ? 'ring-1 ring-red-300' : ''}`}>
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0 transition-colors ${complete ? 'bg-emerald-500 text-white' : 'bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white'}`}>
-            {complete ? <CheckCircle2 className="h-5 w-5" /> : num}
+          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0 transition-colors ${complete ? 'bg-emerald-500 text-white' : needs ? 'bg-red-500 text-white' : 'bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white'}`}>
+            {complete ? <CheckCircle2 className="h-5 w-5" /> : needs ? <AlertTriangle className="h-4 w-4" /> : num}
           </div>
           <div className="min-w-0 flex-1">
             <CardTitle className="text-base flex items-center gap-2">
               {icon}
               {title}
               {complete && <span className="ml-1 text-[11px] font-medium text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Complete</span>}
+              {needs && <span className="ml-1 text-[11px] font-medium text-red-600 inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Needs info</span>}
             </CardTitle>
             {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
           </div>
@@ -492,6 +497,37 @@ export default function NewEmployee() {
     [SECTION_IDS.payroll]:     (parseNumberInput(form.payRate) ?? 0) > 0,
     [SECTION_IDS.review]:      isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
   };
+
+  // Live self-onboarding checklist — mirrors the backend computeOnboarding so the
+  // wizard can show what's still missing in real time and highlight the relevant
+  // sections (no need to submit to find out). Drives the header chips + per-section
+  // red "Needs info" markers when in onboarding mode.
+  const ID_UPLOAD_LABELS = new Set([
+    'Social Security Number', "Driver's License", 'State-Issued ID', 'US Passport',
+    'Permanent Resident Card', 'Employment Authorization Document', 'ID Proof', 'Government ID',
+  ]);
+  const uploadedDocTypes = new Set<string>([
+    ...((existingEmployee?.documents ?? []).map(d => d.type)),
+    ...form.documents.filter(d => d.file).map(d => d.type),
+    ...IDENTITY_DOC_ROWS.filter(r => form.identityDocFiles[r.type]).map(r => r.label),
+  ]);
+  const permFilled = form.permanentSameAsPresent
+    ? [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim())
+    : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
+  const onboardingChecklist = [
+    { id: 'photo',     label: 'Profile photo',      section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview || !!existingEmployee?.profilePhotoUrl },
+    { id: 'personal',  label: 'Personal details',   section: SECTION_IDS.personal,      done: !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup },
+    { id: 'permanent', label: 'Permanent address',  section: SECTION_IDS.permanentAddr, done: permFilled },
+    { id: 'emergency', label: 'Emergency contact',  section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.phone.trim() },
+    { id: 'education', label: 'Education',           section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() !== '') },
+    { id: 'id_number', label: 'Government ID number', section: SECTION_IDS.identity,     done: form.identityDocuments.some(d => (d.number ?? '').trim() !== '') },
+    { id: 'id_upload', label: 'Government ID upload', section: SECTION_IDS.identity,     done: [...uploadedDocTypes].some(t => ID_UPLOAD_LABELS.has(t)) },
+    { id: 'resume',    label: 'Résumé upload',      section: SECTION_IDS.documents,     done: uploadedDocTypes.has('Resume') },
+  ];
+  const onbDone = onboardingChecklist.filter(c => c.done).length;
+  const onbPct = Math.round((onbDone / onboardingChecklist.length) * 100);
+  const onbIncompleteSections = new Set(onboardingChecklist.filter(c => !c.done).map(c => c.section));
+  const firstIncompleteSection = onboardingChecklist.find(c => !c.done)?.section;
 
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = (): { ok: boolean; firstErrorSectionId?: string } => {
@@ -730,10 +766,12 @@ export default function NewEmployee() {
           navigate('/portal/dashboard', { replace: true });
         } catch (e: any) {
           const msg = e?.response?.data?.error
-            ?? 'Some required details are still missing. Please complete every section, then click Finish.';
+            ?? 'Some required details are still missing. Please complete every highlighted section, then click Finish.';
           setSubmitError(msg);
           toast.error(msg, { duration: 12000 });
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          // Jump straight to the first still-incomplete section instead of the top.
+          if (firstIncompleteSection) scrollToSection(firstIncompleteSection);
+          else window.scrollTo({ top: 0, behavior: 'smooth' });
         }
         return;
       }
@@ -843,20 +881,31 @@ export default function NewEmployee() {
               <LogOut className="h-4 w-4" /> Sign out
             </Button>
           </div>
-          {existingEmployee?.onboarding && (
-            <div className="rounded-xl border border-gray-200 bg-white p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Profile completion</span>
-                <span className="text-sm font-bold tabular-nums text-[#4069FF]">{existingEmployee.onboarding.percent}%</span>
-              </div>
-              <div className="h-2 rounded-full bg-gray-100 overflow-hidden">
-                <div className="h-full rounded-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all" style={{ width: `${existingEmployee.onboarding.percent}%` }} />
-              </div>
-              {existingEmployee.onboarding.missing.length > 0 && (
-                <p className="text-xs text-muted-foreground mt-2">Still needed: {existingEmployee.onboarding.missing.join(' · ')}</p>
-              )}
+          <div className="rounded-xl border border-gray-200 bg-white p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Profile completion</span>
+              <span className="text-sm font-bold tabular-nums text-[#4069FF]">{onbPct}%</span>
             </div>
-          )}
+            <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-3">
+              <div className="h-full rounded-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all" style={{ width: `${onbPct}%` }} />
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {onboardingChecklist.map(item => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => scrollToSection(item.section)}
+                  className={`inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full border transition-colors ${item.done ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'bg-red-50 text-red-700 border-red-200 hover:bg-red-100'}`}
+                >
+                  {item.done ? <CheckCircle2 className="h-3 w-3" /> : <AlertTriangle className="h-3 w-3" />}
+                  {item.label}
+                </button>
+              ))}
+            </div>
+            {onbDone < onboardingChecklist.length && (
+              <p className="text-[11px] text-muted-foreground mt-2">Tap a red item to jump straight to that section.</p>
+            )}
+          </div>
         </div>
       ) : (
         <>
@@ -903,7 +952,8 @@ export default function NewEmployee() {
           {/* 01 Personal */}
           <SectionCard
             id={SECTION_IDS.personal}
-            complete={sectionComplete[SECTION_IDS.personal]}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.personal) : sectionComplete[SECTION_IDS.personal]}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.personal)}
             num="01"
             title="Personal Information"
             description="The basics. Profile photo is optional but recommended for the directory."
@@ -1116,6 +1166,8 @@ export default function NewEmployee() {
           {/* 04 Permanent Address */}
           <SectionCard
             id={SECTION_IDS.permanentAddr}
+            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.permanentAddr)}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.permanentAddr)}
             num="04"
             title="Permanent Address"
             description="Long-term mailing address (used for tax forms)."
@@ -1242,6 +1294,7 @@ export default function NewEmployee() {
               <div>
                 <Label>Work Authorization Expiry</Label>
                 <Input type="date" value={form.visaExpiry} onChange={e => set('visaExpiry', e.target.value)} />
+                {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />
               </div>
               <div>
@@ -1271,6 +1324,8 @@ export default function NewEmployee() {
           {/* 07 Identity & Documents (US) */}
           <SectionCard
             id={SECTION_IDS.identity}
+            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.identity)}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
             description="US-issued ID numbers + optional file copies. Used for I-9 verification and payroll tax forms."
@@ -1305,12 +1360,15 @@ export default function NewEmployee() {
                         </Select>
                       )}
                       {row.hasExpiry && (
-                        <Input
-                          type="date"
-                          value={doc.expiry ?? ''}
-                          onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
-                          placeholder="Expiry"
-                        />
+                        <div>
+                          <Input
+                            type="date"
+                            value={doc.expiry ?? ''}
+                            onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
+                            placeholder="Expiry"
+                          />
+                          {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
+                        </div>
                       )}
                     </div>
                     <div>
@@ -1349,6 +1407,8 @@ export default function NewEmployee() {
           {/* 08 Education */}
           <SectionCard
             id={SECTION_IDS.education}
+            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.education)}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.education)}
             num="08"
             title="Education"
             description="Add each qualification — most recent first."
@@ -1495,7 +1555,8 @@ export default function NewEmployee() {
           {/* 10 Emergency Contact */}
           <SectionCard
             id={SECTION_IDS.emergency}
-            complete={sectionComplete[SECTION_IDS.emergency]}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.emergency) : sectionComplete[SECTION_IDS.emergency]}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.emergency)}
             num="10"
             title="Emergency Contact"
             description="Used only if HR can't reach the employee in an emergency."
@@ -1615,6 +1676,8 @@ export default function NewEmployee() {
           {/* 12 Documents */}
           <SectionCard
             id={SECTION_IDS.documents}
+            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.documents)}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.documents)}
             num="12"
             title="Documents"
             description="Optional. Uploads happen after the employee is created."

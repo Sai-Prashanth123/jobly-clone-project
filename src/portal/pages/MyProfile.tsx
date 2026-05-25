@@ -9,6 +9,8 @@ import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { useEmployee } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
+import { ExpiryBadge } from '../components/shared/ExpiryBadge';
+import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency } from '../lib/utils';
 
 // Identity-doc type codes → the labels shown on the Add Employee form.
@@ -152,7 +154,13 @@ export default function MyProfile() {
             <CardHeader><CardTitle className="text-base">Immigration & I-9</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Field label="Visa Type" value={employee.visaType?.toUpperCase()} />
-              <Field label="Authorization Expiry" value={formatDate(employee.visaExpiry)} />
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Authorization Expiry</p>
+                <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
+                  <span>{formatDate(employee.visaExpiry)}</span>
+                  <ExpiryBadge date={employee.visaExpiry} />
+                </p>
+              </div>
               <Field label="I-9 Status" value={employee.i9Status} />
               <Field label="SSN (last 4)" value={employee.ssn ? `•••• ${employee.ssn}` : undefined} />
             </CardContent>
@@ -184,10 +192,13 @@ export default function MyProfile() {
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {identityDocs.map((d, i) => (
-                <div key={`${d.type}-${i}`} className="p-3 rounded-md bg-gray-50/60 border border-gray-100">
-                  <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
-                    {ID_DOC_LABELS[d.type] ?? d.type}
-                  </p>
+                <div key={`${d.type}-${i}`} className={`p-3 rounded-md border ${expiryStatus(d.expiry) === 'expired' ? 'bg-red-50/60 border-red-200' : expiryStatus(d.expiry) === 'expiring' ? 'bg-amber-50/60 border-amber-200' : 'bg-gray-50/60 border-gray-100'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+                      {ID_DOC_LABELS[d.type] ?? d.type}
+                    </p>
+                    <ExpiryBadge date={d.expiry} />
+                  </div>
                   <p className="text-sm font-medium text-gray-900 mt-0.5 font-mono">{d.number || '—'}</p>
                   {(d.state || d.expiry) && (
                     <p className="text-[11px] text-muted-foreground mt-0.5">
