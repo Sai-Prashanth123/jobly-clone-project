@@ -1,6 +1,8 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAnon, supabaseAdmin } from '../config/supabase';
 import { UnauthorizedError } from '../lib/errors';
+import { resetUserPassword } from '../services/admin.service';
+import type { ChangePasswordInput, ForgotPasswordInput } from '../schemas/auth.schema';
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -46,6 +48,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
           role: portalUser.role,
           employeeId: portalUser.employee_id ?? undefined,
           avatarInitials: portalUser.avatar_initials,
+          mustResetPassword: portalUser.must_reset_password ?? false,
         },
       },
     });
@@ -69,6 +72,65 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
 export async function me(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     res.json({ success: true, data: req.user });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Self-service password change. Serves BOTH the forced first-login reset and a
+// voluntary change. Verifies the current password (so a hijacked session can't
+// silently rotate it), sets the new one, and clears the must-reset flag.
+export async function changePassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { currentPassword, newPassword } = req.body as ChangePasswordInput;
+    const userId = req.user!.id;
+    const email = req.user!.email;
+
+    if (currentPassword === newPassword) {
+      res.status(400).json({ success: false, error: 'New password must be different from your current password.' });
+      return;
+    }
+
+    // Verify the current password by attempting a sign-in with the anon client.
+    const { error: signInErr } = await supabaseAnon.auth.signInWithPassword({ email, password: currentPassword });
+    if (signInErr) {
+      res.status(400).json({ success: false, error: 'Current password is incorrect.' });
+      return;
+    }
+
+    const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
+    if (updErr) throw updErr;
+
+    await supabaseAdmin
+      .from('portal_users')
+      .update({ must_reset_password: false, password_changed_at: new Date().toISOString() })
+      .eq('id', userId);
+
+    res.json({ success: true });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Self-service "Forgot password?". To avoid leaking which emails exist, ALWAYS
+// returns the same generic success. If the email maps to a portal user, we reuse
+// the admin reset (fresh temp + force first-login reset + email the temp).
+export async function forgotPassword(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email } = req.body as ForgotPasswordInput;
+    const normalized = email.trim().toLowerCase();
+
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id').eq('email', normalized).maybeSingle();
+    if (pu?.id) {
+      try {
+        await resetUserPassword(pu.id);
+      } catch (e) {
+        console.error('[auth.forgotPassword] reset failed for', normalized, e);
+      }
+    }
+
+    res.json({ success: true, message: 'If an account exists for that email, we’ve emailed reset instructions.' });
   } catch (err) {
     next(err);
   }

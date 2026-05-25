@@ -13,12 +13,13 @@ import {
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
   Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search, UserPlus,
-  CalendarCheck, CalendarClock,
+  CalendarCheck, CalendarClock, KeyRound,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmployee } from '../../hooks/useEmployees';
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../../hooks/useNotifications';
+import { ChangePasswordDialog } from '../auth/ChangePasswordDialog';
 import type { UserRole } from '../../types';
 
 interface NavItem {
@@ -68,6 +69,7 @@ export function PortalSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
   const [notifOpen, setNotifOpen] = useState(false);
+  const [changePwOpen, setChangePwOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
   const bellRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -306,6 +308,18 @@ export function PortalSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
+              onClick={() => setChangePwOpen(true)}
+              className="w-full rounded-lg text-gray-500 hover:text-[#4069FF] transition-colors duration-150 cursor-pointer"
+              style={{ background: 'transparent' }}
+            >
+              <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] w-full hover:bg-blue-50/70 transition-colors duration-150">
+                <KeyRound className="h-4 w-4" />
+                Change password
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
               onClick={logout}
               className="w-full rounded-lg text-gray-500 hover:text-red-600 transition-colors duration-150 cursor-pointer"
               style={{ background: 'transparent' }}
@@ -317,6 +331,8 @@ export function PortalSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
+
+        <ChangePasswordDialog open={changePwOpen} onOpenChange={setChangePwOpen} />
       </SidebarFooter>
     </Sidebar>
   );

@@ -109,6 +109,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
         role: 'employee',
         employee_id: empId,
         avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
+        must_reset_password: true,   // the temp password is first-login-only
       }, { onConflict: 'id' });
       if (upsertErr) throw upsertErr;
 
@@ -130,6 +131,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
           role: 'employee',
           employee_id: empId,
           avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
+          must_reset_password: true,   // the temp password is first-login-only
         });
         if (insertErr) throw insertErr;
         credentialsReady = true;
@@ -365,6 +367,45 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
     .single();
   if (error || !emp) throw new NotFoundError('Employee not found');
 
+  // If the employee has already completed their first-login reset (i.e. set
+  // their OWN password), do NOT regenerate a temp — that would overwrite the
+  // password they chose. Send an info letter (login email + portal link, no
+  // password) instead.
+  const { data: pu } = await supabaseAdmin
+    .from('portal_users')
+    .select('id, email, must_reset_password')
+    .eq('employee_id', employeeId)
+    .maybeSingle();
+
+  if (pu && pu.must_reset_password === false) {
+    const personalEmail = (emp.email ?? '').trim();
+    const workEmail = (emp.work_email ?? '').trim();
+    const loginEmail = (pu.email as string) || workEmail || personalEmail;
+    const recipients = [...new Set([personalEmail, workEmail].filter(Boolean))];
+    let emailSent = false;
+    let warning: string | undefined;
+    if (!mailerConfigured) {
+      warning = 'Mailer is not configured; no info letter was sent.';
+    } else if (recipients.length === 0) {
+      warning = 'No email address on file to send to.';
+    } else {
+      try {
+        await sendWelcomeEmail({
+          to: recipients,
+          firstName: emp.first_name,
+          lastName: emp.last_name,
+          loginEmail,
+          // no tempPassword → info-only letter (the account is already active)
+        });
+        emailSent = true;
+      } catch (err: any) {
+        warning = `Info letter could not be sent (${err?.code ?? ''} ${err?.message ?? 'send failed'}).`;
+      }
+    }
+    logActivity(actorId ?? null, 'updated', 'employee', emp.id, emp.display_id ?? `${emp.first_name} ${emp.last_name}`, { event: 'resent_welcome_info' });
+    return { credentialsReady: true, emailSent, warning, loginEmail };
+  }
+
   // Build a CreateEmployeeInput-shaped object from the stored row to reuse
   // issueCredentials. The fields not strictly needed for the email are set to
   // safe defaults — issueCredentials only reads the email/name/work fields.
@@ -496,20 +537,65 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 
   if (error) throw error;
 
-  // If an email changed, automatically (re-)send the credentials to the new
-  // address(es). resendCredentials → issueCredentials links the login by
-  // employee_id, so it updates the existing login's email + password and emails
-  // BOTH the personal and work addresses. This is what HR expects: "edit the
-  // email → the new mailbox gets the login credentials." Best-effort; a send
-  // failure must not fail the update.
+  // If an email changed, update the login accordingly — WITHOUT ever overwriting
+  // a password the employee chose. If they're still on the one-time temp (or have
+  // no login yet) we re-issue a fresh temp to the new address. If they've already
+  // set their own password, we only move the login email and keep their password,
+  // notifying them of the change. Best-effort; a failure must not fail the update.
   const personalChanged = input.email !== undefined && (input.email ?? '') !== (existing.email ?? '');
   const workChanged     = input.workEmail !== undefined && (input.workEmail ?? '') !== (existing.work_email ?? '');
   if (personalChanged || workChanged) {
     try {
-      await resendCredentials(id, actorId);
-      console.log('[updateEmployee] email changed → re-sent credentials for', id);
+      const { data: pu } = await supabaseAdmin
+        .from('portal_users')
+        .select('id, must_reset_password')
+        .eq('employee_id', id)
+        .maybeSingle();
+
+      if (!pu || pu.must_reset_password !== false) {
+        // No login yet, or still on the temp → re-issue temp creds to the new email.
+        await resendCredentials(id, actorId);
+        console.log('[updateEmployee] email changed → re-issued temp credentials for', id);
+      } else {
+        // User has their own password → move the login email only, keep password.
+        const newPersonal = (emp.email ?? '').trim();
+        const newWork = (emp.work_email ?? '').trim();
+        const newLoginEmail = newWork || newPersonal;
+        if (newLoginEmail) {
+          const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(
+            pu.id, { email: newLoginEmail, email_confirm: true },
+          );
+          if (authErr) throw authErr;
+          await supabaseAdmin.from('portal_users').update({ email: newLoginEmail }).eq('id', pu.id);
+
+          try {
+            await createNotification(
+              pu.id, 'Login email updated',
+              `Your Jobly login email is now ${newLoginEmail}. Your password is unchanged.`,
+              'info',
+            );
+          } catch { /* notification is best-effort */ }
+
+          const recipients = [...new Set([newPersonal, newWork].filter(Boolean))];
+          if (mailerConfigured && recipients.length) {
+            try {
+              await sendWelcomeEmail({
+                to: recipients,
+                firstName: emp.first_name,
+                lastName: emp.last_name,
+                loginEmail: newLoginEmail,
+                subject: 'Your Jobly login email has changed',
+                bodyIntro: 'Your Jobly Portal login email has been updated. Use the address below to log in next time &mdash; your password is unchanged.',
+              });
+            } catch (e) {
+              console.error('[updateEmployee] login-email-changed notice failed for', id, e);
+            }
+          }
+          console.log('[updateEmployee] email changed → moved login email (password kept) for', id);
+        }
+      }
     } catch (err) {
-      console.error('[updateEmployee] auto-resend credentials failed for', id, err);
+      console.error('[updateEmployee] email-change credential handling failed for', id, err);
     }
   }
 

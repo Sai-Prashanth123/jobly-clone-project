@@ -8,6 +8,7 @@ import { PortalLayout } from './components/layout/PortalLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 // Eager — small pages that are the first landing targets per area
 import Login from './pages/Login';
+import ForcePasswordReset from './pages/ForcePasswordReset';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import PortalClients from './pages/Clients';
@@ -60,6 +61,19 @@ export default function PortalApp() {
         <Routes>
           {/* Public */}
           <Route path="login" element={<Login />} />
+
+          {/* Authenticated but OUTSIDE the layout — the forced first-login
+              password reset. Its own ProtectedRoute keeps it auth-gated; the
+              shared ProtectedRoute logic pins must-reset users here and releases
+              them to the dashboard once done. */}
+          <Route
+            path="force-password-reset"
+            element={
+              <ProtectedRoute>
+                <ForcePasswordReset />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Protected — wrapped in layout */}
           <Route

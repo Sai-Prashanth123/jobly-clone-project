@@ -9,6 +9,7 @@ export interface AuthUser {
   role: string;
   employeeId?: string;
   avatarInitials?: string;
+  mustResetPassword: boolean;
 }
 
 declare global {
@@ -19,7 +20,7 @@ declare global {
   }
 }
 
-export async function authenticate(req: Request, _res: Response, next: NextFunction): Promise<void> {
+export async function authenticate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader?.startsWith('Bearer ')) {
@@ -51,7 +52,22 @@ export async function authenticate(req: Request, _res: Response, next: NextFunct
       role: portalUser.role,
       employeeId: portalUser.employee_id ?? undefined,
       avatarInitials: portalUser.avatar_initials ?? undefined,
+      mustResetPassword: portalUser.must_reset_password ?? false,
     };
+
+    // Hard gate: a user who still must reset their (temporary) password gets NO
+    // access beyond the endpoints required to do so. The temp password is
+    // login-only — full access is granted only after they set their own password.
+    const path = req.originalUrl.split('?')[0];
+    const allowedWhileReset = ['/auth/change-password', '/auth/logout', '/auth/me'];
+    if (req.user.mustResetPassword && !allowedWhileReset.some(p => path.endsWith(p))) {
+      res.status(403).json({
+        success: false,
+        code: 'PASSWORD_RESET_REQUIRED',
+        error: 'You must set a new password before continuing.',
+      });
+      return;
+    }
 
     next();
   } catch (err) {

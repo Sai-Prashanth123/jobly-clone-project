@@ -57,6 +57,10 @@ export interface PortalUser {
   role: UserRole;
   employeeId?: string;
   avatarInitials: string;
+  // True while the user is still on a one-time temporary password and must set
+  // their own before getting any other access (enforced by the backend gate +
+  // the ProtectedRoute force-reset redirect).
+  mustResetPassword?: boolean;
 }
 
 // Added for real backend: UUID is the primary id, displayId is human-readable (EMP-0001)

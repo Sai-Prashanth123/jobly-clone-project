@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Loader2 } from 'lucide-react';
+import { Edit, Loader2, KeyRound } from 'lucide-react';
+import { ChangePasswordDialog } from '../components/auth/ChangePasswordDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
@@ -23,6 +25,7 @@ export default function MyProfile() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: employee, isLoading } = useEmployee(user?.employeeId);
+  const [changePwOpen, setChangePwOpen] = useState(false);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -270,6 +273,21 @@ export default function MyProfile() {
           </CardContent>
         </Card>
       )}
+
+      <Card>
+        <CardHeader><CardTitle className="text-base">Security</CardTitle></CardHeader>
+        <CardContent className="flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="text-sm font-medium text-gray-900">Password</p>
+            <p className="text-xs text-muted-foreground">Change the password you use to sign in to Jobly.</p>
+          </div>
+          <Button variant="outline" onClick={() => setChangePwOpen(true)} className="gap-1.5">
+            <KeyRound className="h-4 w-4" /> Change password
+          </Button>
+        </CardContent>
+      </Card>
+
+      <ChangePasswordDialog open={changePwOpen} onOpenChange={setChangePwOpen} />
     </div>
   );
 }

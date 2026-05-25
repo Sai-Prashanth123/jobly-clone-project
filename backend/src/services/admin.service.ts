@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
+import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
 
 const VALID_ROLES = ['admin', 'hr', 'operations', 'finance', 'employee'];
 
@@ -81,9 +82,32 @@ export async function resetUserPassword(userId: string, actorId?: string): Promi
   });
   if (error) throw error;
 
-  // Audit: capture WHO reset WHOSE password, but never log the new password.
+  // The reset is one-time: force a fresh first-login password reset so the temp
+  // never becomes the user's standing password.
+  await supabaseAdmin.from('portal_users').update({ must_reset_password: true }).eq('id', userId);
+
   const { data: target } = await supabaseAdmin
-    .from('portal_users').select('email').eq('id', userId).single();
+    .from('portal_users').select('email, name').eq('id', userId).single();
+
+  // Email the temp credentials so the admin doesn't have to relay them by hand.
+  if (target?.email && mailerConfigured) {
+    const parts = (target.name ?? '').trim().split(/\s+/);
+    try {
+      await sendWelcomeEmail({
+        to: target.email,
+        firstName: parts[0] || 'there',
+        lastName: parts.slice(1).join(' '),
+        loginEmail: target.email,
+        tempPassword,
+        subject: 'Your Jobly Portal password has been reset',
+        bodyIntro: 'Your Jobly Portal password has been reset by an administrator. Use the temporary password below to log in &mdash; you will be asked to set a new password right away.',
+      });
+    } catch (err) {
+      console.error('[admin.resetUserPassword] temp-password email failed for', userId, err);
+    }
+  }
+
+  // Audit: capture WHO reset WHOSE password, but never log the new password.
   logActivity(actorId ?? null, 'updated', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
     event: 'password_reset',
   });

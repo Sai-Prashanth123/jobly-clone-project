@@ -2,7 +2,10 @@ import { useState } from 'react';
 import { Navigate, useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, useForgotPassword } from '../hooks/useAuth';
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
+} from '@/components/ui/dialog';
 import { Eye, EyeOff, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 
 const ACCOUNTS = [
@@ -23,6 +26,11 @@ export default function Login() {
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
   const [active, setActive]     = useState<string | null>(null);
+
+  const forgot = useForgotPassword();
+  const [fpOpen, setFpOpen]     = useState(false);
+  const [fpEmail, setFpEmail]   = useState('');
+  const [fpSent, setFpSent]     = useState(false);
 
   // Only honour redirects to in-portal paths to prevent open-redirect to external sites.
   const safeRedirect = (() => {
@@ -194,6 +202,16 @@ export default function Login() {
               </div>
             </div>
 
+            <div className="flex justify-end -mt-1">
+              <button
+                type="button"
+                onClick={() => { setFpEmail(email); setFpSent(false); setFpOpen(true); }}
+                className="text-[12px] text-gray-400 hover:text-[#4069FF] transition-colors"
+              >
+                Forgot password?
+              </button>
+            </div>
+
             {error && (
               <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm text-red-600"
                 style={{ background: 'rgba(239,68,68,0.05)', border: '1px solid rgba(239,68,68,0.15)' }}>
@@ -255,6 +273,75 @@ export default function Login() {
 
         </div>
       </div>
+
+      {/* Forgot-password — emails a temporary password + forces a reset. Always
+          shows the same generic confirmation (the backend never reveals whether
+          the email exists). */}
+      <Dialog open={fpOpen} onOpenChange={setFpOpen}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle>Reset your password</DialogTitle>
+            <DialogDescription>
+              Enter your account email and we'll send reset instructions.
+            </DialogDescription>
+          </DialogHeader>
+          {fpSent ? (
+            <div className="py-1">
+              <p className="text-sm text-gray-600 leading-relaxed">
+                If an account exists for <strong>{fpEmail}</strong>, we've emailed reset
+                instructions. Check your inbox (and spam) for a temporary password, then sign
+                in — you'll be asked to set a new password.
+              </p>
+              <div className="flex justify-end pt-4">
+                <button
+                  type="button"
+                  onClick={() => setFpOpen(false)}
+                  className="portal-btn-gradient px-4 h-10 rounded-lg text-[13px] font-semibold text-white"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          ) : (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                try { await forgot.mutateAsync(fpEmail.trim()); } catch { /* response is generic regardless */ }
+                setFpSent(true);
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-1.5">
+                <Label htmlFor="fp-email">Email address</Label>
+                <Input
+                  id="fp-email"
+                  type="email"
+                  value={fpEmail}
+                  required
+                  onChange={e => setFpEmail(e.target.value)}
+                  placeholder="you@joblysolutions.com"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setFpOpen(false)}
+                  className="px-4 h-10 rounded-lg text-[13px] font-medium text-gray-500 hover:text-gray-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={forgot.isPending}
+                  className="portal-btn-gradient px-4 h-10 rounded-lg text-[13px] font-semibold text-white flex items-center gap-2 disabled:opacity-50"
+                >
+                  {forgot.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</> : 'Send instructions'}
+                </button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -30,6 +30,18 @@ apiClient.interceptors.response.use(
   res => res,
   err => {
     const status = err.response?.status;
+
+    // The backend gates a user who still must reset their temp password: every
+    // protected call returns 403 PASSWORD_RESET_REQUIRED until they do. Push them
+    // to the force-reset screen (the ProtectedRoute gate normally catches this
+    // first; this is the defensive net for direct/stale API calls).
+    if (status === 403 && err.response?.data?.code === 'PASSWORD_RESET_REQUIRED') {
+      if (!window.location.pathname.endsWith('/force-password-reset')) {
+        window.location.href = '/portal/force-password-reset';
+      }
+      return Promise.reject(err);
+    }
+
     if (status === 401 && !redirecting) {
       redirecting = true;
       sessionStorage.clear();

@@ -90,7 +90,7 @@ export interface WelcomeEmailPayload {
   to: string | string[];
   firstName: string;
   lastName: string;
-  displayId: string;
+  displayId?: string;
   jobTitle?: string;
   department?: string;
   startDate?: string;
@@ -99,17 +99,26 @@ export interface WelcomeEmailPayload {
   paymentType?: string;
   loginEmail?: string;
   tempPassword?: string;
+  // Info-only variants (resending after the user has set their OWN password, or
+  // a login-email-changed notice) omit the temp password entirely so we never
+  // re-surface / overwrite a credential the user controls. `subject`/`bodyIntro`
+  // tailor the copy without needing a separate template.
+  subject?: string;
+  bodyIntro?: string;
 }
 
 export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<void> {
   const {
     to, firstName, lastName, displayId,
     jobTitle, department, startDate, workLocation, employmentType, paymentType,
-    loginEmail, tempPassword,
+    loginEmail, tempPassword, subject, bodyIntro,
   } = payload;
 
+  // Credentialed welcome only when a temp password is actually being issued.
+  const showCreds = !!(loginEmail && tempPassword);
+
   const rows = [
-    ['Employee ID', displayId],
+    displayId     ? ['Employee ID', displayId]            : null,
     jobTitle      ? ['Job Title', jobTitle]               : null,
     department    ? ['Department', department]             : null,
     startDate     ? ['Start Date', startDate]              : null,
@@ -126,6 +135,10 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
       </tr>`)
     .join('');
 
+  const intro = bodyIntro ?? (showCreds
+    ? 'Welcome aboard! HR has added you to the Jobly Workforce Portal. Below are your onboarding details and your temporary login credentials &mdash; please log in and change your password right away.'
+    : 'Your Jobly Workforce Portal account is active. Use the button below to log in. If you ever forget your password, use &ldquo;Forgot password?&rdquo; on the login page.');
+
   const html = `
 <!DOCTYPE html>
 <html>
@@ -139,7 +152,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
         <tr>
           <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
             <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Welcome to Jobly Portal</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Your employee account is ready</p>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${showCreds ? 'Your employee account is ready' : 'Account update'}</p>
           </td>
         </tr>
 
@@ -148,10 +161,10 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
           <td style="padding:32px 40px;">
             <p style="margin:0 0 24px;color:#374151;font-size:15px;">Hi <strong>${esc(firstName)} ${esc(lastName)}</strong>,</p>
             <p style="margin:0 0 24px;color:#374151;font-size:14px;line-height:1.6;">
-              Welcome aboard! HR has added you to the Jobly Workforce Portal. Below are your onboarding details
-              and your temporary login credentials &mdash; please log in and change your password right away.
+              ${intro}
             </p>
 
+            ${rows.length ? `
             <!-- Details table -->
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px;">
               <thead>
@@ -163,8 +176,9 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
               </thead>
               <tbody>${tableRows}</tbody>
             </table>
+            ` : ''}
 
-            ${loginEmail && tempPassword ? `
+            ${showCreds ? `
             <!-- Login credentials -->
             <table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #4069FF;border-radius:8px;overflow:hidden;margin-bottom:28px;">
               <thead>
@@ -190,9 +204,19 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
               </tbody>
             </table>
             <p style="margin:0 0 24px;color:#dc2626;font-size:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:10px 14px;">
-              ⚠️ Please log in and change your password immediately. Do not share these credentials with anyone.
+              ⚠️ This is a one-time temporary password. You'll be asked to set your own password the first time you log in.
             </p>
-            ` : ''}
+            ` : (loginEmail ? `
+            <!-- Login email (no password) -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px;">
+              <tbody>
+                <tr>
+                  <td style="padding:12px 16px;color:#6b7280;font-size:13px;width:40%;">Login Email</td>
+                  <td style="padding:12px 16px;color:#111827;font-size:13px;font-weight:600;font-family:monospace;">${esc(loginEmail)}</td>
+                </tr>
+              </tbody>
+            </table>
+            ` : '')}
 
             <!-- CTA -->
             <table width="100%" cellpadding="0" cellspacing="0">
@@ -233,7 +257,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
   await sendWithRetry({
     from: FROM,
     to,
-    subject: `Welcome to Jobly Portal — ${displayId}`,
+    subject: subject ?? (showCreds ? `Welcome to Jobly Portal — ${displayId ?? ''}` : 'Your Jobly Portal account'),
     html,
   });
 }
