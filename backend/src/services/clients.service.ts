@@ -21,13 +21,24 @@ export async function listClients(query: ListClientsQuery) {
 export async function getClient(id: string) {
   const { data, error } = await supabaseAdmin
     .from('clients')
-    .select('*, documents(*)')
+    .select('*')
     .eq('id', id)
     .is('deleted_at', null)
     .single();
 
   if (error || !data) throw new NotFoundError('Client not found');
-  return data;
+
+  // `documents` is polymorphic (entity_type + entity_id) with NO foreign key to
+  // clients, so a PostgREST `documents(*)` embed errors out — fetch separately
+  // (mirrors getEmployee). Embedding here previously made every client
+  // detail/update/delete 404.
+  const { data: docs } = await supabaseAdmin
+    .from('documents')
+    .select('*')
+    .eq('entity_type', 'client')
+    .eq('entity_id', id);
+
+  return { ...data, documents: docs ?? [] };
 }
 
 export async function createClient(input: CreateClientInput) {
