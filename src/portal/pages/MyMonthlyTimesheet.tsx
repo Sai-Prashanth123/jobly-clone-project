@@ -314,16 +314,16 @@ export default function MyMonthlyTimesheet() {
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm">
                     <thead>
-                      <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
-                        <th className="px-3 py-2 text-left font-semibold w-10">#</th>
-                        <th className="px-3 py-2 text-left font-semibold w-24">Date</th>
-                        <th className="px-3 py-2 text-left font-semibold w-12">Day</th>
-                        <th className="px-3 py-2 text-left font-semibold w-32">Project</th>
-                        <th className="px-3 py-2 text-left font-semibold">Task Description</th>
-                        <th className="px-3 py-2 text-center font-semibold w-24">Start</th>
-                        <th className="px-3 py-2 text-center font-semibold w-24">End</th>
-                        <th className="px-3 py-2 text-center font-semibold w-20">Hours</th>
-                        <th className="px-3 py-2 text-center font-semibold w-28">Status</th>
+                      <tr className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-400">
+                        <th className="px-3 py-2.5 text-left font-semibold w-10">#</th>
+                        <th className="px-3 py-2.5 text-left font-semibold w-24">Date</th>
+                        <th className="px-3 py-2.5 text-left font-semibold w-14">Day</th>
+                        <th className="px-3 py-2.5 text-left font-semibold w-44">Project</th>
+                        <th className="px-3 py-2.5 text-left font-semibold min-w-[240px]">Task Description</th>
+                        <th className="px-3 py-2.5 text-center font-semibold w-28">Start</th>
+                        <th className="px-3 py-2.5 text-center font-semibold w-28">End</th>
+                        <th className="px-3 py-2.5 text-center font-semibold w-24">Hours</th>
+                        <th className="px-3 py-2.5 text-center font-semibold w-32">Status</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -336,18 +336,18 @@ export default function MyMonthlyTimesheet() {
                         const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[loaded.month - 1].slice(0, 3)}`;
                         return (
                           <tr key={e.date} className={`border-b border-gray-100 ${ROW_TINT[e.status] ?? ''}`}>
-                            <td className="px-3 py-1.5 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
-                            <td className="px-3 py-1.5 font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</td>
-                            <td className="px-3 py-1.5">
-                              <span className={`inline-block min-w-[34px] text-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>{e.dayOfWeek}</span>
+                            <td className="px-3 py-2.5 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
+                            <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</td>
+                            <td className="px-3 py-2.5">
+                              <span className={`inline-block min-w-[36px] text-center px-2 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>{e.dayOfWeek}</span>
                             </td>
-                            <td className="px-2 py-1.5"><Input value={e.project} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Project'} onChange={ev => updateEntry(idx, { project: ev.target.value })} className="h-8 text-xs" /></td>
-                            <td className="px-2 py-1.5"><Input value={e.task} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Task description'} onChange={ev => updateEntry(idx, { task: ev.target.value })} className="h-8 text-xs" /></td>
-                            <td className="px-2 py-1.5"><Input type="time" value={e.startTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { startTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
-                            <td className="px-2 py-1.5"><Input type="time" value={e.endTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { endTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
-                            <td className="px-2 py-1.5">
+                            <td className="px-2.5 py-2.5"><Input value={e.project} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Project'} onChange={ev => updateEntry(idx, { project: ev.target.value })} className="h-9 text-sm" /></td>
+                            <td className="px-2.5 py-2.5"><Input value={e.task} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Task description'} onChange={ev => updateEntry(idx, { task: ev.target.value })} className="h-9 text-sm" /></td>
+                            <td className="px-2.5 py-2.5"><Input type="time" value={e.startTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { startTime: ev.target.value })} className="h-9 text-sm font-mono" /></td>
+                            <td className="px-2.5 py-2.5"><Input type="time" value={e.endTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { endTime: ev.target.value })} className="h-9 text-sm font-mono" /></td>
+                            <td className="px-2.5 py-2.5">
                               {isWeekend ? (
-                                <div className="text-center font-mono text-xs text-gray-400">—</div>
+                                <div className="text-center font-mono text-sm text-gray-400">—</div>
                               ) : (
                                 <Input
                                   type="number" min={0} max={24} step={0.5}
@@ -355,14 +355,14 @@ export default function MyMonthlyTimesheet() {
                                   disabled={fieldsDisabled}
                                   onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
                                   placeholder="0"
-                                  className="h-8 text-xs text-center font-mono"
+                                  className="h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                                 />
                               )}
                             </td>
-                            <td className="px-2 py-1.5 text-center">
+                            <td className="px-2.5 py-2.5 text-center">
                               {isWeekend ? <DayStatusPill status="weekend" /> : (
                                 <Select value={e.status} onValueChange={v => updateEntry(idx, { status: v as MonthlyDayStatus })} disabled={isLocked}>
-                                  <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                  <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                                   <SelectContent>{DAY_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
                                 </Select>
                               )}
