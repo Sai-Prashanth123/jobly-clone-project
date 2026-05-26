@@ -90,21 +90,21 @@ export async function resetUserPassword(userId: string, actorId?: string): Promi
     .from('portal_users').select('email, name').eq('id', userId).single();
 
   // Email the temp credentials so the admin doesn't have to relay them by hand.
+  // Fire-and-forget: never block the HTTP response on the (sometimes slow) SMTP
+  // send — a hung send was causing 504 gateway timeouts on reset, which rotated
+  // the password WITHOUT returning the new value (orphaning the account). The
+  // temp is still returned below for the admin UI regardless of email success.
   if (target?.email && mailerConfigured) {
     const parts = (target.name ?? '').trim().split(/\s+/);
-    try {
-      await sendWelcomeEmail({
-        to: target.email,
-        firstName: parts[0] || 'there',
-        lastName: parts.slice(1).join(' '),
-        loginEmail: target.email,
-        tempPassword,
-        subject: 'Your Jobly Portal password has been reset',
-        bodyIntro: 'Your Jobly Portal password has been reset by an administrator. Use the temporary password below to log in &mdash; you will be asked to set a new password right away.',
-      });
-    } catch (err) {
-      console.error('[admin.resetUserPassword] temp-password email failed for', userId, err);
-    }
+    void sendWelcomeEmail({
+      to: target.email,
+      firstName: parts[0] || 'there',
+      lastName: parts.slice(1).join(' '),
+      loginEmail: target.email,
+      tempPassword,
+      subject: 'Your Jobly Portal password has been reset',
+      bodyIntro: 'Your Jobly Portal password has been reset by an administrator. Use the temporary password below to log in &mdash; you will be asked to set a new password right away.',
+    }).catch(err => console.error('[admin.resetUserPassword] temp-password email failed for', userId, err));
   }
 
   // Audit: capture WHO reset WHOSE password, but never log the new password.

@@ -29,7 +29,10 @@ const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
 const useSmtp = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
 export const mailerConfigured = useSmtp || !!(GMAIL_USER && GMAIL_APP_PASSWORD);
 
-const POOL = { pool: true, maxConnections: 3, maxMessages: 50, rateDelta: 1000, rateLimit: 5 } as const;
+// Hard timeouts so a slow/hung SMTP connection fails fast instead of blocking the
+// request thread until Azure's gateway 504s (which previously rotated a password
+// without returning the new value on /reset-password).
+const POOL = { pool: true, maxConnections: 3, maxMessages: 50, rateDelta: 1000, rateLimit: 5, connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000 } as const;
 const transporter = nodemailer.createTransport(
   useSmtp
     ? { host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465, auth: { user: SMTP_USER, pass: SMTP_PASS }, ...POOL }
