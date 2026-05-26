@@ -130,6 +130,19 @@ export default function MyMonthlyTimesheet() {
     setEntries(prev => prev.map((e, i) => {
       if (i !== idx) return e;
       const next = { ...e, ...patch };
+      // Status change adjusts the row: Present restores the workday defaults;
+      // Leave/Holiday/Absent clear the times and zero the hours (not worked days).
+      if ('status' in patch) {
+        if (patch.status === 'present') {
+          next.startTime = next.startTime || '09:00';
+          next.endTime = next.endTime || '17:30';
+          next.hours = computeHours(next.startTime, next.endTime);
+        } else if (patch.status === 'leave' || patch.status === 'holiday' || patch.status === 'absent') {
+          next.startTime = '';
+          next.endTime = '';
+          next.hours = 0;
+        }
+      }
       if ('startTime' in patch || 'endTime' in patch) next.hours = computeHours(next.startTime, next.endTime);
       return next;
     }));
@@ -309,13 +322,16 @@ export default function MyMonthlyTimesheet() {
                         <th className="px-3 py-2 text-left font-semibold">Task Description</th>
                         <th className="px-3 py-2 text-center font-semibold w-24">Start</th>
                         <th className="px-3 py-2 text-center font-semibold w-24">End</th>
-                        <th className="px-3 py-2 text-center font-semibold w-16">Hours</th>
+                        <th className="px-3 py-2 text-center font-semibold w-20">Hours</th>
                         <th className="px-3 py-2 text-center font-semibold w-28">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {entries.map((e, idx) => {
                         const isWeekend = e.status === 'weekend';
+                        // Worked-day fields are editable only on Present days; weekend +
+                        // leave/holiday/absent rows are greyed out.
+                        const fieldsDisabled = isLocked || e.status !== 'present';
                         const dayNum = Number(e.date.slice(-2));
                         const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[loaded.month - 1].slice(0, 3)}`;
                         return (
@@ -325,11 +341,24 @@ export default function MyMonthlyTimesheet() {
                             <td className="px-3 py-1.5">
                               <span className={`inline-block min-w-[34px] text-center px-1.5 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>{e.dayOfWeek}</span>
                             </td>
-                            <td className="px-2 py-1.5"><Input value={e.project} disabled={isWeekend || isLocked} placeholder={isWeekend ? '—' : 'Project'} onChange={ev => updateEntry(idx, { project: ev.target.value })} className="h-8 text-xs" /></td>
-                            <td className="px-2 py-1.5"><Input value={e.task} disabled={isWeekend || isLocked} placeholder={isWeekend ? '—' : 'Task description'} onChange={ev => updateEntry(idx, { task: ev.target.value })} className="h-8 text-xs" /></td>
-                            <td className="px-2 py-1.5"><Input type="time" value={e.startTime} disabled={isWeekend || isLocked} onChange={ev => updateEntry(idx, { startTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
-                            <td className="px-2 py-1.5"><Input type="time" value={e.endTime} disabled={isWeekend || isLocked} onChange={ev => updateEntry(idx, { endTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
-                            <td className={`px-3 py-1.5 text-center font-mono text-xs font-semibold ${e.hours > 0 ? 'text-gray-900' : 'text-gray-400'}`}>{isWeekend ? '—' : e.hours > 0 ? e.hours.toFixed(1) : '0.0'}</td>
+                            <td className="px-2 py-1.5"><Input value={e.project} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Project'} onChange={ev => updateEntry(idx, { project: ev.target.value })} className="h-8 text-xs" /></td>
+                            <td className="px-2 py-1.5"><Input value={e.task} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Task description'} onChange={ev => updateEntry(idx, { task: ev.target.value })} className="h-8 text-xs" /></td>
+                            <td className="px-2 py-1.5"><Input type="time" value={e.startTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { startTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
+                            <td className="px-2 py-1.5"><Input type="time" value={e.endTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { endTime: ev.target.value })} className="h-8 text-xs font-mono" /></td>
+                            <td className="px-2 py-1.5">
+                              {isWeekend ? (
+                                <div className="text-center font-mono text-xs text-gray-400">—</div>
+                              ) : (
+                                <Input
+                                  type="number" min={0} max={24} step={0.5}
+                                  value={e.hours ? String(e.hours) : ''}
+                                  disabled={fieldsDisabled}
+                                  onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
+                                  placeholder="0"
+                                  className="h-8 text-xs text-center font-mono"
+                                />
+                              )}
+                            </td>
                             <td className="px-2 py-1.5 text-center">
                               {isWeekend ? <DayStatusPill status="weekend" /> : (
                                 <Select value={e.status} onValueChange={v => updateEntry(idx, { status: v as MonthlyDayStatus })} disabled={isLocked}>
