@@ -11,7 +11,7 @@ export function expiryStatus(date?: string | null, windowDays = EXPIRY_WINDOW_DA
   const exp = new Date(date);
   if (Number.isNaN(exp.getTime())) return null;
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   const days = Math.ceil((exp.getTime() - today.getTime()) / 86_400_000);
   if (days < 0) return 'expired';
   if (days <= windowDays) return 'expiring';
@@ -24,6 +24,6 @@ export function daysUntil(date?: string | null): number | null {
   const exp = new Date(date);
   if (Number.isNaN(exp.getTime())) return null;
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   return Math.ceil((exp.getTime() - today.getTime()) / 86_400_000);
 }

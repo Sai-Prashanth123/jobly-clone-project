@@ -195,9 +195,12 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
   const label = row.display_id ?? id.slice(0, 8);
   logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: 'submitted' });
 
-  // Side-effects never break the submission.
-  const { emailSent, warning } = await runSubmitSideEffects(updated);
-  return { row: updated, emailSent, warning };
+  // Side-effects (PDF generation + manager/HR notification email) never block
+  // the submit response — a slow PDF/SMTP must not delay (or 504) the employee's
+  // submission. Fire-and-forget; failures are logged.
+  void runSubmitSideEffects(updated).catch(err =>
+    console.error('[monthlyTimesheets] submit side-effects failed for', id, err));
+  return { row: updated, emailSent: true, warning: undefined };
 }
 
 export async function patchMonthlyStatus(id: string, input: PatchMonthlyStatusInput, actorRole: string, actorId: string) {

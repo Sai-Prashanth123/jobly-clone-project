@@ -238,7 +238,7 @@ export default function EmployeeDetail() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <Field label="Department" value={employee.department} />
             <Field label="Job Title" value={employee.jobTitle} />
-            <Field label="Employment Type" value={employee.employmentType.toUpperCase()} />
+            <Field label="Employment Type" value={employee.employmentType?.toUpperCase()} />
             <Field label="Start Date" value={formatDate(employee.startDate)} />
             <Field label="Work Location" value={employee.workLocation} />
             <Field label="Reporting Manager" value={reportingManager ? `${reportingManager.firstName} ${reportingManager.lastName}` : undefined} />
