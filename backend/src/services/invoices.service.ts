@@ -425,7 +425,9 @@ export async function getInvoicePDF(id: string) {
   const { data: urlData } = await supabaseAdmin
     .storage
     .from('invoices')
-    .createSignedUrl(fileName, 7 * 24 * 60 * 60);
+    // `download` → Content-Disposition: attachment so the link saves the PDF
+    // (under its real name) instead of opening inline in a tab.
+    .createSignedUrl(fileName, 7 * 24 * 60 * 60, { download: fileName });
 
   // Cache pdf_url on invoice
   await supabaseAdmin

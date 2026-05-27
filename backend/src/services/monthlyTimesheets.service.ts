@@ -301,7 +301,9 @@ export async function generateAndStoreMonthlyPdf(row: any): Promise<string | nul
 
   const { data: urlData } = await supabaseAdmin
     .storage.from('monthly-timesheets')
-    .createSignedUrl(fileName, 7 * 24 * 60 * 60);
+    // `download` → Content-Disposition: attachment so the link saves the PDF
+    // (under its real name) instead of opening inline in a tab.
+    .createSignedUrl(fileName, 7 * 24 * 60 * 60, { download: fileName });
 
   await supabaseAdmin.from('monthly_timesheets').update({ pdf_url: urlData?.signedUrl }).eq('id', row.id);
   return urlData?.signedUrl ?? null;
