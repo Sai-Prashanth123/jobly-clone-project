@@ -64,6 +64,10 @@ export interface PortalUser {
   // False while an employee still has to finish self-onboarding (gates the
   // dashboard via ProtectedRoute). Always true/undefined for non-employee roles.
   onboardingComplete?: boolean;
+  // 3-state onboarding gate (employees only): 'in_progress' (filling the form),
+  // 'pending_review' (submitted, awaiting HR approval), 'approved' (HR set the
+  // employee active). Non-employees are always 'approved'. Drives ProtectedRoute.
+  onboardingStatus?: 'in_progress' | 'pending_review' | 'approved';
 }
 
 // Added for real backend: UUID is the primary id, displayId is human-readable (EMP-0001)

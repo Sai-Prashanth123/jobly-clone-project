@@ -39,6 +39,8 @@ const HrI9StatusEmployees = lazy(() => import('./pages/hr/I9StatusEmployees'));
 
 // New card-per-section Add Employee onboarding page
 const NewEmployee = lazy(() => import('./pages/NewEmployee'));
+// "Awaiting HR review" screen shown after an employee submits onboarding
+const OnboardingPending = lazy(() => import('./pages/OnboardingPending'));
 
 // Monthly attendance timesheet (separate from the weekly billing Timesheets)
 const MyMonthlyTimesheet = lazy(() => import('./pages/MyMonthlyTimesheet'));
@@ -83,6 +85,18 @@ export default function PortalApp() {
             element={
               <ProtectedRoute>
                 <NewEmployee />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Authenticated but OUTSIDE the layout — the "awaiting HR review"
+              screen shown after an employee submits onboarding. ProtectedRoute
+              pins pending_review employees here until HR approves. */}
+          <Route
+            path="onboarding/pending"
+            element={
+              <ProtectedRoute>
+                <OnboardingPending />
               </ProtectedRoute>
             }
           />

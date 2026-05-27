@@ -489,7 +489,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, actorRole?: string) {
   const { data: existing, error: findErr } = await supabaseAdmin
     .from('employees')
-    .select('id, display_id, email, work_email')
+    .select('id, display_id, email, work_email, status')
     .eq('id', id)
     .is('deleted_at', null)
     .single();
@@ -583,6 +583,27 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 
   if (error) throw error;
 
+  // HR approved onboarding (onboarding → active): notify the employee in-app so
+  // they're not stuck on the "awaiting review" screen. Fire-and-forget.
+  if (input.status === 'active' && existing.status === 'onboarding') {
+    void (async () => {
+      try {
+        const { data: pu } = await supabaseAdmin
+          .from('portal_users').select('id').eq('employee_id', id).maybeSingle();
+        if (pu?.id) {
+          await createNotification(
+            pu.id,
+            'Onboarding approved',
+            'Your onboarding has been approved — welcome aboard! You now have full access to the portal.',
+            'success', 'employee', id,
+          );
+        }
+      } catch (err) {
+        console.error('[employees.service] onboarding-approved notification failed', err);
+      }
+    })();
+  }
+
   // If an email changed, update the login accordingly — WITHOUT ever overwriting
   // a password the employee chose. If they're still on the one-time temp (or have
   // no login yet) we re-issue a fresh temp to the new address. If they've already
@@ -665,9 +686,9 @@ async function notifyOnboardingCompleted(emp: any): Promise<void> {
     for (const uid of [...new Set([...hrIds, ...adminIds])]) {
       await createNotification(
         uid,
-        'Onboarding completed',
-        `${label} (${fullName}) has completed onboarding and is now active.`,
-        'success', 'employee', emp.id,
+        'Onboarding submitted for review',
+        `${label} (${fullName}) submitted their onboarding and is awaiting your review & approval.`,
+        'info', 'employee', emp.id,
       );
     }
   } catch (err) {
@@ -696,10 +717,12 @@ async function notifyOnboardingCompleted(emp: any): Promise<void> {
   }
 }
 
-// ── onboarding completion ──────────────────────────────────────────────────────
-// Finalizes self-onboarding: server-side re-validates the full checklist (so the
-// gate can't be skipped), stamps onboarding_completed_at, and auto-activates the
-// employee (status onboarding → active). An employee may only complete their own.
+// ── onboarding submission ───────────────────────────────────────────────────────
+// Submits self-onboarding for HR review: server-side re-validates the full
+// checklist (so the gate can't be skipped) and stamps onboarding_completed_at as
+// the "submitted" marker. Status stays 'onboarding' until HR approves (which sets
+// status → 'active' via updateEmployee / the Approve Onboarding button). An
+// employee may only submit their own.
 export async function completeOnboarding(id: string, actorRole?: string, actorEmployeeId?: string, actorId?: string) {
   if (actorRole === 'employee' && actorEmployeeId !== id) {
     throw new ForbiddenError('You may only complete your own onboarding');
@@ -718,15 +741,16 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
     throw new ValidationError(`Onboarding is incomplete. Still required: ${result.missing.join(', ')}`);
   }
 
+  // Mark as submitted for HR review — do NOT auto-activate. HR approval flips
+  // status → 'active' (see updateEmployee / the Approve Onboarding button).
   const patch: Record<string, any> = { onboarding_completed_at: new Date().toISOString() };
-  if (emp.status === 'onboarding') patch.status = 'active'; // auto-activate on completion
   const { data: updated, error: updErr } = await supabaseAdmin
     .from('employees').update(patch).eq('id', id).select().single();
   if (updErr) throw updErr;
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'onboarding_completed' });
+  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'onboarding_submitted' });
 
-  // Give HR visibility that this employee finished onboarding (in-app + email).
+  // Tell HR an employee submitted onboarding and is awaiting review (in-app + email).
   // Fire-and-forget so a slow mailer can never delay/504 the employee's "Finish".
   void notifyOnboardingCompleted(updated);
 

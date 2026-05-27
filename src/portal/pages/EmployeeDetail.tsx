@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2 } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -99,6 +99,11 @@ export default function EmployeeDetail() {
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs font-mono text-blue-600">{employee.displayId ?? employee.id.slice(0, 8)}</span>
               <StatusBadge status={employee.status} />
+              {employee.status === 'onboarding' && employee.onboardingCompletedAt && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5">
+                  <Clock className="h-3 w-3" /> Submitted — ready for review
+                </span>
+              )}
               {employee.jobTitle && <span className="text-xs text-muted-foreground">· {employee.jobTitle}</span>}
             </div>
           </div>

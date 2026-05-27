@@ -35,11 +35,10 @@ export function HRDashboard() {
     .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
     .slice(0, 5);
 
-  // Employees who finished self-onboarding in the last 30 days — HR visibility
-  // for when a new hire submits their form (they auto-activate on completion).
-  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
-  const recentlyOnboarded = employees
-    .filter(e => e.onboardingCompletedAt && (today.getTime() - new Date(e.onboardingCompletedAt).getTime()) <= THIRTY_DAYS_MS)
+  // Employees who SUBMITTED onboarding and are awaiting HR review/approval
+  // (status still 'onboarding' with a submitted timestamp) — HR's action queue.
+  const pendingReview = employees
+    .filter(e => e.onboardingCompletedAt && e.status === 'onboarding')
     .sort((a, b) => new Date(b.onboardingCompletedAt!).getTime() - new Date(a.onboardingCompletedAt!).getTime())
     .slice(0, 5);
 
@@ -310,24 +309,30 @@ export function HRDashboard() {
         </CardContent>
       </Card>
 
-      {recentlyOnboarded.length > 0 && (
-        <Card>
+      {pendingReview.length > 0 && (
+        <Card className="ring-1 ring-amber-200">
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
-              <UserCheck className="h-4 w-4 text-emerald-600" />
-              Recently completed onboarding
+              <Clock className="h-4 w-4 text-amber-600" />
+              Pending onboarding review
+              <span className="ml-1 text-[11px] font-medium text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
+                {pendingReview.length} awaiting
+              </span>
             </CardTitle>
           </CardHeader>
           <CardContent>
+            <p className="text-xs text-muted-foreground mb-2">
+              These employees submitted onboarding and need your review &amp; approval before they go Active.
+            </p>
             <div className="space-y-2">
-              {recentlyOnboarded.map(emp => (
+              {pendingReview.map(emp => (
                 <Link
                   key={emp.id}
                   to={`/portal/employees/${emp.id}`}
                   className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-semibold text-emerald-600">
+                    <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center text-xs font-semibold text-amber-700">
                       {emp.firstName[0]}{emp.lastName[0]}
                     </div>
                     <div>
@@ -337,10 +342,10 @@ export function HRDashboard() {
                   </div>
                   <div className="flex items-center gap-3 text-right">
                     <div>
-                      <p className="text-xs text-muted-foreground">Completed</p>
+                      <p className="text-xs text-muted-foreground">Submitted</p>
                       <p className="text-xs font-medium">{formatDate(emp.onboardingCompletedAt!)}</p>
                     </div>
-                    <StatusBadge status={emp.status} />
+                    <span className="text-xs font-medium text-[#4069FF]">Review →</span>
                   </div>
                 </Link>
               ))}

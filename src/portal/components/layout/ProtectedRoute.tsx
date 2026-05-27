@@ -15,8 +15,15 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   const mustReset = !!user?.mustResetPassword;
   const isForceResetRoute = location.pathname.endsWith('/force-password-reset');
   // Exact match — '/portal/hr/onboarding' (HR drill-down) must NOT count here.
-  const isOnboardingRoute = location.pathname.replace(/\/$/, '') === '/portal/onboarding';
-  const needsOnboarding = user?.role === 'employee' && user?.onboardingComplete === false;
+  const path = location.pathname.replace(/\/$/, '');
+  const isOnboardingRoute = path === '/portal/onboarding';
+  const isPendingRoute = path === '/portal/onboarding/pending';
+  // 3-state onboarding gate (employees only). Falls back to the legacy
+  // onboardingComplete flag for sessions created before onboardingStatus existed.
+  const ob: 'in_progress' | 'pending_review' | 'approved' =
+    user?.role === 'employee'
+      ? (user.onboardingStatus ?? (user.onboardingComplete ? 'approved' : 'in_progress'))
+      : 'approved';
   const denied = !!(allowedRoles && user && !allowedRoles.includes(user.role));
   const toastShown = useRef(false);
 
@@ -44,13 +51,27 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     return <Navigate to="/portal/dashboard" replace />;
   }
 
-  // After the password reset, a new hire must finish self-onboarding before
-  // reaching anything else; once done, don't keep them on the onboarding screen.
-  if (!mustReset && needsOnboarding && !isOnboardingRoute) {
-    return <Navigate to="/portal/onboarding" replace />;
-  }
-  if (!needsOnboarding && isOnboardingRoute) {
-    return <Navigate to="/portal/dashboard" replace />;
+  // After the password reset, a new hire must finish self-onboarding AND be
+  // approved by HR before reaching the app. Route by onboarding state and pin
+  // them to the correct screen (wizard while filling, "awaiting review" once
+  // submitted, dashboard once approved).
+  if (!mustReset) {
+    if (ob === 'in_progress' && !isOnboardingRoute) {
+      return <Navigate to="/portal/onboarding" replace />;
+    }
+    if (ob === 'pending_review' && !isPendingRoute) {
+      return <Navigate to="/portal/onboarding/pending" replace />;
+    }
+    if (ob === 'approved' && (isOnboardingRoute || isPendingRoute)) {
+      return <Navigate to="/portal/dashboard" replace />;
+    }
+    // Don't let them sit on the wrong onboarding screen for their state.
+    if (ob === 'in_progress' && isPendingRoute) {
+      return <Navigate to="/portal/onboarding" replace />;
+    }
+    if (ob === 'pending_review' && isOnboardingRoute) {
+      return <Navigate to="/portal/onboarding/pending" replace />;
+    }
   }
 
   if (denied) {

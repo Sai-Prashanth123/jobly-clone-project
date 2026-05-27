@@ -331,7 +331,7 @@ export default function NewEmployee() {
   const navigate = useNavigate();
   const location = useLocation();
   const params = useParams<{ id?: string }>();
-  const { user, logout, markOnboardingComplete } = useAuth();
+  const { user, logout, markOnboardingSubmitted } = useAuth();
   const queryClient = useQueryClient();
 
   // Self-edit: an employee editing their own profile lands here via
@@ -758,14 +758,15 @@ export default function NewEmployee() {
       }
 
       if (isOnboarding) {
-        // Finalize onboarding — the backend re-validates the full checklist and
-        // auto-activates. On success the gate releases; on incomplete it returns
-        // the exact list of what's still missing.
+        // Submit onboarding for HR review — the backend re-validates the full
+        // checklist and stamps it "submitted" (NO auto-activate). On success we
+        // move to the "awaiting HR review" screen; on incomplete it returns the
+        // exact list of what's still missing.
         try {
           await completeOnboarding.mutateAsync();
-          markOnboardingComplete();
-          toast.success('Profile complete — welcome aboard!');
-          navigate('/portal/dashboard', { replace: true });
+          markOnboardingSubmitted();
+          toast.success('Onboarding submitted — our HR team will review it shortly.', { duration: 8000 });
+          navigate('/portal/onboarding/pending', { replace: true });
         } catch (e: any) {
           const msg = e?.response?.data?.error
             ?? 'Some required details are still missing. Please complete every highlighted section, then click Finish.';

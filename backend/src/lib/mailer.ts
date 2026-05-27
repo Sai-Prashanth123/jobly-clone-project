@@ -532,8 +532,8 @@ export interface OnboardingCompletedEmailPayload {
   detailUrl?: string;
 }
 
-// Sent to HR + admin when an employee finishes self-onboarding, so HR has
-// visibility (the employee auto-activates on completion).
+// Sent to HR + admin when an employee submits self-onboarding for review. The
+// employee stays in 'onboarding' until HR opens their profile and approves.
 export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedEmailPayload): Promise<void> {
   if (!mailerConfigured) {
     throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
@@ -567,14 +567,14 @@ export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedE
       <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <tr>
           <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Onboarding Completed</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">An employee finished their onboarding</p>
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Onboarding Submitted for Review</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">An employee is awaiting your review</p>
           </td>
         </tr>
         <tr>
           <td style="padding:32px 40px;">
             <p style="margin:0 0 24px;color:#374151;font-size:14px;line-height:1.6;">
-              <strong>${esc(employeeName)}</strong> has completed their onboarding paperwork and is now <strong>Active</strong>. Review their profile and documents in the portal.
+              <strong>${esc(employeeName)}</strong> has submitted their onboarding paperwork and is <strong>awaiting HR review</strong>. Open their profile, review the details and documents, then click <strong>Approve Onboarding</strong> to activate their account.
             </p>
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px;">
               <tbody>${tableRows}</tbody>
@@ -584,7 +584,7 @@ export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedE
                 <td align="center" style="padding:8px 0 8px;">
                   <a href="${esc(link)}"
                      style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
-                    View Employee →
+                    Review &amp; Approve →
                   </a>
                 </td>
               </tr>
@@ -605,7 +605,7 @@ export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedE
   await sendWithRetry({
     from: FROM,
     to,
-    subject: `Onboarding completed — ${employeeName} (${displayId})`,
+    subject: `Onboarding submitted — ${employeeName} (${displayId}) awaiting review`,
     html,
   });
 }

@@ -4,6 +4,21 @@ import { UnauthorizedError } from '../lib/errors';
 import { resetUserPassword } from '../services/admin.service';
 import type { ChangePasswordInput, ForgotPasswordInput } from '../schemas/auth.schema';
 
+export type OnboardingStatus = 'in_progress' | 'pending_review' | 'approved';
+
+// Onboarding gate state for the frontend. Employees move in_progress →
+// pending_review (submitted, awaiting HR) → approved (HR set status 'active').
+// Everyone else is always 'approved' (never gated).
+async function computeOnboardingStatus(role?: string, employeeId?: string | null): Promise<OnboardingStatus> {
+  if (role !== 'employee' || !employeeId) return 'approved';
+  const { data: emp } = await supabaseAdmin
+    .from('employees').select('status, onboarding_completed_at').eq('id', employeeId).maybeSingle();
+  if (!emp) return 'approved';
+  if (emp.status === 'active') return 'approved';
+  if (emp.onboarding_completed_at) return 'pending_review';
+  return 'in_progress';
+}
+
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const raw = req.body as { email: string; password: string };
@@ -35,14 +50,10 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       throw new UnauthorizedError('User profile not found. Contact your administrator.');
     }
 
-    // Employees must finish self-onboarding before full access; everyone else is
+    // Employees are gated until HR approves their onboarding; everyone else is
     // never gated. Surfaced to the frontend gate (mirrors mustResetPassword).
-    let onboardingComplete = true;
-    if (portalUser.role === 'employee' && portalUser.employee_id) {
-      const { data: emp } = await supabaseAdmin
-        .from('employees').select('onboarding_completed_at').eq('id', portalUser.employee_id).maybeSingle();
-      onboardingComplete = !!emp?.onboarding_completed_at;
-    }
+    const onboardingStatus = await computeOnboardingStatus(portalUser.role, portalUser.employee_id);
+    const onboardingComplete = onboardingStatus === 'approved';
 
     res.json({
       success: true,
@@ -59,6 +70,7 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
           avatarInitials: portalUser.avatar_initials,
           mustResetPassword: portalUser.must_reset_password ?? false,
           onboardingComplete,
+          onboardingStatus,
         },
       },
     });
@@ -81,7 +93,10 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
 
 export async function me(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    res.json({ success: true, data: req.user });
+    // Recompute the onboarding gate state live so a session refresh / the
+    // pending-review screen's polling reflects HR approval immediately.
+    const onboardingStatus = await computeOnboardingStatus(req.user?.role, req.user?.employeeId);
+    res.json({ success: true, data: { ...req.user, onboardingStatus, onboardingComplete: onboardingStatus === 'approved' } });
   } catch (err) {
     next(err);
   }
