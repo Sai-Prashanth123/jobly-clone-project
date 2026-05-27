@@ -8,7 +8,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
 import type { Client, BillingType } from '../../types';
-import { useUploadClientDocument } from '../../hooks/useClients';
+import { useClient, useUploadClientDocument } from '../../hooks/useClients';
+import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
 import { formatDate, parseNumberInput } from '../../lib/utils';
 import { toast } from 'sonner';
 
@@ -40,6 +41,11 @@ const DOC_TYPES = ['Client Agreement', 'NDA', 'MSA/SOW', 'Other'];
 
 export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: ClientFormProps) {
   const uploadDoc = useUploadClientDocument(initial?.id ?? '');
+  // In edit mode, drive the documents list from the live client query so it
+  // (a) always shows already-uploaded docs regardless of where Edit was opened
+  // from (the clients LIST omits documents — only getClient returns them), and
+  // (b) auto-refreshes after an upload (the mutation invalidates ['clients', id]).
+  const liveClient = useClient(isEdit ? initial?.id : undefined);
   const [form, setForm] = useState<ClientFormData>({ ...defaultForm, ...initial, documents: initial?.documents ?? [] });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [activeTab, setActiveTab] = useState('basic');
@@ -152,6 +158,10 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
     pendingFiles.delete(id);
     setForm(prev => ({ ...prev, documents: prev.documents.filter(d => d.id !== id) }));
   };
+
+  // Edit mode shows the live, already-uploaded docs (downloadable); create mode
+  // shows the locally-queued pending docs (removable until the client is saved).
+  const renderDocs = isEdit ? (liveClient.data?.documents ?? initial?.documents ?? []) : form.documents;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -349,7 +359,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
         <TabsContent value="docs">
           <Card><CardContent className="pt-6 space-y-4">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium">Documents ({form.documents.length})</p>
+              <p className="text-sm font-medium">Documents ({renderDocs.length})</p>
               {!showAddDoc && (
                 <Button type="button" variant="outline" size="sm" onClick={() => setShowAddDoc(true)}>
                   <PlusCircle className="h-4 w-4 mr-1" /> Add Document
@@ -392,7 +402,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
               </div>
             )}
 
-            {form.documents.length > 0 ? (
+            {renderDocs.length > 0 ? (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -404,19 +414,23 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {form.documents.map(doc => (
+                    {renderDocs.map(doc => (
                       <TableRow key={doc.id}>
                         <TableCell className="text-sm font-medium">{doc.name}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{doc.type}</TableCell>
                         <TableCell className="text-sm text-muted-foreground">{formatDate(doc.uploadedAt)}</TableCell>
-                        <TableCell>
-                          <Button
-                            type="button" variant="ghost" size="sm"
-                            className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => removeDocument(doc.id)}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
+                        <TableCell className="text-right">
+                          {isEdit ? (
+                            <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
+                          ) : (
+                            <Button
+                              type="button" variant="ghost" size="sm"
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              onClick={() => removeDocument(doc.id)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}

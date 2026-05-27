@@ -7,6 +7,7 @@ import { Edit, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { ClientForm } from '../components/clients/ClientForm';
 import { useClient, useUpdateClient, useDeleteClient } from '../hooks/useClients';
 import { useAssignments } from '../hooks/useAssignments';
@@ -142,6 +143,27 @@ export default function ClientDetail() {
                       <span className="text-sm font-semibold">${a.billRate}/hr</span>
                       <StatusBadge status={a.status} />
                     </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader><CardTitle className="text-base">Documents</CardTitle></CardHeader>
+          <CardContent>
+            {client.documents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No documents uploaded for this client.</p>
+            ) : (
+              <div className="space-y-2">
+                {client.documents.map(doc => (
+                  <div key={doc.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium truncate">{doc.name}</p>
+                      <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
+                    </div>
+                    <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
                   </div>
                 ))}
               </div>

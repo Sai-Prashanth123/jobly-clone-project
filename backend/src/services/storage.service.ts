@@ -28,11 +28,10 @@ export async function uploadDocument(
 
   if (uploadError) throw uploadError;
 
-  const { data: urlData } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    .createSignedUrl(storagePath, 3600);
-
+  // Don't generate/store a signed URL here: it's an extra storage round-trip on
+  // every upload (slows uploads) and the value expires in ~1h anyway. Downloads
+  // always mint a fresh, download-forcing URL via getDocumentSignedUrl below
+  // (GET /documents/:id/url).
   const { data: doc, error } = await supabaseAdmin
     .from('documents')
     .insert({
@@ -41,7 +40,7 @@ export async function uploadDocument(
       name: nameOverride || file.originalname,
       type: docTypeOverride || file.mimetype,
       storage_path: storagePath,
-      storage_url: urlData?.signedUrl,
+      storage_url: null,
       uploaded_by: uploadedBy,
     })
     .select()
@@ -107,7 +106,10 @@ export async function getDocumentSignedUrl(
   const { data } = await supabaseAdmin
     .storage
     .from(bucket)
-    .createSignedUrl(doc.storage_path, 900); // 15 min
+    // `download` sets Content-Disposition: attachment so the browser SAVES the
+    // file (under its real name) instead of rendering it inline. Without it,
+    // TXT/PDF/images open in a tab instead of downloading.
+    .createSignedUrl(doc.storage_path, 900, { download: doc.name ?? 'document' }); // 15 min
 
   return data?.signedUrl ?? null;
 }
