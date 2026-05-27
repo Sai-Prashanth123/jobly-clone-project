@@ -196,22 +196,26 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
 
   logActivity(actorId ?? null, 'created', 'invoice', invoice.id, invoice.invoice_number ?? invoice.id.slice(0, 8));
 
-  // Notify finance + admin (fire-and-forget)
-  try {
-    const finIds = await getUserIdsByRole('finance');
-    const admIds = await getUserIdsByRole('admin');
-    const clientName = client?.company_name ?? 'a client';
-    for (const uid of [...new Set([...finIds, ...admIds])]) {
-      await createNotification(
-        uid,
-        'Invoice Generated',
-        `Invoice ${invoice.invoice_number} for ${clientName} — $${totalAmount.toFixed(2)} — is ready. Review and send to client.`,
-        'success', 'invoice', invoice.id,
-      );
+  // Notify finance + admin — fire-and-forget so notification latency never
+  // delays the create response (the invoice + line items + junction are already
+  // persisted above). Mirrors employees.service notifyOnboardingCompleted.
+  void (async () => {
+    try {
+      const finIds = await getUserIdsByRole('finance');
+      const admIds = await getUserIdsByRole('admin');
+      const clientName = client?.company_name ?? 'a client';
+      for (const uid of [...new Set([...finIds, ...admIds])]) {
+        await createNotification(
+          uid,
+          'Invoice Generated',
+          `Invoice ${invoice.invoice_number} for ${clientName} — $${totalAmount.toFixed(2)} — is ready. Review and send to client.`,
+          'success', 'invoice', invoice.id,
+        );
+      }
+    } catch (err) {
+      console.error('[invoices.service] generate notification failed for invoice', invoice.id, err);
     }
-  } catch (err) {
-    console.error('[invoices.service] generate notification failed for invoice', invoice.id, err);
-  }
+  })();
 
   return getInvoice(invoice.id);
 }

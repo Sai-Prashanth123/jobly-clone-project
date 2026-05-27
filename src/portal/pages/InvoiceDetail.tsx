@@ -11,12 +11,14 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { InvoicePrintView } from '../components/invoices/InvoicePrintView';
 import { useInvoice, useUpdateInvoice, useDeleteInvoice, useGetInvoicePDF, useSendInvoice } from '../hooks/useInvoices';
 import { useClient } from '../hooks/useClients';
+import { useAuth } from '../hooks/useAuth';
 import { formatCurrency, formatDate } from '../lib/utils';
 import type { InvoiceStatus } from '../types';
 
 export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data: invoice, isLoading } = useInvoice(id);
   const { data: client } = useClient(invoice?.clientId);
   const updateInvoice = useUpdateInvoice(id!);
@@ -102,10 +104,12 @@ export default function InvoiceDetail() {
           <Button variant="outline" size="sm" onClick={() => { setNewStatus(invoice.status); setStatusOpen(true); }}>
             Update Status
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
-            className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {invoice.status === 'draft' && user?.role === 'admin' && (
+            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
+              className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 

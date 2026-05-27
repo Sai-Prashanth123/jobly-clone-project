@@ -15,9 +15,10 @@ import { useAssignments } from '../../hooks/useAssignments';
 interface InvoiceFormProps {
   onGenerate: (timesheetIds: string[], clientId: string, taxRate: number) => void;
   onCancel: () => void;
+  isGenerating?: boolean;
 }
 
-export function InvoiceForm({ onGenerate, onCancel }: InvoiceFormProps) {
+export function InvoiceForm({ onGenerate, onCancel, isGenerating = false }: InvoiceFormProps) {
   const [clientId, setClientId] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [taxRate, setTaxRate] = useState(0);
@@ -181,8 +182,13 @@ export function InvoiceForm({ onGenerate, onCancel }: InvoiceFormProps) {
       {error && <p className="text-sm text-red-500">{error}</p>}
 
       <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={selected.length === 0}>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isGenerating}>Cancel</Button>
+        <Button
+          onClick={handleSubmit}
+          disabled={selected.length === 0 || isGenerating}
+          loading={isGenerating}
+          loadingText="Generating…"
+        >
           Generate Invoice
         </Button>
       </div>

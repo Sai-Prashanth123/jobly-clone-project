@@ -6,13 +6,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2, Pencil, Info } from 'lucide-react';
+import { Plus, Loader2, Pencil, Info, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { InvoiceForm } from '../components/invoices/InvoiceForm';
-import { useInvoices, useGenerateInvoice, useUpdateInvoice } from '../hooks/useInvoices';
+import { useInvoices, useGenerateInvoice, useUpdateInvoice, useDeleteInvoice } from '../hooks/useInvoices';
 import { useClients } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency, parseNumberInput } from '../lib/utils';
@@ -24,10 +25,13 @@ export default function Invoices() {
   const { data, isLoading } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
   const generateInvoice = useGenerateInvoice();
+  const deleteInvoice = useDeleteInvoice();
   const [showForm, setShowForm] = useState(false);
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const updateInvoice = useUpdateInvoice(editInvoice?.id ?? '');
   const canEdit = user?.role === 'admin' || user?.role === 'finance';
+  const canDelete = user?.role === 'admin';
 
   // Local edit form state
   const [editStatus, setEditStatus] = useState<InvoiceStatus>('draft');
@@ -104,15 +108,28 @@ export default function Invoices() {
       header: '',
       getValue: () => '',
       render: (i: Invoice) => (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 gap-1 text-muted-foreground hover:text-foreground"
-          onClick={(e) => { e.stopPropagation(); setEditInvoice(i); }}
-        >
-          <Pencil className="h-3.5 w-3.5" />
-          Edit
-        </Button>
+        <div className="flex items-center justify-end gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+            onClick={(e) => { e.stopPropagation(); setEditInvoice(i); }}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+            Edit
+          </Button>
+          {canDelete && i.status === 'draft' && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+              onClick={(e) => { e.stopPropagation(); setDeleteTarget(i); }}
+              aria-label="Delete invoice"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+            </Button>
+          )}
+        </div>
       ),
     }] : []),
   ];
@@ -185,6 +202,7 @@ export default function Invoices() {
             <DialogDescription className="sr-only">Select a client and approved timesheets to generate a new invoice.</DialogDescription>
           </DialogHeader>
           <InvoiceForm
+            isGenerating={generateInvoice.isPending}
             onGenerate={async (timesheetIds, clientId, taxRate) => {
               try {
                 const inv = await generateInvoice.mutateAsync({
@@ -277,6 +295,25 @@ export default function Invoices() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="Delete Invoice?"
+        description={deleteTarget ? `Delete ${deleteTarget.invoiceNumber}? This cannot be undone.` : ''}
+        confirmLabel="Delete Invoice"
+        loading={deleteInvoice.isPending}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await deleteInvoice.mutateAsync(deleteTarget.id);
+            toast.success(`Invoice ${deleteTarget.invoiceNumber} deleted`);
+            setDeleteTarget(null);
+          } catch (err: any) {
+            toast.error(err?.response?.data?.error ?? 'Failed to delete invoice');
+          }
+        }}
+      />
     </div>
   );
 }
