@@ -35,6 +35,14 @@ export function HRDashboard() {
     .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
     .slice(0, 5);
 
+  // Employees who finished self-onboarding in the last 30 days — HR visibility
+  // for when a new hire submits their form (they auto-activate on completion).
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const recentlyOnboarded = employees
+    .filter(e => e.onboardingCompletedAt && (today.getTime() - new Date(e.onboardingCompletedAt).getTime()) <= THIRTY_DAYS_MS)
+    .sort((a, b) => new Date(b.onboardingCompletedAt!).getTime() - new Date(a.onboardingCompletedAt!).getTime())
+    .slice(0, 5);
+
   // 6-month hire trend
   const months: { key: string; label: string }[] = [];
   for (let i = 5; i >= 0; i--) {
@@ -301,6 +309,45 @@ export function HRDashboard() {
           </div>
         </CardContent>
       </Card>
+
+      {recentlyOnboarded.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserCheck className="h-4 w-4 text-emerald-600" />
+              Recently completed onboarding
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {recentlyOnboarded.map(emp => (
+                <Link
+                  key={emp.id}
+                  to={`/portal/employees/${emp.id}`}
+                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-emerald-100 flex items-center justify-center text-xs font-semibold text-emerald-600">
+                      {emp.firstName[0]}{emp.lastName[0]}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">{emp.firstName} {emp.lastName}</p>
+                      <p className="text-xs text-muted-foreground">{emp.jobTitle} • {emp.department}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 text-right">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Completed</p>
+                      <p className="text-xs font-medium">{formatDate(emp.onboardingCompletedAt!)}</p>
+                    </div>
+                    <StatusBadge status={emp.status} />
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { ConflictError, NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
-import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
+import { sendWelcomeEmail, sendOnboardingCompletedEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { computeOnboarding } from '../lib/onboarding';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
@@ -651,6 +651,51 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   return serializeEmployee(emp);
 }
 
+// Notify HR + admin that an employee finished onboarding — in-app notification
+// + email. Fire-and-forget: callers must NOT await this (it must never block or
+// fail onboarding completion). Internally swallows its own errors.
+async function notifyOnboardingCompleted(emp: any): Promise<void> {
+  const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
+  const label = emp.display_id ?? fullName;
+
+  // In-app notifications to all HR + admin users.
+  try {
+    const hrIds = await getUserIdsByRole('hr');
+    const adminIds = await getUserIdsByRole('admin');
+    for (const uid of [...new Set([...hrIds, ...adminIds])]) {
+      await createNotification(
+        uid,
+        'Onboarding completed',
+        `${label} (${fullName}) has completed onboarding and is now active.`,
+        'success', 'employee', emp.id,
+      );
+    }
+  } catch (err) {
+    console.error('[employees.service] onboarding-completed in-app notification failed', err);
+  }
+
+  // Email HR + admin (respects mailer config).
+  if (!mailerConfigured) return;
+  try {
+    const { data: recipients } = await supabaseAdmin
+      .from('portal_users').select('email').in('role', ['hr', 'admin']);
+    const to = [...new Set((recipients ?? []).map((r: any) => r.email).filter(Boolean))];
+    if (to.length === 0) return;
+    const portalBase = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
+    await sendOnboardingCompletedEmail({
+      to,
+      employeeName: fullName,
+      displayId: emp.display_id ?? emp.id,
+      department: emp.department ?? undefined,
+      jobTitle: emp.job_title ?? undefined,
+      completedAt: emp.onboarding_completed_at ?? new Date().toISOString(),
+      detailUrl: portalBase ? `${portalBase}/portal/employees/${emp.id}` : undefined,
+    });
+  } catch (err) {
+    console.error('[employees.service] onboarding-completed email failed', err);
+  }
+}
+
 // ── onboarding completion ──────────────────────────────────────────────────────
 // Finalizes self-onboarding: server-side re-validates the full checklist (so the
 // gate can't be skipped), stamps onboarding_completed_at, and auto-activates the
@@ -680,6 +725,10 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
   if (updErr) throw updErr;
 
   logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'onboarding_completed' });
+
+  // Give HR visibility that this employee finished onboarding (in-app + email).
+  // Fire-and-forget so a slow mailer can never delay/504 the employee's "Finish".
+  void notifyOnboardingCompleted(updated);
 
   const { data: docList } = await supabaseAdmin
     .from('documents').select('*').eq('entity_type', 'employee').eq('entity_id', id);

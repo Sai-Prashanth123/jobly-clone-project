@@ -84,6 +84,7 @@ function mapEmployee(raw: any): Employee {
     identityDocuments: Array.isArray(raw.identity_documents) ? raw.identity_documents : [],
 
     onboarding: raw.onboarding ?? undefined,
+    onboardingCompletedAt: raw.onboarding_completed_at ?? undefined,
 
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,

@@ -139,7 +139,7 @@ const IDENTITY_DOC_ROWS: Array<{
     hint: 'Primary photo ID for I-9 List B.', hasState: true },
   { type: 'state_id',       label: 'State-Issued ID',            placeholder: 'S1234567',
     hint: 'Alternative to driver license for non-drivers.', hasState: true },
-  { type: 'passport',       label: 'US Passport',                placeholder: '123456789',
+  { type: 'passport',       label: 'Passport',                   placeholder: '123456789',
     hint: 'I-9 List A — proves identity AND work authorization on its own.', hasExpiry: true },
   { type: 'green_card',     label: 'Permanent Resident Card',    placeholder: 'A12345678',
     hint: 'Green Card — also I-9 List A.', hasExpiry: true },
@@ -503,7 +503,7 @@ export default function NewEmployee() {
   // sections (no need to submit to find out). Drives the header chips + per-section
   // red "Needs info" markers when in onboarding mode.
   const ID_UPLOAD_LABELS = new Set([
-    'Social Security Number', "Driver's License", 'State-Issued ID', 'US Passport',
+    'Social Security Number', "Driver's License", 'State-Issued ID', 'Passport',
     'Permanent Resident Card', 'Employment Authorization Document', 'ID Proof', 'Government ID',
   ]);
   const uploadedDocTypes = new Set<string>([
@@ -627,24 +627,12 @@ export default function NewEmployee() {
   };
 
   // ── Submit ───────────────────────────────────────────────────────────────
-  const handleSubmit = async () => {
-    if (submittingRef.current) return;
-    setSubmitError('');
-    const { ok, firstErrorSectionId } = validate();
-    if (!ok) {
-      if (firstErrorSectionId) scrollToSection(firstErrorSectionId);
-      toast.error('Please fix the highlighted fields');
-      return;
-    }
-    submittingRef.current = true;
-
-    // If "same as present address" is ticked, copy the present address into
-    // the permanent address payload at submit time.
-    const permanent = form.permanentSameAsPresent
-      ? { ...form.address }
-      : { ...form.permanentAddress };
-
-    const payload: Partial<Employee> = {
+  // Build the employee payload from the current form state. Shared by the full
+  // submit (Create / Save Changes / Finish onboarding) and the onboarding draft save.
+  const buildPayload = (): Partial<Employee> => {
+    // If "same as present address" is ticked, copy present → permanent.
+    const permanent = form.permanentSameAsPresent ? { ...form.address } : { ...form.permanentAddress };
+    return {
       firstName: form.firstName,
       lastName: form.lastName,
       middleName: form.middleName || undefined,
@@ -689,6 +677,20 @@ export default function NewEmployee() {
       // Only persist identity docs that have at least a number filled in.
       identityDocuments: form.identityDocuments.filter(d => (d.number ?? '').trim() !== ''),
     };
+  };
+
+  const handleSubmit = async () => {
+    if (submittingRef.current) return;
+    setSubmitError('');
+    const { ok, firstErrorSectionId } = validate();
+    if (!ok) {
+      if (firstErrorSectionId) scrollToSection(firstErrorSectionId);
+      toast.error('Please fix the highlighted fields');
+      return;
+    }
+    submittingRef.current = true;
+
+    const payload = buildPayload();
 
     try {
       // Branch: edit re-uses the existing id, create returns a new one.
@@ -813,6 +815,79 @@ export default function NewEmployee() {
     }
   };
 
+  // Onboarding-only: persist progress to the employee's own record WITHOUT
+  // finalizing onboarding, so a new hire can finish across multiple sittings.
+  // The backend update schema is all-optional, so partial data saves fine. Any
+  // staged files are uploaded now and their refs cleared so a later "Finish
+  // onboarding" doesn't create duplicate document rows. The one-shot prefill
+  // guard means the refetch after save won't clobber the in-progress form.
+  const handleSaveDraft = async () => {
+    if (submittingRef.current || !editId) return;
+    setSubmitError('');
+    submittingRef.current = true;
+    try {
+      const emp = await updateEmployee.mutateAsync(buildPayload());
+
+      const tasks: Promise<unknown>[] = [];
+      if (form.profilePhotoFile) {
+        const fd = new FormData();
+        fd.append('file', form.profilePhotoFile);
+        tasks.push(apiClient.post(`/employees/${emp.id}/photo`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }));
+      }
+      const uploadedDocTypes: string[] = [];
+      const uploadedGenericIds: string[] = [];
+      const uploads: { file: File; name: string; docType: string }[] = [];
+      for (const row of IDENTITY_DOC_ROWS) {
+        const file = form.identityDocFiles[row.type];
+        if (file) { uploads.push({ file, name: file.name, docType: row.label }); uploadedDocTypes.push(row.type); }
+      }
+      for (const d of form.documents) {
+        if (d.file) { uploads.push({ file: d.file, name: d.file.name, docType: d.type }); uploadedGenericIds.push(d.id); }
+      }
+      for (const u of uploads) {
+        const fd = new FormData();
+        fd.append('file', u.file);
+        fd.append('name', u.name);
+        fd.append('docType', u.docType);
+        tasks.push(apiClient.post(`/employees/${emp.id}/documents`, fd, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }));
+      }
+
+      if (tasks.length > 0) {
+        try {
+          await Promise.all(tasks);
+          // Clear refs of files we just uploaded so Finish won't re-upload duplicates.
+          setForm(p => ({
+            ...p,
+            profilePhotoFile: null,
+            identityDocFiles: Object.fromEntries(
+              Object.entries(p.identityDocFiles).map(([k, v]) => [k, uploadedDocTypes.includes(k) ? null : v]),
+            ),
+            documents: p.documents.filter(d => !uploadedGenericIds.includes(d.id)),
+          }));
+        } catch (uploadErr: any) {
+          toast.warning(
+            `Progress saved, but one or more files failed to upload: ${uploadErr?.response?.data?.error ?? 'unknown error'}`,
+            { duration: 8000 },
+          );
+        }
+        queryClient.invalidateQueries({ queryKey: ['employees'] });
+        queryClient.invalidateQueries({ queryKey: ['employees', emp.id] });
+      }
+
+      toast.success('Progress saved — you can finish onboarding later.');
+    } catch (err: any) {
+      const msg = err?.response?.data?.error ?? 'Could not save your progress. Please try again.';
+      setSubmitError(msg);
+      toast.error(msg, { duration: 8000 });
+    } finally {
+      submittingRef.current = false;
+    }
+  };
+
   // First-input auto-focus on mount — only in create mode, since edit mode
   // already has the field filled and the user is more likely to be looking
   // for a specific section to change.
@@ -865,7 +940,7 @@ export default function NewEmployee() {
     : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
 
   return (
-    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-32' : 'pb-32'}>
+    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-40' : 'pb-40'}>
       {isOnboarding ? (
         <div className="mb-5">
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -1343,24 +1418,31 @@ export default function NewEmployee() {
                       {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px] gap-2">
-                      <Input
-                        value={doc.number ?? ''}
-                        onChange={e => upsertIdentityDoc(row.type, { number: e.target.value })}
-                        placeholder={row.placeholder}
-                      />
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-gray-500">ID Number</Label>
+                        <Input
+                          value={doc.number ?? ''}
+                          onChange={e => upsertIdentityDoc(row.type, { number: e.target.value })}
+                          placeholder={row.placeholder}
+                        />
+                      </div>
                       {row.hasState && (
-                        <Select
-                          value={doc.state || ''}
-                          onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
-                        >
-                          <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
-                          <SelectContent className="max-h-[280px]">
-                            {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-medium text-gray-500">State</Label>
+                          <Select
+                            value={doc.state || ''}
+                            onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
+                          >
+                            <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                            <SelectContent className="max-h-[280px]">
+                              {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       )}
                       {row.hasExpiry && (
-                        <div>
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
                           <Input
                             type="date"
                             value={doc.expiry ?? ''}
@@ -1734,13 +1816,15 @@ export default function NewEmployee() {
             complete={sectionComplete[SECTION_IDS.review]}
             num="13"
             title="Review & Submit"
-            description="Confirm the information is correct before creating the employee."
+            description={isOnboarding ? 'Review your details, then finish onboarding.' : isEditMode ? 'Review and save your changes.' : 'Confirm the information is correct before creating the employee.'}
             icon={<CheckCircle2 className="h-4 w-4 text-[#4069FF]" />}
           >
             <div className="space-y-4">
-              <div className="bg-amber-50 border border-amber-100 rounded-md p-3 text-xs text-amber-900">
-                Once you click <strong>Create Employee</strong>, the portal account is created and a welcome email is sent to the personal email above (if the mailer is configured).
-              </div>
+              {!isEditMode && (
+                <div className="bg-amber-50 border border-amber-100 rounded-md p-3 text-xs text-amber-900">
+                  Once you click <strong>Create Employee</strong>, the portal account is created and a welcome email is sent to the personal email above (if the mailer is configured).
+                </div>
+              )}
 
               <div className="flex items-start gap-2">
                 <Checkbox
@@ -1791,6 +1875,16 @@ export default function NewEmployee() {
           {!isOnboarding && (
             <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending}>
               Cancel
+            </Button>
+          )}
+          {isOnboarding && (
+            <Button
+              variant="outline"
+              onClick={handleSaveDraft}
+              loading={updateEmployee.isPending}
+              loadingText="Saving…"
+            >
+              Save &amp; continue later
             </Button>
           )}
           <Button

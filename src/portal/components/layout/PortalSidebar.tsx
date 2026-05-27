@@ -41,6 +41,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Invoices',       path: '/portal/invoices',       icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
   { label: 'Documents',      path: '/portal/documents',      icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'] },
   { label: 'Reports',        path: '/portal/reports',        icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','operations'] },
+  { label: 'Notifications',  path: '/portal/notifications',  icon: <Bell className="h-4 w-4" />,            roles: ['admin','hr','operations','finance','employee'] },
   { label: 'My Profile',     path: '/portal/profile',        icon: <UserCircle className="h-4 w-4" />,      roles: ['employee'] },
   { label: 'Admin Settings', path: '/portal/admin',          icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
 ];
@@ -270,7 +271,12 @@ export function PortalSidebar() {
                     <span className={isActive ? 'text-[#4069FF]' : 'text-gray-400'}>
                       {item.icon}
                     </span>
-                    {item.label}
+                    <span className="flex-1">{item.label}</span>
+                    {item.path === '/portal/notifications' && unreadCount > 0 && (
+                      <span className="ml-auto h-5 min-w-[20px] px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

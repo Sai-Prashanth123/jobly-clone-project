@@ -187,6 +187,8 @@ export interface Employee {
 
   // Onboarding completeness (computed server-side). Present on list + detail.
   onboarding?: OnboardingStatus;
+  // Timestamp the employee finished self-onboarding (migration 009). Null until done.
+  onboardingCompletedAt?: string;
 
   // Onboarding-form extension fields (migration 005). All optional.
   middleName?: string;

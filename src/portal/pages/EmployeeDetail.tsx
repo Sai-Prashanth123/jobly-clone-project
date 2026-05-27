@@ -65,7 +65,7 @@ export default function EmployeeDetail() {
     ssn: 'Social Security Number',
     driver_license: "Driver's License",
     state_id: 'State-Issued ID',
-    passport: 'US Passport',
+    passport: 'Passport',
     green_card: 'Permanent Resident Card',
     ead: 'Employment Authorization Document',
   };
