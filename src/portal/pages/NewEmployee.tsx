@@ -356,6 +356,10 @@ export default function NewEmployee() {
   const [form, setForm] = useState<FormState>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string>('');
+  // Missing-section list rendered as clickable jump links in the error banner.
+  // Populated only on onboarding-submit validation failure (one entry per
+  // incomplete checklist item). Cleared whenever submitError is cleared.
+  const [submitMissing, setSubmitMissing] = useState<{ label: string; section: string }[]>([]);
   const [prefilled, setPrefilled] = useState(false);
   const submittingRef = useRef(false);
 
@@ -558,11 +562,11 @@ export default function NewEmployee() {
     // flag a marker error per missing item (so the section badges turn red)
     // and surface the human-readable labels so the toast/banner can list
     // them. Order matches the checklist for predictable scroll-to.
-    let missingItems: string[] | undefined;
+    let missingItems: { label: string; section: string }[] | undefined;
     if (isOnboarding) {
       const incomplete = onboardingChecklist.filter(c => !c.done);
       if (incomplete.length > 0) {
-        missingItems = incomplete.map(c => c.label);
+        missingItems = incomplete.map(c => ({ label: c.label, section: c.section }));
         for (const item of incomplete) {
           flag(`__onb_${item.id}`, item.label, item.section);
         }
@@ -730,6 +734,7 @@ export default function NewEmployee() {
   const handleSubmit = async () => {
     if (submittingRef.current) return;
     setSubmitError('');
+    setSubmitMissing([]);
     const { ok, firstErrorSectionId, missingItems } = validate();
     if (!ok) {
       // Build a specific, human-readable list of what's missing so the toast
@@ -737,10 +742,11 @@ export default function NewEmployee() {
       // fields".
       let msg: string;
       if (isOnboarding && missingItems && missingItems.length > 0) {
-        // Onboarding submit: list the still-incomplete checklist items.
-        const head = missingItems.slice(0, 5).join(', ');
-        const more = missingItems.length > 5 ? ` and ${missingItems.length - 5} more` : '';
+        const labels = missingItems.map(m => m.label);
+        const head = labels.slice(0, 5).join(', ');
+        const more = labels.length > 5 ? ` and ${labels.length - 5} more` : '';
         msg = `Please complete every section before submitting. Still missing: ${head}${more}.`;
+        setSubmitMissing(missingItems);
       } else {
         const missing: string[] = [];
         if (!form.firstName.trim()) missing.push('First Name');
@@ -1100,16 +1106,33 @@ export default function NewEmployee() {
           <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-red-800">
-              {isEditMode ? "Couldn't save your changes" : 'No new employee was created'}
+              {isEditMode ? "Couldn't save your changes" : isOnboarding ? "Can't submit yet — some sections still need info" : 'No new employee was created'}
             </p>
             <p className="text-sm text-red-700 mt-1 break-words">{submitError}</p>
+            {submitMissing.length > 0 && (
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
+                {submitMissing.map(m => (
+                  <button
+                    key={`${m.section}:${m.label}`}
+                    type="button"
+                    onClick={() => scrollToSection(m.section)}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-full bg-white border border-red-200 text-red-700 hover:bg-red-100 hover:border-red-300 transition-colors"
+                  >
+                    <AlertTriangle className="h-3 w-3" />
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+            )}
             <p className="text-xs text-red-600/80 mt-2">
-              Fix the highlighted field, then click <strong>{isEditMode ? 'Save Changes' : 'Create Employee'}</strong> again.
+              {submitMissing.length > 0
+                ? <>Tap any item above to jump to that section.</>
+                : <>Fix the highlighted field, then click <strong>{isEditMode ? 'Save Changes' : 'Create Employee'}</strong> again.</>}
             </p>
           </div>
           <button
             type="button"
-            onClick={() => setSubmitError('')}
+            onClick={() => { setSubmitError(''); setSubmitMissing([]); }}
             className="flex-shrink-0 p-1 rounded hover:bg-red-100 transition-colors text-red-600"
             aria-label="Dismiss"
           >
