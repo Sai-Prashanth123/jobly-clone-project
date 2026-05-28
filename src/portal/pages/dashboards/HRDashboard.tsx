@@ -68,22 +68,37 @@ export function HRDashboard() {
     .map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">HR Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Workforce overview &amp; compliance</p>
+    <div className="space-y-8 md:space-y-10">
+      <header className="portal-animate-in">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400 mb-2">
+          Workspace · HR
+        </p>
+        <h1
+          className="font-bold portal-gradient-text leading-[1.05]"
+          style={{ fontSize: 'clamp(1.75rem, 3.5vw, 2.75rem)', letterSpacing: '-0.025em' }}
+        >
+          HR Dashboard
+        </h1>
+        <p className="text-[13px] sm:text-[15px] text-gray-500 mt-2 max-w-2xl">
+          Workforce overview &amp; compliance — your at-a-glance view of headcount, hiring trends, the onboarding queue, and visa/I-9 risk.
+        </p>
+      </header>
+
+      <div className="portal-animate-in">
+        <QuickActions
+          actions={[
+            { label: 'Add Employee',     to: '/portal/employees?new=1', icon: UserPlus, tone: 'blue' },
+            { label: 'View Onboarding',  to: '/portal/hr/onboarding',   icon: Users, tone: 'violet' },
+            { label: 'I-9 Status',       to: '/portal/hr/i9-status',    icon: ShieldAlert, tone: 'red' },
+            { label: 'Documents',        to: '/portal/documents',       icon: FolderOpen, tone: 'cyan' },
+          ]}
+        />
       </div>
 
-      <QuickActions
-        actions={[
-          { label: 'Add Employee',     to: '/portal/employees?new=1', icon: UserPlus, tone: 'blue' },
-          { label: 'View Onboarding',  to: '/portal/hr/onboarding',   icon: Users, tone: 'violet' },
-          { label: 'I-9 Status',       to: '/portal/hr/i9-status',    icon: ShieldAlert, tone: 'red' },
-          { label: 'Documents',        to: '/portal/documents',       icon: FolderOpen, tone: 'cyan' },
-        ]}
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+      <div
+        className="grid gap-4 sm:gap-5 portal-animate-in"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
+      >
         {[
           {
             title: 'Active',
@@ -139,10 +154,13 @@ export function HRDashboard() {
       </div>
 
       {/* Charts row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
+      <div
+        className="grid gap-4 sm:gap-5 portal-animate-in"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}
+      >
+        <Card className="portal-hover-lift">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2 tracking-tight">
               <UserPlus className="h-4 w-4 text-[#4069FF]" />
               Hiring Trend (Last 6 Months)
             </CardTitle>
@@ -150,19 +168,25 @@ export function HRDashboard() {
           <CardContent>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={hireSeries} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="hr-bar-fill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7c3aed" />
+                    <stop offset="100%" stopColor="#a78bfa" />
+                  </linearGradient>
+                </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} allowDecimals={false} axisLine={false} tickLine={false} />
                 <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [v, 'Hires']} />
-                <Bar dataKey="hires" fill="#7c3aed" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                <Bar dataKey="hires" fill="url(#hr-bar-fill)" radius={[6, 6, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="portal-hover-lift">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2 tracking-tight">
               <Users className="h-4 w-4 text-emerald-500" />
               Headcount by Department
             </CardTitle>
@@ -209,7 +233,7 @@ export function HRDashboard() {
 
       {/* Refined alerts */}
       {i9NonCompliant.length > 0 && (
-        <div className="portal-alert-callout text-red-600">
+        <div className="portal-alert-callout text-red-600 portal-animate-in">
           <div className="flex items-start justify-between gap-4">
             <div className="flex gap-3 min-w-0 flex-1">
               <div className="p-2 rounded-full bg-red-100 text-red-600 flex-shrink-0">
@@ -240,7 +264,7 @@ export function HRDashboard() {
       )}
 
       {expiringVisa.length > 0 && (
-        <div className="portal-alert-callout text-amber-700">
+        <div className="portal-alert-callout text-amber-700 portal-animate-in">
           <div className="flex items-start justify-between gap-4">
             <div className="flex gap-3 min-w-0 flex-1">
               <div className="p-2 rounded-full bg-amber-100 text-amber-600 flex-shrink-0">
@@ -269,9 +293,9 @@ export function HRDashboard() {
         </div>
       )}
 
-      <Card>
+      <Card className="portal-hover-lift portal-animate-in">
         <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
+          <CardTitle className="text-base flex items-center gap-2 tracking-tight">
             <Clock className="h-4 w-4 text-[#4069FF]" />
             Recent Hires
           </CardTitle>
@@ -310,9 +334,9 @@ export function HRDashboard() {
       </Card>
 
       {pendingReview.length > 0 && (
-        <Card className="ring-1 ring-amber-200">
+        <Card className="ring-1 ring-amber-200 portal-hover-lift portal-animate-in">
           <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
+            <CardTitle className="text-base flex items-center gap-2 tracking-tight">
               <Clock className="h-4 w-4 text-amber-600" />
               Pending onboarding review
               <span className="ml-1 text-[11px] font-medium text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">

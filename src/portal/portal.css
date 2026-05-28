@@ -288,6 +288,16 @@
   letter-spacing: -0.01em;
 }
 
+/* Brand-gradient text — same palette as portal-btn-gradient. Used on dashboard
+   page titles for a premium, on-brand wordmark feel. */
+.portal-scope .portal-gradient-text {
+  background: linear-gradient(135deg, #4069FF 0%, #32CDDC 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
 /* Primary CTA button — flat, confident, no transform on hover. */
 .portal-btn-gradient {
   background: linear-gradient(135deg, #4069FF 0%, #32CDDC 100%) !important;
