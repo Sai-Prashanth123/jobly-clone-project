@@ -9,8 +9,6 @@ import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
-import { PageHeader } from '../../components/shared/PageHeader';
-import { BentoTile } from '../../components/shared/BentoTile';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { useInvoices } from '../../hooks/useInvoices';
 import { useClients } from '../../hooks/useClients';
@@ -71,11 +69,10 @@ export function FinanceDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Finance"
-        title="Revenue & invoices"
-        description="Track outstanding balance, collected revenue, and the invoice pipeline."
-      />
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Finance Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Revenue &amp; invoice management</p>
+      </div>
 
       <QuickActions
         actions={[
@@ -85,83 +82,46 @@ export function FinanceDashboard() {
         ]}
       />
 
-      {/* ── Premium bento — hero (outstanding balance, cash flow) + 3 KPI tiles ── */}
-      <div className="bento">
-        <BentoTile
-          tone="navy"
-          span={{ md: 4, lg: 4, rowLg: 2 }}
-          eyebrow="Outstanding balance"
-          delay={0}
-        >
-          <div className="flex flex-col h-full justify-between gap-4">
-            <div>
-              <p className="display-lg text-white tabular-nums leading-none">
-                {formatCurrency(outstandingAmount)}
-              </p>
-              <p className="text-[12px] text-white/55 mt-2">
-                {totalOverdue > 0
-                  ? <><span className="text-red-300 font-medium">{formatCurrency(totalOverdue)}</span> past due · </>
-                  : null}
-                {formatCurrency(totalPaidAllTime)} collected all-time
-              </p>
-            </div>
-            <div className="-mx-2">
-              <ResponsiveContainer width="100%" height={140}>
-                <AreaChart data={cashFlow} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="heroFinI" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#4069FF" stopOpacity={0.35} />
-                      <stop offset="100%" stopColor="#4069FF" stopOpacity={0} />
-                    </linearGradient>
-                    <linearGradient id="heroFinC" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#32CDDC" stopOpacity={0.5} />
-                      <stop offset="100%" stopColor="#32CDDC" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [formatCurrency(v), '']} />
-                  <Area type="monotone" dataKey="Invoiced" stroke="#4069FF" fill="url(#heroFinI)" strokeWidth={2} />
-                  <Area type="monotone" dataKey="Collected" stroke="#32CDDC" fill="url(#heroFinC)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </BentoTile>
-
-        <div className="bento-span-md-4 bento-span-lg-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-5">
-          <StatCard
-            title="Draft Invoices"
-            value={pendingInvoices}
-            icon={<FileText className="h-5 w-5" />}
-            variant="orange"
-            description="Created but not yet sent to the client"
-            helper='Drafts are safe to edit or delete. Send them to move to "Sent" status.'
-            to="/portal/invoices"
-            linkLabel="Open invoices"
-          />
-          <StatCard
-            title="Outstanding Payments"
-            value={formatCurrency(outstandingAmount)}
-            icon={<DollarSign className="h-5 w-5" />}
-            variant={totalOverdue > 0 ? 'red' : 'blue'}
-            description={totalOverdue > 0
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[
+          {
+            title: 'Draft Invoices',
+            value: pendingInvoices,
+            icon: <FileText className="h-5 w-5" />,
+            variant: 'orange' as const,
+            description: 'Created but not yet sent to the client',
+            helper: 'Drafts are safe to edit or delete. Send them to move to "Sent" status.',
+            to: '/portal/invoices',
+            linkLabel: 'Open invoices',
+          },
+          {
+            title: 'Outstanding Payments',
+            value: formatCurrency(outstandingAmount),
+            icon: <DollarSign className="h-5 w-5" />,
+            variant: (totalOverdue > 0 ? 'red' : 'blue') as 'red' | 'blue',
+            description: totalOverdue > 0
               ? `${formatCurrency(totalOverdue)} is past due`
-              : 'Sent invoices awaiting payment'}
-            helper="Total of Sent + Overdue invoices. These are emails sent but not yet paid."
-            to="/portal/invoices"
-            linkLabel="Open invoices"
-          />
-          <StatCard
-            title="Total Collected"
-            value={formatCurrency(totalPaidAllTime)}
-            icon={<TrendingUp className="h-5 w-5" />}
-            variant="green"
-            description="All-time revenue from Paid invoices"
-            helper="Lifetime sum of every invoice marked Paid. Sparkline shows the last 6 months."
-            sparkline={monthlyRevenue.map(m => m.revenue)}
-            to="/portal/reports"
-            linkLabel="View revenue report"
-          />
-        </div>
+              : 'Sent invoices awaiting payment',
+            helper: 'Total of Sent + Overdue invoices. These are emails sent but not yet paid.',
+            to: '/portal/invoices',
+            linkLabel: 'Open invoices',
+          },
+          {
+            title: 'Total Collected',
+            value: formatCurrency(totalPaidAllTime),
+            icon: <TrendingUp className="h-5 w-5" />,
+            variant: 'green' as const,
+            description: 'All-time revenue from Paid invoices',
+            helper: 'Lifetime sum of every invoice marked Paid. Sparkline shows the last 6 months.',
+            sparkline: monthlyRevenue.map(m => m.revenue),
+            to: '/portal/reports',
+            linkLabel: 'View revenue report',
+          },
+        ].map((c, i) => (
+          <div key={c.title} className="portal-stagger" style={{ animationDelay: `${i * 60}ms` }}>
+            <StatCard {...c} />
+          </div>
+        ))}
       </div>
 
       {/* Status legend — answers "what does Draft mean?" right on the dashboard. */}

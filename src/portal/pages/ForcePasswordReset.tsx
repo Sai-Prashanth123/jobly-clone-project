@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Loader2, ShieldCheck, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
@@ -14,10 +15,10 @@ export default function ForcePasswordReset() {
   const change = useChangePassword();
 
   const [current, setCurrent] = useState('');
-  const [next, setNext]       = useState('');
+  const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [show, setShow]       = useState(false);
-  const [err, setErr]         = useState('');
+  const [show, setShow] = useState(false);
+  const [err, setErr] = useState('');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,102 +38,65 @@ export default function ForcePasswordReset() {
   };
 
   return (
-    <div className="portal-scope auth-shell flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-[460px] portal-animate-in">
-        <div className="auth-card p-7 sm:p-9">
+    <div className="portal-scope min-h-screen flex items-center justify-center px-4 py-10 bg-gray-50">
+      <div className="w-full max-w-[420px] portal-animate-in">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-7 sm:p-9">
           <div className="flex items-center gap-3 mb-5">
-            <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-gradient-to-br from-ink-800 to-ink-700 shadow-md shadow-ink-800/20">
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#4069FF] to-[#32CDDC]">
               <ShieldCheck className="h-5 w-5 text-white" />
             </div>
-            <div className="min-w-0">
-              <h1 className="text-[17px] font-semibold text-ink-900 leading-tight tracking-tight">Set your password</h1>
-              <p className="text-[12px] text-slate-500 mt-0.5">One-time step before you can continue</p>
+            <div>
+              <h1 className="text-lg font-semibold text-gray-900 leading-tight">Set your password</h1>
+              <p className="text-[12px] text-gray-500">One-time step before you can continue</p>
             </div>
           </div>
 
-          <p className="text-[13px] text-slate-600 leading-relaxed mb-6">
-            You signed in with a temporary password{user?.email ? <> for <strong className="text-ink-900">{user.email}</strong></> : ''}.
-            Choose a new password to finish setting up your account — you&rsquo;ll use it from now on.
+          <p className="text-[13px] text-gray-600 leading-relaxed mb-6">
+            You signed in with a temporary password{user?.email ? <> for <strong>{user.email}</strong></> : ''}.
+            Choose a new password to finish setting up your account — you'll use it from now on.
           </p>
 
           <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="fr-current" className="eyebrow">Temporary password</Label>
-              <input
-                id="fr-current"
-                type={show ? 'text' : 'password'}
-                value={current}
-                onChange={e => setCurrent(e.target.value)}
-                autoComplete="current-password"
-                required
-                placeholder="The password from your welcome email"
-                className="input-premium"
-              />
+            <div className="space-y-1.5">
+              <Label htmlFor="fr-current">Temporary password</Label>
+              <Input id="fr-current" type={show ? 'text' : 'password'} value={current}
+                onChange={e => setCurrent(e.target.value)} autoComplete="current-password" required
+                placeholder="The password from your welcome email" />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fr-new" className="eyebrow">New password</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="fr-new">New password</Label>
               <div className="relative">
-                <input
-                  id="fr-new"
-                  type={show ? 'text' : 'password'}
-                  value={next}
-                  onChange={e => setNext(e.target.value)}
-                  autoComplete="new-password"
-                  required
-                  placeholder="At least 8 characters"
-                  className="input-premium pr-12"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShow(s => !s)}
-                  aria-label={show ? 'Hide password' : 'Show password'}
-                  className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[44px] min-w-[44px] rounded-lg flex items-center justify-center text-slate-400 hover:text-ink-800 hover:bg-slate-100 transition-colors"
-                >
+                <Input id="fr-new" type={show ? 'text' : 'password'} value={next}
+                  onChange={e => setNext(e.target.value)} autoComplete="new-password" required className="pr-10"
+                  placeholder="At least 8 characters" />
+                <button type="button" onClick={() => setShow(s => !s)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="fr-confirm" className="eyebrow">Confirm new password</Label>
-              <input
-                id="fr-confirm"
-                type={show ? 'text' : 'password'}
-                value={confirm}
-                onChange={e => setConfirm(e.target.value)}
-                autoComplete="new-password"
-                required
-                className="input-premium"
-              />
+            <div className="space-y-1.5">
+              <Label htmlFor="fr-confirm">Confirm new password</Label>
+              <Input id="fr-confirm" type={show ? 'text' : 'password'} value={confirm}
+                onChange={e => setConfirm(e.target.value)} autoComplete="new-password" required />
             </div>
 
             {err && (
-              <div
-                role="alert"
-                className="flex items-start gap-2.5 px-4 py-3 rounded-xl text-[13px] text-red-700 bg-red-50 border border-red-100"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0 mt-1.5" />
-                <span className="leading-relaxed">{err}</span>
+              <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-sm text-red-600 bg-red-50 border border-red-100">
+                <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
+                {err}
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={change.isPending}
-              className="btn-navy w-full mt-2"
-            >
-              {change.isPending
-                ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting password…</>
-                : 'Set password & continue'}
+            <button type="submit" disabled={change.isPending}
+              className="portal-btn-gradient w-full h-11 rounded-xl font-semibold text-[13px] text-white flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ boxShadow: '0 4px 24px rgba(64,105,255,0.28)' }}>
+              {change.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Setting password…</> : 'Set password & continue'}
             </button>
           </form>
 
-          <button
-            type="button"
-            onClick={logout}
-            className="mt-5 w-full inline-flex items-center justify-center gap-1.5 text-[12px] text-slate-400 hover:text-ink-800 transition-colors min-h-[44px]"
-          >
+          <button type="button" onClick={logout}
+            className="mt-5 w-full inline-flex items-center justify-center gap-1.5 text-[12px] text-gray-400 hover:text-gray-600 transition-colors">
             <LogOut className="h-3.5 w-3.5" /> Sign out instead
           </button>
         </div>

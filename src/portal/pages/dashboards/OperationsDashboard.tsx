@@ -8,9 +8,6 @@ import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
-import { PageHeader } from '../../components/shared/PageHeader';
-import { BentoTile } from '../../components/shared/BentoTile';
-import { Area, AreaChart } from 'recharts';
 import { formatDate } from '../../lib/utils';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useTimesheets } from '../../hooks/useTimesheets';
@@ -76,11 +73,10 @@ export function OperationsDashboard() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Operations"
-        title="Assignments & approvals"
-        description="Approve timesheets, manage assignments, and watch your weekly throughput."
-      />
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Operations Dashboard</h1>
+        <p className="text-sm text-gray-500 mt-1">Assignment &amp; timesheet management</p>
+      </div>
 
       <QuickActions
         actions={[
@@ -90,47 +86,17 @@ export function OperationsDashboard() {
         ]}
       />
 
-      {/* ── Premium bento — hero (approval velocity) + 4 KPI tiles ── */}
-      <div className="bento">
-        <BentoTile
-          tone="navy"
-          span={{ md: 4, lg: 4, rowLg: 2 }}
-          eyebrow="Approval velocity"
-          delay={0}
-        >
-          <div className="flex flex-col h-full justify-between gap-4">
-            <div>
-              <p className="display-lg text-white tabular-nums leading-none">
-                {velocitySeries[velocitySeries.length - 1]?.approved ?? 0}
-                <span className="text-white/55 ml-2 text-[0.55em] font-medium align-middle">this week</span>
-              </p>
-              <p className="text-[12px] text-white/55 mt-2">
-                {approvedThisWeek.length} manager-approved · {pendingTimesheets.length} awaiting · {rejectedTimesheets.length} rejected
-              </p>
-            </div>
-            <div className="-mx-2">
-              <ResponsiveContainer width="100%" height={140}>
-                <AreaChart data={velocitySeries} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="heroOps" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#32CDDC" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#32CDDC" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [`${v} approvals`, '']} />
-                  <Area type="monotone" dataKey="approved" stroke="#32CDDC" fill="url(#heroOps)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { title: 'Active Assignments', value: activeAssignments.length, icon: <Briefcase className="h-5 w-5" />, variant: 'blue' as const, to: '/portal/assignments', linkLabel: 'View assignments' },
+          { title: 'Awaiting Approval', value: pendingTimesheets.length, icon: <Clock className="h-5 w-5" />, variant: 'orange' as const, description: 'Submitted timesheets', to: '/portal/timesheets', linkLabel: 'View timesheets' },
+          { title: 'Manager Approved', value: approvedThisWeek.length, icon: <CheckCircle className="h-5 w-5" />, variant: 'green' as const, description: 'Awaiting client approval', sparkline: velocitySeries.map(v => v.approved), to: '/portal/timesheets', linkLabel: 'View timesheets' },
+          { title: 'Rejected', value: rejectedTimesheets.length, icon: <XCircle className="h-5 w-5" />, variant: 'red' as const, description: 'Need resubmission', to: '/portal/timesheets', linkLabel: 'View timesheets' },
+        ].map((c, i) => (
+          <div key={c.title} className="portal-stagger" style={{ animationDelay: `${i * 60}ms` }}>
+            <StatCard {...c} />
           </div>
-        </BentoTile>
-
-        <div className="bento-span-md-4 bento-span-lg-2 grid grid-cols-2 lg:grid-cols-2 gap-4 sm:gap-5">
-          <StatCard title="Active Assignments" value={activeAssignments.length} icon={<Briefcase className="h-5 w-5" />} variant="blue" to="/portal/assignments" linkLabel="View assignments" />
-          <StatCard title="Awaiting Approval" value={pendingTimesheets.length} icon={<Clock className="h-5 w-5" />} variant="orange" description="Submitted timesheets" to="/portal/timesheets" linkLabel="View timesheets" />
-          <StatCard title="Manager Approved" value={approvedThisWeek.length} icon={<CheckCircle className="h-5 w-5" />} variant="green" description="Awaiting client approval" sparkline={velocitySeries.map(v => v.approved)} to="/portal/timesheets" linkLabel="View timesheets" />
-          <StatCard title="Rejected" value={rejectedTimesheets.length} icon={<XCircle className="h-5 w-5" />} variant="red" description="Need resubmission" to="/portal/timesheets" linkLabel="View timesheets" />
-        </div>
+        ))}
       </div>
 
       {/* Charts row */}

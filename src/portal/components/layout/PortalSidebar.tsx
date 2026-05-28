@@ -114,21 +114,21 @@ export function PortalSidebar() {
 
   return (
     <Sidebar
-      className="border-r border-white/[0.06] text-white"
+      className="border-r border-gray-200/70"
       style={{
-        background: 'rgba(11, 18, 32, 0.92)',
+        background: 'rgba(255, 255, 255, 0.85)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
       }}
     >
       {/* ── Brand header ── */}
-      <SidebarHeader className="px-4 py-5 border-b border-white/[0.06]">
+      <SidebarHeader className="px-4 py-5 border-b border-gray-100">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-3">
             <img
               src="/assets/img/logo/logo-3.png"
               alt="Jobly"
-              className="h-8 w-auto object-contain brightness-0 invert opacity-95"
+              className="h-8 w-auto object-contain"
               onError={e => {
                 (e.currentTarget as HTMLImageElement).style.display = 'none';
                 const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
@@ -141,9 +141,9 @@ export function PortalSidebar() {
             >
               <span className="text-white text-xs font-bold">J</span>
             </div>
-            <div className="min-w-0">
-              <p className="text-[13.5px] font-semibold text-white tracking-tight">Jobly Portal</p>
-              <p className="text-[11px] text-white/45 capitalize">{user?.role ?? '—'}</p>
+            <div>
+              <p className="text-sm font-semibold text-gray-900">Jobly Portal</p>
+              <p className="text-xs text-gray-400 capitalize">{user?.role ?? '—'}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
@@ -151,20 +151,19 @@ export function PortalSidebar() {
             <button
               type="button"
               aria-label="Open search"
-              className="md:hidden min-h-[44px] min-w-[44px] p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-white/55 hover:text-white flex items-center justify-center"
+              className="md:hidden p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
               onClick={() => window.dispatchEvent(new CustomEvent('portal:open-command'))}
             >
               <Search className="h-4 w-4" />
             </button>
             <button
               ref={bellRef}
-              aria-label="Notifications"
-              className="relative min-h-[44px] min-w-[44px] p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors text-white/55 hover:text-white flex items-center justify-center"
+              className="relative p-1.5 rounded-lg hover:bg-gray-100 transition-colors text-gray-400 hover:text-gray-700"
               onClick={openNotif}
             >
               <Bell className="h-4 w-4" />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 h-4 min-w-4 px-1 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                <span className="absolute -top-0.5 -right-0.5 h-4 w-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                   {unreadCount > 9 ? '9+' : unreadCount}
                 </span>
               )}
@@ -174,64 +173,68 @@ export function PortalSidebar() {
               <div
                 ref={dropdownRef}
                 style={{ position: 'fixed', top: dropdownPos.top, left: Math.max(8, dropdownPos.left) }}
-                className="z-[9999] w-[calc(100vw-16px)] sm:w-80 max-w-[320px] rounded-2xl border border-slate-200 bg-white shadow-xl overflow-hidden text-ink-900"
+                className="z-[9999] w-[calc(100vw-16px)] sm:w-80 max-w-[320px] rounded-xl border border-gray-200 bg-white shadow-xl"
               >
-                <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-slate-50/50">
-                  <p className="text-[13px] font-semibold text-ink-900">Notifications</p>
+                <div className="flex items-center justify-between px-3 py-2 border-b">
+                  <p className="text-sm font-semibold">Notifications</p>
                   {unreadCount > 0 && (
-                    <Button variant="ghost" size="sm" className="text-xs h-7 px-2 text-slate-600 hover:text-ink-800" onClick={() => markAllRead.mutate()}>
+                    <Button variant="ghost" size="sm" className="text-xs h-6 px-2" onClick={() => markAllRead.mutate()}>
                       Mark all read
                     </Button>
                   )}
                 </div>
                 <div className="max-h-72 overflow-y-auto">
                   {notifications.length === 0 ? (
-                    <p className="text-sm text-slate-500 text-center py-8">No notifications</p>
+                    <p className="text-sm text-muted-foreground text-center py-6">No notifications</p>
                   ) : (
                     notifications.slice(0, 10).map(n => (
                       <div
                         key={n.id}
-                        className={`px-3.5 py-3 border-b border-slate-100 last:border-0 cursor-pointer hover:bg-slate-50 transition-colors ${!n.read ? 'bg-blue-50/40' : ''}`}
+                        className={`px-3 py-2.5 border-b last:border-0 cursor-pointer hover:bg-gray-50 transition-colors ${!n.read ? 'bg-blue-50/50' : ''}`}
                         onClick={() => { if (!n.read) markRead.mutate(n.id); }}
                       >
-                        <div className="flex items-start gap-2.5">
+                        <div className="flex items-start gap-2">
                           <span className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${
                             n.type === 'error' ? 'bg-red-500' :
-                            n.type === 'success' ? 'bg-emerald-500' :
-                            n.type === 'warning' ? 'bg-amber-500' : 'bg-[#4069FF]'
+                            n.type === 'success' ? 'bg-green-500' :
+                            n.type === 'warning' ? 'bg-amber-500' : 'bg-blue-500'
                           }`} />
                           <div className="flex-1 min-w-0">
-                            <p className="text-[12.5px] font-semibold text-ink-900 truncate">{n.title}</p>
-                            <p className="text-[12px] text-slate-500 mt-0.5 line-clamp-2">{n.message}</p>
-                            <p className="text-[10.5px] text-slate-400 mt-1">{timeAgo(n.createdAt)}</p>
+                            <p className="text-xs font-semibold text-gray-900 truncate">{n.title}</p>
+                            <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{n.message}</p>
+                            <p className="text-[10px] text-gray-400 mt-1">{timeAgo(n.createdAt)}</p>
                           </div>
-                          {!n.read && <span className="h-1.5 w-1.5 bg-[#4069FF] rounded-full mt-1 flex-shrink-0" />}
+                          {!n.read && <span className="h-1.5 w-1.5 bg-blue-500 rounded-full mt-1 flex-shrink-0" />}
                         </div>
                       </div>
                     ))
                   )}
                 </div>
                 <div
-                  className="px-3 py-2.5 border-t border-slate-100 text-center cursor-pointer hover:bg-slate-50 transition-colors"
+                  className="px-3 py-2 border-t text-center cursor-pointer hover:bg-gray-50 transition-colors"
                   onClick={() => { setNotifOpen(false); navigate('/portal/notifications'); }}
                 >
-                  <p className="text-[12px] text-[#2563EB] font-semibold">View all notifications</p>
+                  <p className="text-xs text-blue-600 font-medium">View all notifications</p>
                 </div>
               </div>
             )}
 
-            <SidebarTrigger className="text-white/55 hover:text-white transition-colors flex-shrink-0" />
+            <SidebarTrigger className="text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0" />
           </div>
         </div>
       </SidebarHeader>
 
       {/* ── Navigation ── */}
       <SidebarContent className="px-3 py-3">
-        <p className="px-3 mb-2 eyebrow !text-white/40">Workspace</p>
+        {/* Section label */}
+        <p className="px-3 mb-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-gray-400">
+          Workspace
+        </p>
 
         {/* Pick the single best-matching item — longest-prefix wins. This stops
             "Employees" from staying active when the user navigates to
             "Add Employee" (whose path is a child of /portal/employees). */}
+        {(() => null)()}
         <SidebarMenu className="space-y-0.5">
           {(() => {
             let bestPath = '';
@@ -240,52 +243,55 @@ export function PortalSidebar() {
               else if (item.path !== '/portal/dashboard' && location.pathname.startsWith(item.path + '/') && item.path.length > bestPath.length) bestPath = item.path;
             }
             return visibleItems.map((item, i) => {
-              const isActive = bestPath === item.path;
-              return (
-                <SidebarMenuItem
-                  key={item.path}
-                  className="portal-nav-item"
-                  style={{ animationDelay: `${i * 50}ms` }}
+            const isActive = bestPath === item.path;
+
+            return (
+              <SidebarMenuItem
+                key={item.path}
+                className="portal-nav-item"
+                style={{ animationDelay: `${i * 50}ms` }}
+              >
+                <SidebarMenuButton
+                  asChild
+                  isActive={isActive}
+                  className="w-full rounded-lg"
+                  style={{
+                    background: isActive ? 'rgba(64,105,255,0.07)' : 'transparent',
+                    borderLeft: isActive ? '2px solid #4069FF' : '2px solid transparent',
+                  }}
                 >
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive}
-                    className="w-full rounded-lg !bg-transparent hover:!bg-white/[0.06] data-[active=true]:!bg-white/[0.09] transition-colors"
+                  <Link
+                    to={item.path}
+                    className={`flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${
+                      isActive
+                        ? 'text-[#4069FF] font-semibold'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/60'
+                    }`}
                   >
-                    <Link
-                      to={item.path}
-                      className={`flex items-center gap-3 pl-3 pr-3 min-h-[44px] rounded-lg text-[13px] transition-colors duration-150 relative ${
-                        isActive
-                          ? 'text-white font-semibold'
-                          : 'text-white/65 hover:text-white'
-                      }`}
-                      style={isActive ? {
-                        boxShadow: 'inset 2px 0 0 0 #4069FF',
-                      } : undefined}
-                    >
-                      <span className={isActive ? 'text-[#7BA1FF]' : 'text-white/45'}>
-                        {item.icon}
+                    <span className={isActive ? 'text-[#4069FF]' : 'text-gray-400'}>
+                      {item.icon}
+                    </span>
+                    <span className="flex-1">{item.label}</span>
+                    {item.path === '/portal/notifications' && unreadCount > 0 && (
+                      <span className="ml-auto h-5 min-w-[20px] px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
-                      <span className="flex-1">{item.label}</span>
-                      {item.path === '/portal/notifications' && unreadCount > 0 && (
-                        <span className="ml-auto h-5 min-w-[20px] px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-                          {unreadCount > 99 ? '99+' : unreadCount}
-                        </span>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            });
+                    )}
+                  </Link>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            );
+          });
           })()}
         </SidebarMenu>
       </SidebarContent>
 
       {/* ── Footer / Sign out ── */}
-      <SidebarFooter className="px-3 py-3 border-t border-white/[0.06]">
+      <SidebarFooter className="px-3 py-3 border-t border-gray-100">
+        {/* User identity card */}
         <div className="flex items-center gap-3 px-2 py-2 mb-1 rounded-lg">
           <div
-            className={`w-9 h-9 rounded-full ${selfPhotoUrl ? 'bg-white/[0.04]' : `bg-gradient-to-br ${roleGradient}`} flex items-center justify-center flex-shrink-0 ring-1 ring-white/10 shadow-sm overflow-hidden`}
+            className={`w-9 h-9 rounded-full ${selfPhotoUrl ? 'bg-gray-100' : `bg-gradient-to-br ${roleGradient}`} flex items-center justify-center flex-shrink-0 ring-1 ring-white shadow-sm overflow-hidden`}
           >
             {selfPhotoUrl ? (
               <img src={selfPhotoUrl} alt={user?.name ?? ''} className="w-full h-full object-cover" />
@@ -296,10 +302,10 @@ export function PortalSidebar() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-[13px] font-medium text-white truncate leading-tight">
+            <p className="text-[13px] font-medium text-gray-900 truncate leading-tight">
               {user?.name ?? 'User'}
             </p>
-            <p className="text-[11px] text-white/45 truncate capitalize mt-0.5">
+            <p className="text-[11px] text-gray-400 truncate capitalize mt-0.5">
               {user?.role ?? 'member'} · {user?.email}
             </p>
           </div>
@@ -309,9 +315,10 @@ export function PortalSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => setChangePwOpen(true)}
-              className="w-full rounded-lg !bg-transparent hover:!bg-white/[0.06] cursor-pointer transition-colors"
+              className="w-full rounded-lg text-gray-500 hover:text-[#4069FF] transition-colors duration-150 cursor-pointer"
+              style={{ background: 'transparent' }}
             >
-              <div className="flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-[13px] w-full text-white/65 hover:text-white transition-colors">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] w-full hover:bg-blue-50/70 transition-colors duration-150">
                 <KeyRound className="h-4 w-4" />
                 Change password
               </div>
@@ -320,9 +327,10 @@ export function PortalSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={logout}
-              className="w-full rounded-lg !bg-transparent hover:!bg-red-500/10 cursor-pointer transition-colors"
+              className="w-full rounded-lg text-gray-500 hover:text-red-600 transition-colors duration-150 cursor-pointer"
+              style={{ background: 'transparent' }}
             >
-              <div className="flex items-center gap-3 px-3 min-h-[44px] rounded-lg text-[13px] w-full text-white/65 hover:text-red-300 transition-colors">
+              <div className="flex items-center gap-3 px-3 py-2 rounded-lg text-[13px] w-full hover:bg-red-50/70 transition-colors duration-150">
                 <LogOut className="h-4 w-4" />
                 Sign out
               </div>

@@ -1,6 +1,6 @@
 import { Clock, CheckCircle, Send, XCircle, Building2, FileEdit, FolderOpen, Briefcase } from 'lucide-react';
 import {
-  AreaChart, Area, ResponsiveContainer, Tooltip,
+  AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,6 @@ import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
-import { PageHeader } from '../../components/shared/PageHeader';
-import { BentoTile } from '../../components/shared/BentoTile';
 import { formatDate } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 import { useTimesheets } from '../../hooks/useTimesheets';
@@ -70,16 +68,13 @@ export function EmployeeDashboard() {
       .reduce((s, t) => s + t.totalHours, 0),
   }));
   const hoursSpark = hoursSeries.map(h => h.hours);
-  const thisWeekHours = hoursSeries[hoursSeries.length - 1]?.hours ?? 0;
-  const firstName = user?.name?.split(' ')[0] ?? 'there';
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="My workspace"
-        title={`Welcome back, ${firstName}`}
-        description="Your work at a glance — submit timesheets, track approvals, and review your assignments."
-      />
+      <div>
+        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Welcome, {user?.name?.split(' ')[0]}</h1>
+        <p className="text-sm text-gray-500 mt-1">Your work summary</p>
+      </div>
 
       <QuickActions
         actions={[
@@ -89,77 +84,49 @@ export function EmployeeDashboard() {
         ]}
       />
 
-      {/* ── Premium bento — hero (navy) + 3 KPI tiles ── */}
-      <div className="bento">
-        <BentoTile
-          tone="navy"
-          span={{ md: 4, lg: 4, rowLg: 2 }}
-          eyebrow="This week's hours"
-          delay={0}
-        >
-          <div className="flex flex-col h-full justify-between gap-4">
-            <div>
-              <p className="display-lg text-white tabular-nums leading-none">
-                {thisWeekHours}
-                <span className="text-white/55 ml-2 text-[0.55em] font-medium align-middle">hrs</span>
-              </p>
-              <p className="text-[12px] text-white/55 mt-2">
-                Week label {hoursSeries[hoursSeries.length - 1]?.week ?? '—'} · {approvedHours} approved YTD
-              </p>
-            </div>
-            <div className="-mx-2">
-              <ResponsiveContainer width="100%" height={130}>
-                <AreaChart data={hoursSeries} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="heroEmp" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#32CDDC" stopOpacity={0.45} />
-                      <stop offset="100%" stopColor="#32CDDC" stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [`${v} hrs`, 'Hours']} />
-                  <Area type="monotone" dataKey="hours" stroke="#32CDDC" fill="url(#heroEmp)" strokeWidth={2} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[
+          { title: 'Assigned Client', value: assignedClientName, icon: <Building2 className="h-5 w-5" />, variant: 'cyan' as const,
+            description: myAssignments.length > 1 ? `+${myAssignments.length - 1} more assignment${myAssignments.length > 2 ? 's' : ''}` : primaryAssignment?.projectName ?? 'No active project',
+            to: '/portal/assignments', linkLabel: 'View assignments' },
+          { title: 'Pending Timesheets', value: pendingTimesheets, icon: <Clock className="h-5 w-5" />,
+            variant: (pendingTimesheets > 0 ? 'orange' : 'green') as 'orange' | 'green',
+            description: pendingTimesheets > 0 ? 'Awaiting approval' : 'All up to date',
+            to: '/portal/timesheets', linkLabel: 'View timesheets' },
+          { title: 'Approved Hours', value: `${approvedHours} hrs`, icon: <CheckCircle className="h-5 w-5" />, variant: 'green' as const,
+            description: 'Client-approved', sparkline: hoursSpark, to: '/portal/timesheets', linkLabel: 'View timesheets' },
+        ].map((c, i) => (
+          <div key={c.title} className="portal-stagger" style={{ animationDelay: `${i * 60}ms` }}>
+            <StatCard {...c} />
           </div>
-        </BentoTile>
-
-        {/* KPI column — stacks next to hero on lg+, wraps under on smaller screens */}
-        <div className="bento-span-md-4 bento-span-lg-2 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 sm:gap-5">
-          <StatCard
-            title="Pending Timesheets"
-            value={pendingTimesheets}
-            icon={<Clock className="h-5 w-5" />}
-            variant={pendingTimesheets > 0 ? 'orange' : 'green'}
-            description={pendingTimesheets > 0 ? 'Awaiting approval' : 'All up to date'}
-            to="/portal/timesheets"
-            linkLabel="View timesheets"
-          />
-          <StatCard
-            title="Approved Hours"
-            value={`${approvedHours} hrs`}
-            icon={<CheckCircle className="h-5 w-5" />}
-            variant="green"
-            description="Client-approved"
-            sparkline={hoursSpark}
-            to="/portal/timesheets"
-            linkLabel="View timesheets"
-          />
-          <StatCard
-            title="Assigned Client"
-            value={assignedClientName}
-            icon={<Building2 className="h-5 w-5" />}
-            variant="cyan"
-            description={
-              myAssignments.length > 1
-                ? `+${myAssignments.length - 1} more assignment${myAssignments.length > 2 ? 's' : ''}`
-                : primaryAssignment?.projectName ?? 'No active project'
-            }
-            to="/portal/assignments"
-            linkLabel="View assignments"
-          />
-        </div>
+        ))}
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Clock className="h-4 w-4 text-[#4069FF]" />
+            My Hours per Week (Last 8 Weeks)
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <AreaChart data={hoursSeries} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="empHours" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#4069FF" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#4069FF" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
+              <XAxis dataKey="week" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [`${v} hrs`, 'Hours']} />
+              <Area type="monotone" dataKey="hours" stroke="#4069FF" fill="url(#empHours)" strokeWidth={2.5} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
 
       {rejected.length > 0 && (
         <div className="portal-alert-callout text-red-600">
@@ -205,7 +172,7 @@ export function EmployeeDashboard() {
                 <Link
                   key={a.id}
                   to={`/portal/assignments/${a.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/80"
+                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
                 >
                   <div>
                     <p className="text-sm font-medium">{a.projectName}</p>
@@ -240,7 +207,7 @@ export function EmployeeDashboard() {
                 <Link
                   key={ts.id}
                   to={`/portal/timesheets/${ts.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-slate-100 last:border-0 transition-colors hover:bg-slate-50/80"
+                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
                 >
                   <div>
                     <p className="text-sm font-medium">Week of {formatDate(ts.weekStartDate)}</p>
