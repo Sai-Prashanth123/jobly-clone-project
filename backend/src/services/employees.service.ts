@@ -232,8 +232,9 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
 export async function createEmployee(input: CreateEmployeeInput, actorId?: string) {
   // Pre-check by email so HR gets a precise 409 with the existing employee's
   // displayId, instead of a generic 500 from the DB unique-violation.
-  // Soft-deleted rows are silently restored — that path predates this guard and
-  // is useful for HR who delete by accident, then immediately re-create.
+  // Active duplicate → reject. Legacy soft-deleted row with the same email
+  // (pre-this-fix) → purge it inline so the email frees up, then fall through
+  // to a fresh insert (no resurrect — see deleteEmployee for the why).
   const { data: existingEmp } = await supabaseAdmin
     .from('employees')
     .select('*')
@@ -243,19 +244,18 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     .maybeSingle();
 
   if (existingEmp) {
-    if (existingEmp.deleted_at) {
-      await supabaseAdmin.from('employees').update({ deleted_at: null }).eq('id', existingEmp.id);
-      existingEmp.deleted_at = null;
-      const credsResult = await issueCredentials(existingEmp.id, existingEmp, input);
-      logActivity(actorId ?? null, 'updated', 'employee', existingEmp.id, existingEmp.display_id ?? input.email, { event: 'restored_soft_deleted' });
-      return { ...serializeEmployee(existingEmp), _credentials: credsResult };
+    if (!existingEmp.deleted_at) {
+      // Active duplicate — refuse with a clear message including the existing
+      // employee's displayId and name so HR can find the right record.
+      const label = existingEmp.display_id ?? existingEmp.id.slice(0, 8);
+      throw new ConflictError(
+        `An employee with email ${input.email} already exists (${label} — ${existingEmp.first_name} ${existingEmp.last_name}). Open their profile or use a different email.`,
+      );
     }
-    // Active duplicate — refuse with a clear message including the existing
-    // employee's displayId and name so HR can find the right record.
-    const label = existingEmp.display_id ?? existingEmp.id.slice(0, 8);
-    throw new ConflictError(
-      `An employee with email ${input.email} already exists (${label} — ${existingEmp.first_name} ${existingEmp.last_name}). Open their profile or use a different email.`,
-    );
+    // Legacy soft-deleted row whose email wasn't mangled (created before the
+    // delete-purge fix). Purge its data + free the email, then continue to the
+    // fresh insert below — the new employee gets a brand-new id/display_id.
+    await purgeEmployeeData(existingEmp.id, existingEmp.email);
   }
 
   let emp: any;
@@ -875,36 +875,104 @@ export async function reopenOnboarding(
 
 // ── delete ───────────────────────────────────────────────────────────────────
 
+// Internal helper — wipe all the personally-identifying data carried on an
+// employee row + the docs/storage/notifications/login attached to them, so a
+// re-create with the same email starts genuinely fresh. The employees row is
+// soft-deleted (not hard-deleted) so the FK chain on assignments / timesheets /
+// monthly_timesheets / invoice_line_items stays intact (audit + invoicing).
+//
+// Email is mangled to `deleted-<ts>-<old>` to free the unconditional UNIQUE
+// constraint on employees.email — that's what lets a fresh create reuse the
+// original email without a schema migration. Caller MUST have already verified
+// the row exists.
+async function purgeEmployeeData(empId: string, currentEmail: string | null): Promise<void> {
+  const mangledEmail = currentEmail
+    ? `deleted-${Date.now()}-${currentEmail}`
+    : `deleted-${Date.now()}-${empId}`;
+
+  // 1. Soft-delete + free the email + wipe per-employee PII / JSONB on the row.
+  //    Keep first/last name + display_id + created_at + the new deleted_at for
+  //    the activity log + downstream SET-NULL FK references to make sense.
+  await supabaseAdmin
+    .from('employees')
+    .update({
+      deleted_at: new Date().toISOString(),
+      email: mangledEmail,
+      work_email: null,
+      identity_documents: [],
+      education: [],
+      work_history: [],
+      emergency_contact_name: null,
+      emergency_contact_relationship: null,
+      emergency_contact_phone: null,
+      emergency_contact_alt_phone: null,
+      emergency_contact_address: null,
+      profile_photo_url: null,
+      ssn: null,
+      bank_name: null,
+      bank_routing_number: null,
+      bank_account_number: null,
+      onboarding_completed_at: null,
+      onboarding_change_request_message: null,
+      onboarding_change_requested_at: null,
+      onboarding_change_requested_by: null,
+    })
+    .eq('id', empId);
+
+  // 2. Remove the linked portal login + auth user. Without this the deleted
+  //    employee could still sign in, and their session keeps fetching this
+  //    now-404 record. portal_users.id === auth user id. Best-effort.
+  try {
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id').eq('employee_id', empId).maybeSingle();
+    if (pu?.id) {
+      await supabaseAdmin.from('portal_users').delete().eq('id', pu.id);
+      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(pu.id);
+      if (authErr) console.error('[purgeEmployeeData] auth.deleteUser failed for', pu.id, authErr);
+    }
+  } catch (err) {
+    console.error('[purgeEmployeeData] login cleanup failed for employee', empId, err);
+  }
+
+  // 3. Delete the employee's documents (DB rows) — best-effort.
+  try {
+    await supabaseAdmin.from('documents').delete().eq('entity_type', 'employee').eq('entity_id', empId);
+  } catch (err) {
+    console.error('[purgeEmployeeData] documents delete failed for employee', empId, err);
+  }
+
+  // 4. Remove the employee's storage files in both buckets — best-effort.
+  for (const bucket of ['employee-docs', 'employee-photos'] as const) {
+    try {
+      const { data: files } = await supabaseAdmin.storage.from(bucket).list(`${empId}/`, { limit: 1000 });
+      if (files && files.length > 0) {
+        const paths = files.map(f => `${empId}/${f.name}`);
+        await supabaseAdmin.storage.from(bucket).remove(paths);
+      }
+    } catch (err) {
+      console.error(`[purgeEmployeeData] storage cleanup failed for ${bucket}/${empId}/`, err);
+    }
+  }
+
+  // 5. Drop stale notifications targeting this employee (so old "submitted /
+  //    changes requested" notes don't linger on HR's bell). Best-effort.
+  try {
+    await supabaseAdmin.from('notifications').delete().eq('entity_type', 'employee').eq('entity_id', empId);
+  } catch (err) {
+    console.error('[purgeEmployeeData] notifications cleanup failed for employee', empId, err);
+  }
+}
+
 export async function deleteEmployee(id: string, actorId?: string) {
   const { data: existing, error: findErr } = await supabaseAdmin
     .from('employees')
-    .select('id, display_id')
+    .select('id, display_id, email')
     .eq('id', id)
     .is('deleted_at', null)
     .single();
   if (findErr || !existing) throw new NotFoundError('Employee not found');
 
-  await supabaseAdmin
-    .from('employees')
-    .update({ deleted_at: new Date().toISOString() })
-    .eq('id', id);
-
-  // Remove the linked portal login + auth user. Without this the deleted
-  // employee could still sign in, and their session keeps fetching this
-  // now-404 record (sidebar avatar, My Profile) — the "random 404s". Best-effort:
-  // a cleanup failure must not abort the delete. portal_users.id === auth user id.
-  try {
-    const { data: pu } = await supabaseAdmin
-      .from('portal_users').select('id').eq('employee_id', id).maybeSingle();
-    if (pu?.id) {
-      await supabaseAdmin.from('portal_users').delete().eq('id', pu.id);
-      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(pu.id);
-      if (authErr) console.error('[deleteEmployee] auth.deleteUser failed for', pu.id, authErr);
-    }
-  } catch (err) {
-    console.error('[deleteEmployee] login cleanup failed for employee', id, err);
-  }
-
+  await purgeEmployeeData(id, existing.email);
   logActivity(actorId ?? null, 'deleted', 'employee', id, existing.display_id ?? id.slice(0, 8));
 }
 
