@@ -153,6 +153,29 @@
   width: 40%;
 }
 
+/* Suppress browser number-input spinner arrows for a flat, premium form feel.
+   Users can still type / paste / use arrow keys; we just hide the visible
+   up/down spinners that clash with the rest of the input styling. Scoped to
+   .portal-scope so the public marketing site is unaffected. */
+.portal-scope input[type=number]::-webkit-inner-spin-button,
+.portal-scope input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.portal-scope input[type=number] {
+  -moz-appearance: textfield;
+}
+
+/* Unified field height + radius for the onboarding/HR wizard so every Input,
+   SelectTrigger, and textarea lines up vertically inside the wizard grids.
+   Scoped to .portal-wizard so other portal pages keep shadcn defaults. */
+.portal-scope .portal-wizard input:not([type=checkbox]):not([type=radio]):not([type=file]),
+.portal-scope .portal-wizard [data-slot="select-trigger"],
+.portal-scope .portal-wizard textarea {
+  min-height: 44px;
+  border-radius: 10px;
+}
+
 /* ── Utility Classes ─────────────────────────────────────────── */
 
 /* Light glass card — white frosted surface. Subtle, not floaty. */

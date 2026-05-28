@@ -10,7 +10,7 @@ import { useAuth, useChangePassword } from '../hooks/useAuth';
 // password. They cannot reach anything else until they set their own password
 // (enforced by the ProtectedRoute redirect + the backend 403 gate).
 export default function ForcePasswordReset() {
-  const { user, logout, markPasswordResetComplete } = useAuth();
+  const { user, logout, login } = useAuth();
   const navigate = useNavigate();
   const change = useChangePassword();
 
@@ -28,9 +28,19 @@ export default function ForcePasswordReset() {
     if (next === current) { setErr('New password must be different from the temporary password.'); return; }
     try {
       await change.mutateAsync({ currentPassword: current, newPassword: next });
-      markPasswordResetComplete();
+      // Supabase admin password update REVOKES the user's existing access token.
+      // Re-login with the new password BEFORE any other API call — otherwise the
+      // 401 from the stale token bounces us to /portal/login and forces the user
+      // to enter the password a second time. login() writes a fresh session +
+      // pulls /me, which reflects the must_reset_password=false the server just
+      // set, so ProtectedRoute can route them straight to onboarding.
+      const reauth = await login(user!.email, next);
+      if (!reauth.success) {
+        setErr(reauth.error ?? 'Password set, but auto-login failed. Please sign in again.');
+        return;
+      }
       toast.success('Password set — welcome to Jobly!');
-      navigate('/portal/dashboard', { replace: true });
+      navigate('/portal/onboarding', { replace: true });
     } catch (e2: unknown) {
       const msg = (e2 as { response?: { data?: { error?: string } } })?.response?.data?.error;
       setErr(msg ?? 'Could not set your password. Please try again.');

@@ -296,18 +296,17 @@ function SectionCard({
   return (
     <Card id={id} className={`scroll-mt-24 portal-animate-in portal-hover-lift ${needs ? 'ring-1 ring-red-300' : ''}`}>
       <CardHeader className="pb-3">
-        <div className="flex items-start gap-4">
-          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0 transition-colors ${complete ? 'bg-emerald-500 text-white' : needs ? 'bg-red-500 text-white' : 'bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white'}`}>
+        <div className="flex items-start gap-3 sm:gap-4">
+          <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0 transition-colors shadow-sm ${complete ? 'bg-emerald-500 text-white' : needs ? 'bg-red-500 text-white' : 'bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white'}`}>
             {complete ? <CheckCircle2 className="h-5 w-5" /> : needs ? <AlertTriangle className="h-4 w-4" /> : num}
           </div>
           <div className="min-w-0 flex-1">
-            <CardTitle className="text-base flex items-center gap-2">
-              {icon}
-              {title}
-              {complete && <span className="ml-1 text-[11px] font-medium text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Complete</span>}
-              {needs && <span className="ml-1 text-[11px] font-medium text-red-600 inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Needs info</span>}
+            <CardTitle className="text-[15px] font-semibold tracking-tight flex flex-wrap items-center gap-x-2 gap-y-1">
+              <span className="inline-flex items-center gap-2">{icon}{title}</span>
+              {complete && <span className="text-[11px] font-medium text-emerald-600 inline-flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" /> Complete</span>}
+              {needs && <span className="text-[11px] font-medium text-red-600 inline-flex items-center gap-1"><AlertTriangle className="h-3.5 w-3.5" /> Needs info</span>}
             </CardTitle>
-            {description && <p className="text-xs text-muted-foreground mt-1">{description}</p>}
+            {description && <p className="text-xs text-muted-foreground mt-1 leading-relaxed">{description}</p>}
           </div>
         </div>
       </CardHeader>
@@ -416,7 +415,7 @@ export default function NewEmployee() {
       identityDocFiles: {},
       education: e.education ?? [],
       workHistory: e.workHistory ?? [],
-      totalExperienceYears: e.totalExperienceYears != null ? String(e.totalExperienceYears) : '',
+      totalExperienceYears: e.totalExperienceYears ? String(e.totalExperienceYears) : '',
       experienceLevel: e.experienceLevel ?? '',
       emergencyContact: {
         name: e.emergencyContact?.name ?? '',
@@ -425,7 +424,7 @@ export default function NewEmployee() {
         altPhone: e.emergencyContact?.altPhone ?? '',
         address: e.emergencyContact?.address ?? '',
       },
-      payRate: e.payRate != null ? String(e.payRate) : '',
+      payRate: e.payRate ? String(e.payRate) : '',
       payType: e.payType ?? 'hourly',
       paymentType: (e.paymentType ?? '') as FormState['paymentType'],
       taxFormType: (e.taxFormType ?? '') as FormState['taxFormType'],
@@ -502,28 +501,13 @@ export default function NewEmployee() {
   // wizard can show what's still missing in real time and highlight the relevant
   // sections (no need to submit to find out). Drives the header chips + per-section
   // red "Needs info" markers when in onboarding mode.
-  const ID_UPLOAD_LABELS = new Set([
-    'Social Security Number', "Driver's License", 'State-Issued ID', 'Passport',
-    'Permanent Resident Card', 'Employment Authorization Document', 'ID Proof', 'Government ID',
-  ]);
-  const uploadedDocTypes = new Set<string>([
-    ...((existingEmployee?.documents ?? []).map(d => d.type)),
-    ...form.documents.filter(d => d.file).map(d => d.type),
-    ...IDENTITY_DOC_ROWS.filter(r => form.identityDocFiles[r.type]).map(r => r.label),
-  ]);
+  // File uploads + I-9 metadata (DL number, passport expiry, etc.) are intentionally
+  // NOT in this checklist — employees often don't have scans on day 1; HR collects
+  // missing items via the change-request flow.
   const presentFilled = [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim());
   const permFilled = form.permanentSameAsPresent
     ? presentFilled
     : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
-  // Strict identity-doc compliance — mirrors backend onboarding.ts rules.
-  const dlDoc = form.identityDocuments.find(d => d.type === 'driver_license');
-  const stateIdDoc = form.identityDocuments.find(d => d.type === 'state_id');
-  const hasGovPhotoId =
-    !!(dlDoc && (dlDoc.number ?? '').trim() && (dlDoc.state ?? '').trim()) ||
-    !!(stateIdDoc && (stateIdDoc.number ?? '').trim() && (stateIdDoc.state ?? '').trim());
-  const optionalsHalfFilled = form.identityDocuments.some(d =>
-    ['passport', 'green_card', 'ead'].includes(d.type) && (d.number ?? '').trim() && !(d.expiry ?? '').trim(),
-  );
   const onboardingChecklist = [
     // Personal
     { id: 'photo',       label: 'Profile photo',                  section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview || !!existingEmployee?.profilePhotoUrl },
@@ -536,9 +520,6 @@ export default function NewEmployee() {
     { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation },
     // Immigration + SSN
     { id: 'immigration', label: 'Immigration & I-9 (incl. SSN)',  section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && !!form.i9Status && /^\d{4}$/.test(form.ssn) },
-    // Identity docs
-    { id: 'gov_photo_id',  label: "Driver's License or State ID (with state)",                    section: SECTION_IDS.identity, done: hasGovPhotoId },
-    { id: 'optional_ids',  label: 'Passport / Green Card / EAD complete if started',             section: SECTION_IDS.identity, done: !optionalsHalfFilled },
     // Education
     { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
     // Emergency
@@ -546,9 +527,6 @@ export default function NewEmployee() {
     // Payroll
     { id: 'payment',     label: 'Payment type & rate',            section: SECTION_IDS.payroll,       done: !!form.paymentType && (Number(form.payRate || 0) > 0) },
     { id: 'bank',        label: 'Bank details',                   section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim() },
-    // Uploads
-    { id: 'id_upload',   label: 'Government ID upload',           section: SECTION_IDS.identity,      done: [...uploadedDocTypes].some(t => ID_UPLOAD_LABELS.has(t)) },
-    { id: 'resume',      label: 'Résumé upload',                  section: SECTION_IDS.documents,     done: uploadedDocTypes.has('Resume') },
     // Declaration
     { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
   ];
@@ -646,26 +624,46 @@ export default function NewEmployee() {
   };
 
   // ── Documents (deferred upload) ──────────────────────────────────────────
+  // 20 MB matches the backend multer limit (see backend/src/middleware/upload.ts).
+  // Reject larger files client-side to avoid a 413 round-trip during upload.
+  const MAX_DOC_BYTES = 20 * 1024 * 1024;
   const [docDraft, setDocDraft] = useState<{ type: string; file: File | null }>({ type: '', file: null });
-  const addDocumentDraft = () => {
-    if (!docDraft.type || !docDraft.file) {
-      toast.error('Pick a type and a file first');
-      return;
+  const [docDragOver, setDocDragOver] = useState(false);
+
+  // Stage one or more files. If a type was preselected in the draft Select, all
+  // newly-added files inherit it; otherwise rows start unclassified and prompt
+  // the user with an inline type Select (Submit is disabled while any row is
+  // unclassified — see `unclassifiedDocs` below).
+  const stageDocumentFiles = (files: File[]) => {
+    if (files.length === 0) return;
+    const valid: { id: string; name: string; type: string; file: File }[] = [];
+    let dropped = 0;
+    for (const f of files) {
+      if (f.size > MAX_DOC_BYTES) { dropped += 1; continue; }
+      valid.push({ id: crypto.randomUUID(), name: f.name, type: docDraft.type ?? '', file: f });
     }
-    setForm(p => ({
-      ...p,
-      documents: [
-        ...p.documents,
-        { id: crypto.randomUUID(), name: docDraft.file!.name, type: docDraft.type, file: docDraft.file! },
-      ],
-    }));
-    setDocDraft({ type: '', file: null });
+    if (dropped > 0) {
+      toast.error(`${dropped} file${dropped === 1 ? '' : 's'} exceeded the 20 MB limit and ${dropped === 1 ? 'was' : 'were'} skipped.`);
+    }
+    if (valid.length === 0) return;
+    setForm(p => ({ ...p, documents: [...p.documents, ...valid] }));
+  };
+  const addDocumentDraft = () => {
+    if (!docDraft.file) { toast.error('Pick a file first'); return; }
+    stageDocumentFiles([docDraft.file]);
+    setDocDraft(d => ({ type: d.type, file: null }));
     const input = document.getElementById('new-emp-doc-file') as HTMLInputElement | null;
     if (input) input.value = '';
   };
   const removeDocumentDraft = (id: string) => {
     setForm(p => ({ ...p, documents: p.documents.filter(d => d.id !== id) }));
   };
+  const setDocumentType = (id: string, type: string) => {
+    setForm(p => ({ ...p, documents: p.documents.map(d => d.id === id ? { ...d, type } : d) }));
+  };
+  // Exposes the unclassified-row count to the submit handler so we can block the
+  // wizard from completing onboarding with half-typed uploads.
+  const unclassifiedDocs = form.documents.filter(d => !d.type).length;
 
   // ── Submit ───────────────────────────────────────────────────────────────
   // Build the employee payload from the current form state. Shared by the full
@@ -715,8 +713,14 @@ export default function NewEmployee() {
       totalExperienceYears: parseNumberInput(form.totalExperienceYears),
       experienceLevel: form.experienceLevel || undefined,
       emergencyContact: form.emergencyContact,
-      // Only persist identity docs that have at least a number filled in.
-      identityDocuments: form.identityDocuments.filter(d => (d.number ?? '').trim() !== ''),
+      // identity_documents (number/state/expiry per type) is captured by HR only.
+      // In employee self-onboarding / Edit My Profile, the wizard hides the
+      // metadata fields entirely — we omit the key from the partial PUT so the
+      // existing JSONB column stays untouched (preserves any HR-entered values).
+      // In HR-create / HR-edit, send the array unchanged.
+      ...(isOnboarding || isSelfEdit
+        ? {}
+        : { identityDocuments: form.identityDocuments.filter(d => (d.number ?? '').trim() !== '') }),
     };
   };
 
@@ -1013,7 +1017,7 @@ export default function NewEmployee() {
     : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
 
   return (
-    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-56' : 'pb-56'}>
+    <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-40 sm:pb-56' : 'portal-wizard pb-40 sm:pb-56'}>
       {isOnboarding ? (
         <div className="mb-5">
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -1111,6 +1115,21 @@ export default function NewEmployee() {
         </div>
       )}
 
+      {/* Completion-done banner — surfaces explicit "all green" affirmation so
+          the employee knows they're ready to submit; otherwise the silent green
+          chip cluster requires them to scan + count. */}
+      {isOnboarding && onbDone === onboardingChecklist.length && !submitMutation.isPending && !completeOnboarding.isPending && (
+        <div
+          role="status"
+          className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 portal-animate-in flex items-start gap-3"
+        >
+          <CheckCircle2 className="h-5 w-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm font-medium text-emerald-800 leading-relaxed">
+            You're all set — click <strong>Finish onboarding</strong> below to submit your profile for HR review.
+          </p>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 lg:gap-6">
         {/* Main column — all the cards */}
         <div className="space-y-6 md:space-y-7">
@@ -1186,7 +1205,7 @@ export default function NewEmployee() {
                   <FieldError msg={errors.lastName} />
                 </div>
                 <div>
-                  <Label>Date of Birth</Label>
+                  <Label>Date of Birth {isOnboarding && <RequiredMark />}</Label>
                   <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
                   <FieldError msg={errors.dob} />
                 </div>
@@ -1195,7 +1214,7 @@ export default function NewEmployee() {
                   <Input value={age != null ? `${age} years` : ''} disabled placeholder="Auto" />
                 </div>
                 <div>
-                  <Label>Gender</Label>
+                  <Label>Gender {isOnboarding && <RequiredMark />}</Label>
                   <Select value={form.gender} onValueChange={v => set('gender', v)}>
                     <SelectTrigger><SelectValue placeholder="Select gender" /></SelectTrigger>
                     <SelectContent>
@@ -1209,7 +1228,7 @@ export default function NewEmployee() {
             {/* Demographics + language row */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div>
-                <Label>Marital Status</Label>
+                <Label>Marital Status {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.maritalStatus} onValueChange={v => set('maritalStatus', v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1218,7 +1237,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Blood Group</Label>
+                <Label>Blood Group {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.bloodGroup} onValueChange={v => set('bloodGroup', v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1227,11 +1246,11 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Nationality</Label>
+                <Label>Nationality {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="United States" />
               </div>
               <div>
-                <Label>Preferred Language</Label>
+                <Label>Preferred Language {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.preferredLanguage} onChange={e => set('preferredLanguage', e.target.value)} placeholder="English" />
               </div>
 
@@ -1268,7 +1287,7 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>Mobile Phone</Label>
+                <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
                 <FieldError msg={errors.phone} />
               </div>
@@ -1299,17 +1318,17 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
               <div className="sm:col-span-6">
-                <Label>Street Address</Label>
+                <Label>Street Address {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.address.street} onChange={e => setAddress('street', e.target.value)} />
                 <FieldError msg={errors.addressStreet} />
               </div>
               <div className="sm:col-span-3">
-                <Label>City</Label>
+                <Label>City {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.address.city} onChange={e => setAddress('city', e.target.value)} />
                 <FieldError msg={errors.addressCity} />
               </div>
               <div className="sm:col-span-2">
-                <Label>State</Label>
+                <Label>State {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.address.state} onValueChange={v => setAddress('state', v)}>
                   <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
                   <SelectContent className="max-h-[280px]">
@@ -1319,7 +1338,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.addressState} />
               </div>
               <div className="sm:col-span-1">
-                <Label>ZIP</Label>
+                <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.address.zip} onChange={e => setAddress('zip', e.target.value)} placeholder="94103" />
                 <FieldError msg={errors.addressZip} />
               </div>
@@ -1351,15 +1370,15 @@ export default function NewEmployee() {
             {!form.permanentSameAsPresent && (
               <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
                 <div className="sm:col-span-6">
-                  <Label>Street Address</Label>
+                  <Label>Street Address {isOnboarding && <RequiredMark />}</Label>
                   <Input value={form.permanentAddress.street} onChange={e => setPermanentAddress('street', e.target.value)} />
                 </div>
                 <div className="sm:col-span-3">
-                  <Label>City</Label>
+                  <Label>City {isOnboarding && <RequiredMark />}</Label>
                   <Input value={form.permanentAddress.city} onChange={e => setPermanentAddress('city', e.target.value)} />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label>State</Label>
+                  <Label>State {isOnboarding && <RequiredMark />}</Label>
                   <Select value={form.permanentAddress.state} onValueChange={v => setPermanentAddress('state', v)}>
                     <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
                     <SelectContent className="max-h-[280px]">
@@ -1368,7 +1387,7 @@ export default function NewEmployee() {
                   </Select>
                 </div>
                 <div className="sm:col-span-1">
-                  <Label>ZIP</Label>
+                  <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
                   <Input value={form.permanentAddress.zip} onChange={e => setPermanentAddress('zip', e.target.value)} />
                 </div>
                 <div className="sm:col-span-6">
@@ -1390,15 +1409,15 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Department</Label>
+                <Label>Department {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.department} onChange={e => set('department', e.target.value)} placeholder="Engineering" />
               </div>
               <div>
-                <Label>Job Title</Label>
+                <Label>Job Title {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.jobTitle} onChange={e => set('jobTitle', e.target.value)} placeholder="Senior Software Engineer" />
               </div>
               <div>
-                <Label>Employment Type</Label>
+                <Label>Employment Type {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.employmentType} onValueChange={v => set('employmentType', v as FormState['employmentType'])}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
@@ -1407,7 +1426,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Start Date</Label>
+                <Label>Start Date {isOnboarding && <RequiredMark />}</Label>
                 <Input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
                 <FieldError msg={errors.startDate} />
               </div>
@@ -1432,7 +1451,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div className="sm:col-span-2">
-                <Label>Work Location</Label>
+                <Label>Work Location {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.workLocation} onChange={e => set('workLocation', e.target.value)} placeholder="Remote · Onsite - New York · Hybrid" />
               </div>
             </div>
@@ -1449,7 +1468,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Visa Type</Label>
+                <Label>Visa Type {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1459,13 +1478,13 @@ export default function NewEmployee() {
                 <FieldError msg={errors.visaType} />
               </div>
               <div>
-                <Label>Work Authorization Expiry</Label>
+                <Label>Work Authorization Expiry {isOnboarding && <RequiredMark />}</Label>
                 <Input type="date" value={form.visaExpiry} onChange={e => set('visaExpiry', e.target.value)} />
                 {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />
               </div>
               <div>
-                <Label>I-9 Status</Label>
+                <Label>I-9 Status {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.i9Status || ''} onValueChange={v => set('i9Status', v as FormState['i9Status'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1475,7 +1494,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.i9Status} />
               </div>
               <div>
-                <Label>SSN — Last 4 digits</Label>
+                <Label>SSN — Last 4 digits {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.ssn}
                   onChange={e => set('ssn', e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -1488,94 +1507,146 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 07 Identity & Documents (US) */}
+          {/* 07 Identity & Documents (US) — employee mode: upload-only cards.
+              HR-create / HR-edit modes: number + state/expiry + upload (I-9 metadata). */}
           <SectionCard
             id={SECTION_IDS.identity}
-            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.identity)}
-            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description="US-issued ID numbers + optional file copies. Used for I-9 verification and payroll tax forms."
+            description={
+              isOnboarding || isSelfEdit
+                ? 'Upload whichever of these apply to your status. None are required — your HR contact will let you know if anything is missing.'
+                : 'US-issued ID numbers + optional file copies. Used for I-9 verification and payroll tax forms.'
+            }
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
-            <div className="space-y-3">
-              {IDENTITY_DOC_ROWS.map(row => {
-                const doc = getIdentityDoc(row.type);
-                const file = form.identityDocFiles[row.type];
-                const inputId = `id-doc-file-${row.type}`;
-                return (
-                  <div key={row.type} className="grid grid-cols-1 sm:grid-cols-[170px_1fr_auto_auto] gap-2 sm:gap-3 items-start p-3 bg-gray-50/60 rounded-md">
-                    <div className="sm:pt-2">
-                      <p className="text-sm font-medium text-gray-800">{row.label}</p>
-                      {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
+            {isOnboarding || isSelfEdit ? (
+              // Employee mode — clean upload grid, no metadata fields.
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {IDENTITY_DOC_ROWS.map(row => {
+                  const file = form.identityDocFiles[row.type];
+                  const inputId = `id-doc-file-${row.type}`;
+                  return (
+                    <div key={row.type} className="p-4 bg-gray-50/60 rounded-lg border border-gray-100 flex flex-col gap-3">
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{row.label}</p>
+                        {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
+                      </div>
+                      <div className="flex items-center gap-2 mt-auto">
+                        <label
+                          htmlFor={inputId}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          {file ? 'Replace' : 'Upload'}
+                        </label>
+                        <input
+                          id={inputId}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
+                        />
+                        {file && (
+                          <>
+                            <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
+                              Uploaded
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setIdentityDocFile(row.type, null)}
+                              className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
+                            >
+                              Remove
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px] gap-2">
-                      <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-gray-500">ID Number</Label>
-                        <Input
-                          value={doc.number ?? ''}
-                          onChange={e => upsertIdentityDoc(row.type, { number: e.target.value })}
-                          placeholder={row.placeholder}
+                  );
+                })}
+              </div>
+            ) : (
+              // HR mode — full metadata capture (number / state / expiry) + upload.
+              <div className="space-y-3">
+                {IDENTITY_DOC_ROWS.map(row => {
+                  const doc = getIdentityDoc(row.type);
+                  const file = form.identityDocFiles[row.type];
+                  const inputId = `id-doc-file-${row.type}`;
+                  return (
+                    <div key={row.type} className="grid grid-cols-1 sm:grid-cols-[170px_1fr_auto_auto] gap-2 sm:gap-3 items-start p-3 bg-gray-50/60 rounded-md">
+                      <div className="sm:pt-2">
+                        <p className="text-sm font-medium text-gray-800">{row.label}</p>
+                        {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px] gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-medium text-gray-500">ID Number</Label>
+                          <Input
+                            value={doc.number ?? ''}
+                            onChange={e => upsertIdentityDoc(row.type, { number: e.target.value })}
+                            placeholder={row.placeholder}
+                          />
+                        </div>
+                        {row.hasState && (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-medium text-gray-500">State</Label>
+                            <Select
+                              value={doc.state || ''}
+                              onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
+                            >
+                              <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                              <SelectContent className="max-h-[280px]">
+                                {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        )}
+                        {row.hasExpiry && (
+                          <div className="space-y-1">
+                            <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
+                            <Input
+                              type="date"
+                              value={doc.expiry ?? ''}
+                              onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
+                              placeholder="Expiry"
+                            />
+                            {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label
+                          htmlFor={inputId}
+                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
+                        >
+                          <Upload className="h-3.5 w-3.5" />
+                          {file ? 'Replace' : 'Upload Copy'}
+                        </label>
+                        <input
+                          id={inputId}
+                          type="file"
+                          accept=".pdf,.jpg,.jpeg,.png"
+                          className="hidden"
+                          onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
                         />
                       </div>
-                      {row.hasState && (
-                        <div className="space-y-1">
-                          <Label className="text-[11px] font-medium text-gray-500">State</Label>
-                          <Select
-                            value={doc.state || ''}
-                            onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
-                          >
-                            <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
-                            <SelectContent className="max-h-[280px]">
-                              {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                      {row.hasExpiry && (
-                        <div className="space-y-1">
-                          <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
-                          <Input
-                            type="date"
-                            value={doc.expiry ?? ''}
-                            onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
-                            placeholder="Expiry"
-                          />
-                          {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
-                        </div>
-                      )}
+                      <div className="flex sm:items-center">
+                        {file ? (
+                          <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
+                            Uploaded
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
+                            Pending
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <label
-                        htmlFor={inputId}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
-                      >
-                        <Upload className="h-3.5 w-3.5" />
-                        {file ? 'Replace' : 'Upload Copy'}
-                      </label>
-                      <input
-                        id={inputId}
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="hidden"
-                        onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
-                      />
-                    </div>
-                    <div className="flex sm:items-center">
-                      {file ? (
-                        <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
-                          Uploaded
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
-                          Pending
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </SectionCard>
 
           {/* 08 Education */}
@@ -1595,7 +1666,7 @@ export default function NewEmployee() {
                 {form.education.map((row, idx) => (
                   <div key={idx} className="grid grid-cols-1 sm:grid-cols-7 gap-2 items-end p-3 bg-gray-50/60 rounded-md">
                     <div className="sm:col-span-2">
-                      <Label className="text-[11px]">Level</Label>
+                      <Label className="text-[11px]">Level {isOnboarding && idx === 0 && <RequiredMark />}</Label>
                       <Select value={row.level || ''} onValueChange={v => updateEducation(idx, 'level', v)}>
                         <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                         <SelectContent>
@@ -1608,11 +1679,11 @@ export default function NewEmployee() {
                       <Input value={row.specialization ?? ''} onChange={e => updateEducation(idx, 'specialization', e.target.value)} />
                     </div>
                     <div className="sm:col-span-2">
-                      <Label className="text-[11px]">Institution</Label>
+                      <Label className="text-[11px]">Institution {isOnboarding && idx === 0 && <RequiredMark />}</Label>
                       <Input value={row.institution ?? ''} onChange={e => updateEducation(idx, 'institution', e.target.value)} />
                     </div>
                     <div>
-                      <Label className="text-[11px]">Pass Year</Label>
+                      <Label className="text-[11px]">Pass Year {isOnboarding && idx === 0 && <RequiredMark />}</Label>
                       <Input value={row.passYear ?? ''} onChange={e => updateEducation(idx, 'passYear', e.target.value)} placeholder="2024" />
                     </div>
                     <div>
@@ -1738,12 +1809,12 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Contact Name</Label>
+                <Label>Contact Name {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.emergencyContact.name} onChange={e => setEmergency('name', e.target.value)} />
                 <FieldError msg={errors.emergencyName} />
               </div>
               <div>
-                <Label>Relationship</Label>
+                <Label>Relationship {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.emergencyContact.relationship || ''} onValueChange={v => setEmergency('relationship', v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1752,7 +1823,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Mobile Phone</Label>
+                <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.emergencyContact.phone} onChange={e => setEmergency('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
                 <FieldError msg={errors.emergencyPhone} />
               </div>
@@ -1778,7 +1849,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Pay Rate (USD)</Label>
+                <Label>Pay Rate (USD) {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   type="number"
                   min={0}
@@ -1799,7 +1870,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Payment Type</Label>
+                <Label>Payment Type {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.paymentType || ''} onValueChange={v => set('paymentType', v as FormState['paymentType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1823,11 +1894,11 @@ export default function NewEmployee() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Bank Details (ACH Direct Deposit)</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <Label>Bank Name</Label>
+                <Label>Bank Name {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.bankName} onChange={e => set('bankName', e.target.value)} placeholder="Chase" />
               </div>
               <div>
-                <Label>Routing Number (9 digits)</Label>
+                <Label>Routing Number (9 digits) {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.bankRoutingNumber}
                   onChange={e => set('bankRoutingNumber', e.target.value.replace(/\D/g, '').slice(0, 9))}
@@ -1837,7 +1908,7 @@ export default function NewEmployee() {
                 />
               </div>
               <div>
-                <Label>Account Number</Label>
+                <Label>Account Number {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.bankAccountNumber}
                   onChange={e => set('bankAccountNumber', e.target.value)}
@@ -1847,57 +1918,98 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 12 Documents */}
+          {/* 12 Documents — drag-and-drop multi-file upload with inline classification.
+              Optional in onboarding mode (no checklist entry); HR can request specific
+              uploads via the change-request flow if anything is still needed. */}
           <SectionCard
             id={SECTION_IDS.documents}
-            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.documents)}
-            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.documents)}
             num="12"
             title="Documents"
-            description="Optional. Uploads happen after the employee is created."
+            description="Optional. Drag files in (or click to browse), then choose a type for each."
             icon={<FileText className="h-4 w-4 text-[#4069FF]" />}
           >
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <Label className="text-xs">Type</Label>
-                <Select value={docDraft.type} onValueChange={v => setDocDraft(d => ({ ...d, type: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                  <SelectContent>
-                    {DOC_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+            <div
+              onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
+              onDragLeave={() => setDocDragOver(false)}
+              onDrop={e => {
+                e.preventDefault();
+                setDocDragOver(false);
+                stageDocumentFiles(Array.from(e.dataTransfer.files));
+              }}
+              className={`rounded-xl border-2 border-dashed p-4 transition-colors ${
+                docDragOver ? 'border-[#4069FF] bg-blue-50/40' : 'border-gray-200'
+              }`}
+            >
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-xs">Default type (optional)</Label>
+                  <Select value={docDraft.type} onValueChange={v => setDocDraft(d => ({ ...d, type: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Choose for new uploads" /></SelectTrigger>
+                    <SelectContent>
+                      {DOC_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Files</Label>
+                  <input
+                    id="new-emp-doc-file"
+                    type="file"
+                    multiple
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                    onChange={e => {
+                      const picked = Array.from(e.target.files ?? []);
+                      if (picked.length > 0) {
+                        stageDocumentFiles(picked);
+                        e.target.value = '';
+                      }
+                    }}
+                    className="block w-full h-10 text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
+                  />
+                </div>
+                <div className="flex items-end">
+                  <Button type="button" onClick={addDocumentDraft} disabled={!docDraft.file} className="w-full gap-2" variant="outline">
+                    <Plus className="h-4 w-4" /> Stage file
+                  </Button>
+                </div>
               </div>
-              <div>
-                <Label className="text-xs">File</Label>
-                <input
-                  id="new-emp-doc-file"
-                  type="file"
-                  accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
-                  onChange={e => setDocDraft(d => ({ ...d, file: e.target.files?.[0] ?? null }))}
-                  className="block w-full h-10 text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                />
-              </div>
-              <div className="flex items-end">
-                <Button type="button" onClick={addDocumentDraft} disabled={!docDraft.type || !docDraft.file} className="w-full gap-2">
-                  <Plus className="h-4 w-4" /> Add
-                </Button>
-              </div>
+              <p className="text-[11px] text-muted-foreground mt-3 text-center">
+                Drag PDFs, images, or Office docs anywhere into this area — max 20&nbsp;MB each.
+              </p>
             </div>
 
             {form.documents.length > 0 && (
               <div className="mt-4 space-y-2">
                 {form.documents.map(d => (
                   <div key={d.id} className="flex items-center justify-between gap-2 py-2 px-3 rounded-md bg-gray-50/60 border border-gray-100">
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
                       <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <p className="text-sm truncate">{d.name}</p>
-                      <span className="text-[11px] text-muted-foreground">{d.type}</span>
+                      <p className="text-sm truncate flex-shrink min-w-0">{d.name}</p>
+                      {d.type ? (
+                        <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-white border border-gray-200 flex-shrink-0">
+                          {d.type}
+                        </span>
+                      ) : (
+                        <div className="flex-shrink-0 w-44">
+                          <Select value="" onValueChange={v => setDocumentType(d.id, v)}>
+                            <SelectTrigger className="h-7 text-[11px]"><SelectValue placeholder="Set type…" /></SelectTrigger>
+                            <SelectContent>
+                              {DOC_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )}
                     </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeDocumentDraft(d.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50">
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeDocumentDraft(d.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0">
                       <Trash2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))}
+                {unclassifiedDocs > 0 && (
+                  <p className="text-[11px] text-amber-700 mt-2 pl-1">
+                    {unclassifiedDocs} file{unclassifiedDocs === 1 ? '' : 's'} still need{unclassifiedDocs === 1 ? 's' : ''} a type before you can submit.
+                  </p>
+                )}
               </div>
             )}
           </SectionCard>
@@ -1955,13 +2067,13 @@ export default function NewEmployee() {
       <div
         className={`fixed bottom-0 left-0 right-0 z-30 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 ${!isOnboarding ? 'md:left-[var(--sidebar-width)]' : ''}`}
       >
-        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
               <p className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
                 {progress.filled} / {progress.total} required sections
               </p>
-              <div className="hidden sm:block flex-1 max-w-[200px] h-1 bg-gray-100 rounded-full overflow-hidden">
+              <div className="flex-1 sm:max-w-[200px] h-1 bg-gray-100 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all"
                   style={{ width: `${(progress.filled / progress.total) * 100}%` }}
@@ -1969,6 +2081,7 @@ export default function NewEmployee() {
               </div>
             </div>
           </div>
+          <div className="flex flex-row gap-2 w-full sm:w-auto sm:contents">
           {!isOnboarding && (
             <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending}>
               Cancel
@@ -1988,11 +2101,14 @@ export default function NewEmployee() {
             onClick={handleSubmit}
             loading={submitMutation.isPending || completeOnboarding.isPending}
             loadingText={isOnboarding ? 'Finishing…' : isEditMode ? 'Saving…' : 'Creating…'}
+            disabled={unclassifiedDocs > 0}
+            title={unclassifiedDocs > 0 ? 'Set a type for each uploaded file first.' : undefined}
             className="gap-2"
           >
             <CheckCircle2 className="h-4 w-4" />
             {isOnboarding ? 'Finish onboarding' : isEditMode ? 'Save Changes' : 'Create Employee'}
           </Button>
+          </div>
         </div>
       </div>
 
