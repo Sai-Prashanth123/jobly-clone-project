@@ -511,18 +511,46 @@ export default function NewEmployee() {
     ...form.documents.filter(d => d.file).map(d => d.type),
     ...IDENTITY_DOC_ROWS.filter(r => form.identityDocFiles[r.type]).map(r => r.label),
   ]);
+  const presentFilled = [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim());
   const permFilled = form.permanentSameAsPresent
-    ? [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim())
+    ? presentFilled
     : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
+  // Strict identity-doc compliance — mirrors backend onboarding.ts rules.
+  const dlDoc = form.identityDocuments.find(d => d.type === 'driver_license');
+  const stateIdDoc = form.identityDocuments.find(d => d.type === 'state_id');
+  const hasGovPhotoId =
+    !!(dlDoc && (dlDoc.number ?? '').trim() && (dlDoc.state ?? '').trim()) ||
+    !!(stateIdDoc && (stateIdDoc.number ?? '').trim() && (stateIdDoc.state ?? '').trim());
+  const optionalsHalfFilled = form.identityDocuments.some(d =>
+    ['passport', 'green_card', 'ead'].includes(d.type) && (d.number ?? '').trim() && !(d.expiry ?? '').trim(),
+  );
   const onboardingChecklist = [
-    { id: 'photo',     label: 'Profile photo',      section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview || !!existingEmployee?.profilePhotoUrl },
-    { id: 'personal',  label: 'Personal details',   section: SECTION_IDS.personal,      done: !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup },
-    { id: 'permanent', label: 'Permanent address',  section: SECTION_IDS.permanentAddr, done: permFilled },
-    { id: 'emergency', label: 'Emergency contact',  section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.phone.trim() },
-    { id: 'education', label: 'Education',           section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() !== '') },
-    { id: 'id_number', label: 'Government ID number', section: SECTION_IDS.identity,     done: form.identityDocuments.some(d => (d.number ?? '').trim() !== '') },
-    { id: 'id_upload', label: 'Government ID upload', section: SECTION_IDS.identity,     done: [...uploadedDocTypes].some(t => ID_UPLOAD_LABELS.has(t)) },
-    { id: 'resume',    label: 'Résumé upload',      section: SECTION_IDS.documents,     done: uploadedDocTypes.has('Resume') },
+    // Personal
+    { id: 'photo',       label: 'Profile photo',                  section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview || !!existingEmployee?.profilePhotoUrl },
+    { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
+    // Contact
+    { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
+    { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
+    { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
+    // Employment
+    { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation },
+    // Immigration + SSN
+    { id: 'immigration', label: 'Immigration & I-9 (incl. SSN)',  section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && !!form.i9Status && /^\d{4}$/.test(form.ssn) },
+    // Identity docs
+    { id: 'gov_photo_id',  label: "Driver's License or State ID (with state)",                    section: SECTION_IDS.identity, done: hasGovPhotoId },
+    { id: 'optional_ids',  label: 'Passport / Green Card / EAD complete if started',             section: SECTION_IDS.identity, done: !optionalsHalfFilled },
+    // Education
+    { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
+    // Emergency
+    { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() },
+    // Payroll
+    { id: 'payment',     label: 'Payment type & rate',            section: SECTION_IDS.payroll,       done: !!form.paymentType && (Number(form.payRate || 0) > 0) },
+    { id: 'bank',        label: 'Bank details',                   section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim() },
+    // Uploads
+    { id: 'id_upload',   label: 'Government ID upload',           section: SECTION_IDS.identity,      done: [...uploadedDocTypes].some(t => ID_UPLOAD_LABELS.has(t)) },
+    { id: 'resume',      label: 'Résumé upload',                  section: SECTION_IDS.documents,     done: uploadedDocTypes.has('Resume') },
+    // Declaration
+    { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
   ];
   const onbDone = onboardingChecklist.filter(c => c.done).length;
   const onbPct = Math.round((onbDone / onboardingChecklist.length) * 100);
@@ -530,7 +558,7 @@ export default function NewEmployee() {
   const firstIncompleteSection = onboardingChecklist.find(c => !c.done)?.section;
 
   // ── Validation ────────────────────────────────────────────────────────────
-  const validate = (): { ok: boolean; firstErrorSectionId?: string } => {
+  const validate = (): { ok: boolean; firstErrorSectionId?: string; missingItems?: string[] } => {
     const e: Record<string, string> = {};
     let firstSection: string | undefined;
     const flag = (key: string, msg: string, section: string) => {
@@ -538,9 +566,8 @@ export default function NewEmployee() {
       if (!firstSection) firstSection = section;
     };
 
-    // HR only has to provide first name, last name, and personal email at
-    // creation. Everything else is completed by the employee during
-    // self-onboarding (or by HR later via edit), so it's optional here.
+    // HR-create / edit: only firstName/lastName/email are required. The
+    // employee fills the rest during self-onboarding.
     if (!form.firstName.trim()) flag('firstName', 'First name is required', SECTION_IDS.personal);
     if (!form.lastName.trim())  flag('lastName',  'Last name is required',  SECTION_IDS.personal);
 
@@ -548,11 +575,25 @@ export default function NewEmployee() {
     else if (!/^\S+@\S+\.\S+$/.test(form.email)) flag('email', 'Enter a valid email', SECTION_IDS.contact);
     if (form.workEmail && !/^\S+@\S+\.\S+$/.test(form.workEmail)) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
 
-    // Optional fields: only validate format when actually filled in.
     if (form.ssn && !/^\d{4}$/.test(form.ssn)) flag('ssn', 'SSN must be exactly 4 digits', SECTION_IDS.immigration);
 
+    // Onboarding submit: every item in the live checklist must be done. We
+    // flag a marker error per missing item (so the section badges turn red)
+    // and surface the human-readable labels so the toast/banner can list
+    // them. Order matches the checklist for predictable scroll-to.
+    let missingItems: string[] | undefined;
+    if (isOnboarding) {
+      const incomplete = onboardingChecklist.filter(c => !c.done);
+      if (incomplete.length > 0) {
+        missingItems = incomplete.map(c => c.label);
+        for (const item of incomplete) {
+          flag(`__onb_${item.id}`, item.label, item.section);
+        }
+      }
+    }
+
     setErrors(e);
-    return { ok: Object.keys(e).length === 0, firstErrorSectionId: firstSection };
+    return { ok: Object.keys(e).length === 0, firstErrorSectionId: firstSection, missingItems };
   };
 
   // Scroll to a specific section. Used after validation failure.
@@ -682,22 +723,29 @@ export default function NewEmployee() {
   const handleSubmit = async () => {
     if (submittingRef.current) return;
     setSubmitError('');
-    const { ok, firstErrorSectionId } = validate();
+    const { ok, firstErrorSectionId, missingItems } = validate();
     if (!ok) {
       // Build a specific, human-readable list of what's missing so the toast
       // and persistent banner say WHAT to fix — not just "fix the highlighted
-      // fields". Falls back to the generic message when only format errors
-      // tripped validation (e.g. SSN format, invalid email).
-      const missing: string[] = [];
-      if (!form.firstName.trim()) missing.push('First Name');
-      if (!form.lastName.trim()) missing.push('Last Name');
-      if (!form.email.trim()) missing.push('Personal Email');
-      const msg = missing.length
-        ? `Please fill required fields: ${missing.join(', ')}.`
-        : 'Please fix the highlighted fields before submitting.';
+      // fields".
+      let msg: string;
+      if (isOnboarding && missingItems && missingItems.length > 0) {
+        // Onboarding submit: list the still-incomplete checklist items.
+        const head = missingItems.slice(0, 5).join(', ');
+        const more = missingItems.length > 5 ? ` and ${missingItems.length - 5} more` : '';
+        msg = `Please complete every section before submitting. Still missing: ${head}${more}.`;
+      } else {
+        const missing: string[] = [];
+        if (!form.firstName.trim()) missing.push('First Name');
+        if (!form.lastName.trim()) missing.push('Last Name');
+        if (!form.email.trim()) missing.push('Personal Email');
+        msg = missing.length
+          ? `Please fill required fields: ${missing.join(', ')}.`
+          : 'Please fix the highlighted fields before submitting.';
+      }
       setSubmitError(msg);
       if (firstErrorSectionId) scrollToSection(firstErrorSectionId);
-      toast.error(msg, { duration: 7000 });
+      toast.error(msg, { duration: 8000 });
       return;
     }
     submittingRef.current = true;
@@ -965,7 +1013,7 @@ export default function NewEmployee() {
     : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
 
   return (
-    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-48' : 'pb-48'}>
+    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-56' : 'pb-56'}>
       {isOnboarding ? (
         <div className="mb-5">
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -981,6 +1029,23 @@ export default function NewEmployee() {
               <LogOut className="h-4 w-4" /> Sign out
             </Button>
           </div>
+
+          {/* HR has asked the employee to fix something. Surface it at the top
+              of the wizard so they don't have to dig back to the pending
+              screen to see what HR said. */}
+          {existingEmployee?.onboardingChangeRequestMessage && (
+            <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 p-4 portal-animate-in">
+              <p className="text-[11px] font-semibold tracking-[0.14em] uppercase text-amber-700">
+                HR has requested changes
+              </p>
+              <p className="mt-1.5 text-sm text-amber-900 whitespace-pre-wrap leading-relaxed">
+                {existingEmployee.onboardingChangeRequestMessage}
+              </p>
+              <p className="mt-2 text-[11px] text-amber-700/80">
+                Update what they asked for below, then click <strong>Finish onboarding</strong> again to resubmit.
+              </p>
+            </div>
+          )}
           <div className="rounded-xl border border-gray-200 bg-white p-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Profile completion</span>
@@ -1890,7 +1955,7 @@ export default function NewEmployee() {
       <div
         className={`fixed bottom-0 left-0 right-0 z-30 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 ${!isOnboarding ? 'md:left-[var(--sidebar-width)]' : ''}`}
       >
-        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex items-center gap-3">
+        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex flex-wrap items-center gap-2 sm:gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
               <p className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
@@ -1931,23 +1996,14 @@ export default function NewEmployee() {
         </div>
       </div>
 
-      {(submitMutation.isPending || completeOnboarding.isPending) && (
+      {(submitMutation.isPending || completeOnboarding.isPending || updateEmployee.isPending) && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-md"
+          className="fixed top-0 left-0 right-0 z-50 h-[3px] overflow-hidden"
           role="status"
           aria-live="polite"
+          aria-label="Working…"
         >
-          <div className="flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-white shadow-xl border border-gray-100">
-            <Loader2 className="h-9 w-9 animate-spin text-[#4069FF]" />
-            <div className="text-center">
-              <p className="text-sm font-semibold text-gray-900">
-                {isOnboarding ? 'Submitting your onboarding…' : isEditMode ? 'Saving changes…' : 'Creating employee…'}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5">
-                {isOnboarding ? 'Sending to HR for review.' : isEditMode ? 'Updating record.' : 'This takes a moment — opening the profile next.'}
-              </p>
-            </div>
-          </div>
+          <div className="portal-top-progress h-full bg-gradient-to-r from-[#4069FF] via-[#32CDDC] to-[#4069FF]" />
         </div>
       )}
     </div>

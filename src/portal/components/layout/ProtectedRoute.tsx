@@ -18,9 +18,11 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   const path = location.pathname.replace(/\/$/, '');
   const isOnboardingRoute = path === '/portal/onboarding';
   const isPendingRoute = path === '/portal/onboarding/pending';
-  // 3-state onboarding gate (employees only). Falls back to the legacy
+  // 4-state onboarding gate (employees only). Falls back to the legacy
   // onboardingComplete flag for sessions created before onboardingStatus existed.
-  const ob: 'in_progress' | 'pending_review' | 'approved' =
+  // `changes_requested` (HR sent the employee back to edit) routes to the same
+  // pending screen as `pending_review`; the screen renders different copy.
+  const ob: 'in_progress' | 'pending_review' | 'changes_requested' | 'approved' =
     user?.role === 'employee'
       ? (user.onboardingStatus ?? (user.onboardingComplete ? 'approved' : 'in_progress'))
       : 'approved';
@@ -60,6 +62,14 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
       return <Navigate to="/portal/onboarding" replace />;
     }
     if (ob === 'pending_review' && !isPendingRoute) {
+      return <Navigate to="/portal/onboarding/pending" replace />;
+    }
+    // HR has asked the employee to revise. The pending screen is the
+    // communication hub (it shows HR's message + an "Update my information"
+    // CTA). The wizard is where they actually edit. Allow EITHER route — if
+    // they land somewhere else, send them to pending so they read the message
+    // first.
+    if (ob === 'changes_requested' && !isOnboardingRoute && !isPendingRoute) {
       return <Navigate to="/portal/onboarding/pending" replace />;
     }
     if (ob === 'approved' && (isOnboardingRoute || isPendingRoute)) {

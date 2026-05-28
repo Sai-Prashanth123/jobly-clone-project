@@ -4,19 +4,46 @@ import { UnauthorizedError } from '../lib/errors';
 import { resetUserPassword } from '../services/admin.service';
 import type { ChangePasswordInput, ForgotPasswordInput } from '../schemas/auth.schema';
 
-export type OnboardingStatus = 'in_progress' | 'pending_review' | 'approved';
+export type OnboardingStatus = 'in_progress' | 'pending_review' | 'changes_requested' | 'approved';
 
-// Onboarding gate state for the frontend. Employees move in_progress →
-// pending_review (submitted, awaiting HR) → approved (HR set status 'active').
+export interface OnboardingGateState {
+  status: OnboardingStatus;
+  // When status === 'changes_requested', the latest HR message + when it was sent.
+  // Surfaced on the OnboardingPending screen.
+  changeRequestMessage?: string | null;
+  changeRequestedAt?: string | null;
+}
+
+// Onboarding gate state for the frontend. Employees move
+//   in_progress → pending_review (submitted, awaiting HR)
+//                → changes_requested (HR sent the employee back to edit)
+//                → approved (HR set status 'active').
 // Everyone else is always 'approved' (never gated).
-async function computeOnboardingStatus(role?: string, employeeId?: string | null): Promise<OnboardingStatus> {
-  if (role !== 'employee' || !employeeId) return 'approved';
+async function computeOnboardingState(role?: string, employeeId?: string | null): Promise<OnboardingGateState> {
+  if (role !== 'employee' || !employeeId) return { status: 'approved' };
   const { data: emp } = await supabaseAdmin
-    .from('employees').select('status, onboarding_completed_at').eq('id', employeeId).maybeSingle();
-  if (!emp) return 'approved';
-  if (emp.status === 'active') return 'approved';
-  if (emp.onboarding_completed_at) return 'pending_review';
-  return 'in_progress';
+    .from('employees')
+    .select('status, onboarding_completed_at, onboarding_change_request_message, onboarding_change_requested_at')
+    .eq('id', employeeId).maybeSingle();
+  if (!emp) return { status: 'approved' };
+  if (emp.status === 'active') return { status: 'approved' };
+  // HR has asked the employee to revise: status is still 'onboarding' (we
+  // didn't add a new enum value), but the change-request message is set and
+  // the submission timestamp has been cleared by requestOnboardingChanges.
+  if (emp.onboarding_change_request_message) {
+    return {
+      status: 'changes_requested',
+      changeRequestMessage: emp.onboarding_change_request_message,
+      changeRequestedAt: emp.onboarding_change_requested_at,
+    };
+  }
+  if (emp.onboarding_completed_at) return { status: 'pending_review' };
+  return { status: 'in_progress' };
+}
+
+// Back-compat wrapper used by login/me (existing callers only need the status string).
+async function computeOnboardingStatus(role?: string, employeeId?: string | null): Promise<OnboardingStatus> {
+  return (await computeOnboardingState(role, employeeId)).status;
 }
 
 export async function login(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -94,9 +121,20 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
 export async function me(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // Recompute the onboarding gate state live so a session refresh / the
-    // pending-review screen's polling reflects HR approval immediately.
-    const onboardingStatus = await computeOnboardingStatus(req.user?.role, req.user?.employeeId);
-    res.json({ success: true, data: { ...req.user, onboardingStatus, onboardingComplete: onboardingStatus === 'approved' } });
+    // pending-review screen's polling reflects HR approval / change-request
+    // immediately. Also surface the HR change-request message so the pending
+    // screen can render it without an extra round-trip.
+    const gate = await computeOnboardingState(req.user?.role, req.user?.employeeId);
+    res.json({
+      success: true,
+      data: {
+        ...req.user,
+        onboardingStatus: gate.status,
+        onboardingComplete: gate.status === 'approved',
+        onboardingChangeRequestMessage: gate.changeRequestMessage ?? null,
+        onboardingChangeRequestedAt: gate.changeRequestedAt ?? null,
+      },
+    });
   } catch (err) {
     next(err);
   }

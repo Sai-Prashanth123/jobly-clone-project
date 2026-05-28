@@ -28,5 +28,10 @@ router.post('/:id/documents', requireRole('admin','hr','employee'), upload.singl
 router.delete('/:id/documents/:docId', requireRole('admin','hr','employee'), ctrl.deleteDoc);
 // Finalize self-onboarding (re-validates the checklist server-side, auto-activates).
 router.post('/:id/onboarding/complete', requireRole('admin','hr','employee'), ctrl.completeOnboarding);
+// HR asks the employee to fix something in their submitted onboarding.
+router.post('/:id/onboarding/request-changes', requireRole('admin','hr'), ctrl.requestOnboardingChanges);
+// Employee self-reopens the wizard while still in the "pending review" state
+// (before HR has acted). The service enforces ownership.
+router.post('/:id/onboarding/reopen', requireRole('admin','hr','employee'), ctrl.reopenOnboarding);
 
 export default router;

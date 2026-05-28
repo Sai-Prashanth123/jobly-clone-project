@@ -609,3 +609,87 @@ export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedE
     html,
   });
 }
+
+export interface OnboardingChangesRequestedEmailPayload {
+  to: string | string[];
+  employeeName: string;
+  displayId: string;
+  message: string;       // HR's freeform message to the employee
+  portalUrl?: string;    // Deep link to /portal/onboarding/pending
+}
+
+// Sent to the employee when HR clicks "Request Changes" on their submitted
+// onboarding. The pending-review screen surfaces the same message in-app; this
+// email duplicates it so the employee notices even if they're not logged in.
+export async function sendOnboardingChangesRequestedEmail(
+  payload: OnboardingChangesRequestedEmailPayload,
+): Promise<void> {
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+  }
+  const { to, employeeName, displayId, message, portalUrl } = payload;
+  const link = portalUrl || `${PORTAL_URL}/portal/onboarding/pending`;
+
+  // Render the message with paragraph breaks preserved.
+  const messageHtml = esc(message).replace(/\n/g, '<br>');
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
+    <tr><td align="center">
+      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#f59e0b,#fb923c);padding:32px 40px;">
+            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Onboarding — changes requested</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.92);font-size:14px;">Please review HR's notes and update your information</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 40px;">
+            <p style="margin:0 0 16px;color:#374151;font-size:15px;">Hi <strong>${esc(employeeName)}</strong>,</p>
+            <p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.6;">
+              HR has reviewed your onboarding submission for <strong>${esc(displayId)}</strong> and asked for a few changes before they can approve.
+              Their note is below — please log in to the portal, update your information, and resubmit.
+            </p>
+
+            <div style="margin:0 0 24px;padding:16px 18px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#78350f;font-size:14px;line-height:1.55;">
+              ${messageHtml}
+            </div>
+
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td align="center" style="padding:8px 0 8px;">
+                  <a href="${esc(link)}"
+                     style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
+                    Update my information →
+                  </a>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:18px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">
+              If you have questions about what to change, reach out to your HR team directly.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
+            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · Workforce Management Portal</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+
+  await sendWithRetry({
+    from: FROM,
+    to,
+    subject: `Onboarding — changes requested for ${employeeName} (${displayId})`,
+    html,
+  });
+}

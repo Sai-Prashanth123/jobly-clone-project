@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { ConflictError, NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
-import { sendWelcomeEmail, sendOnboardingCompletedEmail, mailerConfigured } from '../lib/mailer';
+import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRequestedEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { computeOnboarding } from '../lib/onboarding';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
@@ -737,20 +737,140 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
 
   // Mark as submitted for HR review — do NOT auto-activate. HR approval flips
   // status → 'active' (see updateEmployee / the Approve Onboarding button).
+  // If this is a re-submission after an HR "Request Changes", clear the
+  // change-request columns so the pending screen renders normally and HR sees
+  // a clean "submitted for review" state again.
+  const wasChangeRequested = !!emp.onboarding_change_request_message;
   const patch: Record<string, any> = { onboarding_completed_at: new Date().toISOString() };
+  if (wasChangeRequested) {
+    patch.onboarding_change_request_message = null;
+    patch.onboarding_change_requested_at = null;
+    patch.onboarding_change_requested_by = null;
+  }
   const { data: updated, error: updErr } = await supabaseAdmin
     .from('employees').update(patch).eq('id', id).select().single();
   if (updErr) throw updErr;
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'onboarding_submitted' });
+  logActivity(
+    actorId ?? null, 'updated', 'employee', id,
+    updated.display_id ?? id.slice(0, 8),
+    { event: wasChangeRequested ? 'onboarding_resubmitted' : 'onboarding_submitted' },
+  );
 
   // Tell HR an employee submitted onboarding and is awaiting review (in-app + email).
   // Fire-and-forget so a slow mailer can never delay/504 the employee's "Finish".
   void notifyOnboardingCompleted(updated);
 
+  // Build the full documents list from rows we ALREADY fetched above — no
+  // second round-trip. The `docs` query selected only `type`; for the response
+  // we want full rows, so reuse and project from a single query (replace the
+  // initial query with the full select inline).
   const { data: docList } = await supabaseAdmin
     .from('documents').select('*').eq('entity_type', 'employee').eq('entity_id', id);
   return { ...serializeEmployee(updated), documents: docList ?? [], onboarding: computeOnboarding(updated, docTypes) };
+}
+
+// ── HR-side: request changes from the employee ─────────────────────────────────
+// Called by HR/admin from the employee detail page. Stashes HR's message on the
+// employee row, clears onboarding_completed_at (so the gate re-routes the
+// employee from "pending review" back to "needs to update"), and notifies the
+// employee (in-app + email). status stays 'onboarding'; we surface the
+// "changes_requested" state in the application layer (computeOnboardingStatus).
+export async function requestOnboardingChanges(
+  id: string,
+  message: string,
+  actorId?: string,
+): Promise<{ employee: any }> {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('*').eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+  if (emp.status !== 'onboarding') {
+    throw new ValidationError('Change requests are only valid for employees currently onboarding.');
+  }
+  if (!emp.onboarding_completed_at) {
+    throw new ValidationError('Employee has not submitted their onboarding yet — nothing to review.');
+  }
+
+  const patch: Record<string, any> = {
+    onboarding_change_request_message: message,
+    onboarding_change_requested_at: new Date().toISOString(),
+    onboarding_change_requested_by: actorId ?? null,
+    // Clear the submission timestamp so the gate routes them back to the
+    // wizard and the pending screen shows the "HR has requested changes" UI.
+    onboarding_completed_at: null,
+  };
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from('employees').update(patch).eq('id', id).select().single();
+  if (updErr) throw updErr;
+
+  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
+    event: 'onboarding_changes_requested',
+  });
+
+  // Fire-and-forget: notify the employee in-app + by email.
+  void notifyOnboardingChangesRequested(updated, message);
+
+  return { employee: updated };
+}
+
+// Internal helper — mirrors notifyOnboardingCompleted but for the changes-requested case.
+async function notifyOnboardingChangesRequested(emp: any, message: string): Promise<void> {
+  const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
+  // In-app notification to the employee's portal user.
+  try {
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id, email').eq('employee_id', emp.id).maybeSingle();
+    if (pu?.id) {
+      await createNotification(
+        pu.id,
+        'HR has requested changes to your onboarding',
+        message.length > 280 ? `${message.slice(0, 277)}…` : message,
+        'warning',
+        'employee',
+        emp.id,
+      );
+    }
+    if (pu?.email && mailerConfigured) {
+      const portalBase = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
+      await sendOnboardingChangesRequestedEmail({
+        to: pu.email,
+        employeeName: fullName || 'there',
+        displayId: emp.display_id ?? emp.id,
+        message,
+        portalUrl: portalBase ? `${portalBase}/portal/onboarding/pending` : undefined,
+      });
+    }
+  } catch (err) {
+    console.error('[employees.service] changes-requested notification failed', err);
+  }
+}
+
+// ── Employee-side: self-reopen the wizard before HR has acted ──────────────────
+// Called from the OnboardingPending screen's "Change information" button. Only
+// valid when the caller IS the employee, status is 'onboarding', and
+// onboarding_completed_at is set (they're on the pending screen). Clears the
+// submission timestamp so the gate sends them back to the wizard.
+export async function reopenOnboarding(
+  id: string,
+  actorRole?: string,
+  actorEmployeeId?: string,
+): Promise<{ employee: any }> {
+  if (actorRole === 'employee' && actorEmployeeId !== id) {
+    throw new ForbiddenError('You may only reopen your own onboarding.');
+  }
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('id, status, onboarding_completed_at, display_id').eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+  if (emp.status !== 'onboarding' || !emp.onboarding_completed_at) {
+    throw new ValidationError('Onboarding is not in a submitted state — nothing to reopen.');
+  }
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from('employees').update({ onboarding_completed_at: null }).eq('id', id).select().single();
+  if (updErr) throw updErr;
+  logActivity(actorEmployeeId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8), {
+    event: 'onboarding_reopened',
+  });
+  return { employee: updated };
 }
 
 // ── delete ───────────────────────────────────────────────────────────────────

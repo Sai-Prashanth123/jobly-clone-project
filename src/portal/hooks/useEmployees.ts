@@ -85,6 +85,9 @@ function mapEmployee(raw: any): Employee {
 
     onboarding: raw.onboarding ?? undefined,
     onboardingCompletedAt: raw.onboarding_completed_at ?? undefined,
+    onboardingChangeRequestMessage: raw.onboarding_change_request_message ?? null,
+    onboardingChangeRequestedAt: raw.onboarding_change_requested_at ?? null,
+    onboardingChangeRequestedBy: raw.onboarding_change_requested_by ?? null,
 
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
@@ -194,6 +197,40 @@ export function useCompleteOnboarding(id: string) {
     mutationFn: async () => {
       const { data } = await apiClient.post(`/employees/${id}/onboarding/complete`, {});
       return mapEmployee(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees', id] });
+    },
+  });
+}
+
+// HR-side: post a freeform message asking the employee to fix things in their
+// submitted onboarding. Backend clears onboarding_completed_at and stamps the
+// change-request columns; the employee's pending screen flips to the "HR has
+// requested changes" UI on next refresh.
+export function useRequestOnboardingChanges(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (message: string) => {
+      const { data } = await apiClient.post(`/employees/${id}/onboarding/request-changes`, { message });
+      return data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees', id] });
+    },
+  });
+}
+
+// Employee-side: self-reopen the wizard while still on "pending review" (before
+// HR has acted). Clears onboarding_completed_at; status stays 'onboarding'.
+export function useReopenOnboarding(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post(`/employees/${id}/onboarding/reopen`, {});
+      return data.data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['employees'] });

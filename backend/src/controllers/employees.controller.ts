@@ -74,6 +74,25 @@ export async function completeOnboarding(req: Request, res: Response, next: Next
   } catch (err) { next(err); }
 }
 
+export async function requestOnboardingChanges(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const message = String((req.body as any)?.message ?? '').trim();
+    if (message.length < 1 || message.length > 2000) {
+      res.status(400).json({ success: false, error: 'Message must be 1–2000 characters.' });
+      return;
+    }
+    const data = await svc.requestOnboardingChanges(req.params.id, message, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function reopenOnboarding(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.reopenOnboarding(req.params.id, req.user!.role, req.user?.employeeId);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     await svc.deleteEmployee(req.params.id, req.user?.id);

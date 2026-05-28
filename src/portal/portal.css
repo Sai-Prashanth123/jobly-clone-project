@@ -140,6 +140,19 @@
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* Indeterminate top-of-page progress bar used while a long-running action
+   (employee create, onboarding submit, save) is in flight. Slides a 40%-wide
+   highlight from -40% to 100% so it feels responsive without taking over the
+   screen the way a fullscreen modal would. */
+@keyframes portalTopProgress {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+.portal-top-progress {
+  animation: portalTopProgress 1100ms cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  width: 40%;
+}
+
 /* ── Utility Classes ─────────────────────────────────────────── */
 
 /* Light glass card — white frosted surface. Subtle, not floaty. */

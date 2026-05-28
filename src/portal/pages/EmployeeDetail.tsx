@@ -2,13 +2,15 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
-import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials } from '../hooks/useEmployees';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials, useRequestOnboardingChanges } from '../hooks/useEmployees';
 import { useAssignments } from '../hooks/useAssignments';
 import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
@@ -27,9 +29,12 @@ export default function EmployeeDetail() {
   const updateEmployee = useUpdateEmployee(id!);
   const deleteEmployee = useDeleteEmployee();
   const resendCreds = useResendEmployeeCredentials();
+  const requestChanges = useRequestOnboardingChanges(id!);
 
   const { user } = useAuth();
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [changesOpen, setChangesOpen] = useState(false);
+  const [changesMessage, setChangesMessage] = useState('');
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -104,6 +109,14 @@ export default function EmployeeDetail() {
                   <Clock className="h-3 w-3" /> Submitted — ready for review
                 </span>
               )}
+              {employee.onboardingChangeRequestMessage && (
+                <span
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"
+                  title={`Sent ${employee.onboardingChangeRequestedAt ? formatDate(employee.onboardingChangeRequestedAt) : ''}: ${employee.onboardingChangeRequestMessage}`}
+                >
+                  <MessageSquareWarning className="h-3 w-3" /> Changes requested — awaiting employee
+                </span>
+              )}
               {employee.jobTitle && <span className="text-xs text-muted-foreground">· {employee.jobTitle}</span>}
             </div>
           </div>
@@ -130,6 +143,20 @@ export default function EmployeeDetail() {
             >
               <CheckCircle2 className="h-4 w-4" />
               {employee.status === 'inactive' ? 'Activate Employee' : 'Approve Onboarding'}
+            </Button>
+          )}
+          {/* Request Changes — only shown when the employee has actually
+              submitted (status onboarding + completed_at set). Lets HR ask the
+              employee to fix something before approving. */}
+          {employee.status === 'onboarding' && employee.onboardingCompletedAt && (user?.role === 'admin' || user?.role === 'hr') && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-amber-700 border-amber-200 hover:bg-amber-50"
+              onClick={() => { setChangesMessage(''); setChangesOpen(true); }}
+            >
+              <MessageSquareWarning className="h-4 w-4" />
+              Request Changes
             </Button>
           )}
           {(user?.role === 'admin' || user?.role === 'hr') && (
@@ -441,6 +468,62 @@ export default function EmployeeDetail() {
           }
         }}
       />
+
+      {/* Request-Changes dialog — HR types a message that the employee will see
+          on the OnboardingPending screen + receive via email. */}
+      <Dialog open={changesOpen} onOpenChange={(open) => !requestChanges.isPending && setChangesOpen(open)}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Request changes to onboarding</DialogTitle>
+            <DialogDescription>
+              Send {employee.firstName} {employee.lastName} a note about what to fix. They&rsquo;ll get an
+              email + in-app notification and the message will appear on their onboarding page.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              value={changesMessage}
+              onChange={(e) => setChangesMessage(e.target.value)}
+              placeholder="e.g. Please re-upload your Passport — the previous file was cut off. Also fix your phone number — it&rsquo;s missing a digit."
+              rows={6}
+              maxLength={2000}
+              disabled={requestChanges.isPending}
+              className="resize-y"
+            />
+            <p className="text-xs text-muted-foreground text-right tabular-nums">
+              {changesMessage.length} / 2000
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setChangesOpen(false)} disabled={requestChanges.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                const msg = changesMessage.trim();
+                if (msg.length < 1) {
+                  toast.error('Please enter a message.');
+                  return;
+                }
+                try {
+                  await requestChanges.mutateAsync(msg);
+                  toast.success(`${employee.firstName} has been notified.`);
+                  setChangesOpen(false);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error ?? 'Could not send the request. Please try again.');
+                }
+              }}
+              loading={requestChanges.isPending}
+              loadingText="Sending&hellip;"
+              disabled={changesMessage.trim().length < 1}
+              className="gap-2"
+            >
+              <MessageSquareWarning className="h-4 w-4" />
+              Send to employee
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
