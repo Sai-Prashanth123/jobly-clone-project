@@ -14,10 +14,31 @@ export const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
+// Idle-session timeout: if no API activity for > IDLE_LIMIT, treat the session
+// as expired on the next request and bounce to login. Mitigates unattended-
+// workstation risk (#8 edge-case audit). Uses sessionStorage so closing the
+// tab also resets it.
+const IDLE_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
+const ACTIVITY_KEY = 'last_activity_at';
+function touchActivity() {
+  sessionStorage.setItem(ACTIVITY_KEY, String(Date.now()));
+}
+function isIdleExpired(): boolean {
+  const last = Number(sessionStorage.getItem(ACTIVITY_KEY) || 0);
+  return last > 0 && Date.now() - last > IDLE_LIMIT_MS;
+}
+
 // Attach JWT from sessionStorage on every request
 apiClient.interceptors.request.use(config => {
   const token = sessionStorage.getItem('access_token');
   if (token) {
+    if (isIdleExpired()) {
+      // Force a 401-style redirect on the next response — let it flow through
+      // the normal handler so the redirect logic stays in one place.
+      sessionStorage.clear();
+      window.location.href = '/portal/login?reason=idle';
+      return Promise.reject(new axios.Cancel('Session idle timeout'));
+    }
     config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
@@ -27,7 +48,7 @@ apiClient.interceptors.request.use(config => {
 // so the user lands back where they were after re-authenticating.
 let redirecting = false;
 apiClient.interceptors.response.use(
-  res => res,
+  res => { touchActivity(); return res; },
   err => {
     const status = err.response?.status;
 

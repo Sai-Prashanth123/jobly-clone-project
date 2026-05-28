@@ -59,6 +59,19 @@ export async function uploadEmployeePhoto(employeeId: string, file: Express.Mult
     || (file.mimetype === 'image/png' ? 'png' : 'jpg');
   const storagePath = `${employeeId}/${Date.now()}.${ext}`;
 
+  // Clean up any previous photo files in this employee's folder so storage
+  // doesn't accumulate orphan images on repeated uploads (#21 edge-case audit).
+  // Best-effort: a cleanup failure must not block the upload.
+  try {
+    const { data: existing } = await supabaseAdmin.storage
+      .from(bucket).list(`${employeeId}/`, { limit: 100 });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.storage.from(bucket).remove(existing.map(f => `${employeeId}/${f.name}`));
+    }
+  } catch (err) {
+    console.error('[storage] employee photo cleanup failed for', employeeId, err);
+  }
+
   const { error: uploadError } = await supabaseAdmin
     .storage
     .from(bucket)
@@ -109,7 +122,10 @@ export async function getDocumentSignedUrl(
     // `download` sets Content-Disposition: attachment so the browser SAVES the
     // file (under its real name) instead of rendering it inline. Without it,
     // TXT/PDF/images open in a tab instead of downloading.
-    .createSignedUrl(doc.storage_path, 900, { download: doc.name ?? 'document' }); // 15 min
+    // 60 min TTL — long enough for users to open an emailed link without
+    // re-issuing, short enough that a leaked URL has a bounded window
+    // (#19 edge-case audit).
+    .createSignedUrl(doc.storage_path, 3600, { download: doc.name ?? 'document' });
 
   return data?.signedUrl ?? null;
 }

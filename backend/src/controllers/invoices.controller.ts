@@ -41,6 +41,12 @@ export async function remove(req: Request, res: Response, next: NextFunction): P
 export async function getPDF(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const url = await svc.getInvoicePDF(req.params.id);
+    // Audit every PDF download so finance has a trail of who accessed which
+    // invoice and when (#12 edge-case audit). Best-effort import to avoid a
+    // circular dep with services.
+    void import('../lib/activityLogger').then(({ logActivity }) =>
+      logActivity(req.user?.id ?? null, 'downloaded_pdf', 'invoice', req.params.id, req.params.id.slice(0, 8)),
+    );
     res.json({ success: true, data: { url } });
   } catch (err) { next(err); }
 }
