@@ -477,12 +477,13 @@ export default function NewEmployee() {
       !!form.startDate,                                                             // Employment
       !!form.visaType && !!form.visaExpiry && !!form.i9Status && /^\d{4}$/.test(form.ssn), // Immigration
       !!form.emergencyContact.name && !!form.emergencyContact.phone,                // Emergency
-      !!form.payRate && Number(form.payRate) > 0,                                   // Payroll
+      // Payroll: HR-side only. Hidden + not required in employee onboarding / self-edit.
+      ...(isOnboarding || isSelfEdit ? [] : [!!form.payRate && Number(form.payRate) > 0]),
       form.declarationAccepted && !!form.signatureName,                             // Review
     ];
     const filled = checks.filter(Boolean).length;
     return { filled, total: checks.length };
-  }, [form]);
+  }, [form, isOnboarding, isSelfEdit]);
 
   // Per-section completion — drives the green check shown on each section header
   // so the user gets positive "this section is done" feedback as they fill it.
@@ -509,8 +510,7 @@ export default function NewEmployee() {
     ? presentFilled
     : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
   const onboardingChecklist = [
-    // Personal
-    { id: 'photo',       label: 'Profile photo',                  section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview || !!existingEmployee?.profilePhotoUrl },
+    // Personal (photo intentionally NOT required — optional but recommended)
     { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
     // Contact
     { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
@@ -524,9 +524,8 @@ export default function NewEmployee() {
     { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
     // Emergency
     { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() },
-    // Payroll
-    { id: 'payment',     label: 'Payment type & rate',            section: SECTION_IDS.payroll,       done: !!form.paymentType && (Number(form.payRate || 0) > 0) },
-    { id: 'bank',        label: 'Bank details',                   section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim() },
+    // Payroll + bank: HR-owned (captured via HR-create/HR-edit), not part of the
+    // employee-side checklist.
     // Declaration
     { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
   ];
@@ -713,13 +712,17 @@ export default function NewEmployee() {
       totalExperienceYears: parseNumberInput(form.totalExperienceYears),
       experienceLevel: form.experienceLevel || undefined,
       emergencyContact: form.emergencyContact,
-      // identity_documents (number/state/expiry per type) is captured by HR only.
-      // In employee self-onboarding / Edit My Profile, the wizard hides the
-      // metadata fields entirely — we omit the key from the partial PUT so the
-      // existing JSONB column stays untouched (preserves any HR-entered values).
-      // In HR-create / HR-edit, send the array unchanged.
+      // identity_documents JSONB: HR-mode persists the full record (number +
+      // state + expiry per type). Employee mode only exposes the expiry input
+      // for visa-tied docs (Passport / Green Card / EAD) — we filter to those
+      // expiry-bearing rows so HR-entered number/state values stay intact on
+      // partial PUT, and add any expiry the employee just typed.
       ...(isOnboarding || isSelfEdit
-        ? {}
+        ? {
+            identityDocuments: form.identityDocuments.filter(d =>
+              (d.expiry ?? '').trim() !== '' || (d.number ?? '').trim() !== '',
+            ),
+          }
         : { identityDocuments: form.identityDocuments.filter(d => (d.number ?? '').trim() !== '') }),
     };
   };
@@ -1521,10 +1524,13 @@ export default function NewEmployee() {
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
             {isOnboarding || isSelfEdit ? (
-              // Employee mode — clean upload grid, no metadata fields.
+              // Employee mode — clean upload grid. Number/state inputs are
+              // intentionally hidden, but expiry stays for Passport / Green Card
+              // / EAD (visa-tied docs) so HR can track work-authorization expiry.
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {IDENTITY_DOC_ROWS.map(row => {
                   const file = form.identityDocFiles[row.type];
+                  const doc = getIdentityDoc(row.type);
                   const inputId = `id-doc-file-${row.type}`;
                   return (
                     <div key={row.type} className="p-4 bg-gray-50/60 rounded-lg border border-gray-100 flex flex-col gap-3">
@@ -1532,6 +1538,17 @@ export default function NewEmployee() {
                         <p className="text-sm font-semibold text-gray-800">{row.label}</p>
                         {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
                       </div>
+                      {row.hasExpiry && (
+                        <div className="space-y-1">
+                          <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
+                          <Input
+                            type="date"
+                            value={doc.expiry ?? ''}
+                            onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
+                          />
+                          {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
+                        </div>
+                      )}
                       <div className="flex items-center gap-2 mt-auto">
                         <label
                           htmlFor={inputId}
@@ -1838,7 +1855,10 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 11 Payroll & Tax */}
+          {/* 11 Payroll & Tax — HR-only (hidden from employee onboarding /
+              Edit My Profile). Pay rate, payment type, tax form, and bank
+              details are captured by HR via the HR-create / HR-edit screens. */}
+          {!isOnboarding && !isSelfEdit && (
           <SectionCard
             id={SECTION_IDS.payroll}
             complete={sectionComplete[SECTION_IDS.payroll]}
@@ -1917,6 +1937,7 @@ export default function NewEmployee() {
               </div>
             </div>
           </SectionCard>
+          )}
 
           {/* 12 Documents — drag-and-drop multi-file upload with inline classification.
               Optional in onboarding mode (no checklist entry); HR can request specific

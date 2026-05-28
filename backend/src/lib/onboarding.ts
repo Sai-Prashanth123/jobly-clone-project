@@ -6,8 +6,9 @@
 // NOT in this checklist. Employees often lack scans on day 1; HR collects missing
 // items via the change-request flow (see employees.service.ts:requestOnboardingChanges).
 // Strict checklist covers data the employee can always provide themselves: personal
-// details, addresses, employment, immigration status + SSN-last-4, education,
-// emergency contact, payroll, declaration.
+// details (no photo — optional), addresses, employment, immigration status + SSN-last-4,
+// education, emergency contact, declaration. Payroll + bank details are HR-only
+// (collected by HR via the HR-create / HR-edit screens, not the employee wizard).
 
 export interface OnboardingItem {
   id: string;
@@ -33,8 +34,8 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
   const education: any[] = Array.isArray(emp.education) ? emp.education : [];
 
   const checks: OnboardingItem[] = [
-    // Personal
-    { id: 'photo',              label: 'Profile photo',                                       done: nonEmpty(emp.profile_photo_url) },
+    // Personal — photo is intentionally optional (the wizard labels it "optional but
+    // recommended" but the strict gate used to block submission when missing).
     { id: 'dob',                label: 'Date of birth',                                       done: nonEmpty(emp.dob) },
     { id: 'gender',             label: 'Gender',                                              done: nonEmpty(emp.gender) },
     { id: 'marital_status',     label: 'Marital status',                                      done: nonEmpty(emp.marital_status) },
@@ -82,14 +83,8 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
         && nonEmpty(emp.emergency_contact_phone),
     },
 
-    // Payroll
-    { id: 'payment_type',       label: 'Payment type',                                        done: nonEmpty(emp.payment_type) },
-    { id: 'pay_rate',           label: 'Pay rate',                                            done: numPositive(emp.pay_rate) },
-    {
-      id: 'bank',               label: 'Bank details (name, routing, account)',
-      done: nonEmpty(emp.bank_name) && nonEmpty(emp.bank_routing_number) && nonEmpty(emp.bank_account_number),
-    },
-
+    // Payroll + bank are HR-owned (captured via HR-create/HR-edit screens, not the
+    // employee wizard) so they're not in the employee-side strict checklist.
   ];
 
   const done = checks.filter(c => c.done).length;
