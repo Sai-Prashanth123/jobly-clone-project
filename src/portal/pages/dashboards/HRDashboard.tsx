@@ -68,19 +68,19 @@ export function HRDashboard() {
     .map(([name, value]) => ({ name, value }));
 
   return (
-    <div className="space-y-8 md:space-y-10">
+    <div className="space-y-6 md:space-y-7">
       <header className="portal-animate-in">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gray-400 mb-2">
+        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400 mb-1.5">
           Workspace · HR
         </p>
         <h1
-          className="font-bold portal-gradient-text leading-[1.05]"
-          style={{ fontSize: 'clamp(1.75rem, 3.5vw, 2.75rem)', letterSpacing: '-0.025em' }}
+          className="font-semibold portal-gradient-text leading-[1.15]"
+          style={{ fontSize: 'clamp(1.25rem, 1.6vw, 1.625rem)', letterSpacing: '-0.015em' }}
         >
           HR Dashboard
         </h1>
-        <p className="text-[13px] sm:text-[15px] text-gray-500 mt-2 max-w-2xl">
-          Workforce overview &amp; compliance — your at-a-glance view of headcount, hiring trends, the onboarding queue, and visa/I-9 risk.
+        <p className="text-[13px] text-gray-500 mt-1 max-w-2xl">
+          Workforce overview &amp; compliance.
         </p>
       </header>
 
