@@ -137,7 +137,13 @@ export function useCreateEmployee() {
         warning: data.warning as string | undefined,
       };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+    onSuccess: ({ employee }) => {
+      // Pre-populate the detail query so the immediate navigate to
+      // /portal/employees/:id finds the new employee in cache (no loading
+      // flash on the detail page) — feels instant after create.
+      qc.setQueryData(['employees', employee.id], employee);
+      qc.invalidateQueries({ queryKey: ['employees'] });
+    },
   });
 }
 

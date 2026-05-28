@@ -294,10 +294,10 @@ function SectionCard({
   // precedence over `complete` so a section can't show green + red at once.
   const needs = attention && !complete;
   return (
-    <Card id={id} className={`scroll-mt-24 portal-animate-in ${needs ? 'ring-1 ring-red-300' : ''}`}>
+    <Card id={id} className={`scroll-mt-24 portal-animate-in portal-hover-lift ${needs ? 'ring-1 ring-red-300' : ''}`}>
       <CardHeader className="pb-3">
-        <div className="flex items-start gap-3">
-          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0 transition-colors ${complete ? 'bg-emerald-500 text-white' : needs ? 'bg-red-500 text-white' : 'bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white'}`}>
+        <div className="flex items-start gap-4">
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-bold tabular-nums flex-shrink-0 transition-colors ${complete ? 'bg-emerald-500 text-white' : needs ? 'bg-red-500 text-white' : 'bg-gradient-to-br from-[#4069FF] to-[#32CDDC] text-white'}`}>
             {complete ? <CheckCircle2 className="h-5 w-5" /> : needs ? <AlertTriangle className="h-4 w-4" /> : num}
           </div>
           <div className="min-w-0 flex-1">
@@ -684,8 +684,20 @@ export default function NewEmployee() {
     setSubmitError('');
     const { ok, firstErrorSectionId } = validate();
     if (!ok) {
+      // Build a specific, human-readable list of what's missing so the toast
+      // and persistent banner say WHAT to fix — not just "fix the highlighted
+      // fields". Falls back to the generic message when only format errors
+      // tripped validation (e.g. SSN format, invalid email).
+      const missing: string[] = [];
+      if (!form.firstName.trim()) missing.push('First Name');
+      if (!form.lastName.trim()) missing.push('Last Name');
+      if (!form.email.trim()) missing.push('Personal Email');
+      const msg = missing.length
+        ? `Please fill required fields: ${missing.join(', ')}.`
+        : 'Please fix the highlighted fields before submitting.';
+      setSubmitError(msg);
       if (firstErrorSectionId) scrollToSection(firstErrorSectionId);
-      toast.error('Please fix the highlighted fields');
+      toast.error(msg, { duration: 7000 });
       return;
     }
     submittingRef.current = true;
@@ -796,7 +808,19 @@ export default function NewEmployee() {
       navigate(`/portal/employees/${emp.id}`, { replace: true });
     } catch (err: any) {
       const status = err?.response?.status;
-      const msg = err?.response?.data?.error ?? (isEditMode ? 'Failed to update employee. Please try again.' : 'Failed to create employee. Please try again.');
+      // Build a clear, actionable message for the common cases instead of the
+      // raw server text. Duplicate-email gets its own copy; no-response
+      // (offline / backend cold-start) gets a distinct fallback.
+      const serverMsg = err?.response?.data?.error;
+      const noResponse = !err?.response;
+      let msg: string;
+      if (status === 409) {
+        msg = 'An employee with this personal email already exists. Use a different email, or check the Employees list to find them.';
+      } else if (noResponse) {
+        msg = "Couldn't reach the server. Please check your connection and try again.";
+      } else {
+        msg = serverMsg ?? (isEditMode ? 'Failed to update employee. Please try again.' : 'Failed to create employee. Please try again.');
+      }
       // Persistent banner at the top of the form — the toast disappears after
       // a few seconds but the banner stays until the user fixes the issue.
       setSubmitError(msg);
@@ -805,7 +829,7 @@ export default function NewEmployee() {
         // Duplicate email. Highlight the email field inline and jump the user
         // straight to it so it's obvious what to change (and that nothing was
         // created). The banner up top also makes the no-create state explicit.
-        setErrors(prev => ({ ...prev, email: 'This email is already used by another employee. Use a different one.' }));
+        setErrors(prev => ({ ...prev, email: 'An employee with this email already exists.' }));
         scrollToSection(SECTION_IDS.contact);
       } else {
         // Scroll to the top so the banner is visible.
@@ -941,7 +965,7 @@ export default function NewEmployee() {
     : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
 
   return (
-    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-40' : 'pb-40'}>
+    <div className={isOnboarding ? 'portal-scope min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-48' : 'pb-48'}>
       {isOnboarding ? (
         <div className="mb-5">
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -1024,7 +1048,7 @@ export default function NewEmployee() {
 
       <div className="grid grid-cols-1 gap-4 lg:gap-6">
         {/* Main column — all the cards */}
-        <div className="space-y-5">
+        <div className="space-y-6 md:space-y-7">
           {/* 01 Personal */}
           <SectionCard
             id={SECTION_IDS.personal}
@@ -1170,9 +1194,11 @@ export default function NewEmployee() {
                 <FieldError msg={errors.email} />
               </div>
               <div>
-                <Label>Work Email</Label>
+                <Label>
+                  Work Email <span className="text-[11px] font-normal text-gray-400">(optional)</span>
+                </Label>
                 <Input type="email" value={form.workEmail} onChange={e => set('workEmail', e.target.value)} placeholder="jane.doe@joblysolutions.com" />
-                <p className="text-[11px] text-muted-foreground mt-1">Portal login. Falls back to personal email if blank.</p>
+                <p className="text-[11px] text-muted-foreground mt-1">Optional. If left blank, portal login uses the personal email above.</p>
                 <FieldError msg={errors.workEmail} />
               </div>
 
@@ -1857,8 +1883,13 @@ export default function NewEmployee() {
 
       </div>
 
-      {/* Sticky save bar */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85">
+      {/* Sticky save bar — on the HR-create/edit layout (sidebar visible md+),
+          offset the left edge by the sidebar width so the bar doesn't cover the
+          sidebar's Change Password / Sign out. In onboarding mode the screen is
+          full-bleed (no sidebar), so left-0 is correct. */}
+      <div
+        className={`fixed bottom-0 left-0 right-0 z-30 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 ${!isOnboarding ? 'md:left-[var(--sidebar-width)]' : ''}`}
+      >
         <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-3">
@@ -1900,9 +1931,23 @@ export default function NewEmployee() {
         </div>
       </div>
 
-      {submitMutation.isPending && (
-        <div className="fixed inset-0 bg-white/30 backdrop-blur-sm z-50 flex items-center justify-center pointer-events-none">
-          <Loader2 className="h-8 w-8 animate-spin text-[#4069FF]" />
+      {(submitMutation.isPending || completeOnboarding.isPending) && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-md"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="flex flex-col items-center gap-3 px-6 py-5 rounded-2xl bg-white shadow-xl border border-gray-100">
+            <Loader2 className="h-9 w-9 animate-spin text-[#4069FF]" />
+            <div className="text-center">
+              <p className="text-sm font-semibold text-gray-900">
+                {isOnboarding ? 'Submitting your onboarding…' : isEditMode ? 'Saving changes…' : 'Creating employee…'}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                {isOnboarding ? 'Sending to HR for review.' : isEditMode ? 'Updating record.' : 'This takes a moment — opening the profile next.'}
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </div>

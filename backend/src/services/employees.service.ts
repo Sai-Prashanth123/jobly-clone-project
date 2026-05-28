@@ -201,38 +201,30 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       loginEmail: portalLoginEmail, tempPassword,
     };
   }
-  try {
-    await sendWelcomeEmail({
-      to: recipients,
-      firstName: input.firstName,
-      lastName: input.lastName,
-      displayId: emp.display_id ?? emp.id?.slice(0, 8) ?? empId.slice(0, 8),
-      jobTitle: input.jobTitle,
-      department: input.department,
-      startDate: input.startDate,
-      workLocation: input.workLocation ?? undefined,
-      employmentType: input.employmentType,
-      paymentType: input.paymentType ?? undefined,
-      loginEmail: portalLoginEmail,
-      tempPassword,
-    });
-    console.log('[mailer] credentials email sent to', recipients.join(', '), '(login:', portalLoginEmail, ')');
-    return { credentialsReady: true, emailSent: true, loginEmail: portalLoginEmail };
-  } catch (err: any) {
-    // Rich detail so ops can see WHY a recipient failed (bad address vs throttle
-    // vs auth) — the generic message alone made this undiagnosable.
-    console.error('[mailer] credentials email FAILED for', recipients.join(', '), {
+  // Fire-and-forget the welcome email — a slow SMTP roundtrip (500-3000ms +
+  // retries) was making the entire create-employee response wait on mail
+  // delivery. The credentials row is already persisted; HR has a "Resend
+  // Welcome Email" button on the detail page if delivery fails.
+  void sendWelcomeEmail({
+    to: recipients,
+    firstName: input.firstName,
+    lastName: input.lastName,
+    displayId: emp.display_id ?? emp.id?.slice(0, 8) ?? empId.slice(0, 8),
+    jobTitle: input.jobTitle,
+    department: input.department,
+    startDate: input.startDate,
+    workLocation: input.workLocation ?? undefined,
+    employmentType: input.employmentType,
+    paymentType: input.paymentType ?? undefined,
+    loginEmail: portalLoginEmail,
+    tempPassword,
+  })
+    .then(() => console.log('[mailer] credentials email sent to', recipients.join(', '), '(login:', portalLoginEmail, ')'))
+    .catch((err: any) => console.error('[mailer] credentials email FAILED for', recipients.join(', '), {
       code: err?.code, responseCode: err?.responseCode, response: err?.response,
       rejected: err?.rejected, message: err?.message,
-    });
-    return {
-      credentialsReady: true,
-      emailSent: false,
-      warning: `Login was created but the welcome email could not be sent (${err?.code ?? ''} ${err?.message ?? 'send failed'}). Share these credentials manually.`,
-      loginEmail: portalLoginEmail,
-      tempPassword,
-    };
-  }
+    }));
+  return { credentialsReady: true, emailSent: true, loginEmail: portalLoginEmail };
 }
 
 // ── create ───────────────────────────────────────────────────────────────────
@@ -365,25 +357,27 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     return { ...serializeEmployee(emp), _credentials: credsResult };
   }
 
-  // Notify HR about new onboarding employee (fire-and-forget)
-  try {
-    const hrIds = await getUserIdsByRole('hr');
-    const adminIds = await getUserIdsByRole('admin');
-    const label = emp.display_id ?? `${input.firstName} ${input.lastName}`;
-    for (const uid of [...new Set([...hrIds, ...adminIds])]) {
-      await createNotification(
-        uid,
-        'New Employee Onboarding',
-        `${label} (${input.firstName} ${input.lastName}) has been added and is pending onboarding completion.`,
-        'info', 'employee', emp.id,
+  // Notify HR/admin about the new onboarding employee — TRULY fire-and-forget,
+  // and fan out the inserts in parallel (was sequential `await` per user). The
+  // employee + auth + portal_users are already persisted, so create response
+  // returns immediately. Mirrors invoices.service generateInvoice notify block.
+  void (async () => {
+    try {
+      const [hrIds, adminIds] = await Promise.all([
+        getUserIdsByRole('hr'),
+        getUserIdsByRole('admin'),
+      ]);
+      const label = emp.display_id ?? `${input.firstName} ${input.lastName}`;
+      const msg = `${label} (${input.firstName} ${input.lastName}) has been added and is pending onboarding completion.`;
+      await Promise.all(
+        [...new Set([...hrIds, ...adminIds])].map(uid =>
+          createNotification(uid, 'New Employee Onboarding', msg, 'info', 'employee', emp.id),
+        ),
       );
+    } catch (err) {
+      console.error('[employees.service] new-employee notification failed', err);
     }
-  } catch (err) {
-    // Non-blocking, but surface the failure in logs so silent drops are visible
-    // to operators. We deliberately do NOT rethrow — onboarding must succeed
-    // even when the notification pipeline is degraded.
-    console.error('[employees.service] onboarding notification failed', err);
-  }
+  })();
 
   return { ...serializeEmployee(emp), _credentials: credsResult };
 }
