@@ -9,18 +9,12 @@ interface PageHeaderProps {
 export function PageHeader({ title, description, action, eyebrow }: PageHeaderProps) {
   return (
     <div className="mb-6 portal-animate-in">
-      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-6 pb-4 border-b border-gray-100">
+      <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3 sm:gap-6 pb-5 border-b border-slate-100">
         <div className="min-w-0">
-          {eyebrow && (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-400 mb-1.5">
-              {eyebrow}
-            </p>
-          )}
-          <h1 className="portal-heading text-[1.5rem] sm:text-[1.75rem] font-semibold tracking-tight truncate">
-            {title}
-          </h1>
+          {eyebrow && <p className="eyebrow mb-2">{eyebrow}</p>}
+          <h1 className="display-lg text-ink-900 truncate">{title}</h1>
           {description && (
-            <p className="text-[13px] text-gray-500 mt-1.5">{description}</p>
+            <p className="text-[13.5px] text-slate-500 mt-2 leading-relaxed">{description}</p>
           )}
         </div>
         {action && <div className="flex-shrink-0">{action}</div>}

@@ -12,6 +12,8 @@ import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
+import { PageHeader } from '../../components/shared/PageHeader';
+import { BentoTile } from '../../components/shared/BentoTile';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useClients } from '../../hooks/useClients';
@@ -107,9 +109,45 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Admin Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Full system overview</p>
+      <PageHeader
+        eyebrow="System overview"
+        title="Admin command center"
+        description="Live view of revenue, headcount, projects, and pending work across the entire workspace."
+      />
+
+      {/* ── Premium hero — revenue-this-month + 6-month trend ── */}
+      <div className="bento">
+        <BentoTile
+          tone="navy"
+          span={{ md: 4, lg: 6 }}
+          eyebrow="Revenue this month"
+          delay={0}
+        >
+          <div className="flex flex-col sm:flex-row items-start sm:items-end justify-between gap-6">
+            <div className="min-w-0">
+              <p className="display-lg text-white tabular-nums leading-none">
+                {formatCurrency(revenueThisMonth)}
+              </p>
+              <p className="text-[12px] text-white/55 mt-2">
+                {formatCurrency(totalOutstanding)} outstanding · {pendingApprovals} timesheet{pendingApprovals === 1 ? '' : 's'} awaiting approval · {activeProjects} active project{activeProjects === 1 ? '' : 's'}
+              </p>
+            </div>
+            <div className="w-full sm:w-[55%] sm:max-w-[420px] -mx-2 sm:mx-0">
+              <ResponsiveContainer width="100%" height={110}>
+                <AreaChart data={revenueSeries} margin={{ top: 6, right: 4, left: 4, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="heroAdmin" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#32CDDC" stopOpacity={0.5} />
+                      <stop offset="100%" stopColor="#32CDDC" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
+                  <Area type="monotone" dataKey="revenue" stroke="#32CDDC" fill="url(#heroAdmin)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </BentoTile>
       </div>
 
       <QuickActions

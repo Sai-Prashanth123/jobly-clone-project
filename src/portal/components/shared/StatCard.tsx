@@ -104,19 +104,17 @@ export function StatCard({
 }: StatCardProps) {
   const body = (
     <div
-      className={`portal-glass-card portal-hover-lift p-3.5 flex flex-col h-full ${
+      className={`portal-glass-card portal-hover-lift p-5 flex flex-col h-full ${
         to ? 'group cursor-pointer' : ''
       } ${className ?? ''}`}
     >
-      {/* Title row — icon + label on one line so the label has the full card width on the next line. */}
-      <div className="flex items-center justify-between gap-2 mb-1.5">
-        <p className="text-[10px] font-semibold text-gray-500 uppercase tracking-[0.08em] truncate flex-1 min-w-0">
-          {title}
-        </p>
+      {/* Title row — eyebrow label + accent icon square. */}
+      <div className="flex items-start justify-between gap-3 mb-3">
+        <p className="eyebrow truncate flex-1 min-w-0 mt-0.5">{title}</p>
         {icon && (
           <div
             title={helper}
-            className={`w-7 h-7 rounded-lg ${ICON_BG[variant]} flex items-center justify-center flex-shrink-0 [&_svg]:h-4 [&_svg]:w-4`}
+            className={`w-9 h-9 rounded-xl ${ICON_BG[variant]} flex items-center justify-center flex-shrink-0 [&_svg]:h-4 [&_svg]:w-4 transition-transform duration-200 group-hover:scale-105`}
           >
             {icon}
           </div>
@@ -125,7 +123,10 @@ export function StatCard({
 
       {/* Value row */}
       <div className="flex items-end justify-between gap-2">
-        <p className="text-[1.5rem] leading-none font-semibold text-gray-900 tabular-nums tracking-tight">
+        <p
+          className="leading-none font-semibold text-ink-900 tabular-nums tracking-tight"
+          style={{ fontSize: 'clamp(1.625rem, 2.4vw, 2rem)' }}
+        >
           {value}
         </p>
         {sparkline && sparkline.length >= 2 && (
@@ -134,27 +135,27 @@ export function StatCard({
       </div>
 
       {description && (
-        <p className="text-[11px] text-gray-400 mt-1.5 line-clamp-1">{description}</p>
+        <p className="text-[12px] text-slate-500 mt-2 line-clamp-1">{description}</p>
       )}
 
       {trend && (
-        <div className="flex items-center gap-1 mt-1.5">
+        <div className="flex items-center gap-1.5 mt-2">
           {trend.value >= 0 ? (
-            <TrendingUp className="h-3 w-3 text-emerald-500" />
+            <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
           ) : (
-            <TrendingDown className="h-3 w-3 text-red-500" />
+            <TrendingDown className="h-3.5 w-3.5 text-red-500" />
           )}
-          <span className={`text-[11px] font-semibold tabular-nums ${trend.value >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+          <span className={`text-[12px] font-semibold tabular-nums ${trend.value >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
             {trend.value >= 0 ? '+' : ''}{trend.value}%
           </span>
-          <span className="text-[11px] text-gray-400">{trend.label}</span>
+          <span className="text-[12px] text-slate-400">{trend.label}</span>
         </div>
       )}
 
       {to && (
-        <div className="mt-2 pt-2 border-t border-gray-100/80 flex items-center justify-between text-[10px] font-medium text-gray-500 group-hover:text-[#4069FF] transition-colors">
+        <div className="mt-auto pt-3 border-t border-slate-100/80 flex items-center justify-between text-[11.5px] font-medium text-slate-500 group-hover:text-ink-800 transition-colors">
           <span>{linkLabel ?? 'View'}</span>
-          <ChevronRight className="h-3 w-3 transform group-hover:translate-x-0.5 transition-transform" />
+          <ChevronRight className="h-3.5 w-3.5 transform group-hover:translate-x-0.5 transition-transform" />
         </div>
       )}
     </div>

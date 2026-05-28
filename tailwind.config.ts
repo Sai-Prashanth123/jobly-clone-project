@@ -15,8 +15,27 @@ export default {
     extend: {
       fontFamily: {
         poppins: ['Poppins', 'sans-serif'],
+        inter: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
       },
       colors: {
+        /* Portal premium-redesign aliases — navy ramp, brand accents */
+        ink: {
+          900: '#0B1220',
+          800: '#0F172A',
+          700: '#1E293B',
+          600: '#334155',
+          500: '#475569',
+        },
+        brand: {
+          blue: '#4069FF',
+          cyan: '#32CDDC',
+        },
+        hover: {
+          blue: '#2563EB',
+        },
+        surface: {
+          alt: '#F0F4FF',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
