@@ -2088,20 +2088,7 @@ export default function NewEmployee() {
       <div
         className={`fixed bottom-0 left-0 right-0 z-30 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 ${!isOnboarding ? 'md:left-[var(--sidebar-width)]' : ''}`}
       >
-        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3">
-              <p className="text-xs text-muted-foreground tabular-nums whitespace-nowrap">
-                {progress.filled} / {progress.total} required sections
-              </p>
-              <div className="flex-1 sm:max-w-[200px] h-1 bg-gray-100 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all"
-                  style={{ width: `${(progress.filled / progress.total) * 100}%` }}
-                />
-              </div>
-            </div>
-          </div>
+        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex flex-row items-center justify-end gap-2 sm:gap-3">
           <div className="flex flex-row gap-2 w-full sm:w-auto sm:contents">
           {!isOnboarding && (
             <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending}>
