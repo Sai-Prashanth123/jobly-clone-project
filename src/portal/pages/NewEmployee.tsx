@@ -1020,7 +1020,7 @@ export default function NewEmployee() {
     : 'Fill out each section to onboard a new hire. Required fields are marked with a red asterisk.';
 
   return (
-    <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-40 sm:pb-56' : 'portal-wizard pb-40 sm:pb-56'}>
+    <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-28 sm:pb-32' : 'portal-wizard pb-28 sm:pb-32'}>
       {isOnboarding ? (
         <div className="mb-5">
           <div className="flex items-start justify-between gap-3 mb-3">
@@ -2057,17 +2057,20 @@ export default function NewEmployee() {
 
       </div>
 
-      {/* Sticky save bar — on the HR-create/edit layout (sidebar visible md+),
-          offset the left edge by the sidebar width so the bar doesn't cover the
-          sidebar's Change Password / Sign out. In onboarding mode the screen is
-          full-bleed (no sidebar), so left-0 is correct. */}
+      {/* Floating action buttons — no background bar / no border. The two
+          buttons just float in the bottom-right; their own shadcn shadow keeps
+          them legible against any underlying content. On HR-create/edit the
+          right edge is offset so the buttons don't sit over the sidebar's
+          Change Password / Sign out controls (they're below the sidebar's
+          right edge anyway on full-bleed; in employee onboarding mode there's
+          no sidebar). */}
       <div
-        className={`fixed bottom-0 left-0 right-0 z-30 border-t bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 ${!isOnboarding ? 'md:left-[var(--sidebar-width)]' : ''}`}
+        className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-30 pointer-events-none ${!isOnboarding ? 'md:left-[var(--sidebar-width)]' : ''}`}
       >
-        <div className="max-w-screen-2xl mx-auto px-3 sm:px-4 md:px-6 py-3 flex flex-row items-center justify-end gap-2 sm:gap-3">
-          <div className="flex flex-row gap-2 w-full sm:w-auto sm:contents">
+        <div className="flex flex-row items-center justify-end gap-2 sm:gap-3 pointer-events-auto">
+          <div className="flex flex-row gap-2 sm:contents">
           {!isOnboarding && (
-            <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending}>
+            <Button variant="outline" onClick={() => navigate(backTo)} disabled={submitMutation.isPending} className="shadow-lg">
               Cancel
             </Button>
           )}
@@ -2077,6 +2080,7 @@ export default function NewEmployee() {
               onClick={handleSaveDraft}
               loading={updateEmployee.isPending}
               loadingText="Saving…"
+              className="shadow-lg"
             >
               Save &amp; continue later
             </Button>
@@ -2087,7 +2091,7 @@ export default function NewEmployee() {
             loadingText={isOnboarding ? 'Finishing…' : isEditMode ? 'Saving…' : 'Creating…'}
             disabled={unclassifiedDocs > 0}
             title={unclassifiedDocs > 0 ? 'Set a type for each uploaded file first.' : undefined}
-            className="gap-2"
+            className="gap-2 shadow-lg"
           >
             <CheckCircle2 className="h-4 w-4" />
             {isOnboarding ? 'Finish onboarding' : isEditMode ? 'Save Changes' : 'Create Employee'}
