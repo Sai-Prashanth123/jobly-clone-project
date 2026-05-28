@@ -1433,26 +1433,6 @@ export default function NewEmployee() {
                 <Input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
                 <FieldError msg={errors.startDate} />
               </div>
-              <div>
-                <Label>Status</Label>
-                <Select value={form.status} onValueChange={v => set('status', v as FormState['status'])}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Reporting Manager</Label>
-                <Select value={form.reportingManagerId} onValueChange={v => set('reportingManagerId', v)}>
-                  <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
-                  <SelectContent className="max-h-[300px]">
-                    {activeEmployees.filter(e => e.status === 'active').map(e => (
-                      <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName} — {e.jobTitle ?? '—'}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
               <div className="sm:col-span-2">
                 <Label>Work Location {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.workLocation} onChange={e => set('workLocation', e.target.value)} placeholder="Remote · Onsite - New York · Hybrid" />
@@ -1855,10 +1835,7 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 11 Payroll & Tax — HR-only (hidden from employee onboarding /
-              Edit My Profile). Pay rate, payment type, tax form, and bank
-              details are captured by HR via the HR-create / HR-edit screens. */}
-          {!isOnboarding && !isSelfEdit && (
+          {/* 11 Payroll & Tax */}
           <SectionCard
             id={SECTION_IDS.payroll}
             complete={sectionComplete[SECTION_IDS.payroll]}
@@ -1937,7 +1914,6 @@ export default function NewEmployee() {
               </div>
             </div>
           </SectionCard>
-          )}
 
           {/* 12 Documents — drag-and-drop multi-file upload with inline classification.
               Optional in onboarding mode (no checklist entry); HR can request specific
