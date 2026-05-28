@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError, ForbiddenError, ConflictError } from '../lib/errors';
+import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
+import { isCurrentOrFutureMonthUTC } from '../lib/dateUtils';
 import {
   createNotification, getUserIdsByRole,
   getPortalUserByEmployeeId, getReportingManagerPortalUserId,
@@ -126,6 +127,15 @@ export async function upsertMonthlyTimesheet(
     : (input.employeeId ?? actorEmployeeId);
   if (!targetEmployee) throw new ForbiddenError('No employee record is linked to this account.');
 
+  // Period lockout — past months are read-only for everyone except admin.
+  // Matches a strict corporate payroll cutoff: once a month closes, employees
+  // and HR cannot retroactively edit; admin overrides exist for corrections.
+  if (actorRole !== 'admin' && !isCurrentOrFutureMonthUTC(input.year, input.month)) {
+    throw new ValidationError(
+      `${monthLabel(input.year, input.month)} is closed. Past timesheets cannot be edited — contact your admin for a correction.`,
+    );
+  }
+
   const summary = computeSummary(input.entries as MonthlyEntry[]);
 
   const { data: existing } = await supabaseAdmin
@@ -139,26 +149,58 @@ export async function upsertMonthlyTimesheet(
     }
     const { data, error } = await supabaseAdmin
       .from('monthly_timesheets')
-      .update({ entries: input.entries, notes: input.notes ?? null, ...summary })
+      .update({
+        entries: input.entries, notes: input.notes ?? null,
+        leave_reason: input.leaveReason ?? null,
+        ...summary,
+      })
       .eq('id', existing.id).select().single();
     if (error) throw error;
     logActivity(actorId ?? null, 'updated', 'monthly_timesheet', existing.id, existing.display_id ?? existing.id.slice(0, 8));
     return data;
   }
 
-  const { data, error } = await supabaseAdmin
-    .from('monthly_timesheets')
-    .insert({
-      employee_id: targetEmployee, year: input.year, month: input.month,
-      entries: input.entries, notes: input.notes ?? null, status: 'draft', ...summary,
-    })
-    .select().single();
-  if (error) {
-    if ((error as any).code === '23505') throw new ConflictError('A timesheet already exists for this employee and month.');
-    throw error;
+  // Race-safe: 23505 from the UNIQUE(employee_id, year, month) constraint is
+  // returned as ConflictError to the caller (#1 from the edge-case audit).
+  let attempt = 0;
+  while (true) {
+    attempt++;
+    const { data, error } = await supabaseAdmin
+      .from('monthly_timesheets')
+      .insert({
+        employee_id: targetEmployee, year: input.year, month: input.month,
+        entries: input.entries, notes: input.notes ?? null,
+        leave_reason: input.leaveReason ?? null,
+        status: 'draft', ...summary,
+      })
+      .select().single();
+    if (error) {
+      if ((error as any).code === '23505' && attempt === 1) {
+        // Two simultaneous upserts raced; re-run the existing-row path once.
+        const { data: now } = await supabaseAdmin
+          .from('monthly_timesheets').select('id, status, display_id')
+          .eq('employee_id', targetEmployee).eq('year', input.year).eq('month', input.month)
+          .maybeSingle();
+        if (now) {
+          const { data: updated, error: updErr } = await supabaseAdmin
+            .from('monthly_timesheets')
+            .update({
+              entries: input.entries, notes: input.notes ?? null,
+              leave_reason: input.leaveReason ?? null,
+              ...summary,
+            })
+            .eq('id', now.id).select().single();
+          if (updErr) throw updErr;
+          logActivity(actorId ?? null, 'updated', 'monthly_timesheet', now.id, now.display_id ?? now.id.slice(0, 8));
+          return updated;
+        }
+        throw new ConflictError('A timesheet already exists for this employee and month.');
+      }
+      throw error;
+    }
+    logActivity(actorId ?? null, 'created', 'monthly_timesheet', data.id, data.display_id ?? data.id.slice(0, 8));
+    return data;
   }
-  logActivity(actorId ?? null, 'created', 'monthly_timesheet', data.id, data.display_id ?? data.id.slice(0, 8));
-  return data;
 }
 
 export async function updateMonthlyTimesheet(id: string, input: UpdateMonthlyTimesheetInput, actorRole: string, actorId?: string) {
@@ -166,10 +208,19 @@ export async function updateMonthlyTimesheet(id: string, input: UpdateMonthlyTim
   if (actorRole !== 'admin' && !['draft', 'rejected'].includes(row.status)) {
     throw new ForbiddenError('Only draft or rejected timesheets can be edited.');
   }
+  if (actorRole !== 'admin' && !isCurrentOrFutureMonthUTC(row.year, row.month)) {
+    throw new ValidationError(
+      `${monthLabel(row.year, row.month)} is closed. Past timesheets cannot be edited — contact your admin for a correction.`,
+    );
+  }
   const summary = computeSummary(input.entries as MonthlyEntry[]);
   const { data, error } = await supabaseAdmin
     .from('monthly_timesheets')
-    .update({ entries: input.entries, notes: input.notes ?? null, ...summary })
+    .update({
+      entries: input.entries, notes: input.notes ?? null,
+      leave_reason: input.leaveReason ?? null,
+      ...summary,
+    })
     .eq('id', id).select().single();
   if (error) throw error;
   logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
@@ -184,6 +235,22 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
   // Employees may only submit their own; admin/HR may submit on an employee's behalf.
   if (actorRole === 'employee' && row.employee_id !== actorEmployeeId) {
     throw new ForbiddenError('You can only submit your own timesheet.');
+  }
+  if (actorRole !== 'admin' && !isCurrentOrFutureMonthUTC(row.year, row.month)) {
+    throw new ValidationError(
+      `${monthLabel(row.year, row.month)} is closed. Past timesheets cannot be submitted — contact your admin for a correction.`,
+    );
+  }
+  // Submit-time gates:
+  //  - Zero-hour periods (employee on leave) require leave_reason.
+  //  - Non-zero periods require a client-signed timesheet upload as proof.
+  //    If hours = 0 (leave / medical), the upload requirement is skipped —
+  //    no work means no client signature exists.
+  if ((row.total_hours ?? 0) === 0 && !row.leave_reason) {
+    throw new ValidationError('Add a reason (e.g. medical leave, sick, unpaid leave) before submitting a zero-hour timesheet.');
+  }
+  if ((row.total_hours ?? 0) > 0 && !row.client_signed_url) {
+    throw new ValidationError('Upload the client-signed timesheet before submitting.');
   }
 
   const { data: updated, error } = await supabaseAdmin
@@ -380,4 +447,91 @@ async function runSubmitSideEffects(row: any): Promise<{ emailSent: boolean; war
   }
 
   return { emailSent, warning };
+}
+
+// ── Client-signed-timesheet proof upload ───────────────────────────────────
+//
+// Employees attach the client-signed copy of their monthly timesheet (PDF /
+// image / DOC) as proof. Required at submit-time when total_hours > 0; hidden
+// + skipped when the period is zero-hours (employee was on leave / medical).
+
+const PROOF_BUCKET = 'timesheet-proofs';
+const PROOF_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+export async function uploadMonthlyClientProof(
+  id: string, file: Express.Multer.File, actorRole: string, actorEmployeeId: string | null, actorId?: string,
+) {
+  const row = await getMonthlyTimesheet(id);
+  if (actorRole === 'employee' && row.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only upload proof to your own timesheet.');
+  }
+  if (actorRole !== 'admin' && !['draft', 'rejected'].includes(row.status)) {
+    throw new ForbiddenError('Proof can only be attached while the timesheet is in draft or rejected state.');
+  }
+  if (actorRole !== 'admin' && !isCurrentOrFutureMonthUTC(row.year, row.month)) {
+    throw new ValidationError(
+      `${monthLabel(row.year, row.month)} is closed. Past timesheets cannot be modified.`,
+    );
+  }
+
+  // Delete the previous proof (best-effort) so storage doesn't accumulate
+  // orphan files when employees re-upload.
+  try {
+    const { data: existing } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET).list(`monthly/${id}/`, { limit: 100 });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.storage.from(PROOF_BUCKET).remove(existing.map(f => `monthly/${id}/${f.name}`));
+    }
+  } catch (err) {
+    console.error('[monthlyTimesheets] old proof cleanup failed for', id, err);
+  }
+
+  const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+  const path = `monthly/${id}/${Date.now()}-${safeName}`;
+  const { error: upErr } = await supabaseAdmin.storage.from(PROOF_BUCKET)
+    .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+  if (upErr) throw upErr;
+
+  const { data: signed, error: signErr } = await supabaseAdmin.storage.from(PROOF_BUCKET)
+    .createSignedUrl(path, PROOF_URL_TTL_SECONDS);
+  if (signErr) throw signErr;
+
+  const { data: updated, error: dbErr } = await supabaseAdmin
+    .from('monthly_timesheets')
+    .update({ client_signed_url: signed.signedUrl, client_signed_filename: file.originalname })
+    .eq('id', id).select().single();
+  if (dbErr) throw dbErr;
+
+  logActivity(actorId ?? null, 'uploaded_client_proof', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  return updated;
+}
+
+export async function deleteMonthlyClientProof(
+  id: string, actorRole: string, actorEmployeeId: string | null, actorId?: string,
+) {
+  const row = await getMonthlyTimesheet(id);
+  if (actorRole === 'employee' && row.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only modify your own timesheet.');
+  }
+  if (actorRole !== 'admin' && !['draft', 'rejected'].includes(row.status)) {
+    throw new ForbiddenError('Proof can only be removed while the timesheet is in draft or rejected state.');
+  }
+
+  try {
+    const { data: existing } = await supabaseAdmin.storage
+      .from(PROOF_BUCKET).list(`monthly/${id}/`, { limit: 100 });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.storage.from(PROOF_BUCKET).remove(existing.map(f => `monthly/${id}/${f.name}`));
+    }
+  } catch (err) {
+    console.error('[monthlyTimesheets] proof file cleanup failed for', id, err);
+  }
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('monthly_timesheets')
+    .update({ client_signed_url: null, client_signed_filename: null })
+    .eq('id', id).select().single();
+  if (error) throw error;
+  logActivity(actorId ?? null, 'removed_client_proof', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  return updated;
 }

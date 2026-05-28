@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Info, Loader2, RotateCcw, Printer, Send, CheckCircle2, Save, Calendar, Users,
+  Upload, FileText, Trash2, AlertTriangle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +19,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useEmployee, useEmployees } from '../hooks/useEmployees';
 import {
   useMyMonth, useUpsertMonthlyTimesheet, useSubmitMonthlyTimesheet,
+  useUploadMonthlyClientProof, useDeleteMonthlyClientProof,
 } from '../hooks/useMonthlyTimesheets';
 import { apiClient } from '../lib/apiClient';
 import {
@@ -32,6 +34,22 @@ const DAY_STATUS_OPTIONS: { value: MonthlyDayStatus; label: string }[] = [
   { value: 'holiday', label: 'Holiday' },
   { value: 'absent', label: 'Absent' },
 ];
+
+// Leave-reason options surfaced when the employee submits a zero-hour month
+// (everything is leave/absent/holiday). Free text via "Other".
+const LEAVE_REASON_OPTIONS: { value: string; label: string }[] = [
+  { value: 'medical_leave', label: 'Medical leave' },
+  { value: 'sick', label: 'Sick' },
+  { value: 'vacation', label: 'Vacation / personal time off' },
+  { value: 'unpaid_leave', label: 'Unpaid leave' },
+  { value: 'bereavement', label: 'Bereavement' },
+  { value: 'jury_duty', label: 'Jury duty' },
+  { value: 'other', label: 'Other (specify in notes)' },
+];
+
+// Accepted client-proof file types — mirrors the backend multer whitelist.
+const PROOF_ACCEPT = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv';
+const MAX_PROOF_BYTES = 20 * 1024 * 1024;
 
 const ROW_TINT: Record<string, string> = {
   weekend: 'bg-gray-50/70',
@@ -73,10 +91,13 @@ export default function MyMonthlyTimesheet() {
 
   const upsert = useUpsertMonthlyTimesheet();
   const submit = useSubmitMonthlyTimesheet();
+  const uploadProof = useUploadMonthlyClientProof();
+  const deleteProof = useDeleteMonthlyClientProof();
 
   const [sheet, setSheet] = useState<MonthlyTimesheet | null>(null);
   const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month));
   const [notes, setNotes] = useState('');
+  const [leaveReason, setLeaveReason] = useState('');
   const [dirty, setDirty] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -85,6 +106,25 @@ export default function MyMonthlyTimesheet() {
 
   const isLocked = sheet?.status === 'submitted' || sheet?.status === 'approved';
   const summary = useMemo(() => computeMonthlySummary(entries), [entries]);
+  // Total hours actually logged (after the present-day cells are summed).
+  const totalHours = useMemo(() => entries.reduce((s, e) => s + (Number(e.hours) || 0), 0), [entries]);
+
+  // Period lockout — past months are read-only for non-admin/HR. The employee
+  // wizard sees `max={currentMonthInput}` on the picker, but the server is
+  // the real gate (returns 400 if you bypass via DevTools).
+  const cur = currentMonth();
+  const isPastMonth = loaded.year < cur.year || (loaded.year === cur.year && loaded.month < cur.month);
+  const isStaffOverride = isStaff;
+  const periodClosed = isPastMonth && !isStaffOverride;
+  const maxMonthInput = monthInputValue(cur.year, cur.month);
+
+  // Submit-time gates the frontend mirrors so the button + helper text are honest.
+  const needsLeaveReason = totalHours === 0;
+  const needsClientProof = totalHours > 0;
+  const hasClientProof = !!sheet?.clientSignedUrl;
+  const canSubmit = !isLocked
+    && !periodClosed
+    && (needsLeaveReason ? !!leaveReason : hasClientProof);
 
   // Hydrate the grid when the (employee, month) data lands.
   useEffect(() => {
@@ -97,22 +137,28 @@ export default function MyMonthlyTimesheet() {
       setSheet(serverSheet);
       setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month));
       setNotes(serverSheet.notes ?? '');
+      setLeaveReason(serverSheet.leaveReason ?? '');
     } else {
       setSheet(null);
       setEntries(buildMonthSkeleton(loaded.year, loaded.month));
       setNotes('');
+      setLeaveReason('');
     }
     setDirty(false);
     setSaveState('idle');
   }, [serverSheet, loadingMonth, loaded.year, loaded.month, targetEmployeeId]);
 
   // Debounced draft auto-save (only while editable + after a real edit).
+  // Skips for past (closed) periods — server would 400 the upsert anyway.
   useEffect(() => {
-    if (!targetEmployeeId || isLocked || !dirty) return;
+    if (!targetEmployeeId || isLocked || !dirty || periodClosed) return;
     setSaveState('saving');
     const t = setTimeout(() => {
       upsert.mutate(
-        { employeeId: targetEmployeeId, year: loaded.year, month: loaded.month, entries, notes },
+        {
+          employeeId: targetEmployeeId, year: loaded.year, month: loaded.month,
+          entries, notes, leaveReason: leaveReason || null,
+        },
         {
           onSuccess: (saved) => { setSheet(saved); setDirty(false); setSaveState('saved'); },
           onError: () => setSaveState('idle'),
@@ -121,7 +167,7 @@ export default function MyMonthlyTimesheet() {
     }, 800);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [entries, notes, dirty]);
+  }, [entries, notes, leaveReason, dirty]);
 
   const handleLoad = () => { hydratedKey.current = ''; setLoaded(period); };
 
@@ -151,7 +197,10 @@ export default function MyMonthlyTimesheet() {
 
   const ensureSaved = async (): Promise<MonthlyTimesheet | null> => {
     if (sheet && !dirty) return sheet;
-    const saved = await upsert.mutateAsync({ employeeId: targetEmployeeId, year: loaded.year, month: loaded.month, entries, notes });
+    const saved = await upsert.mutateAsync({
+      employeeId: targetEmployeeId, year: loaded.year, month: loaded.month,
+      entries, notes, leaveReason: leaveReason || null,
+    });
     setSheet(saved); setDirty(false); setSaveState('saved');
     return saved;
   };
@@ -267,6 +316,7 @@ export default function MyMonthlyTimesheet() {
               <Input
                 type="month"
                 value={monthInputValue(period.year, period.month)}
+                max={isStaff ? undefined : maxMonthInput}
                 onChange={e => { const p = parseMonthInput(e.target.value); if (p) setPeriod(p); }}
               />
             </div>
@@ -396,11 +446,124 @@ export default function MyMonthlyTimesheet() {
             />
           </div>
 
+          {periodClosed && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span><strong>This month is closed.</strong> Past timesheets can't be edited or submitted — contact your admin for a correction.</span>
+            </div>
+          )}
+
+          {/* Leave-reason picker — only visible (and required) when the entire
+              month is zero-hour (employee was on leave / medical / sick). */}
+          {!isLocked && !periodClosed && needsLeaveReason && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">
+              <Label className="text-[12px] font-medium text-amber-900">Reason for zero-hour month <span className="text-red-500">*</span></Label>
+              <p className="text-[11px] text-amber-800/80 mb-2">All days are leave / absent / holiday — pick the reason so HR has context.</p>
+              <Select value={leaveReason} onValueChange={v => { setLeaveReason(v); setDirty(true); }}>
+                <SelectTrigger className="bg-white"><SelectValue placeholder="Select a reason" /></SelectTrigger>
+                <SelectContent>
+                  {LEAVE_REASON_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          {/* Client-signed timesheet upload — required at submit-time when the
+              month has any working hours. Hidden entirely on zero-hour months
+              (no work means no client signature exists). */}
+          {!isLocked && !periodClosed && needsClientProof && (
+            <div className="rounded-lg border border-gray-200 bg-gray-50/60 px-4 py-3">
+              <Label className="text-[12px] font-medium text-gray-800">Client-signed timesheet <span className="text-red-500">*</span></Label>
+              <p className="text-[11px] text-muted-foreground mb-2">Upload a PDF / image / DOC of the client-signed copy as proof. Max 20 MB.</p>
+              {hasClientProof ? (
+                <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-white border border-emerald-200">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                    <a href={sheet!.clientSignedUrl} target="_blank" rel="noopener" className="text-sm text-emerald-700 hover:underline truncate">
+                      {sheet?.clientSignedFilename ?? 'Uploaded proof'}
+                    </a>
+                    <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex-shrink-0">Uploaded</span>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <label htmlFor="client-proof-replace" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 cursor-pointer px-2 py-1 rounded hover:bg-blue-50">
+                      <Upload className="h-3.5 w-3.5" /> Replace
+                    </label>
+                    <input
+                      id="client-proof-replace"
+                      type="file"
+                      accept={PROOF_ACCEPT}
+                      className="hidden"
+                      onChange={async e => {
+                        const f = e.target.files?.[0];
+                        if (!f) return;
+                        if (f.size > MAX_PROOF_BYTES) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                        const saved = await ensureSaved();
+                        if (!saved) return;
+                        try {
+                          const updated = await uploadProof.mutateAsync({ id: saved.id, file: f });
+                          setSheet(updated);
+                          toast.success('Client-signed timesheet uploaded.');
+                        } catch (err: any) {
+                          toast.error(err?.response?.data?.error ?? 'Upload failed.');
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                    <Button
+                      variant="ghost" size="sm"
+                      onClick={async () => {
+                        if (!sheet) return;
+                        try {
+                          const updated = await deleteProof.mutateAsync(sheet.id);
+                          setSheet(updated);
+                          toast.success('Proof removed.');
+                        } catch (err: any) {
+                          toast.error(err?.response?.data?.error ?? 'Remove failed.');
+                        }
+                      }}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="client-proof-upload" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors">
+                    <Upload className="h-3.5 w-3.5" /> Upload signed timesheet
+                  </label>
+                  <input
+                    id="client-proof-upload"
+                    type="file"
+                    accept={PROOF_ACCEPT}
+                    className="hidden"
+                    onChange={async e => {
+                      const f = e.target.files?.[0];
+                      if (!f) return;
+                      if (f.size > MAX_PROOF_BYTES) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                      const saved = await ensureSaved();
+                      if (!saved) return;
+                      try {
+                        const updated = await uploadProof.mutateAsync({ id: saved.id, file: f });
+                        setSheet(updated);
+                        toast.success('Client-signed timesheet uploaded.');
+                      } catch (err: any) {
+                        toast.error(err?.response?.data?.error ?? 'Upload failed.');
+                      }
+                      e.target.value = '';
+                    }}
+                  />
+                  <span className="text-[11px] text-muted-foreground">PDF / JPG / PNG / DOC / XLS — max 20 MB</span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2">
               <Button variant="outline" onClick={handlePrint} className="gap-1.5"><Printer className="h-4 w-4" /> Print / Save PDF</Button>
-              <Button variant="outline" onClick={() => setClearOpen(true)} disabled={isLocked} className="gap-1.5"><RotateCcw className="h-4 w-4" /> Clear Entries</Button>
-              {!isLocked && (
+              <Button variant="outline" onClick={() => setClearOpen(true)} disabled={isLocked || periodClosed} className="gap-1.5"><RotateCcw className="h-4 w-4" /> Clear Entries</Button>
+              {!isLocked && !periodClosed && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1.5">
                   {saveState === 'saving' ? <><Loader2 className="h-3 w-3 animate-spin" /> Saving…</>
                     : saveState === 'saved' ? <><Save className="h-3 w-3 text-emerald-500" /> Draft saved</>
@@ -414,7 +577,17 @@ export default function MyMonthlyTimesheet() {
                 {sheet?.status === 'approved' ? 'Approved — locked.' : 'Submitted — awaiting review.'}
               </div>
             ) : (
-              <Button onClick={() => setPreviewOpen(true)} className="gap-2 portal-btn-gradient" disabled={summary.workingDays === 0}>
+              <Button
+                onClick={() => setPreviewOpen(true)}
+                className="gap-2 portal-btn-gradient"
+                disabled={!canSubmit}
+                title={
+                  periodClosed ? 'Past months are closed.'
+                  : needsLeaveReason && !leaveReason ? 'Add a reason for the zero-hour month first.'
+                  : needsClientProof && !hasClientProof ? 'Upload the client-signed timesheet first.'
+                  : undefined
+                }
+              >
                 <Send className="h-4 w-4" /> Send Monthly Report to HR
               </Button>
             )}

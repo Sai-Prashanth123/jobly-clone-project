@@ -86,6 +86,25 @@ export async function patchStatus(req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 }
 
+export async function uploadClientProof(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.file) { res.status(400).json({ success: false, error: 'No file uploaded' }); return; }
+    const data = await svc.uploadMonthlyClientProof(
+      req.params.id, req.file, req.user!.role, req.user?.employeeId ?? null, req.user?.id,
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function deleteClientProof(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.deleteMonthlyClientProof(
+      req.params.id, req.user!.role, req.user?.employeeId ?? null, req.user?.id,
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function getPdf(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const row = await svc.getMonthlyTimesheet(req.params.id);

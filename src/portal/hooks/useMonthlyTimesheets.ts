@@ -29,6 +29,9 @@ function mapMonthlyTimesheet(raw: any): MonthlyTimesheet {
     employeeName: raw.employees ? `${raw.employees.first_name ?? ''} ${raw.employees.last_name ?? ''}`.trim() : undefined,
     employeeDisplayId: raw.employees?.display_id ?? undefined,
     department: raw.employees?.department ?? undefined,
+    leaveReason: raw.leave_reason ?? undefined,
+    clientSignedUrl: raw.client_signed_url ?? undefined,
+    clientSignedFilename: raw.client_signed_filename ?? undefined,
   };
 }
 
@@ -89,6 +92,39 @@ interface UpsertBody {
   month: number;
   entries: MonthlyTimesheetEntry[];
   notes?: string | null;
+  leaveReason?: string | null;
+}
+
+export function useUploadMonthlyClientProof() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await apiClient.post(`/monthly-timesheets/${id}/client-proof`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return mapMonthlyTimesheet(data.data);
+    },
+    onSuccess: (_, vars) => {
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets'] });
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets', vars.id] });
+    },
+  });
+}
+
+export function useDeleteMonthlyClientProof() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { data } = await apiClient.delete(`/monthly-timesheets/${id}/client-proof`);
+      return mapMonthlyTimesheet(data.data);
+    },
+    onSuccess: (_, id) => {
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets'] });
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets', id] });
+    },
+  });
 }
 
 export function useUpsertMonthlyTimesheet() {

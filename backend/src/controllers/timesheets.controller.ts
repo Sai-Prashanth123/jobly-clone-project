@@ -26,8 +26,27 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.createTimesheet(req.body as CreateTimesheetInput);
+    const data = await svc.createTimesheet(req.body as CreateTimesheetInput, req.user?.role);
     res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function uploadClientProof(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.file) { res.status(400).json({ success: false, error: 'No file uploaded' }); return; }
+    const data = await svc.uploadWeeklyClientProof(
+      req.params.id, req.file, req.user!.role, req.user?.employeeId ?? null, req.user?.id,
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function deleteClientProof(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.deleteWeeklyClientProof(
+      req.params.id, req.user!.role, req.user?.employeeId ?? null, req.user?.id,
+    );
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 }
 

@@ -15,11 +15,13 @@ export const createTimesheetSchema = z.object({
   weekEndDate: z.string(),
   entries: z.array(timesheetEntrySchema).max(7),
   notes: z.string().optional().nullable(),
+  leaveReason: z.string().min(3).max(280).optional().nullable(),
 });
 
 export const updateTimesheetSchema = z.object({
   entries: z.array(timesheetEntrySchema).max(7),
   notes: z.string().optional().nullable(),
+  leaveReason: z.string().min(3).max(280).optional().nullable(),
 });
 
 export const patchTimesheetStatusSchema = z.object({

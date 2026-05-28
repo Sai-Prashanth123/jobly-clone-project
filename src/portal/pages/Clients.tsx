@@ -22,6 +22,9 @@ export default function PortalClients() {
   const [showForm, setShowForm] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const updateClient = useUpdateClient(editClient?.id ?? '');
+  // Onboarding a new client is admin-only. Operations manages existing clients
+  // (edit / upload docs / change status), so canEdit stays broader than canCreate.
+  const canCreate = user?.role === 'admin';
   const canEdit = user?.role === 'admin' || user?.role === 'operations';
 
   const clients = data?.data ?? [];
@@ -108,12 +111,12 @@ export default function PortalClients() {
       <PageHeader
         title="Clients"
         description={isLoading ? 'Loading...' : `${clients.length} total clients`}
-        action={
+        action={canCreate ? (
           <Button onClick={() => setShowForm(true)} className="gap-2">
             <Plus className="h-4 w-4" />
             Add Client
           </Button>
-        }
+        ) : undefined}
       />
 
       {isLoading ? (

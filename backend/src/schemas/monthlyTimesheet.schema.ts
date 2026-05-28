@@ -18,11 +18,13 @@ export const upsertMonthlyTimesheetSchema = z.object({
   month: z.number().int().min(1).max(12),
   entries: z.array(monthlyEntrySchema).max(31),
   notes: z.string().optional().nullable(),
+  leaveReason: z.string().min(3).max(280).optional().nullable(),
 });
 
 export const updateMonthlyTimesheetSchema = z.object({
   entries: z.array(monthlyEntrySchema).max(31),
   notes: z.string().optional().nullable(),
+  leaveReason: z.string().min(3).max(280).optional().nullable(),
 });
 
 // Submission is handled by the dedicated /submit endpoint; this one is review-only.

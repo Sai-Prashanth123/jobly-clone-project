@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
+import { documentUpload } from '../middleware/upload';
 import {
   upsertMonthlyTimesheetSchema, updateMonthlyTimesheetSchema,
   patchMonthlyStatusSchema, listMonthlyTimesheetsQuerySchema,
@@ -25,5 +26,10 @@ router.patch('/:id/submit', requireRole('admin', 'hr', 'employee'), ctrl.submit)
 // Approve/Reject — route permits 'employee' so a reporting-manager employee can
 // review; the service verifies the caller is the manager OR role ∈ {hr, admin}.
 router.patch('/:id/status', requireRole('admin', 'hr', 'employee'), validateBody(patchMonthlyStatusSchema), ctrl.patchStatus);
+
+// Client-signed timesheet proof — required at submit-time when total_hours > 0.
+// Employee can only upload to their own timesheet (controller enforces).
+router.post('/:id/client-proof', requireRole('admin', 'hr', 'employee'), documentUpload.single('file'), ctrl.uploadClientProof);
+router.delete('/:id/client-proof', requireRole('admin', 'hr', 'employee'), ctrl.deleteClientProof);
 
 export default router;

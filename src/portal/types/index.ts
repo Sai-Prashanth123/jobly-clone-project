@@ -48,6 +48,11 @@ export interface MonthlyTimesheet {
   employeeName?: string;
   employeeDisplayId?: string;
   department?: string;
+  // Zero-hour periods require a reason (medical leave / sick / unpaid / etc.).
+  leaveReason?: string;
+  // Client-signed proof attachment (required at submit-time when total_hours > 0).
+  clientSignedUrl?: string;
+  clientSignedFilename?: string;
 }
 
 export interface PortalUser {

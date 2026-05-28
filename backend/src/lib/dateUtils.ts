@@ -62,6 +62,31 @@ export function daysBetween(dateA: string, dateB: string): number {
 }
 
 /**
+ * True if `weekStart` (a YYYY-MM-DD Monday) is the current ISO week's Monday or later.
+ * Used as the strict period-lockout gate on weekly timesheets — employees cannot
+ * submit or edit past weeks; only admin bypasses (handled at the call site).
+ */
+export function isCurrentOrFutureWeekUTC(weekStart: string): boolean {
+  return weekStart >= currentMondayUTC();
+}
+
+/** UTC current year and 1-indexed month (matches the columns on monthly_timesheets). */
+export function currentYearMonthUTC(): { year: number; month: number } {
+  const now = new Date();
+  return { year: now.getUTCFullYear(), month: now.getUTCMonth() + 1 };
+}
+
+/**
+ * True if (year, month) is the current calendar month or later. Period-lockout
+ * gate on monthly timesheets — employees cannot submit or edit past months.
+ * Admin bypass is handled at the call site.
+ */
+export function isCurrentOrFutureMonthUTC(year: number, month: number): boolean {
+  const { year: cy, month: cm } = currentYearMonthUTC();
+  return year > cy || (year === cy && month >= cm);
+}
+
+/**
  * Format a YYYY-MM-DD date for display ("Jan 15, 2026") without ever going
  * through `new Date(string)`, which JS parses as UTC midnight and then formats
  * in the server's local timezone — drifting by ±1 day depending on offset.

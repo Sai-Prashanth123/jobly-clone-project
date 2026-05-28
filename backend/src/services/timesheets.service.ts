@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError, ForbiddenError, ConflictError } from '../lib/errors';
+import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
+import { isCurrentOrFutureWeekUTC } from '../lib/dateUtils';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import type {
@@ -58,7 +59,16 @@ export async function getTimesheet(id: string) {
   return data;
 }
 
-export async function createTimesheet(input: CreateTimesheetInput) {
+export async function createTimesheet(input: CreateTimesheetInput, actorRole?: string) {
+  // Period lockout — past weeks are read-only for everyone except admin.
+  // Matches a strict corporate payroll cutoff. Admin can still backfill for
+  // corrections via a separate audit-logged path.
+  if (actorRole !== 'admin' && !isCurrentOrFutureWeekUTC(input.weekStartDate)) {
+    throw new ValidationError(
+      `Week of ${input.weekStartDate} is closed. Past timesheets cannot be created — contact your admin for a correction.`,
+    );
+  }
+
   // Check for duplicate
   const { data: existing } = await supabaseAdmin
     .from('timesheets')
@@ -70,7 +80,8 @@ export async function createTimesheet(input: CreateTimesheetInput) {
 
   if (existing) throw new ConflictError('Timesheet already exists for this employee/assignment/week');
 
-  const totalHours = input.entries.reduce((sum, e) => sum + e.hours, 0);
+  // total_hours is computed server-side; ignore any client-supplied value.
+  const totalHours = input.entries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
 
   const { data: ts, error: tsError } = await supabaseAdmin
     .from('timesheets')
@@ -82,6 +93,7 @@ export async function createTimesheet(input: CreateTimesheetInput) {
       week_end_date: input.weekEndDate,
       total_hours: totalHours,
       notes: input.notes ?? null,
+      leave_reason: input.leaveReason ?? null,
       status: 'draft',
     })
     .select()
@@ -126,8 +138,14 @@ export async function updateTimesheet(id: string, input: UpdateTimesheetInput, u
   if (userRole !== 'admin' && !['draft', 'rejected'].includes(ts.status)) {
     throw new ForbiddenError('Can only edit draft or rejected timesheets');
   }
+  // Period lockout for non-admins.
+  if (userRole !== 'admin' && !isCurrentOrFutureWeekUTC(ts.week_start_date)) {
+    throw new ValidationError(
+      `Week of ${ts.week_start_date} is closed. Past timesheets cannot be edited — contact your admin for a correction.`,
+    );
+  }
 
-  const totalHours = input.entries.reduce((sum, e) => sum + e.hours, 0);
+  const totalHours = input.entries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
 
   // Upsert entries — avoids duplicate-key errors from concurrent requests
   if (input.entries.length > 0) {
@@ -146,6 +164,7 @@ export async function updateTimesheet(id: string, input: UpdateTimesheetInput, u
 
   const updatePayload: Record<string, unknown> = { total_hours: totalHours };
   if (input.notes !== undefined) updatePayload.notes = input.notes ?? null;
+  if (input.leaveReason !== undefined) updatePayload.leave_reason = input.leaveReason ?? null;
 
   const { data, error } = await supabaseAdmin
     .from('timesheets')
@@ -189,6 +208,25 @@ export async function patchTimesheetStatus(
   const action = input.status;
   if (!allowed[action]?.includes(userRole)) {
     throw new ForbiddenError(`Role '${userRole}' cannot set status to '${action}'`);
+  }
+
+  // Submit-time gates (only checked when transitioning into `submitted`):
+  //  - Past weeks are read-only for non-admins.
+  //  - Zero-hour weeks require leave_reason.
+  //  - Non-zero weeks require a client-signed timesheet upload.
+  if (action === 'submitted' && userRole !== 'admin') {
+    if (!isCurrentOrFutureWeekUTC(ts.week_start_date)) {
+      throw new ValidationError(
+        `Week of ${ts.week_start_date} is closed. Past timesheets cannot be submitted — contact your admin for a correction.`,
+      );
+    }
+    const hours = Number(ts.total_hours ?? 0);
+    if (hours === 0 && !ts.leave_reason) {
+      throw new ValidationError('Add a reason (e.g. medical leave, sick, unpaid leave) before submitting a zero-hour timesheet.');
+    }
+    if (hours > 0 && !ts.client_signed_url) {
+      throw new ValidationError('Upload the client-signed timesheet before submitting.');
+    }
   }
 
   const updateData: Record<string, unknown> = { status: input.status };
@@ -373,4 +411,86 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
   }
 
   return { updated: eligible.length, failed };
+}
+
+// ── Client-signed weekly-timesheet proof upload ────────────────────────────
+//
+// Mirrors the monthly proof flow. Required at submit-time when total_hours > 0;
+// skipped when zero-hour (leave). Files live in storage.timesheet-proofs/weekly/<id>/.
+
+const WEEKLY_PROOF_BUCKET = 'timesheet-proofs';
+const WEEKLY_PROOF_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+
+export async function uploadWeeklyClientProof(
+  id: string, file: Express.Multer.File, actorRole: string, actorEmployeeId: string | null, actorId?: string,
+) {
+  const ts = await getTimesheet(id);
+  if (actorRole === 'employee' && ts.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only upload proof to your own timesheet.');
+  }
+  if (actorRole !== 'admin' && !['draft', 'rejected'].includes(ts.status)) {
+    throw new ForbiddenError('Proof can only be attached while the timesheet is in draft or rejected state.');
+  }
+  if (actorRole !== 'admin' && !isCurrentOrFutureWeekUTC(ts.week_start_date)) {
+    throw new ValidationError(`Week of ${ts.week_start_date} is closed.`);
+  }
+
+  try {
+    const { data: existing } = await supabaseAdmin.storage
+      .from(WEEKLY_PROOF_BUCKET).list(`weekly/${id}/`, { limit: 100 });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET).remove(existing.map(f => `weekly/${id}/${f.name}`));
+    }
+  } catch (err) {
+    console.error('[timesheets] old proof cleanup failed for', id, err);
+  }
+
+  const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
+  const path = `weekly/${id}/${Date.now()}-${safeName}`;
+  const { error: upErr } = await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET)
+    .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
+  if (upErr) throw upErr;
+
+  const { data: signed, error: signErr } = await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET)
+    .createSignedUrl(path, WEEKLY_PROOF_URL_TTL_SECONDS);
+  if (signErr) throw signErr;
+
+  const { data: updated, error: dbErr } = await supabaseAdmin
+    .from('timesheets')
+    .update({ client_signed_url: signed.signedUrl, client_signed_filename: file.originalname })
+    .eq('id', id).select().single();
+  if (dbErr) throw dbErr;
+
+  logActivity(actorId ?? null, 'uploaded_client_proof', 'timesheet', id, ts.display_id ?? id.slice(0, 8));
+  return updated;
+}
+
+export async function deleteWeeklyClientProof(
+  id: string, actorRole: string, actorEmployeeId: string | null, actorId?: string,
+) {
+  const ts = await getTimesheet(id);
+  if (actorRole === 'employee' && ts.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only modify your own timesheet.');
+  }
+  if (actorRole !== 'admin' && !['draft', 'rejected'].includes(ts.status)) {
+    throw new ForbiddenError('Proof can only be removed while the timesheet is in draft or rejected state.');
+  }
+
+  try {
+    const { data: existing } = await supabaseAdmin.storage
+      .from(WEEKLY_PROOF_BUCKET).list(`weekly/${id}/`, { limit: 100 });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET).remove(existing.map(f => `weekly/${id}/${f.name}`));
+    }
+  } catch (err) {
+    console.error('[timesheets] proof file cleanup failed for', id, err);
+  }
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('timesheets')
+    .update({ client_signed_url: null, client_signed_filename: null })
+    .eq('id', id).select().single();
+  if (error) throw error;
+  logActivity(actorId ?? null, 'removed_client_proof', 'timesheet', id, ts.display_id ?? id.slice(0, 8));
+  return updated;
 }
