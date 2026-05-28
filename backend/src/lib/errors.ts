@@ -1,11 +1,16 @@
 export class AppError extends Error {
   public readonly statusCode: number;
   public readonly isOperational: boolean;
+  // Optional structured payload surfaced in the JSON response under `details`.
+  // Use it for machine-readable error context the frontend can branch on (e.g.
+  // a list of missing required fields).
+  public readonly details?: Record<string, unknown>;
 
-  constructor(message: string, statusCode = 500, isOperational = true) {
+  constructor(message: string, statusCode = 500, isOperational = true, details?: Record<string, unknown>) {
     super(message);
     this.statusCode = statusCode;
     this.isOperational = isOperational;
+    this.details = details;
     Object.setPrototypeOf(this, AppError.prototype);
     Error.captureStackTrace(this, this.constructor);
   }
@@ -30,8 +35,8 @@ export class ForbiddenError extends AppError {
 }
 
 export class ValidationError extends AppError {
-  constructor(message: string) {
-    super(message, 400);
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message, 400, true, details);
   }
 }
 

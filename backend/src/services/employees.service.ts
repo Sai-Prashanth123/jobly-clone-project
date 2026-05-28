@@ -556,15 +556,16 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.identityDocuments !== undefined)    patch.identity_documents    = input.identityDocuments;
 
   // When an EMPLOYEE edits their own record (self-onboarding / profile edit),
-  // HR/legal/pay fields are off-limits — strip them so a self-update can never
-  // change pay, SSN, visa, I-9, status, employment terms, or the login email.
+  // a small set of truly sensitive fields stays HR-owned: account status (the
+  // employee can't activate themselves), reporting manager (can't reassign),
+  // and login email addresses. Everything else in the onboarding wizard —
+  // department, job title, employment type, start date, work location, visa,
+  // I-9, SSN-last-4, pay rate, bank details — is filled by the employee
+  // during self-onboarding, so it MUST go through. (Previously these were
+  // stripped, which caused completeOnboarding to reject submissions even when
+  // the wizard reported "all set".)
   if (actorRole === 'employee') {
-    const HR_ONLY = [
-      'pay_rate', 'pay_type', 'payment_type', 'bank_name', 'bank_routing_number',
-      'bank_account_number', 'tax_form_type', 'ssn', 'visa_type', 'visa_expiry',
-      'i9_status', 'employment_type', 'status', 'reporting_manager_id',
-      'department', 'job_title', 'start_date', 'work_location', 'email', 'work_email',
-    ];
+    const HR_ONLY = ['status', 'reporting_manager_id', 'email', 'work_email'];
     for (const k of HR_ONLY) delete patch[k];
   }
 
@@ -732,7 +733,13 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
 
   const result = computeOnboarding(emp, docTypes);
   if (!result.complete) {
-    throw new ValidationError(`Onboarding is incomplete. Still required: ${result.missing.join(', ')}`);
+    // Surface the structured missing-items list under `details` so the
+    // frontend can render clickable jump-to-section chips. The string message
+    // stays as the human-readable summary for older clients / toasts.
+    throw new ValidationError(
+      `Onboarding is incomplete. Still required: ${result.missing.join(', ')}`,
+      { missing: result.missing, items: result.items.filter(i => !i.done) },
+    );
   }
 
   // Mark as submitted for HR review — do NOT auto-activate. HR approval flips

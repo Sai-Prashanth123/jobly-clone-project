@@ -843,9 +843,21 @@ export default function NewEmployee() {
         } catch (e: any) {
           const msg = e?.response?.data?.error
             ?? 'Some required details are still missing. Please complete every highlighted section, then click Finish.';
+          // Server returns { details: { missing: [serverLabel, ...], items: [{ id, label, done }] } }.
+          // Map each server label back to the closest local checklist entry so the
+          // banner chips can scroll to a real section instead of going nowhere.
+          const serverMissing: string[] = e?.response?.data?.details?.missing ?? [];
+          const localChipsForServer = serverMissing
+            .map(serverLabel => {
+              const match = onboardingChecklist.find(c =>
+                c.label.toLowerCase().includes(serverLabel.toLowerCase().split(' (')[0])
+                || serverLabel.toLowerCase().includes(c.label.toLowerCase().split(' (')[0]),
+              );
+              return { label: serverLabel, section: match?.section ?? firstIncompleteSection ?? SECTION_IDS.personal };
+            });
           setSubmitError(msg);
+          setSubmitMissing(localChipsForServer.length > 0 ? localChipsForServer : []);
           toast.error(msg, { duration: 12000 });
-          // Jump straight to the first still-incomplete section instead of the top.
           if (firstIncompleteSection) scrollToSection(firstIncompleteSection);
           else window.scrollTo({ top: 0, behavior: 'smooth' });
         }
@@ -1106,7 +1118,11 @@ export default function NewEmployee() {
           <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-red-800">
-              {isEditMode ? "Couldn't save your changes" : isOnboarding ? "Can't submit yet — some sections still need info" : 'No new employee was created'}
+              {isOnboarding
+                ? "Can't submit yet — some sections still need info"
+                : isEditMode
+                  ? "Couldn't save your changes"
+                  : 'No new employee was created'}
             </p>
             <p className="text-sm text-red-700 mt-1 break-words">{submitError}</p>
             {submitMissing.length > 0 && (
@@ -1127,7 +1143,7 @@ export default function NewEmployee() {
             <p className="text-xs text-red-600/80 mt-2">
               {submitMissing.length > 0
                 ? <>Tap any item above to jump to that section.</>
-                : <>Fix the highlighted field, then click <strong>{isEditMode ? 'Save Changes' : 'Create Employee'}</strong> again.</>}
+                : <>Fix the highlighted field, then click <strong>{isOnboarding ? 'Finish onboarding' : isEditMode ? 'Save Changes' : 'Create Employee'}</strong> again.</>}
             </p>
           </div>
           <button
