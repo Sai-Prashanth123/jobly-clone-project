@@ -24,7 +24,11 @@ app.use(cors({
   origin: [env.FRONTEND_URL, 'http://localhost:8080', 'http://localhost:5173'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // X-Silent-Error: opt-out header the frontend apiClient sends on requests
+  // whose errors it handles itself (e.g. useEmployee tolerating a 404 for a
+  // deleted employee) so the global error toast stays quiet. Must be allowed
+  // here or the CORS preflight rejects the request entirely.
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Silent-Error'],
 }));
 
 // Request parsing
