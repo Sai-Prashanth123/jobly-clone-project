@@ -85,8 +85,8 @@ export default function EmployeeDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 lg:gap-4">
+        <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/employees')} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
@@ -101,27 +101,27 @@ export default function EmployeeDetail() {
             <h1 className="text-xl sm:text-2xl font-semibold truncate">
               {employee.firstName}{employee.middleName ? ` ${employee.middleName}` : ''} {employee.lastName}
             </h1>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs font-mono text-blue-600">{employee.displayId ?? employee.id.slice(0, 8)}</span>
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-1.5">
+              <span className="text-xs font-mono text-blue-600 whitespace-nowrap">{employee.displayId ?? employee.id.slice(0, 8)}</span>
               <StatusBadge status={employee.status} />
               {employee.status === 'onboarding' && employee.onboardingCompletedAt && (
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5">
-                  <Clock className="h-3 w-3" /> Submitted — ready for review
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap">
+                  <Clock className="h-3 w-3 flex-shrink-0" /> Submitted — ready for review
                 </span>
               )}
               {employee.onboardingChangeRequestMessage && (
                 <span
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5"
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap"
                   title={`Sent ${employee.onboardingChangeRequestedAt ? formatDate(employee.onboardingChangeRequestedAt) : ''}: ${employee.onboardingChangeRequestMessage}`}
                 >
-                  <MessageSquareWarning className="h-3 w-3" /> Changes requested — awaiting employee
+                  <MessageSquareWarning className="h-3 w-3 flex-shrink-0" /> Changes requested — awaiting employee
                 </span>
               )}
-              {employee.jobTitle && <span className="text-xs text-muted-foreground">· {employee.jobTitle}</span>}
+              {employee.jobTitle && <span className="text-xs text-muted-foreground whitespace-nowrap">· {employee.jobTitle}</span>}
             </div>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 [&>*]:w-full sm:[&>*]:w-auto">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap lg:justify-end lg:flex-shrink-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
           {(employee.status === 'onboarding' || employee.status === 'inactive') && (user?.role === 'admin' || user?.role === 'hr') && (
             <Button
               size="sm"
