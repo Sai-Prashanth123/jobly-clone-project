@@ -1,7 +1,9 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/invoices.service';
 import { exportInvoicesCSV, bulkUpdateInvoiceStatus } from '../services/invoices.service';
+import * as paymentsSvc from '../services/payments.service';
 import type { ListInvoicesQuery, GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput } from '../schemas/invoice.schema';
+import type { CreatePaymentInput } from '../schemas/payment.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -76,6 +78,27 @@ export async function exportInvoices(req: Request, res: Response, next: NextFunc
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="invoices-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);
+  } catch (err) { next(err); }
+}
+
+export async function listPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await paymentsSvc.listPayments(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function recordPayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await paymentsSvc.recordPayment(req.params.id, req.body as CreatePaymentInput, req.user?.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function deletePayment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await paymentsSvc.deletePayment(req.params.paymentId, req.user?.id);
+    res.json({ success: true });
   } catch (err) { next(err); }
 }
 

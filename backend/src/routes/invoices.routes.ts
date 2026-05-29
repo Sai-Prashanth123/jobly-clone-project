@@ -3,6 +3,7 @@ import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
 import { generateInvoiceSchema, createInvoiceSchema, updateInvoiceSchema, listInvoicesQuerySchema } from '../schemas/invoice.schema';
+import { createPaymentSchema } from '../schemas/payment.schema';
 import * as ctrl from '../controllers/invoices.controller';
 
 const router = Router();
@@ -19,5 +20,10 @@ router.put('/:id', requireRole('admin','finance'), validateBody(updateInvoiceSch
 router.delete('/:id', requireRole('admin'), ctrl.remove);
 router.get('/:id/pdf', requireRole('admin','finance'), ctrl.getPDF);
 router.post('/:id/send', requireRole('admin','finance'), ctrl.send);
+
+// Manual payments (partial supported)
+router.get('/:id/payments', requireRole('admin','finance'), ctrl.listPayments);
+router.post('/:id/payments', requireRole('admin','finance'), validateBody(createPaymentSchema), ctrl.recordPayment);
+router.delete('/:id/payments/:paymentId', requireRole('admin','finance'), ctrl.deletePayment);
 
 export default router;

@@ -156,6 +156,60 @@ export function useDeleteInvoice() {
   });
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapPayment(raw: any) {
+  return {
+    id: raw.id,
+    invoiceId: raw.invoice_id,
+    amount: Number(raw.amount) || 0,
+    paidOn: raw.paid_on,
+    method: raw.method,
+    reference: raw.reference ?? undefined,
+    notes: raw.notes ?? undefined,
+    createdAt: raw.created_at,
+  };
+}
+
+export function useInvoicePayments(invoiceId: string | undefined) {
+  return useQuery({
+    queryKey: ['invoices', invoiceId, 'payments'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/invoices/${invoiceId}/payments`);
+      return (data.data as any[]).map(mapPayment);
+    },
+    enabled: isValidId(invoiceId),
+  });
+}
+
+export function useRecordPayment(invoiceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { amount: number; paidOn: string; method: string; reference?: string | null; notes?: string | null }) => {
+      const { data } = await apiClient.post(`/invoices/${invoiceId}/payments`, body);
+      return mapPayment(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      qc.invalidateQueries({ queryKey: ['invoices', invoiceId] });
+      qc.invalidateQueries({ queryKey: ['invoices', invoiceId, 'payments'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+}
+
+export function useDeletePayment(invoiceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (paymentId: string) => apiClient.delete(`/invoices/${invoiceId}/payments/${paymentId}`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      qc.invalidateQueries({ queryKey: ['invoices', invoiceId] });
+      qc.invalidateQueries({ queryKey: ['invoices', invoiceId, 'payments'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+}
+
 export function useGetInvoicePDF() {
   return useMutation({
     mutationFn: async (id: string) => {
