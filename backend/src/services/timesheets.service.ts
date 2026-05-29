@@ -436,10 +436,14 @@ export async function uploadWeeklyClientProof(
   if (actorRole === 'employee' && ts.employee_id !== actorEmployeeId) {
     throw new ForbiddenError('You can only upload proof to your own timesheet.');
   }
-  if (actorRole !== 'admin' && !['draft', 'rejected'].includes(ts.status)) {
+  // Admin and operations can attach/replace the client-signed copy at any point
+  // (operations manages it while reviewing a submitted timesheet); the employee
+  // is limited to draft/rejected and to an open week.
+  const privileged = actorRole === 'admin' || actorRole === 'operations';
+  if (!privileged && !['draft', 'rejected'].includes(ts.status)) {
     throw new ForbiddenError('Proof can only be attached while the timesheet is in draft or rejected state.');
   }
-  if (actorRole !== 'admin' && !isCurrentOrFutureWeekUTC(ts.week_start_date)) {
+  if (!privileged && !isCurrentOrFutureWeekUTC(ts.week_start_date)) {
     throw new ValidationError(`Week of ${ts.week_start_date} is closed.`);
   }
 
@@ -480,7 +484,11 @@ export async function deleteWeeklyClientProof(
   if (actorRole === 'employee' && ts.employee_id !== actorEmployeeId) {
     throw new ForbiddenError('You can only modify your own timesheet.');
   }
-  if (actorRole !== 'admin' && !['draft', 'rejected'].includes(ts.status)) {
+  // Admin and operations can remove the client-signed copy at any point (e.g.
+  // operations clearing a wrong upload during review); the employee is limited
+  // to draft/rejected.
+  const privileged = actorRole === 'admin' || actorRole === 'operations';
+  if (!privileged && !['draft', 'rejected'].includes(ts.status)) {
     throw new ForbiddenError('Proof can only be removed while the timesheet is in draft or rejected state.');
   }
 

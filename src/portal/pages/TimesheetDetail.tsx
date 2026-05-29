@@ -59,6 +59,10 @@ export default function TimesheetDetail() {
   const editableStatus = timesheet?.status === 'draft' || timesheet?.status === 'rejected';
   // Admin can edit any status; ops + owner are bound to draft/rejected.
   const canEdit = isAdmin || ((isOwner || isOps) && editableStatus);
+  // Admin + operations can manage (replace/remove) the client-signed proof even
+  // on a locked/submitted timesheet — they handle it while reviewing. Backend
+  // permits the same (see timesheets.service uploadWeeklyClientProof).
+  const canManageProof = isAdmin || isOps;
   const lockReason = !timesheet
     ? null
     : isAdmin
@@ -378,7 +382,7 @@ export default function TimesheetDetail() {
               {timesheet.totalHours === 0 ? 'Leave reason' : 'Client-signed timesheet'}
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-0">
+          <CardContent className="pt-0 space-y-2">
             {timesheet.totalHours === 0 ? (
               <p className="text-sm text-gray-700">
                 {timesheet.leaveReason
@@ -386,18 +390,65 @@ export default function TimesheetDetail() {
                   : <span className="text-muted-foreground">No reason recorded.</span>}
               </p>
             ) : timesheet.clientSignedUrl ? (
-              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border max-w-md">
-                <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
-                <a href={timesheet.clientSignedUrl} target="_blank" rel="noopener"
-                  className="text-sm text-emerald-700 hover:underline truncate">
-                  {timesheet.clientSignedFilename ?? 'Uploaded proof'}
-                </a>
-                <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex-shrink-0">
-                  Client-signed
-                </span>
+              <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-gray-50 border max-w-md">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                  <a href={timesheet.clientSignedUrl} target="_blank" rel="noopener"
+                    className="text-sm text-emerald-700 hover:underline truncate">
+                    {timesheet.clientSignedFilename ?? 'Uploaded proof'}
+                  </a>
+                  <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex-shrink-0">
+                    Client-signed
+                  </span>
+                </div>
+                {canManageProof && (
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <label htmlFor="wk-proof-replace" aria-disabled={uploadProof.isPending}
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${uploadProof.isPending ? 'text-gray-400 pointer-events-none' : 'text-blue-600 hover:text-blue-700 cursor-pointer hover:bg-blue-50'}`}>
+                      {uploadProof.isPending
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                        : <><Upload className="h-3.5 w-3.5" /> Replace</>}
+                    </label>
+                    <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                      onChange={async e => {
+                        const f = e.target.files?.[0]; if (!f) return;
+                        if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                        try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet replaced.'); }
+                        catch { /* failed-request toast raised centrally (queryClient.ts) */ }
+                        e.target.value = '';
+                      }} />
+                    <Button variant="ghost" size="sm" disabled={deleteProof.isPending} className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      onClick={async () => {
+                        try { await deleteProof.mutateAsync(); toast.success('Proof removed.'); }
+                        catch { /* failed-request toast raised centrally (queryClient.ts) */ }
+                      }}>
+                      {deleteProof.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            ) : canManageProof ? (
+              <div className="flex items-center gap-2">
+                <label htmlFor="wk-proof-upload" aria-disabled={uploadProof.isPending}
+                  className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs font-medium transition-colors ${uploadProof.isPending ? 'border-gray-200 bg-gray-50 text-gray-400 pointer-events-none' : 'border-gray-200 bg-white text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer'}`}>
+                  {uploadProof.isPending
+                    ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                    : <><Upload className="h-3.5 w-3.5" /> Upload signed timesheet</>}
+                </label>
+                <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                  onChange={async e => {
+                    const f = e.target.files?.[0]; if (!f) return;
+                    if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                    try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
+                    catch { /* failed-request toast raised centrally (queryClient.ts) */ }
+                    e.target.value = '';
+                  }} />
               </div>
             ) : (
               <p className="text-sm text-amber-600">No client-signed timesheet was attached.</p>
+            )}
+            {canManageProof && timesheet.totalHours > 0 && (
+              <p className="text-[11px] text-muted-foreground">As operations, you can replace or remove the client-signed copy while reviewing.</p>
             )}
           </CardContent>
         </Card>
