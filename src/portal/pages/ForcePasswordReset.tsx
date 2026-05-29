@@ -6,6 +6,49 @@ import { Eye, EyeOff, Loader2, ShieldCheck, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth, useChangePassword } from '../hooks/useAuth';
 
+// A password input with its own independent show/hide toggle. Each of the three
+// fields gets one so the user can reveal them separately.
+function PasswordField({
+  id, label, value, onChange, autoComplete, placeholder, autoFocus,
+}: {
+  id: string;
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  autoComplete: string;
+  placeholder?: string;
+  autoFocus?: boolean;
+}) {
+  const [show, setShow] = useState(false);
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id} className="text-[13px] font-medium text-gray-700">{label}</Label>
+      <div className="relative">
+        <Input
+          id={id}
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          autoComplete={autoComplete}
+          autoFocus={autoFocus}
+          required
+          className="pr-10"
+          placeholder={placeholder}
+        />
+        <button
+          type="button"
+          onClick={() => setShow(s => !s)}
+          tabIndex={-1}
+          aria-label={show ? `Hide ${label.toLowerCase()}` : `Show ${label.toLowerCase()}`}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // Full-screen, no-sidebar gate shown when a user is still on a one-time temporary
 // password. They cannot reach anything else until they set their own password
 // (enforced by the ProtectedRoute redirect + the backend 403 gate).
@@ -17,7 +60,6 @@ export default function ForcePasswordReset() {
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [show, setShow] = useState(false);
   const [err, setErr] = useState('');
 
   const submit = async (e: React.FormEvent) => {
@@ -49,47 +91,50 @@ export default function ForcePasswordReset() {
 
   return (
     <div className="portal-scope min-h-screen flex items-center justify-center px-4 py-10 bg-gray-50">
-      <div className="w-full max-w-[420px] portal-animate-in">
+      <div className="w-full max-w-[440px] portal-animate-in">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-7 sm:p-9">
-          <div className="flex items-center gap-3 mb-5">
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-gradient-to-br from-[#4069FF] to-[#32CDDC]">
-              <ShieldCheck className="h-5 w-5 text-white" />
+          {/* Header — centered icon + title so the layout stays balanced and the
+              title never wraps awkwardly. `!text-2xl` beats the portal-scope h1
+              reset (which would otherwise revert h1 to a huge UA default). */}
+          <div className="flex flex-col items-center text-center mb-6">
+            <div className="w-12 h-12 rounded-2xl flex items-center justify-center bg-gradient-to-br from-[#4069FF] to-[#32CDDC] shadow-sm mb-3">
+              <ShieldCheck className="h-6 w-6 text-white" />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold text-gray-900 leading-tight">Set your password</h1>
-              <p className="text-[12px] text-gray-500">One-time step before you can continue</p>
-            </div>
+            <h1 className="!text-2xl font-bold text-gray-900 leading-tight tracking-tight">Set your password</h1>
+            <p className="text-[12px] text-gray-500 mt-1">One-time step before you can continue</p>
           </div>
 
-          <p className="text-[13px] text-gray-600 leading-relaxed mb-6">
-            You signed in with a temporary password{user?.email ? <> for <strong>{user.email}</strong></> : ''}.
+          <p className="text-[13px] text-gray-600 leading-relaxed mb-6 text-center">
+            You signed in with a temporary password{user?.email ? <> for <strong className="text-gray-800">{user.email}</strong></> : ''}.
             Choose a new password to finish setting up your account — you'll use it from now on.
           </p>
 
           <form onSubmit={submit} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="fr-current">Temporary password</Label>
-              <Input id="fr-current" type={show ? 'text' : 'password'} value={current}
-                onChange={e => setCurrent(e.target.value)} autoComplete="current-password" required
-                placeholder="The password from your welcome email" />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fr-new">New password</Label>
-              <div className="relative">
-                <Input id="fr-new" type={show ? 'text' : 'password'} value={next}
-                  onChange={e => setNext(e.target.value)} autoComplete="new-password" required className="pr-10"
-                  placeholder="At least 8 characters" />
-                <button type="button" onClick={() => setShow(s => !s)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                  {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="fr-confirm">Confirm new password</Label>
-              <Input id="fr-confirm" type={show ? 'text' : 'password'} value={confirm}
-                onChange={e => setConfirm(e.target.value)} autoComplete="new-password" required />
-            </div>
+            <PasswordField
+              id="fr-current"
+              label="Temporary password"
+              value={current}
+              onChange={setCurrent}
+              autoComplete="current-password"
+              placeholder="The password from your welcome email"
+              autoFocus
+            />
+            <PasswordField
+              id="fr-new"
+              label="New password"
+              value={next}
+              onChange={setNext}
+              autoComplete="new-password"
+              placeholder="At least 8 characters"
+            />
+            <PasswordField
+              id="fr-confirm"
+              label="Confirm new password"
+              value={confirm}
+              onChange={setConfirm}
+              autoComplete="new-password"
+              placeholder="Re-enter your new password"
+            />
 
             {err && (
               <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-lg text-sm text-red-600 bg-red-50 border border-red-100">
