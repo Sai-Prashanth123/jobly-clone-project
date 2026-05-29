@@ -1,14 +1,20 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, FileCheck2, CalendarOff } from 'lucide-react';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMonthlyTimesheets } from '../hooks/useMonthlyTimesheets';
 import { formatDate } from '../lib/utils';
 import { monthLabel } from '../lib/monthUtils';
 import type { MonthlyTimesheet } from '../types';
+
+const LEAVE_REASON_LABELS: Record<string, string> = {
+  medical_leave: 'Medical leave', sick: 'Sick', vacation: 'Vacation',
+  unpaid_leave: 'Unpaid leave', bereavement: 'Bereavement', jury_duty: 'Jury duty', other: 'Other',
+};
 
 const STATUS_FILTERS = [
   { value: 'all', label: 'All statuses' },
@@ -23,6 +29,12 @@ export default function MonthlyTimesheets() {
   const [status, setStatus] = useState('all');
   const { data, isLoading } = useMonthlyTimesheets(status === 'all' ? { limit: 200 } : { status, limit: 200 });
   const rows = data?.data ?? [];
+
+  // Split the queue: worked timesheets (hours logged) go to the Client Timesheet
+  // tab where the reviewer checks the client-signed proof; zero-hour / leave-day
+  // timesheets go to the Leave Approval tab.
+  const workRows = rows.filter(t => Number(t.totalHours) > 0);
+  const leaveRows = rows.filter(t => Number(t.totalHours) === 0 || (t.leaveDays ?? 0) > 0);
 
   const columns: Column<MonthlyTimesheet>[] = [
     {
@@ -81,6 +93,41 @@ export default function MonthlyTimesheets() {
     },
   ];
 
+  // Client Timesheets tab adds a "Proof" column (client-signed upload present?).
+  const clientColumns: Column<MonthlyTimesheet>[] = [
+    ...columns.slice(0, 5), // ID, employee, period, total hours, working days
+    {
+      key: 'proof',
+      header: 'Client Proof',
+      render: t => t.clientSignedUrl
+        ? <span className="inline-flex items-center gap-1 text-xs text-emerald-700"><FileCheck2 className="h-3.5 w-3.5" /> Uploaded</span>
+        : <span className="text-xs text-amber-600">Missing</span>,
+      getValue: t => (t.clientSignedUrl ? 'uploaded' : 'missing'),
+    },
+    columns[5], // status
+    columns[6], // submitted
+  ];
+
+  // Leave Approval tab swaps in leave-specific columns.
+  const leaveColumns: Column<MonthlyTimesheet>[] = [
+    ...columns.slice(0, 3), // ID, employee, period
+    {
+      key: 'leaveDays',
+      header: 'Leave Days',
+      render: t => <span className="tabular-nums">{t.leaveDays ?? 0}</span>,
+      getValue: t => String(t.leaveDays ?? 0),
+      sortable: true,
+    },
+    {
+      key: 'leaveReason',
+      header: 'Reason',
+      render: t => t.leaveReason ? (LEAVE_REASON_LABELS[t.leaveReason] ?? t.leaveReason) : '—',
+      getValue: t => t.leaveReason ?? '',
+    },
+    columns[5], // status
+    columns[6], // submitted
+  ];
+
   return (
     <div>
       <PageHeader
@@ -100,17 +147,40 @@ export default function MonthlyTimesheets() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
-        <DataTable
-          data={rows}
-          columns={columns}
-          searchPlaceholder="Search by employee, ID, status…"
-          searchKeys={['displayId', 'employeeName', 'employeeDisplayId', 'status']}
-          getRowKey={t => t.id}
-          onRowClick={t => navigate(`/portal/attendance/${t.id}`)}
-          emptyTitle="No monthly timesheets"
-          emptyDescription="Submitted attendance timesheets will appear here for review."
-          exportFilename="monthly-timesheets"
-        />
+        <Tabs defaultValue="client" className="mt-2">
+          <TabsList className="mb-4 grid w-full max-w-md grid-cols-2">
+            <TabsTrigger value="client" className="gap-1.5"><FileCheck2 className="h-4 w-4" /> Client Timesheets ({workRows.length})</TabsTrigger>
+            <TabsTrigger value="leave" className="gap-1.5"><CalendarOff className="h-4 w-4" /> Leave Approval ({leaveRows.length})</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="client">
+            <DataTable
+              data={workRows}
+              columns={clientColumns}
+              searchPlaceholder="Search by employee, ID, status…"
+              searchKeys={['displayId', 'employeeName', 'employeeDisplayId', 'status']}
+              getRowKey={t => t.id}
+              onRowClick={t => navigate(`/portal/attendance/${t.id}`)}
+              emptyTitle="No worked timesheets"
+              emptyDescription="Submitted timesheets with logged hours appear here for client-proof review."
+              exportFilename="client-timesheets"
+            />
+          </TabsContent>
+
+          <TabsContent value="leave">
+            <DataTable
+              data={leaveRows}
+              columns={leaveColumns}
+              searchPlaceholder="Search by employee, ID, reason…"
+              searchKeys={['displayId', 'employeeName', 'employeeDisplayId', 'leaveReason', 'status']}
+              getRowKey={t => t.id}
+              onRowClick={t => navigate(`/portal/attendance/${t.id}`)}
+              emptyTitle="No leave to review"
+              emptyDescription="Timesheets containing leave days appear here for approval."
+              exportFilename="leave-approvals"
+            />
+          </TabsContent>
+        </Tabs>
       )}
     </div>
   );

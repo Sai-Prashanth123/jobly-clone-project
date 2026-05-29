@@ -37,7 +37,7 @@ const defaultForm: ClientFormData = {
   currency: 'USD', status: 'active', documents: [],
 };
 
-const DOC_TYPES = ['Client Agreement', 'NDA', 'MSA/SOW', 'Other'];
+const DOC_TYPES = ['Client Agreement', 'Purchase Order (PO)', 'NDA', 'MSA/SOW', 'Other'];
 
 export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: ClientFormProps) {
   const uploadDoc = useUploadClientDocument(initial?.id ?? '');
@@ -61,6 +61,8 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
 
   // Document add state
   const [newDocType, setNewDocType] = useState('');
+  // When type === 'Other', the user titles the document themselves (e.g. "PO #4471").
+  const [newDocTitle, setNewDocTitle] = useState('');
   const [newDocFile, setNewDocFile] = useState<File | null>(null);
   const [showAddDoc, setShowAddDoc] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -119,7 +121,14 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
       toast.error('Please select a file and document type');
       return;
     }
+    if (newDocType === 'Other' && !newDocTitle.trim()) {
+      toast.error('Enter a title for the document');
+      return;
+    }
 
+    // For "Other", the user-typed title becomes the document's type/label so the
+    // docs table shows a meaningful name (e.g. "PO #4471") instead of "Other".
+    const effectiveType = newDocType === 'Other' ? newDocTitle.trim() : newDocType;
     const name = newDocFile.name;
 
     if (isEdit && initial?.id) {
@@ -128,7 +137,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
       const fd = new FormData();
       fd.append('file', newDocFile);
       fd.append('name', name);
-      fd.append('docType', newDocType);
+      fd.append('docType', effectiveType);
       fd.append('entityType', 'client');
       fd.append('entityId', initial.id);
       try {
@@ -142,15 +151,16 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
     } else {
       // Create mode: queue for upload after client is created
       const tempId = `pending-${Date.now()}`;
-      pendingFiles.set(tempId, { file: newDocFile, name, type: newDocType });
+      pendingFiles.set(tempId, { file: newDocFile, name, type: effectiveType });
       setForm(prev => ({
         ...prev,
-        documents: [...prev.documents, { id: tempId, name, type: newDocType, uploadedAt: new Date().toISOString() }],
+        documents: [...prev.documents, { id: tempId, name, type: effectiveType, uploadedAt: new Date().toISOString() }],
       }));
     }
 
     setNewDocFile(null);
     setNewDocType('');
+    setNewDocTitle('');
     setShowAddDoc(false);
   };
 
@@ -378,6 +388,16 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
                     </SelectContent>
                   </Select>
                 </div>
+                {newDocType === 'Other' && (
+                  <div className="w-48 space-y-1">
+                    <Label className="text-xs">Document Title *</Label>
+                    <Input
+                      value={newDocTitle}
+                      onChange={e => setNewDocTitle(e.target.value)}
+                      placeholder="e.g. PO #4471"
+                    />
+                  </div>
+                )}
                 <div className="flex-1 min-w-[180px] space-y-1">
                   <Label className="text-xs">File *</Label>
                   <input
@@ -390,12 +410,12 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
                 <Button
                   type="button" size="sm"
                   onClick={addDocument}
-                  disabled={!newDocType || !newDocFile || uploading || uploadDoc.isPending}
+                  disabled={!newDocType || !newDocFile || (newDocType === 'Other' && !newDocTitle.trim()) || uploading || uploadDoc.isPending}
                 >
                   {(uploading || uploadDoc.isPending) ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Add'}
                 </Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => {
-                  setShowAddDoc(false); setNewDocType(''); setNewDocFile(null);
+                  setShowAddDoc(false); setNewDocType(''); setNewDocTitle(''); setNewDocFile(null);
                 }}>
                   Cancel
                 </Button>

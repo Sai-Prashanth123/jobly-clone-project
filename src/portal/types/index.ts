@@ -319,6 +319,10 @@ export interface Timesheet {
   notes?: string;
   createdAt: string;
   updatedAt: string;
+  // Zero-hour weeks require a reason; worked weeks require a client-signed proof.
+  leaveReason?: string;
+  clientSignedUrl?: string;
+  clientSignedFilename?: string;
 }
 
 export interface InvoiceLineItem {

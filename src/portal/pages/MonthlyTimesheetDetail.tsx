@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Download, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, CheckCircle2, XCircle, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -109,6 +109,32 @@ export default function MonthlyTimesheetDetail() {
       {sheet.status === 'rejected' && sheet.rejectionReason && (
         <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
           <strong>Rejected:</strong> {sheet.rejectionReason}
+        </div>
+      )}
+
+      {/* Review artifacts: client-signed proof (worked months) + leave reason
+          (leave months) surfaced up front so the reviewer acts on the right thing. */}
+      {(sheet.clientSignedUrl || sheet.leaveReason) && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {sheet.clientSignedUrl && (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/60 px-4 py-3 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-emerald-800">Client-signed timesheet</p>
+                  <a href={sheet.clientSignedUrl} target="_blank" rel="noopener" className="text-sm text-emerald-700 hover:underline truncate block">
+                    {sheet.clientSignedFilename ?? 'Open proof'}
+                  </a>
+                </div>
+              </div>
+            </div>
+          )}
+          {sheet.leaveReason && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 px-4 py-3">
+              <p className="text-xs font-medium text-amber-800">Leave reason</p>
+              <p className="text-sm text-amber-900 mt-0.5 capitalize">{sheet.leaveReason.replace(/_/g, ' ')}</p>
+            </div>
+          )}
         </div>
       )}
 

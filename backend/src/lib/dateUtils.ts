@@ -87,6 +87,30 @@ export function isCurrentOrFutureMonthUTC(year: number, month: number): boolean 
 }
 
 /**
+ * True if the (year, month) calendar month is entirely BEFORE the month the
+ * employee joined (their start_date). Used as a date-of-joining floor — an
+ * employee can't file a timesheet for a month before they were hired.
+ * `startDate` is a YYYY-MM-DD string; missing/blank → never before (no floor).
+ */
+export function isMonthBeforeJoiningUTC(year: number, month: number, startDate?: string | null): boolean {
+  if (!startDate) return false;
+  const [sy, sm] = startDate.slice(0, 10).split('-').map(Number);
+  if (!sy || !sm) return false;
+  return year < sy || (year === sy && month < sm);
+}
+
+/**
+ * True if the ISO week starting `weekStart` (YYYY-MM-DD Monday) ends before the
+ * employee's joining date — i.e. the whole week predates their hire. Date-of-
+ * joining floor for weekly timesheets. Blank startDate → no floor.
+ */
+export function isWeekBeforeJoiningUTC(weekStart: string, startDate?: string | null): boolean {
+  if (!startDate) return false;
+  const weekEnd = addDaysToDate(weekStart, 6);
+  return weekEnd < startDate.slice(0, 10);
+}
+
+/**
  * Format a YYYY-MM-DD date for display ("Jan 15, 2026") without ever going
  * through `new Date(string)`, which JS parses as UTC midnight and then formats
  * in the server's local timezone — drifting by ±1 day depending on offset.

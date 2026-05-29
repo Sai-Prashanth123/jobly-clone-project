@@ -28,6 +28,9 @@ function mapTimesheet(raw: any): Timesheet {
     notes: raw.notes ?? undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
+    leaveReason: raw.leave_reason ?? undefined,
+    clientSignedUrl: raw.client_signed_url ?? undefined,
+    clientSignedFilename: raw.client_signed_filename ?? undefined,
   };
 }
 
@@ -95,7 +98,7 @@ export function useCreateTimesheet() {
 export function useUpdateTimesheetEntries(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (payload: { entries: Timesheet['entries']; notes?: string }) => {
+    mutationFn: async (payload: { entries: Timesheet['entries']; notes?: string; leaveReason?: string | null }) => {
       const { data } = await apiClient.put(`/timesheets/${id}`, {
         entries: payload.entries.map(e => ({
           entryDate: e.date,
@@ -104,8 +107,42 @@ export function useUpdateTimesheetEntries(id: string) {
           isBillable: e.isBillable,
         })),
         notes: payload.notes,
+        ...(payload.leaveReason !== undefined ? { leaveReason: payload.leaveReason } : {}),
       });
       return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
+      qc.invalidateQueries({ queryKey: ['timesheets', id] });
+    },
+  });
+}
+
+// Client-signed weekly-timesheet proof — mirrors the monthly proof hooks.
+export function useUploadWeeklyClientProof(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await apiClient.post(`/timesheets/${id}/client-proof`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return mapTimesheet(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
+      qc.invalidateQueries({ queryKey: ['timesheets', id] });
+    },
+  });
+}
+
+export function useDeleteWeeklyClientProof(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.delete(`/timesheets/${id}/client-proof`);
+      return mapTimesheet(data.data);
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['timesheets'] });

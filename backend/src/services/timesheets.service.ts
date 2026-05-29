@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isCurrentOrFutureWeekUTC } from '../lib/dateUtils';
+import { isCurrentOrFutureWeekUTC, isWeekBeforeJoiningUTC } from '../lib/dateUtils';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import type {
@@ -67,6 +67,14 @@ export async function createTimesheet(input: CreateTimesheetInput, actorRole?: s
     throw new ValidationError(
       `Week of ${input.weekStartDate} is closed. Past timesheets cannot be created — contact your admin for a correction.`,
     );
+  }
+  // Date-of-joining floor — can't log a week that ends before the hire date.
+  if (actorRole !== 'admin') {
+    const { data: empJoin } = await supabaseAdmin
+      .from('employees').select('start_date').eq('id', input.employeeId).maybeSingle();
+    if (isWeekBeforeJoiningUTC(input.weekStartDate, empJoin?.start_date)) {
+      throw new ValidationError(`Timesheets can't start before the joining date (${empJoin?.start_date}).`);
+    }
   }
 
   // Check for duplicate

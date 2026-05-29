@@ -2043,13 +2043,13 @@ export default function NewEmployee() {
               </div>
               <FieldError msg={errors.declaration} />
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                <div className="space-y-1.5">
                   <Label>Signature (full name)</Label>
                   <Input value={form.signatureName} onChange={e => set('signatureName', e.target.value)} placeholder="Type your full name" />
                   <FieldError msg={errors.signatureName} />
                 </div>
-                <div>
+                <div className="space-y-1.5">
                   <Label>Date</Label>
                   <Input type="date" value={form.signatureDate} onChange={e => set('signatureDate', e.target.value)} />
                 </div>

@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isCurrentOrFutureMonthUTC } from '../lib/dateUtils';
+import { isCurrentOrFutureMonthUTC, isMonthBeforeJoiningUTC } from '../lib/dateUtils';
 import {
   createNotification, getUserIdsByRole,
   getPortalUserByEmployeeId, getReportingManagerPortalUserId,
@@ -134,6 +134,14 @@ export async function upsertMonthlyTimesheet(
     throw new ValidationError(
       `${monthLabel(input.year, input.month)} is closed. Past timesheets cannot be edited — contact your admin for a correction.`,
     );
+  }
+  // Date-of-joining floor — can't file a timesheet for a month before hire.
+  if (actorRole !== 'admin') {
+    const { data: empJoin } = await supabaseAdmin
+      .from('employees').select('start_date').eq('id', targetEmployee).maybeSingle();
+    if (isMonthBeforeJoiningUTC(input.year, input.month, empJoin?.start_date)) {
+      throw new ValidationError(`Timesheets can't start before the joining date (${empJoin?.start_date}).`);
+    }
   }
 
   const summary = computeSummary(input.entries as MonthlyEntry[]);

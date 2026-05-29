@@ -154,7 +154,9 @@ export function InvoiceForm({ onGenerate, onCancel, isGenerating = false }: Invo
                 min={0}
                 max={100}
                 step={0.5}
-                value={taxRate}
+                inputMode="decimal"
+                placeholder="0"
+                value={taxRate || ''}
                 onChange={e => setTaxRate(Math.max(0, Math.min(100, parseNumberInput(e.target.value) ?? 0)))}
                 className="w-24"
               />

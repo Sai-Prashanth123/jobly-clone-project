@@ -117,6 +117,13 @@ export default function MyMonthlyTimesheet() {
   const isStaffOverride = isStaff;
   const periodClosed = isPastMonth && !isStaffOverride;
   const maxMonthInput = monthInputValue(cur.year, cur.month);
+  // Date-of-joining floor — the picker can't go before the employee's start month.
+  const joinDate = targetEmployee?.startDate; // YYYY-MM-DD
+  const minMonthInput = !isStaff && joinDate ? joinDate.slice(0, 7) : undefined;
+  const beforeJoining = !isStaff && joinDate
+    ? (loaded.year < Number(joinDate.slice(0, 4)) ||
+       (loaded.year === Number(joinDate.slice(0, 4)) && loaded.month < Number(joinDate.slice(5, 7))))
+    : false;
 
   // Submit-time gates the frontend mirrors so the button + helper text are honest.
   const needsLeaveReason = totalHours === 0;
@@ -124,6 +131,7 @@ export default function MyMonthlyTimesheet() {
   const hasClientProof = !!sheet?.clientSignedUrl;
   const canSubmit = !isLocked
     && !periodClosed
+    && !beforeJoining
     && (needsLeaveReason ? !!leaveReason : hasClientProof);
 
   // Hydrate the grid when the (employee, month) data lands.
@@ -317,6 +325,7 @@ export default function MyMonthlyTimesheet() {
                 type="month"
                 value={monthInputValue(period.year, period.month)}
                 max={isStaff ? undefined : maxMonthInput}
+                min={minMonthInput}
                 onChange={e => { const p = parseMonthInput(e.target.value); if (p) setPeriod(p); }}
               />
             </div>
@@ -450,6 +459,13 @@ export default function MyMonthlyTimesheet() {
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
               <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
               <span><strong>This month is closed.</strong> Past timesheets can't be edited or submitted — contact your admin for a correction.</span>
+            </div>
+          )}
+
+          {beforeJoining && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+              <span><strong>Before your joining date.</strong> Timesheets can only be filled from your start date ({joinDate}) onward.</span>
             </div>
           )}
 

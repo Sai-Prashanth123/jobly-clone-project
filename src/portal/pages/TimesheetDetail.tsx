@@ -2,15 +2,17 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, Trash2, Loader2, Check, AlertCircle, Pencil, Lock } from 'lucide-react';
-import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Trash2, Loader2, Check, AlertCircle, Pencil, Lock, Upload, FileText } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { TimesheetWeekGrid } from '../components/timesheets/TimesheetWeekGrid';
 import { TimesheetApprovalActions } from '../components/timesheets/TimesheetApprovalActions';
-import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useDeleteTimesheet } from '../hooks/useTimesheets';
+import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useDeleteTimesheet, useUploadWeeklyClientProof, useDeleteWeeklyClientProof } from '../hooks/useTimesheets';
 import { useEmployee } from '../hooks/useEmployees';
 import { useClient } from '../hooks/useClients';
 import { useAssignment } from '../hooks/useAssignments';
@@ -29,8 +31,11 @@ export default function TimesheetDetail() {
   const updateEntries = useUpdateTimesheetEntries(id!);
   const patchStatus = usePatchTimesheetStatus(id!);
   const deleteTimesheet = useDeleteTimesheet();
+  const uploadProof = useUploadWeeklyClientProof(id!);
+  const deleteProof = useDeleteWeeklyClientProof(id!);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [notes, setNotes] = useState('');
+  const [leaveReason, setLeaveReason] = useState('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [localEntries, setLocalEntries] = useState<TimesheetEntry[]>([]);
   const hasUserEdited = useRef(false);
@@ -52,10 +57,21 @@ export default function TimesheetDetail() {
           ? 'Read-only — only the timesheet owner, admin, or operations can edit hours.'
           : null;
 
-  // Sync notes from loaded timesheet
+  // Sync notes + leave reason from loaded timesheet
   useEffect(() => {
     if (timesheet?.notes !== undefined) setNotes(timesheet.notes ?? '');
   }, [timesheet?.id, timesheet?.notes]);
+  useEffect(() => {
+    setLeaveReason(timesheet?.leaveReason ?? '');
+  }, [timesheet?.id, timesheet?.leaveReason]);
+
+  // Live hours total (from the grid the user is editing) drives whether this is
+  // a leave week (0h → needs a reason) or a worked week (>0h → needs the client
+  // signed proof before it can be submitted).
+  const liveTotalHours = useMemo(
+    () => localEntries.reduce((s, e) => s + (Number(e.hours) || 0), 0),
+    [localEntries],
+  );
 
   // Sync localEntries when timesheet loads. Only re-run when the id changes —
   // if we re-ran on every `timesheet.entries` change (e.g. after an autosave
@@ -74,15 +90,18 @@ export default function TimesheetDetail() {
     saveTimerRef.current = setTimeout(async () => {
       try {
         setSaveState('saving');
-        await updateEntries.mutateAsync({ entries: localEntries, notes });
+        await updateEntries.mutateAsync({ entries: localEntries, notes, leaveReason: leaveReason || null });
         setSaveState('saved');
         setTimeout(() => setSaveState('idle'), 3000);
-      } catch {
+      } catch (err: any) {
+        // Don't fail silently — the inline 'error' chip is easy to miss, so also
+        // toast so the user knows their edits did NOT save.
         setSaveState('error');
+        toast.error(err?.response?.data?.error ?? "Couldn't save your changes — check your connection and try again.");
       }
     }, 800);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
-  }, [localEntries, notes, canEdit]);
+  }, [localEntries, notes, leaveReason, canEdit]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -246,6 +265,86 @@ export default function TimesheetDetail() {
           )}
         </CardContent>
       </Card>
+
+      {/* Leave reason (0-hour week) OR client-signed proof (worked week). The
+          backend submit gate enforces these; this surfaces them so the employee
+          can satisfy the gate before hitting Submit in the actions bar above. */}
+      {canEdit && (
+        <Card>
+          <CardContent className="pt-6">
+            {liveTotalHours === 0 ? (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Reason for a zero-hour week <span className="text-red-500">*</span></Label>
+                <p className="text-xs text-muted-foreground">No hours logged — pick a reason so HR has context. Required to submit.</p>
+                <Select value={leaveReason} onValueChange={v => { hasUserEdited.current = true; setLeaveReason(v); }}>
+                  <SelectTrigger className="bg-white max-w-sm"><SelectValue placeholder="Select a reason" /></SelectTrigger>
+                  <SelectContent>
+                    {[
+                      { value: 'medical_leave', label: 'Medical leave' },
+                      { value: 'sick', label: 'Sick' },
+                      { value: 'vacation', label: 'Vacation / personal time off' },
+                      { value: 'unpaid_leave', label: 'Unpaid leave' },
+                      { value: 'bereavement', label: 'Bereavement' },
+                      { value: 'jury_duty', label: 'Jury duty' },
+                      { value: 'other', label: 'Other (note above)' },
+                    ].map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label className="text-sm">Client-signed timesheet <span className="text-red-500">*</span></Label>
+                <p className="text-xs text-muted-foreground">Upload the client-signed copy as proof of days worked (PDF / image / DOC, max 20 MB). Required to submit.</p>
+                {timesheet.clientSignedUrl ? (
+                  <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-white border border-emerald-200 max-w-md">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                      <a href={timesheet.clientSignedUrl} target="_blank" rel="noopener" className="text-sm text-emerald-700 hover:underline truncate">
+                        {timesheet.clientSignedFilename ?? 'Uploaded proof'}
+                      </a>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex-shrink-0">Uploaded</span>
+                    </div>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <label htmlFor="wk-proof-replace" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 cursor-pointer px-2 py-1 rounded hover:bg-blue-50">
+                        <Upload className="h-3.5 w-3.5" /> Replace
+                      </label>
+                      <input id="wk-proof-replace" type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                        onChange={async e => {
+                          const f = e.target.files?.[0]; if (!f) return;
+                          if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                          try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
+                          catch (err: any) { toast.error(err?.response?.data?.error ?? 'Upload failed.'); }
+                          e.target.value = '';
+                        }} />
+                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={async () => {
+                          try { await deleteProof.mutateAsync(); toast.success('Proof removed.'); }
+                          catch (err: any) { toast.error(err?.response?.data?.error ?? 'Remove failed.'); }
+                        }}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <label htmlFor="wk-proof-upload" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors">
+                      <Upload className="h-3.5 w-3.5" /> Upload signed timesheet
+                    </label>
+                    <input id="wk-proof-upload" type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                      onChange={async e => {
+                        const f = e.target.files?.[0]; if (!f) return;
+                        if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                        try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
+                        catch (err: any) { toast.error(err?.response?.data?.error ?? 'Upload failed.'); }
+                        e.target.value = '';
+                      }} />
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Status Timeline</CardTitle></CardHeader>

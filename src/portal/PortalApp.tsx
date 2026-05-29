@@ -6,6 +6,7 @@ import { queryClient } from './lib/queryClient';
 import { AuthProvider } from './context/AuthContext';
 import { PortalLayout } from './components/layout/PortalLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import { ErrorBoundary } from './components/shared/ErrorBoundary';
 // Eager — small pages that are the first landing targets per area
 import Login from './pages/Login';
 import ForcePasswordReset from './pages/ForcePasswordReset';
@@ -59,6 +60,7 @@ export default function PortalApp() {
   return (
     <QueryClientProvider client={queryClient}>
     <AuthProvider>
+      <ErrorBoundary>
         <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* Public */}
@@ -329,6 +331,7 @@ export default function PortalApp() {
           <Route path="*" element={<Navigate to="/portal/login" replace />} />
         </Routes>
         </Suspense>
+      </ErrorBoundary>
     </AuthProvider>
     </QueryClientProvider>
   );
