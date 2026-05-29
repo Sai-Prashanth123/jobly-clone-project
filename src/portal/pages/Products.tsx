@@ -53,8 +53,8 @@ export default function Products() {
       if (editing) { await updateP.mutateAsync(body); toast.success('Product updated'); }
       else { await createP.mutateAsync(body); toast.success('Product added'); }
       setOpen(false);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Save failed');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -132,7 +132,7 @@ export default function Products() {
         onConfirm={async () => {
           if (!archiveTarget) return;
           try { await deleteP.mutateAsync(archiveTarget.id); toast.success('Archived'); setArchiveTarget(null); }
-          catch (err: any) { toast.error(err?.response?.data?.error ?? 'Failed'); }
+          catch { /* failed-request toast raised centrally (queryClient.ts) */ }
         }}
       />
     </div>

@@ -74,8 +74,8 @@ export default function InvoiceDetail() {
       toast.success('Payment recorded');
       setPayOpen(false);
       setPayForm({ amount: '', paidOn: new Date().toISOString().slice(0, 10), method: 'bank_transfer', reference: '', notes: '' });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Failed to record payment');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -103,8 +103,8 @@ export default function InvoiceDetail() {
               try {
                 const url = await getInvoicePDF.mutateAsync(invoice.id);
                 if (url) window.open(url, '_blank');
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to generate PDF');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
           >
@@ -128,8 +128,8 @@ export default function InvoiceDetail() {
                       { duration: 12000 },
                     );
                   }
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to send invoice');
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
                 }
               }}
             >
@@ -209,7 +209,7 @@ export default function InvoiceDetail() {
                   <Button variant="ghost" size="sm" className="h-7 text-red-600 hover:bg-red-50"
                     onClick={async () => {
                       try { await deletePayment.mutateAsync(p.id); toast.success('Payment removed'); }
-                      catch (err: any) { toast.error(err?.response?.data?.error ?? 'Failed'); }
+                      catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                     }}>
                     <Trash2 className="h-3.5 w-3.5" />
                   </Button>
@@ -266,8 +266,8 @@ export default function InvoiceDetail() {
                     });
                     toast.success(`Invoice marked as ${newStatus}`);
                     setStatusOpen(false);
-                  } catch (err: any) {
-                    toast.error(err?.response?.data?.error ?? 'Failed to update invoice');
+                  } catch {
+                    /* failed-request toast raised centrally (queryClient.ts) */
                   }
                 }}
               >
@@ -330,8 +330,8 @@ export default function InvoiceDetail() {
             toast.success('Invoice deleted');
             setDeleteOpen(false);
             navigate('/portal/invoices');
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Failed to delete invoice');
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
       />

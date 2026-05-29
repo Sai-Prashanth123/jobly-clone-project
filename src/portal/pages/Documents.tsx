@@ -92,8 +92,8 @@ function DocumentManager({ employee }: { employee: Employee }) {
       setFile(null);
       const input = document.getElementById('doc-file') as HTMLInputElement | null;
       if (input) input.value = '';
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Upload failed');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -105,8 +105,8 @@ function DocumentManager({ employee }: { employee: Employee }) {
       await remove.mutateAsync(id);
       toast.success('Document deleted');
       setConfirmTarget(null);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Delete failed');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     } finally {
       setPendingDeleteId(null);
     }

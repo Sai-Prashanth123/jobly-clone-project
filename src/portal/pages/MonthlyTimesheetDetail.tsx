@@ -55,8 +55,8 @@ export default function MonthlyTimesheetDetail() {
     try {
       await patchStatus.mutateAsync({ status: 'approved' });
       toast.success('Timesheet approved.');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Failed to approve.');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -66,8 +66,8 @@ export default function MonthlyTimesheetDetail() {
       toast.success('Timesheet rejected — the employee has been notified.');
       setRejectOpen(false);
       setRejectReason('');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Failed to reject.');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 

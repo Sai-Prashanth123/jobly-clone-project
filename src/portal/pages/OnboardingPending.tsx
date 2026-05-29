@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, LogOut, RefreshCw, CheckCircle2, MessageSquareWarning, Pencil, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 
@@ -57,8 +56,8 @@ export default function OnboardingPending() {
       await apiClient.post(`/employees/${user.employeeId}/onboarding/reopen`, {});
       await refreshUser();
       navigate('/portal/onboarding');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Could not reopen onboarding. Please try again.');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     } finally {
       setReopening(false);
     }

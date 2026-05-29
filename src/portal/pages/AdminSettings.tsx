@@ -148,8 +148,8 @@ function UsersTab() {
                             try {
                               await updateRole.mutateAsync({ userId: u.id, role });
                               toast.success(`${u.name}'s role updated to ${role}`);
-                            } catch (err: any) {
-                              toast.error(err?.response?.data?.error ?? 'Failed to update role');
+                            } catch {
+                              /* failed-request toast raised centrally (queryClient.ts) */
                             }
                           }}
                         >
@@ -181,8 +181,8 @@ function UsersTab() {
                             try {
                               const pwd = await resetPwd.mutateAsync(u.id);
                               setNewPwdResult({ name: u.name, password: pwd });
-                            } catch (err: any) {
-                              toast.error(err?.response?.data?.error ?? 'Failed to reset password');
+                            } catch {
+                              /* failed-request toast raised centrally (queryClient.ts) */
                             }
                           }}
                         >
@@ -224,8 +224,8 @@ function UsersTab() {
             await deactivate.mutateAsync(deactivateTarget);
             toast.success('User access removed');
             setDeactivateTarget(null);
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Failed to remove user');
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
       />

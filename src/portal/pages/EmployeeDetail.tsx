@@ -221,8 +221,8 @@ export default function EmployeeDetail() {
                     } else {
                       toast.error(r.warning ?? 'Resend failed.');
                     }
-                  } catch (err: any) {
-                    toast.error(err?.response?.data?.error ?? 'Failed to resend credentials');
+                  } catch {
+                    /* failed-request toast raised centrally (queryClient.ts) */
                   }
                 }}
               >
@@ -504,8 +504,8 @@ export default function EmployeeDetail() {
             toast.success('Employee deleted');
             setDeleteOpen(false);
             navigate('/portal/employees');
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Failed to delete employee');
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
       />

@@ -323,8 +323,8 @@ export default function Timesheets() {
                 toast.success(`Timesheet ${ts.displayId ?? ts.id} created`);
                 setShowForm(false);
                 navigate(`/portal/timesheets/${ts.id}`);
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to create timesheet');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
             onCancel={() => setShowForm(false)}

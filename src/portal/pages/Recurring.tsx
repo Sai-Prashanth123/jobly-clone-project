@@ -72,8 +72,8 @@ export default function Recurring() {
       setOpen(false);
       setForm({ clientId: '', title: '', frequency: 'monthly', paymentTerms: 'net_30', currency: 'USD', startDate: new Date().toISOString().slice(0, 10), endMode: 'never', endDate: '', maxOccurrences: '', taxRate: '', autoSend: false });
       setLines([blankLine()]);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Failed to create');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -81,8 +81,8 @@ export default function Recurring() {
     try {
       await updateRecurringInline(t.id, { status: t.status === 'active' ? 'paused' : 'active' });
       toast.success(t.status === 'active' ? 'Paused' : 'Resumed');
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Failed');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -99,7 +99,7 @@ export default function Recurring() {
       render: t => (
         <div className="flex items-center gap-1 justify-end">
           <Button variant="ghost" size="sm" className="h-8 gap-1" title="Generate now"
-            onClick={async e => { e.stopPropagation(); try { await runNow.mutateAsync(t.id); toast.success('Invoice generated'); } catch (err: any) { toast.error(err?.response?.data?.error ?? 'Failed'); } }}>
+            onClick={async e => { e.stopPropagation(); try { await runNow.mutateAsync(t.id); toast.success('Invoice generated'); } catch { /* failed-request toast raised centrally (queryClient.ts) */ } }}>
             <RotateCw className="h-3.5 w-3.5" /> Run now
           </Button>
           <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={e => { e.stopPropagation(); togglePause(t); }}>
@@ -206,7 +206,7 @@ export default function Recurring() {
         description="Future invoices will stop generating. Already-generated invoices are unaffected."
         confirmLabel="Delete"
         loading={deleteR.isPending}
-        onConfirm={async () => { if (!delTarget) return; try { await deleteR.mutateAsync(delTarget.id); toast.success('Deleted'); setDelTarget(null); } catch (err: any) { toast.error(err?.response?.data?.error ?? 'Failed'); } }}
+        onConfirm={async () => { if (!delTarget) return; try { await deleteR.mutateAsync(delTarget.id); toast.success('Deleted'); setDelTarget(null); } catch { /* failed-request toast raised centrally (queryClient.ts) */ } }}
       />
     </div>
   );

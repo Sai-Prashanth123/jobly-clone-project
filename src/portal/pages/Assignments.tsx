@@ -124,8 +124,8 @@ export default function Assignments() {
                   const asgn = await createAssignment.mutateAsync(data as Partial<Assignment>);
                   toast.success(`Assignment ${asgn.displayId ?? asgn.id} created`);
                   setShowForm(false);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to create assignment');
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
                 }
               }}
               onCancel={() => setShowForm(false)}

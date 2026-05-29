@@ -186,8 +186,8 @@ export default function ClientDetail() {
                 await updateClient.mutateAsync(data as any);
                 toast.success('Client updated successfully');
                 setEditOpen(false);
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to update client');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
             onCancel={() => setEditOpen(false)}
@@ -209,8 +209,8 @@ export default function ClientDetail() {
             toast.success('Client deleted');
             setDeleteOpen(false);
             navigate('/portal/clients');
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Failed to delete client');
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
       />

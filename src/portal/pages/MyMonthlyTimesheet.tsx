@@ -222,8 +222,8 @@ export default function MyMonthlyTimesheet() {
       setPreviewOpen(false);
       if (res.emailSent) toast.success(`Timesheet ${res.timesheet.displayId ?? ''} submitted — report emailed to HR.`);
       else toast.warning(res.warning ?? 'Timesheet submitted. HR has been notified in-app.', { duration: 9000 });
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Failed to submit timesheet. Please try again.');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -501,12 +501,16 @@ export default function MyMonthlyTimesheet() {
                     <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex-shrink-0">Uploaded</span>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    <label htmlFor="client-proof-replace" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 cursor-pointer px-2 py-1 rounded hover:bg-blue-50">
-                      <Upload className="h-3.5 w-3.5" /> Replace
+                    <label htmlFor="client-proof-replace" aria-disabled={uploadProof.isPending}
+                      className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${uploadProof.isPending ? 'text-gray-400 pointer-events-none' : 'text-blue-600 hover:text-blue-700 cursor-pointer hover:bg-blue-50'}`}>
+                      {uploadProof.isPending
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                        : <><Upload className="h-3.5 w-3.5" /> Replace</>}
                     </label>
                     <input
                       id="client-proof-replace"
                       type="file"
+                      disabled={uploadProof.isPending}
                       accept={PROOF_ACCEPT}
                       className="hidden"
                       onChange={async e => {
@@ -519,38 +523,43 @@ export default function MyMonthlyTimesheet() {
                           const updated = await uploadProof.mutateAsync({ id: saved.id, file: f });
                           setSheet(updated);
                           toast.success('Client-signed timesheet uploaded.');
-                        } catch (err: any) {
-                          toast.error(err?.response?.data?.error ?? 'Upload failed.');
+                        } catch {
+                          /* failed-request toast raised centrally (queryClient.ts) */
                         }
                         e.target.value = '';
                       }}
                     />
                     <Button
                       variant="ghost" size="sm"
+                      disabled={deleteProof.isPending}
                       onClick={async () => {
                         if (!sheet) return;
                         try {
                           const updated = await deleteProof.mutateAsync(sheet.id);
                           setSheet(updated);
                           toast.success('Proof removed.');
-                        } catch (err: any) {
-                          toast.error(err?.response?.data?.error ?? 'Remove failed.');
+                        } catch {
+                          /* failed-request toast raised centrally (queryClient.ts) */
                         }
                       }}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
+                      {deleteProof.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                     </Button>
                   </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <label htmlFor="client-proof-upload" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors">
-                    <Upload className="h-3.5 w-3.5" /> Upload signed timesheet
+                  <label htmlFor="client-proof-upload" aria-disabled={uploadProof.isPending}
+                    className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs font-medium transition-colors ${uploadProof.isPending ? 'border-gray-200 bg-gray-50 text-gray-400 pointer-events-none' : 'border-gray-200 bg-white text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer'}`}>
+                    {uploadProof.isPending
+                      ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                      : <><Upload className="h-3.5 w-3.5" /> Upload signed timesheet</>}
                   </label>
                   <input
                     id="client-proof-upload"
                     type="file"
+                    disabled={uploadProof.isPending}
                     accept={PROOF_ACCEPT}
                     className="hidden"
                     onChange={async e => {
@@ -563,8 +572,8 @@ export default function MyMonthlyTimesheet() {
                         const updated = await uploadProof.mutateAsync({ id: saved.id, file: f });
                         setSheet(updated);
                         toast.success('Client-signed timesheet uploaded.');
-                      } catch (err: any) {
-                        toast.error(err?.response?.data?.error ?? 'Upload failed.');
+                      } catch {
+                        /* failed-request toast raised centrally (queryClient.ts) */
                       }
                       e.target.value = '';
                     }}

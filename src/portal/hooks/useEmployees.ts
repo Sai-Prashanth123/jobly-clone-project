@@ -138,6 +138,10 @@ export function useEmployee(id: string | undefined, opts?: { refetchInterval?: n
     },
     enabled: isValidId(id),
     retry: false,
+    // Per-row employee lookups back many detail/list rows; a transient failure
+    // here shouldn't spray toasts across the page. The page's own primary query
+    // surfaces real errors. (404s already resolve to null above.)
+    meta: { silentError: true },
   });
 }
 
@@ -190,6 +194,10 @@ export function useUpdateEmployee(id: string) {
       // the operations dashboard considers active.
       qc.invalidateQueries({ queryKey: ['assignments'] });
     },
+    // Call sites handle errors contextually (EmployeeDetail's stale-review 409
+    // shows a re-submit warning + refetch; NewEmployee shows an inline form
+    // error). Keep the global handler quiet so those don't double-toast.
+    meta: { silentError: true },
   });
 }
 
@@ -234,6 +242,10 @@ export function useRequestOnboardingChanges(id: string) {
       qc.invalidateQueries({ queryKey: ['employees'] });
       qc.invalidateQueries({ queryKey: ['employees', id] });
     },
+    // EmployeeDetail handles the stale-review 409 with a bespoke "employee
+    // re-submitted — showing the latest" warning + refetch; keep the global
+    // handler quiet here so it doesn't double-toast.
+    meta: { silentError: true },
   });
 }
 

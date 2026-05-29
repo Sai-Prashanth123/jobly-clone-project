@@ -1,6 +1,4 @@
 import axios from 'axios';
-import { toast } from 'sonner';
-import { getApiErrorMessage } from './apiError';
 
 // Base URL comes from VITE_API_URL in .env.local (see CLAUDE.md).
 // Falls back to the Azure deployment if the env var is missing so that
@@ -76,18 +74,9 @@ apiClient.interceptors.response.use(
       return Promise.reject(err);
     }
 
-    // Surface failed DATA LOADS (GET) as a clear popup so the user always knows
-    // why something didn't load (403/404/409/500/offline). Mutations
-    // (POST/PUT/DELETE) already toast at the call site, so we skip them here to
-    // avoid double toasts. 401 is handled by the redirect above. A request can
-    // opt out by sending the header 'X-Silent-Error'.
-    const method = (err.config?.method ?? '').toLowerCase();
-    const silent = !!err.config?.headers?.['X-Silent-Error'];
-    if (status !== 401 && method === 'get' && !silent) {
-      const { title, description } = getApiErrorMessage(err);
-      toast.error(title, { description, id: `api-${status ?? 'net'}-${description}` });
-    }
-
+    // Error toasts are surfaced centrally by the TanStack query/mutation caches
+    // (see queryClient.ts surfaceRequestError) — the one place that catches BOTH
+    // queries and mutations. This interceptor only owns the redirect/idle flows.
     return Promise.reject(err);
   },
 );

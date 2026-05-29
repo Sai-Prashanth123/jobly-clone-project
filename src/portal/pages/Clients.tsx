@@ -163,8 +163,8 @@ export default function PortalClients() {
                 }
                 toast.success(`Client ${client.displayId ?? client.id} created successfully`);
                 setShowForm(false);
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to create client');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
             onCancel={() => setShowForm(false)}
@@ -188,8 +188,8 @@ export default function PortalClients() {
                   await updateClient.mutateAsync(data as Partial<Client>);
                   toast.success('Client updated successfully');
                   setEditClient(null);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to update client');
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
                 }
               }}
               onCancel={() => setEditClient(null)}

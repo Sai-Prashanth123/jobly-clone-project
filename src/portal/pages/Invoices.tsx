@@ -215,8 +215,8 @@ export default function Invoices() {
                 toast.success(`Invoice ${inv.invoiceNumber} generated`);
                 setShowForm(false);
                 navigate(`/portal/invoices/${inv.id}`);
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to generate invoice');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
             onCreate={async (body) => {
@@ -225,8 +225,8 @@ export default function Invoices() {
                 toast.success(`Invoice ${inv.invoiceNumber} created`);
                 setShowForm(false);
                 navigate(`/portal/invoices/${inv.id}`);
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to create invoice');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
             onCancel={() => setShowForm(false)}
@@ -296,8 +296,8 @@ export default function Invoices() {
                   });
                   toast.success(`Invoice ${editInvoice.invoiceNumber} updated`);
                   setEditInvoice(null);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to update invoice');
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
                 }
               }}
             >
@@ -320,8 +320,8 @@ export default function Invoices() {
             await deleteInvoice.mutateAsync(deleteTarget.id);
             toast.success(`Invoice ${deleteTarget.invoiceNumber} deleted`);
             setDeleteTarget(null);
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Failed to delete invoice');
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
       />

@@ -163,8 +163,8 @@ export default function AssignmentDetail() {
                 await updateAssignment.mutateAsync(data as any);
                 toast.success('Assignment updated');
                 setEditOpen(false);
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to update assignment');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
             onCancel={() => setEditOpen(false)}
@@ -186,8 +186,8 @@ export default function AssignmentDetail() {
             toast.success('Assignment deleted');
             setDeleteOpen(false);
             navigate('/portal/assignments');
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Failed to delete assignment');
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
       />

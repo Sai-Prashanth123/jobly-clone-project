@@ -48,8 +48,8 @@ export default function Estimates() {
                   const inv = await convertEstimate.mutateAsync(e.id);
                   toast.success(`Converted to ${inv.invoiceNumber}`);
                   navigate(`/portal/invoices/${inv.id}`);
-                } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Convert failed');
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
                 }
               }}>
               <FileCheck2 className="h-3.5 w-3.5" /> Convert
@@ -99,8 +99,8 @@ export default function Estimates() {
                 toast.success(`Estimate ${est.invoiceNumber} created`);
                 setShowForm(false);
                 navigate(`/portal/invoices/${est.id}`);
-              } catch (err: any) {
-                toast.error(err?.response?.data?.error ?? 'Failed to create estimate');
+              } catch {
+                /* failed-request toast raised centrally (queryClient.ts) */
               }
             }}
             onCancel={() => setShowForm(false)}

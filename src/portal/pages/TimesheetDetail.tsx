@@ -57,13 +57,16 @@ export default function TimesheetDetail() {
           ? 'Read-only — only the timesheet owner, admin, or operations can edit hours.'
           : null;
 
-  // Sync notes + leave reason from loaded timesheet
+  // Sync notes + leave reason from the loaded timesheet ONLY when the id changes.
+  // If we also depended on timesheet.notes/leaveReason, the 800ms autosave
+  // refetch would push a stale snapshot back into these inputs mid-typing —
+  // clobbering the in-progress text and bouncing the caret to the end. The hours
+  // grid (localEntries) already guards against this the same way.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (timesheet?.notes !== undefined) setNotes(timesheet.notes ?? '');
-  }, [timesheet?.id, timesheet?.notes]);
-  useEffect(() => {
+    setNotes(timesheet?.notes ?? '');
     setLeaveReason(timesheet?.leaveReason ?? '');
-  }, [timesheet?.id, timesheet?.leaveReason]);
+  }, [timesheet?.id]);
 
   // Live hours total (from the grid the user is editing) drives whether this is
   // a leave week (0h → needs a reason) or a worked week (>0h → needs the client
@@ -93,11 +96,10 @@ export default function TimesheetDetail() {
         await updateEntries.mutateAsync({ entries: localEntries, notes, leaveReason: leaveReason || null });
         setSaveState('saved');
         setTimeout(() => setSaveState('idle'), 3000);
-      } catch (err: any) {
-        // Don't fail silently — the inline 'error' chip is easy to miss, so also
-        // toast so the user knows their edits did NOT save.
+      } catch {
+        // Surface the inline 'error' chip; the failed-request toast itself is
+        // raised centrally by the query/mutation cache (see queryClient.ts).
         setSaveState('error');
-        toast.error(err?.response?.data?.error ?? "Couldn't save your changes — check your connection and try again.");
       }
     }, 800);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
@@ -122,8 +124,8 @@ export default function TimesheetDetail() {
     try {
       await patchStatus.mutateAsync({ status, rejectionReason });
       toast.success(`Timesheet ${status.replace('_', ' ')}`);
-    } catch (err: any) {
-      toast.error(err?.response?.data?.error ?? 'Action failed');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
     }
   };
 
@@ -305,37 +307,43 @@ export default function TimesheetDetail() {
                       <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex-shrink-0">Uploaded</span>
                     </div>
                     <div className="flex items-center gap-1 flex-shrink-0">
-                      <label htmlFor="wk-proof-replace" className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 cursor-pointer px-2 py-1 rounded hover:bg-blue-50">
-                        <Upload className="h-3.5 w-3.5" /> Replace
+                      <label htmlFor="wk-proof-replace" aria-disabled={uploadProof.isPending}
+                        className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded ${uploadProof.isPending ? 'text-gray-400 pointer-events-none' : 'text-blue-600 hover:text-blue-700 cursor-pointer hover:bg-blue-50'}`}>
+                        {uploadProof.isPending
+                          ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                          : <><Upload className="h-3.5 w-3.5" /> Replace</>}
                       </label>
-                      <input id="wk-proof-replace" type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                      <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
                         onChange={async e => {
                           const f = e.target.files?.[0]; if (!f) return;
                           if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
                           try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
-                          catch (err: any) { toast.error(err?.response?.data?.error ?? 'Upload failed.'); }
+                          catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                           e.target.value = '';
                         }} />
-                      <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      <Button variant="ghost" size="sm" disabled={deleteProof.isPending} className="text-red-600 hover:text-red-700 hover:bg-red-50"
                         onClick={async () => {
                           try { await deleteProof.mutateAsync(); toast.success('Proof removed.'); }
-                          catch (err: any) { toast.error(err?.response?.data?.error ?? 'Remove failed.'); }
+                          catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                         }}>
-                        <Trash2 className="h-3.5 w-3.5" />
+                        {deleteProof.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
                       </Button>
                     </div>
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    <label htmlFor="wk-proof-upload" className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors">
-                      <Upload className="h-3.5 w-3.5" /> Upload signed timesheet
+                    <label htmlFor="wk-proof-upload" aria-disabled={uploadProof.isPending}
+                      className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-md border text-xs font-medium transition-colors ${uploadProof.isPending ? 'border-gray-200 bg-gray-50 text-gray-400 pointer-events-none' : 'border-gray-200 bg-white text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer'}`}>
+                      {uploadProof.isPending
+                        ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
+                        : <><Upload className="h-3.5 w-3.5" /> Upload signed timesheet</>}
                     </label>
-                    <input id="wk-proof-upload" type="file" accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                    <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
                       onChange={async e => {
                         const f = e.target.files?.[0]; if (!f) return;
                         if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
                         try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
-                        catch (err: any) { toast.error(err?.response?.data?.error ?? 'Upload failed.'); }
+                        catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                         e.target.value = '';
                       }} />
                   </div>
@@ -395,8 +403,8 @@ export default function TimesheetDetail() {
             toast.success('Timesheet deleted');
             setDeleteOpen(false);
             navigate('/portal/timesheets');
-          } catch (err: any) {
-            toast.error(err?.response?.data?.error ?? 'Failed to delete timesheet');
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
       />
