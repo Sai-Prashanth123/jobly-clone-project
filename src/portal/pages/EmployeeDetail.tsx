@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning } from 'lucide-react';
@@ -22,7 +23,13 @@ import { formatDate, formatCurrency } from '../lib/utils';
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: employee, isLoading } = useEmployee(id);
+  const qc = useQueryClient();
+  const { user } = useAuth();
+  const isReviewer = user?.role === 'admin' || user?.role === 'hr';
+  // Poll while a reviewer is looking at the page so a parallel re-submission by
+  // the employee surfaces within a few seconds (the 409 guards are the safety
+  // net; this is the proactive half). 0/false disables for everyone else.
+  const { data: employee, isLoading } = useEmployee(id, { refetchInterval: isReviewer ? 15000 : false });
   const { data: assignmentsData } = useAssignments({ employeeId: id, limit: 100 });
   const { data: timesheetsData } = useTimesheets({ employeeId: id, limit: 100 });
   const { data: allEmployeesData } = useEmployees({ limit: 500 });
@@ -31,10 +38,26 @@ export default function EmployeeDetail() {
   const resendCreds = useResendEmployeeCredentials();
   const requestChanges = useRequestOnboardingChanges(id!);
 
-  const { user } = useAuth();
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [changesMessage, setChangesMessage] = useState('');
+
+  // Detect a re-submission while this reviewer has the page open: remember the
+  // submission timestamp first seen, and flag when a poll brings a newer one.
+  const firstSeenSubmittedAt = useRef<string | null | undefined>(undefined);
+  const [resubmittedBanner, setResubmittedBanner] = useState(false);
+  useEffect(() => {
+    if (!employee) return;
+    const ts = employee.onboardingCompletedAt ?? null;
+    if (firstSeenSubmittedAt.current === undefined) {
+      firstSeenSubmittedAt.current = ts;
+      return;
+    }
+    if (ts && ts !== firstSeenSubmittedAt.current) {
+      firstSeenSubmittedAt.current = ts;
+      setResubmittedBanner(true);
+    }
+  }, [employee?.onboardingCompletedAt, employee]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -85,6 +108,15 @@ export default function EmployeeDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {resubmittedBanner && (
+        <div role="status" className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-2 portal-animate-in">
+          <Clock className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-amber-800 flex-1">
+            <strong>{employee.firstName} re-submitted their onboarding just now.</strong> You're viewing the latest version — review it before approving or requesting changes.
+          </p>
+          <button type="button" onClick={() => setResubmittedBanner(false)} className="text-amber-700 hover:text-amber-900 text-xs font-medium flex-shrink-0">Dismiss</button>
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 lg:gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/employees')} className="gap-1 flex-shrink-0">
@@ -130,14 +162,23 @@ export default function EmployeeDetail() {
               loadingText={employee.status === 'inactive' ? 'Activating…' : 'Approving…'}
               onClick={async () => {
                 try {
-                  await updateEmployee.mutateAsync({ status: 'active' } as any);
+                  await updateEmployee.mutateAsync({
+                    status: 'active',
+                    // Guard token: the submission this reviewer is approving.
+                    expectedOnboardingCompletedAt: employee.onboardingCompletedAt ?? null,
+                  } as any);
                   toast.success(
                     employee.status === 'inactive'
                       ? `${employee.firstName} is now Active`
                       : 'Employee onboarding approved — now Active',
                   );
                 } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Failed to activate employee');
+                  if (err?.response?.status === 409) {
+                    toast.warning(err.response.data?.error ?? 'The employee changed their submission — showing the latest.', { duration: 10000 });
+                    qc.invalidateQueries({ queryKey: ['employees', id] });
+                  } else {
+                    toast.error(err?.response?.data?.error ?? 'Failed to activate employee');
+                  }
                 }
               }}
             >
@@ -506,11 +547,19 @@ export default function EmployeeDetail() {
                   return;
                 }
                 try {
-                  await requestChanges.mutateAsync(msg);
+                  await requestChanges.mutateAsync({ message: msg, expectedSubmittedAt: employee.onboardingCompletedAt ?? null });
                   toast.success(`${employee.firstName} has been notified.`);
                   setChangesOpen(false);
                 } catch (err: any) {
-                  toast.error(err?.response?.data?.error ?? 'Could not send the request. Please try again.');
+                  if (err?.response?.status === 409) {
+                    // The employee re-submitted/reopened while HR was reviewing —
+                    // don't write a stale change request; reload the latest.
+                    toast.warning(err.response.data?.error ?? 'The employee updated their submission — showing the latest.', { duration: 10000 });
+                    setChangesOpen(false);
+                    qc.invalidateQueries({ queryKey: ['employees', id] });
+                  } else {
+                    toast.error(err?.response?.data?.error ?? 'Could not send the request. Please try again.');
+                  }
                 }
               }}
               loading={requestChanges.isPending}

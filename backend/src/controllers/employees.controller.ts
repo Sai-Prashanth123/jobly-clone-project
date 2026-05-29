@@ -81,7 +81,8 @@ export async function requestOnboardingChanges(req: Request, res: Response, next
       res.status(400).json({ success: false, error: 'Message must be 1–2000 characters.' });
       return;
     }
-    const data = await svc.requestOnboardingChanges(req.params.id, message, req.user?.id);
+    const expectedSubmittedAt = (req.body as any)?.expectedSubmittedAt ?? null;
+    const data = await svc.requestOnboardingChanges(req.params.id, message, req.user?.id, expectedSubmittedAt);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

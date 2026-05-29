@@ -158,6 +158,10 @@ export const updateEmployeeSchema = z.object({
   experienceLevel: z.string().optional().nullable(),
   bloodGroup: z.string().optional().nullable(),
   identityDocuments: z.array(identityDocumentEntrySchema).optional(),
+  // Optimistic-concurrency guard for onboarding approval — NOT persisted.
+  // The onboarding_completed_at the approver reviewed; updateEmployee rejects
+  // the approval with 409 if the employee re-submitted/reopened since.
+  expectedOnboardingCompletedAt: z.string().nullable().optional(),
 });
 
 export const listEmployeesQuerySchema = z.object({

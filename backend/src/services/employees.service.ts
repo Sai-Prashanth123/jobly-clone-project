@@ -483,11 +483,25 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, actorRole?: string) {
   const { data: existing, error: findErr } = await supabaseAdmin
     .from('employees')
-    .select('id, display_id, email, work_email, status')
+    .select('id, display_id, email, work_email, status, onboarding_completed_at')
     .eq('id', id)
     .is('deleted_at', null)
     .single();
   if (findErr || !existing) throw new NotFoundError('Employee not found');
+
+  // Stale-review guard on onboarding approval. When HR approves (status →
+  // active) from the detail page, they pass the onboarding_completed_at they
+  // reviewed. If the employee re-submitted or reopened in the meantime, the
+  // token won't match — block so HR can't approve a version they didn't see.
+  if (
+    input.status === 'active' && existing.status === 'onboarding' &&
+    input.expectedOnboardingCompletedAt !== undefined &&
+    input.expectedOnboardingCompletedAt !== (existing as any).onboarding_completed_at
+  ) {
+    throw new ConflictError(
+      'This employee changed their submission after you opened this page. The latest version has been loaded — review it before approving.',
+    );
+  }
 
   const patch: Record<string, any> = {};
   if (input.email !== undefined)      patch.email           = input.email;
@@ -787,6 +801,7 @@ export async function requestOnboardingChanges(
   id: string,
   message: string,
   actorId?: string,
+  expectedSubmittedAt?: string | null,
 ): Promise<{ employee: any }> {
   const { data: emp, error } = await supabaseAdmin
     .from('employees').select('*').eq('id', id).is('deleted_at', null).single();
@@ -794,8 +809,21 @@ export async function requestOnboardingChanges(
   if (emp.status !== 'onboarding') {
     throw new ValidationError('Change requests are only valid for employees currently onboarding.');
   }
+  // Stale-review guard. onboarding_completed_at is the version token of the
+  // submission HR reviewed. If it's null now, the employee reopened/began
+  // re-editing after HR loaded the page; if it differs from what HR reviewed,
+  // they re-submitted a newer version in the meantime. Either way, block the
+  // stale request so HR can't ask the employee to fix something they already
+  // fixed — the frontend reloads the latest on this 409.
   if (!emp.onboarding_completed_at) {
-    throw new ValidationError('Employee has not submitted their onboarding yet — nothing to review.');
+    throw new ConflictError(
+      "The employee reopened their onboarding to make changes and hasn't re-submitted yet. The latest state has been loaded — wait for their new submission before requesting changes.",
+    );
+  }
+  if (expectedSubmittedAt && expectedSubmittedAt !== emp.onboarding_completed_at) {
+    throw new ConflictError(
+      'The employee re-submitted their onboarding after you opened this page. The latest version has been loaded — review it before requesting changes.',
+    );
   }
 
   const patch: Record<string, any> = {

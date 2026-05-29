@@ -118,9 +118,10 @@ export function useEmployees(params?: ListParams, options?: { enabled?: boolean 
   });
 }
 
-export function useEmployee(id: string | undefined) {
+export function useEmployee(id: string | undefined, opts?: { refetchInterval?: number | false }) {
   return useQuery({
     queryKey: ['employees', id],
+    refetchInterval: opts?.refetchInterval ?? false,
     queryFn: async () => {
       // A 404 here means the referenced employee was deleted (e.g. an
       // assignment/timesheet still points at them). Resolve to null instead of
@@ -223,8 +224,10 @@ export function useCompleteOnboarding(id: string) {
 export function useRequestOnboardingChanges(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (message: string) => {
-      const { data } = await apiClient.post(`/employees/${id}/onboarding/request-changes`, { message });
+    // expectedSubmittedAt = the onboarding_completed_at HR reviewed. Sent so the
+    // backend can 409 if the employee re-submitted/reopened since (stale review).
+    mutationFn: async ({ message, expectedSubmittedAt }: { message: string; expectedSubmittedAt?: string | null }) => {
+      const { data } = await apiClient.post(`/employees/${id}/onboarding/request-changes`, { message, expectedSubmittedAt });
       return data.data;
     },
     onSuccess: () => {
