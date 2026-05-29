@@ -137,6 +137,18 @@ export default function InvoiceDetail() {
               Send to Client
             </Button>
           )}
+          {invoice.publicToken && (
+            <Button variant="outline" size="sm" className="gap-2"
+              onClick={() => {
+                const url = `${window.location.origin}/portal/i/${invoice.publicToken}`;
+                navigator.clipboard?.writeText(url).then(
+                  () => toast.success('Share link copied'),
+                  () => window.open(url, '_blank'),
+                );
+              }}>
+              Share link
+            </Button>
+          )}
           {canPay && (
             <Button size="sm" className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
               onClick={() => { setPayForm(f => ({ ...f, amount: String(balance) })); setPayOpen(true); }}>

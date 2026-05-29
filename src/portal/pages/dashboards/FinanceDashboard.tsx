@@ -1,4 +1,4 @@
-import { DollarSign, FileText, AlertTriangle, CheckCircle, TrendingUp, BarChart3, Inbox } from 'lucide-react';
+import { DollarSign, FileText, AlertTriangle, CheckCircle, TrendingUp, BarChart3, Inbox, RotateCw, FileCheck2, Clock } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
@@ -13,23 +13,54 @@ import { formatCurrency, formatDate } from '../../lib/utils';
 import { useInvoices } from '../../hooks/useInvoices';
 import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
+import { useRecurringTemplates } from '../../hooks/useRecurring';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+const OUTSTANDING_STATUSES = ['sent', 'viewed', 'partially_paid', 'overdue'];
 
 export function FinanceDashboard() {
   const { data: invData } = useInvoices({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
   const { data: tsData } = useTimesheets({ limit: 200, status: 'client_approved' });
+  const { data: recurring } = useRecurringTemplates();
 
   const invoices = invData?.data ?? [];
   const clients = clientData?.data ?? [];
   const readyToInvoice = tsData?.total ?? 0;
+  const recurringTemplates = recurring ?? [];
+
+  const balanceOf = (i: typeof invoices[number]) => i.balanceDue ?? (i.totalAmount - (i.amountPaid ?? 0));
 
   const pendingInvoices = invoices.filter(i => i.status === 'draft').length;
 
+  // Outstanding = balance still owed across all unpaid-in-flight invoices.
   const outstandingAmount = invoices
-    .filter(i => i.status === 'sent' || i.status === 'overdue')
-    .reduce((s, i) => s + i.totalAmount, 0);
+    .filter(i => OUTSTANDING_STATUSES.includes(i.status))
+    .reduce((s, i) => s + balanceOf(i), 0);
+
+  // Invoices-in-progress funnel (Wave-style) — count + $ per status.
+  const STATUS_ORDER = ['draft', 'sent', 'viewed', 'partially_paid', 'overdue', 'paid'] as const;
+  const STATUS_LABELS: Record<string, string> = { draft: 'Draft', sent: 'Sent', viewed: 'Viewed', partially_paid: 'Partial', overdue: 'Overdue', paid: 'Paid' };
+  const funnel = STATUS_ORDER.map(st => {
+    const rows = invoices.filter(i => i.status === st);
+    return { status: st, label: STATUS_LABELS[st], count: rows.length, amount: rows.reduce((s, i) => s + i.totalAmount, 0) };
+  });
+
+  // Average days-to-pay across paid invoices (paid_at − issue_date).
+  const paidWithDates = invoices.filter(i => i.status === 'paid' && i.paidAt && i.issueDate);
+  const avgDaysToPay = paidWithDates.length
+    ? Math.round(paidWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.paidAt!).getTime() - new Date(i.issueDate).getTime()) / 86400000), 0) / paidWithDates.length)
+    : null;
+
+  // Total collected = sum of recorded payments (amount_paid), so partial
+  // payments count too — not just fully-paid invoices.
+  const totalCollected = invoices.reduce((s, i) => s + (i.amountPaid ?? 0), 0);
+
+  const upcomingRecurring = [...recurringTemplates]
+    .filter(t => t.status === 'active')
+    .sort((a, b) => a.nextRunDate.localeCompare(b.nextRunDate))
+    .slice(0, 5);
 
   const now = new Date();
   const months: { key: string; label: string }[] = [];
@@ -76,9 +107,10 @@ export function FinanceDashboard() {
 
       <QuickActions
         actions={[
-          { label: 'Generate Invoice', to: '/portal/invoices', icon: FileText, tone: 'green' },
-          { label: 'View Overdue',     to: '/portal/invoices', icon: AlertTriangle, tone: 'red' },
-          { label: 'Revenue Report',   to: '/portal/reports',  icon: BarChart3, tone: 'cyan' },
+          { label: 'New Invoice',   to: '/portal/invoices',  icon: FileText, tone: 'green' },
+          { label: 'New Estimate',  to: '/portal/estimates', icon: FileCheck2, tone: 'blue' },
+          { label: 'Recurring',     to: '/portal/recurring', icon: RotateCw, tone: 'cyan' },
+          { label: 'Revenue Report', to: '/portal/reports',  icon: BarChart3, tone: 'orange' },
         ]}
       />
 
@@ -108,11 +140,11 @@ export function FinanceDashboard() {
           },
           {
             title: 'Total Collected',
-            value: formatCurrency(totalPaidAllTime),
+            value: formatCurrency(totalCollected),
             icon: <TrendingUp className="h-5 w-5" />,
             variant: 'green' as const,
-            description: 'All-time revenue from Paid invoices',
-            helper: 'Lifetime sum of every invoice marked Paid. Sparkline shows the last 6 months.',
+            description: avgDaysToPay != null ? `Avg ${avgDaysToPay} days to get paid` : 'All payments recorded (incl. partial)',
+            helper: 'Sum of every payment recorded against invoices (full + partial). Sparkline shows the last 6 months.',
             sparkline: monthlyRevenue.map(m => m.revenue),
             to: '/portal/reports',
             linkLabel: 'View revenue report',
@@ -123,6 +155,49 @@ export function FinanceDashboard() {
           </div>
         ))}
       </div>
+
+      {/* Invoices in progress — Wave-style funnel: count + $ per status. */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-base">Invoices in progress</CardTitle></CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {funnel.map(f => (
+              <Link key={f.status} to="/portal/invoices" className="rounded-lg border border-gray-100 bg-gray-50/60 hover:bg-gray-50 transition-colors p-3 text-center">
+                <p className="text-[11px] uppercase tracking-wide text-gray-400">{f.label}</p>
+                <p className="text-xl font-bold tabular-nums mt-0.5">{f.count}</p>
+                <p className="text-[11px] text-muted-foreground tabular-nums">{formatCurrency(f.amount)}</p>
+              </Link>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {upcomingRecurring.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center gap-2"><RotateCw className="h-4 w-4 text-[#4069FF]" /> Upcoming recurring</CardTitle>
+              <Link to="/portal/recurring" className="text-xs text-blue-600 hover:underline">Manage</Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {upcomingRecurring.map(t => (
+                <div key={t.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{t.title || t.clientName || 'Recurring invoice'}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{t.frequency} · {t.clientName ?? ''}</p>
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end"><Clock className="h-3 w-3" /> {formatDate(t.nextRunDate)}</p>
+                    {t.autoSend && <p className="text-[10px] text-emerald-600">auto-send</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Status legend — answers "what does Draft mean?" right on the dashboard. */}
       <div className="bg-blue-50/40 border border-blue-100 rounded-md px-3 py-2.5">

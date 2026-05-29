@@ -64,6 +64,32 @@ export interface CreateInvoiceBody {
   terms?: string | null;
 }
 
+// Estimates are invoices with doc_type='estimate'. Reuse the same list/detail
+// endpoints with a docType filter.
+export function useEstimates(params?: { status?: string; clientId?: string }) {
+  return useQuery({
+    queryKey: ['estimates', params],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/invoices', { params: { ...params, docType: 'estimate' } });
+      return { data: (data.data as any[]).map(mapInvoice), total: data.total as number };
+    },
+  });
+}
+
+export function useConvertEstimate() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (estimateId: string) => {
+      const { data } = await apiClient.post(`/invoices/${estimateId}/convert`);
+      return mapInvoice(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['estimates'] });
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+    },
+  });
+}
+
 export function useCreateInvoice() {
   const qc = useQueryClient();
   return useMutation({

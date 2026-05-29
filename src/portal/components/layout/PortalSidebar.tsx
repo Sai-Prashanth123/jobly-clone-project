@@ -13,7 +13,7 @@ import {
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
   Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search, UserPlus,
-  CalendarCheck, CalendarClock, KeyRound, Package,
+  CalendarCheck, CalendarClock, KeyRound, Package, FileCheck2, RotateCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -39,6 +39,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'My Attendance',  path: '/portal/attendance',     icon: <CalendarCheck className="h-4 w-4" />,   roles: ['employee','admin','hr'] },
   { label: 'Attendance Review', path: '/portal/attendance/review', icon: <CalendarClock className="h-4 w-4" />, roles: ['admin','hr','operations'] },
   { label: 'Invoices',       path: '/portal/invoices',       icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
+  { label: 'Estimates',      path: '/portal/estimates',      icon: <FileCheck2 className="h-4 w-4" />,      roles: ['admin','finance'] },
+  { label: 'Recurring',      path: '/portal/recurring',      icon: <RotateCw className="h-4 w-4" />,        roles: ['admin','finance'] },
   { label: 'Products',       path: '/portal/products',       icon: <Package className="h-4 w-4" />,         roles: ['admin','finance'] },
   { label: 'Documents',      path: '/portal/documents',      icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'] },
   { label: 'Reports',        path: '/portal/reports',        icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','operations'] },

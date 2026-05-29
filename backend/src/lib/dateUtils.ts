@@ -100,6 +100,33 @@ export function isMonthBeforeJoiningUTC(year: number, month: number, startDate?:
 }
 
 /**
+ * Advance a YYYY-MM-DD date by one recurrence interval. Month-based steps clamp
+ * to the last valid day (e.g. Jan 31 + 1 month → Feb 28/29). UTC-safe.
+ */
+export function advanceByFrequency(dateStr: string, frequency: string): string {
+  const [y, m, d] = dateStr.slice(0, 10).split('-').map(Number);
+  const addMonths = (months: number): string => {
+    const base = new Date(Date.UTC(y, m - 1, 1));
+    base.setUTCMonth(base.getUTCMonth() + months);
+    const year = base.getUTCFullYear();
+    const month = base.getUTCMonth(); // 0-indexed
+    const lastDay = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+    const day = Math.min(d, lastDay);
+    return new Date(Date.UTC(year, month, day)).toISOString().split('T')[0];
+  };
+  switch (frequency) {
+    case 'daily':      return addDaysToDate(dateStr, 1);
+    case 'weekly':     return addDaysToDate(dateStr, 7);
+    case 'biweekly':   return addDaysToDate(dateStr, 14);
+    case 'monthly':    return addMonths(1);
+    case 'quarterly':  return addMonths(3);
+    case 'semiannual': return addMonths(6);
+    case 'yearly':     return addMonths(12);
+    default:           return addMonths(1);
+  }
+}
+
+/**
  * True if the ISO week starting `weekStart` (YYYY-MM-DD Monday) ends before the
  * employee's joining date — i.e. the whole week predates their hire. Date-of-
  * joining floor for weekly timesheets. Blank startDate → no floor.

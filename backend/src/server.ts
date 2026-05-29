@@ -2,6 +2,7 @@ import { app } from './app';
 import { env } from './config/env';
 import { supabaseAdmin } from './config/supabase';
 import { verifyMailer } from './lib/mailer';
+import { startScheduler } from './jobs/scheduler';
 
 // Process-level safety nets. Without these, a stray unhandled Promise
 // rejection (e.g. a fire-and-forget notification) leaves the process in an
@@ -33,6 +34,10 @@ async function startServer(): Promise<void> {
   // Verify mailer at boot so SMTP misconfig is visible in logs immediately
   // (otherwise auth errors only surface — and get swallowed — at send time).
   await verifyMailer();
+
+  // Boot the recurring-invoice + reminder scheduler (no-op unless
+  // ENABLE_SCHEDULER=true). Single always-on container, so node-cron is safe.
+  startScheduler();
 
   const port = parseInt(env.PORT, 10);
   const httpServer = app.listen(port, () => {

@@ -29,6 +29,9 @@ const TimesheetDetail = lazy(() => import('./pages/TimesheetDetail'));
 const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
 const Reports = lazy(() => import('./pages/Reports'));
 const Products = lazy(() => import('./pages/Products'));
+const Estimates = lazy(() => import('./pages/Estimates'));
+const Recurring = lazy(() => import('./pages/Recurring'));
+const PublicInvoiceView = lazy(() => import('./pages/PublicInvoiceView'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const Documents = lazy(() => import('./pages/Documents'));
 
@@ -66,6 +69,8 @@ export default function PortalApp() {
         <Routes>
           {/* Public */}
           <Route path="login" element={<Login />} />
+          {/* Public shareable invoice/estimate view — no auth, token-gated. */}
+          <Route path="i/:token" element={<PublicInvoiceView />} />
 
           {/* Authenticated but OUTSIDE the layout — the forced first-login
               password reset. Its own ProtectedRoute keeps it auth-gated; the
@@ -169,6 +174,22 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'finance']}>
                   <Products />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="estimates"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                  <Estimates />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="recurring"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                  <Recurring />
                 </ProtectedRoute>
               }
             />

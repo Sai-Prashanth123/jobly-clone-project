@@ -398,6 +398,42 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
   });
 }
 
+// Scheduled payment reminder. `tone` shapes the copy: upcoming (before due),
+// due (on due date), overdue (after due).
+export async function sendInvoiceReminderEmail(payload: {
+  to: string; contactName: string; invoiceNumber: string; dueDate: string;
+  balanceDue: number; currency?: string; tone: 'upcoming' | 'due' | 'overdue'; viewUrl?: string;
+}): Promise<void> {
+  if (!mailerConfigured) throw new Error('Email is not configured on the server.');
+  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: payload.currency || 'USD' }).format(n);
+  const fmtDate = (s: string) => formatDateSafe(s, { long: true }) || s;
+  const headline = payload.tone === 'overdue'
+    ? `Payment overdue — Invoice ${payload.invoiceNumber}`
+    : payload.tone === 'due'
+      ? `Payment due today — Invoice ${payload.invoiceNumber}`
+      : `Payment reminder — Invoice ${payload.invoiceNumber}`;
+  const intro = payload.tone === 'overdue'
+    ? `This is a friendly reminder that invoice <strong>${esc(payload.invoiceNumber)}</strong> is past due (was due ${fmtDate(payload.dueDate)}).`
+    : payload.tone === 'due'
+      ? `Invoice <strong>${esc(payload.invoiceNumber)}</strong> is due today, ${fmtDate(payload.dueDate)}.`
+      : `Invoice <strong>${esc(payload.invoiceNumber)}</strong> is due on ${fmtDate(payload.dueDate)}.`;
+  const html = `
+    <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0b1220;">
+      <h2 style="margin:0 0 12px;">${esc(headline)}</h2>
+      <p style="margin:0 0 8px;">Hi ${esc(payload.contactName || 'there')},</p>
+      <p style="margin:0 0 12px;line-height:1.5;">${intro}</p>
+      <p style="margin:0 0 16px;font-size:18px;"><strong>Balance due: ${fmt(payload.balanceDue)}</strong></p>
+      ${payload.viewUrl ? `<p style="margin:0 0 16px;"><a href="${esc(payload.viewUrl)}" style="background:#4069FF;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;display:inline-block;">View invoice</a></p>` : ''}
+      <p style="margin:16px 0 0;color:#64748b;font-size:13px;">Thank you — Jobly Solutions</p>
+    </div>`;
+  await sendWithRetry({
+    from: FROM,
+    to: payload.to,
+    subject: headline,
+    html,
+  });
+}
+
 export interface MonthlyTimesheetEmailPayload {
   to: string | string[];
   employeeName: string;

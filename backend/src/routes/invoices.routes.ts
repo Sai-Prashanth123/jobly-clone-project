@@ -13,6 +13,7 @@ router.use(authenticate);
 router.get('/', requireRole('admin','finance'), validateQuery(listInvoicesQuerySchema), ctrl.list);
 router.post('/generate', requireRole('admin','finance'), validateBody(generateInvoiceSchema), ctrl.generate);
 router.post('/', requireRole('admin','finance'), validateBody(createInvoiceSchema), ctrl.create);
+router.post('/:id/convert', requireRole('admin','finance'), ctrl.convert);
 router.get('/export', requireRole('admin', 'finance'), ctrl.exportInvoices);
 router.patch('/bulk-status', requireRole('admin', 'finance'), ctrl.bulkInvoiceStatus);
 router.get('/:id', requireRole('admin','finance'), ctrl.getOne);

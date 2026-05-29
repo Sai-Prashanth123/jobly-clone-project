@@ -81,6 +81,20 @@ export async function exportInvoices(req: Request, res: Response, next: NextFunc
   } catch (err) { next(err); }
 }
 
+export async function getPublic(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.getPublicInvoice(req.params.token);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function convert(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.convertEstimate(req.params.id, req.user?.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function listPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await paymentsSvc.listPayments(req.params.id);

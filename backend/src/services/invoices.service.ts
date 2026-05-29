@@ -4,7 +4,7 @@ import { generateInvoicePDF } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
-import { addDaysToDate } from '../lib/dateUtils';
+import { addDaysToDate, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
 import { paymentTermsDays } from '../schemas/invoice.schema';
 
@@ -306,6 +306,90 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
     { doc_type: input.docType });
 
   return getInvoice(invoice.id);
+}
+
+// Convert an accepted estimate into a real invoice: clone its line items into a
+// fresh INV-numbered invoice (status draft), recompute the due date from today
+// + the estimate's payment terms, and mark the estimate converted + linked.
+export async function convertEstimate(estimateId: string, actorId?: string) {
+  const est = await getInvoice(estimateId);
+  if (est.doc_type !== 'estimate') throw new ValidationError('Only estimates can be converted.');
+  if (est.converted_invoice_id) throw new ConflictError('This estimate has already been converted to an invoice.');
+
+  const issueDate = todayUTC();
+  const dueDate = est.payment_terms === 'custom'
+    ? est.due_date
+    : addDaysToDate(issueDate, paymentTermsDays(est.payment_terms ?? 'net_30'));
+
+  const invoice = await insertInvoiceWithNumber('INV', {
+    client_id: est.client_id,
+    issue_date: issueDate,
+    due_date: dueDate,
+    subtotal: est.subtotal,
+    tax_rate: est.tax_rate,
+    tax_amount: est.tax_amount,
+    total_amount: est.total_amount,
+    status: 'draft',
+    doc_type: 'invoice',
+    po_number: est.po_number ?? null,
+    payment_terms: est.payment_terms ?? 'net_30',
+    currency: est.currency ?? 'USD',
+    notes: est.notes ?? null,
+    terms: est.terms ?? null,
+  });
+
+  const items = (est.invoice_line_items ?? []).map((li: any) => ({
+    invoice_id: invoice.id,
+    item_name: li.item_name ?? null,
+    description: li.description,
+    product_id: li.product_id ?? null,
+    quantity: li.quantity ?? li.hours,
+    hours: li.hours,
+    bill_rate: li.bill_rate,
+    amount: li.amount,
+  }));
+  if (items.length > 0) await supabaseAdmin.from('invoice_line_items').insert(items);
+
+  await supabaseAdmin.from('invoices')
+    .update({ estimate_status: 'converted', converted_invoice_id: invoice.id })
+    .eq('id', estimateId);
+
+  logActivity(actorId ?? null, 'updated', 'invoice', estimateId, est.invoice_number ?? estimateId.slice(0, 8),
+    { event: 'estimate_converted', invoice_id: invoice.id });
+
+  return getInvoice(invoice.id);
+}
+
+// Public (no-auth) invoice fetch by shareable token. Stamps viewed_at + flips
+// a 'sent' invoice → 'viewed' (or an estimate's status) on first open. Returns
+// only client-safe fields.
+export async function getPublicInvoice(token: string) {
+  const { data: inv, error } = await supabaseAdmin
+    .from('invoices')
+    .select('*, invoice_line_items(*), clients(company_name, billing_street, billing_city, billing_state, billing_zip, billing_country, contact_name)')
+    .eq('public_token', token)
+    .single();
+  if (error || !inv) throw new NotFoundError('Invoice not found');
+
+  // First-open tracking (best-effort, never blocks the response).
+  try {
+    const patch: Record<string, unknown> = {};
+    if (!inv.viewed_at) patch.viewed_at = new Date().toISOString();
+    if (inv.doc_type === 'estimate') {
+      if (inv.estimate_status === 'sent') patch.estimate_status = 'viewed';
+    } else if (inv.status === 'sent') {
+      patch.status = 'viewed';
+    }
+    if (Object.keys(patch).length > 0) await supabaseAdmin.from('invoices').update(patch).eq('id', inv.id);
+  } catch (err) {
+    console.error('[invoices] public view tracking failed for', token, err);
+  }
+
+  const amountPaid = Number(inv.amount_paid) || 0;
+  return {
+    ...inv,
+    balance_due: Math.round(((inv.total_amount ?? 0) - amountPaid) * 100) / 100,
+  };
 }
 
 export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
