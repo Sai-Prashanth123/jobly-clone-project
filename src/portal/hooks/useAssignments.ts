@@ -43,6 +43,11 @@ function mapAssignment(raw: any): Assignment {
     reportingManagerId: raw.reporting_manager_id ?? undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
+    // Joined from the server (employees/clients) so the list never needs a
+    // per-row fetch and deleted-employee rows still render a name.
+    employeeName: raw.employee_name ?? undefined,
+    employeeDisplayId: raw.employee_display_id ?? undefined,
+    clientName: raw.client_name ?? undefined,
   };
 }
 

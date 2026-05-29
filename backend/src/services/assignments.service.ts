@@ -1,10 +1,40 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError } from '../lib/errors';
+import { todayUTC } from '../lib/dateUtils';
 import { createNotification, getPortalUserByEmployeeId, getUserIdsByRole } from './notifications.service';
 import type { CreateAssignmentInput, UpdateAssignmentInput, ListAssignmentsQuery } from '../schemas/assignment.schema';
 
+// Joined select: pull the employee + client names alongside the assignment so
+// the list/detail never needs a per-row fetch (kills the N+1 + the 404 spam
+// when an assignment references a soft-deleted employee — the join still
+// returns the name because it doesn't filter on the child's deleted_at).
+const ASSIGNMENT_SELECT = '*, employees(first_name, last_name, display_id), clients(company_name)';
+
+// Flatten the joined rows to snake_case fields the frontend mapper reads, and
+// overlay a read-time "completed" status: if the engagement's end date has
+// passed and it's still active/pending, present it as completed. Display-only —
+// we never write it, so there are no update races and the Edit form still shows
+// the stored value (admin/ops set the real end-state explicitly).
+function decorateAssignment(row: any): any {
+  const emp = row.employees;
+  const cli = row.clients;
+  let status = row.status;
+  if (row.end_date && row.end_date < todayUTC() && (status === 'active' || status === 'pending')) {
+    status = 'completed';
+  }
+  return {
+    ...row,
+    status,
+    employee_name: emp ? `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() : null,
+    employee_display_id: emp?.display_id ?? null,
+    client_name: cli?.company_name ?? null,
+    employees: undefined,
+    clients: undefined,
+  };
+}
+
 export async function listAssignments(query: ListAssignmentsQuery, userRole?: string, userId?: string) {
-  let q = supabaseAdmin.from('assignments').select('*', { count: 'exact' });
+  let q = supabaseAdmin.from('assignments').select(ASSIGNMENT_SELECT, { count: 'exact' });
 
   // Employees can only see their own assignments
   if (userRole === 'employee' && userId) {
@@ -27,21 +57,28 @@ export async function listAssignments(query: ListAssignmentsQuery, userRole?: st
 
   const { data, error, count } = await q;
   if (error) throw error;
-  return { data: data ?? [], total: count ?? 0 };
+  return { data: (data ?? []).map(decorateAssignment), total: count ?? 0 };
 }
 
 export async function getAssignment(id: string) {
   const { data, error } = await supabaseAdmin
     .from('assignments')
-    .select('*')
+    .select(ASSIGNMENT_SELECT)
     .eq('id', id)
     .single();
 
   if (error || !data) throw new NotFoundError('Assignment not found');
-  return data;
+  return decorateAssignment(data);
 }
 
 export async function createAssignment(input: CreateAssignmentInput) {
+  // Status is derived from the dates, NOT taken from the client — a new
+  // assignment is Pending if its start date is in the future, otherwise Active.
+  // (Completed/Terminated are end-states an admin/ops sets later via edit; the
+  // read-time overlay also shows Completed once the end date passes.) This
+  // prevents the "brand-new assignment shows Completed" confusion.
+  const derivedStatus = input.startDate > todayUTC() ? 'pending' : 'active';
+
   const { data, error } = await supabaseAdmin
     .from('assignments')
     .insert({
@@ -54,7 +91,7 @@ export async function createAssignment(input: CreateAssignmentInput) {
       bill_rate: input.billRate,
       pay_rate: input.payRate,
       max_hours_per_week: input.maxHoursPerWeek,
-      status: input.status,
+      status: derivedStatus,
       billing_type: input.billingType ?? null,
       work_location: input.workLocation ?? null,
       reporting_manager_id: input.reportingManagerId ?? null,

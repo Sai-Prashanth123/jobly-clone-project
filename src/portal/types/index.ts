@@ -288,6 +288,10 @@ export interface Assignment {
   reportingManagerId?: string;
   createdAt: string;
   updatedAt: string;
+  // Joined read-only fields from the server (employee + client names).
+  employeeName?: string;
+  employeeDisplayId?: string;
+  clientName?: string;
 }
 
 export interface TimesheetEntry {

@@ -10,7 +10,9 @@ export const createAssignmentSchema = z.object({
   billRate: z.number().min(0),
   payRate: z.number().min(0),
   maxHoursPerWeek: z.number().int().min(1).max(168).default(40),
-  status: z.enum(['active','completed','pending','terminated']).default('pending'),
+  // Status is derived server-side from the dates on create (see
+  // assignments.service.createAssignment); accepted but ignored if sent.
+  status: z.enum(['active','completed','pending','terminated']).optional(),
   billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),
   workLocation: z.string().optional().nullable().transform(v => v || null),
   reportingManagerId: z.string().uuid().optional().nullable(),

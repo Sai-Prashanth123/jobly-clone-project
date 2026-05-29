@@ -9,8 +9,6 @@ import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { AssignmentForm } from '../components/assignments/AssignmentForm';
 import { useAssignments, useCreateAssignment } from '../hooks/useAssignments';
-import { useEmployees } from '../hooks/useEmployees';
-import { useClients } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
 import type { Assignment } from '../types';
@@ -19,28 +17,24 @@ export default function Assignments() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data, isLoading } = useAssignments({ limit: 100 });
-  const { data: employeesData } = useEmployees({ limit: 200 });
-  const { data: clientsData } = useClients({ limit: 100 });
   const createAssignment = useCreateAssignment();
   const [showForm, setShowForm] = useState(false);
 
   const assignments = data?.data ?? [];
-  const employees = employeesData?.data ?? [];
-  const clients = clientsData?.data ?? [];
 
-  const getEmpName = (id: string) => {
-    const e = employees.find(emp => emp.id === id);
-    return e ? `${e.firstName} ${e.lastName}` : id.slice(0, 8);
-  };
-  const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
+  // Names come joined from the server now (no roster fetch needed → faster, and
+  // a deleted employee still shows a name instead of a raw UUID). Fall back to a
+  // short id only if the join somehow returned nothing.
+  const getEmpName = (a: Assignment) => a.employeeName?.trim() || `${a.employeeId.slice(0, 8)} (removed)`;
+  const getClientName = (a: Assignment) => a.clientName?.trim() || a.clientId.slice(0, 8);
 
   const assignmentsWithLookup = useMemo(
     () => assignments.map(a => ({
       ...a,
-      clientName: getClientName(a.clientId),
-      employeeName: getEmpName(a.employeeId),
+      clientName: getClientName(a),
+      employeeName: getEmpName(a),
     })),
-    [assignments, clients, employees],
+    [assignments],
   );
 
   const canCreate = user?.role === 'admin' || user?.role === 'operations';
@@ -56,14 +50,14 @@ export default function Assignments() {
       header: 'Employee',
       render: a => (
         <div>
-          <p className="font-medium">{getEmpName(a.employeeId)}</p>
+          <p className="font-medium">{getEmpName(a)}</p>
         </div>
       ),
     },
     {
       key: 'clientId',
       header: 'Client',
-      render: a => getClientName(a.clientId),
+      render: a => getClientName(a),
     },
     { key: 'projectName', header: 'Project' },
     { key: 'role', header: 'Role', hideOnMobile: true },

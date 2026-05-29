@@ -89,8 +89,8 @@ export default function AssignmentDetail() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-base">Assignment Details</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Field label="Employee" value={employee ? `${employee.firstName} ${employee.lastName}` : assignment.employeeId.slice(0,8)} />
-            <Field label="Client" value={client?.companyName ?? assignment.clientId.slice(0,8)} />
+            <Field label="Employee" value={employee ? `${employee.firstName} ${employee.lastName}` : (assignment.employeeName ?? `${assignment.employeeId.slice(0,8)} (removed)`)} />
+            <Field label="Client" value={client?.companyName ?? assignment.clientName ?? assignment.clientId.slice(0,8)} />
             <Field label="Project" value={assignment.projectName} />
             <Field label="Role" value={assignment.role} />
             <Field label="Start Date" value={formatDate(assignment.startDate)} />

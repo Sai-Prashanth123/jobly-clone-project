@@ -122,10 +122,21 @@ export function useEmployee(id: string | undefined) {
   return useQuery({
     queryKey: ['employees', id],
     queryFn: async () => {
-      const { data } = await apiClient.get(`/employees/${id}`);
-      return mapEmployee(data.data);
+      // A 404 here means the referenced employee was deleted (e.g. an
+      // assignment/timesheet still points at them). Resolve to null instead of
+      // throwing + retrying, so the UI degrades gracefully and the console
+      // isn't spammed with repeated 404s. Send X-Silent-Error so apiClient's
+      // interceptor doesn't toast it either.
+      try {
+        const { data } = await apiClient.get(`/employees/${id}`, { headers: { 'X-Silent-Error': '1' } });
+        return mapEmployee(data.data);
+      } catch (err: any) {
+        if (err?.response?.status === 404) return null;
+        throw err;
+      }
     },
     enabled: isValidId(id),
+    retry: false,
   });
 }
 

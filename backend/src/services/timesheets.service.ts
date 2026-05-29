@@ -78,7 +78,7 @@ export async function createTimesheet(input: CreateTimesheetInput, actorRole?: s
     .eq('week_start_date', input.weekStartDate)
     .maybeSingle();
 
-  if (existing) throw new ConflictError('Timesheet already exists for this employee/assignment/week');
+  if (existing) throw new ConflictError('A timesheet for this employee and week already exists. Open it from the Timesheets list to edit instead of creating a new one.');
 
   // total_hours is computed server-side; ignore any client-supplied value.
   const totalHours = input.entries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
@@ -104,7 +104,7 @@ export async function createTimesheet(input: CreateTimesheetInput, actorRole?: s
     // index (migration 004) is the real guard. Translate the unique violation
     // into a friendly conflict instead of a generic 500.
     if ((tsError as any).code === '23505') {
-      throw new ConflictError('A timesheet for this employee/assignment/week already exists');
+      throw new ConflictError('A timesheet for this employee and week already exists. Open it from the Timesheets list to edit instead of creating a new one.');
     }
     throw tsError;
   }

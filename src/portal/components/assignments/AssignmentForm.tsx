@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
 import type { Assignment, AssignmentStatus, BillingType } from '../../types';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useClients } from '../../hooks/useClients';
@@ -43,7 +44,7 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
     setErrors(prev => ({ ...prev, [field]: '' }));
   };
 
-  const validate = (): boolean => {
+  const validate = (): Record<string, string> => {
     const errs: Record<string, string> = {};
     if (!form.employeeId) errs.employeeId = 'Employee is required';
     if (!form.clientId) errs.clientId = 'Client is required';
@@ -52,13 +53,23 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
     if (!form.startDate) errs.startDate = 'Start date is required';
     if (form.billRate <= 0) errs.billRate = 'Bill rate must be greater than 0';
     if (form.payRate <= 0) errs.payRate = 'Pay rate must be greater than 0';
+    if (form.endDate && form.startDate && form.endDate < form.startDate) {
+      errs.endDate = 'End date must be on or after the start date';
+    }
     setErrors(errs);
-    return Object.keys(errs).length === 0;
+    return errs;
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) onSubmit(form);
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      // Surface an immediate toast (in addition to the inline red errors) so the
+      // user gets instant feedback instead of silently failing on a missed field.
+      toast.error(`Please fix: ${Object.values(errs).join(', ')}`);
+      return;
+    }
+    onSubmit(form);
   };
 
   const activeEmployees = employees.filter(e => e.status === 'active' || e.status === 'onboarding');
@@ -128,8 +139,8 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
           <div className="space-y-2">
             <Label>Bill Rate ($/hr) *</Label>
             <Input
-              type="number" min={0} step={0.01}
-              value={form.billRate}
+              type="number" min={0} step={0.01} inputMode="decimal" placeholder="0.00"
+              value={form.billRate || ''}
               onChange={e => set('billRate', parseNumberInput(e.target.value) ?? 0)}
             />
             {errors.billRate && <p className="text-xs text-red-500">{errors.billRate}</p>}
@@ -138,8 +149,8 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
           <div className="space-y-2">
             <Label>Pay Rate ($/hr) *</Label>
             <Input
-              type="number" min={0} step={0.01}
-              value={form.payRate}
+              type="number" min={0} step={0.01} inputMode="decimal" placeholder="0.00"
+              value={form.payRate || ''}
               onChange={e => set('payRate', parseNumberInput(e.target.value) ?? 0)}
             />
             {errors.payRate && <p className="text-xs text-red-500">{errors.payRate}</p>}
@@ -148,24 +159,30 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
           <div className="space-y-2">
             <Label>Max Hours / Week</Label>
             <Input
-              type="number" min={1} max={60}
-              value={form.maxHoursPerWeek}
-              onChange={e => set('maxHoursPerWeek', parseInt(e.target.value) || 40)}
+              type="number" min={1} max={168} inputMode="numeric" placeholder="40"
+              value={form.maxHoursPerWeek || ''}
+              onChange={e => set('maxHoursPerWeek', parseNumberInput(e.target.value) ?? 40)}
             />
           </div>
 
-          <div className="space-y-2">
-            <Label>Status</Label>
-            <Select value={form.status} onValueChange={v => set('status', v as AssignmentStatus)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="terminated">Terminated</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Status is shown only when EDITING. On create, the server derives it
+              from the dates (Pending if the start date is in the future, else
+              Active), so a brand-new assignment can never wrongly read 'Completed'.
+              Completed/Terminated are end-states an admin/ops sets here later. */}
+          {isEdit && (
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => set('status', v as AssignmentStatus)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="terminated">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-2">
             <Label>Billing Type</Label>

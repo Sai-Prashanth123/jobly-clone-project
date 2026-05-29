@@ -716,18 +716,13 @@ export default function NewEmployee() {
       totalExperienceYears: parseNumberInput(form.totalExperienceYears),
       experienceLevel: form.experienceLevel || undefined,
       emergencyContact: form.emergencyContact,
-      // identity_documents JSONB: HR-mode persists the full record (number +
-      // state + expiry per type). Employee mode only exposes the expiry input
-      // for visa-tied docs (Passport / Green Card / EAD) — we filter to those
-      // expiry-bearing rows so HR-entered number/state values stay intact on
-      // partial PUT, and add any expiry the employee just typed.
-      ...(isOnboarding || isSelfEdit
-        ? {
-            identityDocuments: form.identityDocuments.filter(d =>
-              (d.expiry ?? '').trim() !== '' || (d.number ?? '').trim() !== '',
-            ),
-          }
-        : { identityDocuments: form.identityDocuments.filter(d => (d.number ?? '').trim() !== '') }),
+      // identity_documents JSONB: all modes are upload-only now, so the only
+      // metadata captured is the expiry date on visa-tied docs. Persist rows
+      // that have an expiry (or legacy number/state already on the record) so
+      // a partial PUT never wipes pre-existing HR-entered values.
+      identityDocuments: form.identityDocuments.filter(d =>
+        (d.expiry ?? '').trim() !== '' || (d.number ?? '').trim() !== '' || (d.state ?? '').trim() !== '',
+      ),
     };
   };
 
@@ -1027,7 +1022,6 @@ export default function NewEmployee() {
     : isEditMode && editId
       ? `/portal/employees/${editId}`
       : '/portal/employees';
-  const backLabel = isSelfEdit ? 'Back to my profile' : isEditMode ? 'Back to employee' : 'Back to Employees';
   const pageTitle = isSelfEdit
     ? 'Edit My Profile'
     : isEditMode
@@ -1075,22 +1069,42 @@ export default function NewEmployee() {
 
   return (
     <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-10' : 'portal-wizard pb-10'}>
+      {/* Sticky action navbar — pinned to the top of the page so the primary
+          actions stay reachable while scrolling the long form. Edge-to-edge via
+          negative margins that cancel the container padding (both onboarding
+          full-bleed mode and the HR layout). */}
+      <div className="portal-wizard-navbar sticky top-0 z-30 -mx-4 sm:-mx-6 md:-mx-8 px-4 sm:px-6 md:px-8 py-3 mb-5 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-200 flex items-center justify-between gap-3">
+        <div className="min-w-0 flex items-center gap-2">
+          {isOnboarding ? (
+            <div className="min-w-0">
+              <p className="text-[10px] font-semibold tracking-[0.18em] uppercase text-[#4069FF] leading-none">Welcome to Jobly</p>
+              <h1 className="text-base font-semibold text-gray-900 truncate leading-tight">Complete your profile</h1>
+            </div>
+          ) : (
+            <Link to={backTo} className="inline-flex items-center gap-1.5 min-w-0">
+              <ArrowLeft className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+              <span className="text-sm font-semibold text-gray-900 truncate">{pageTitle}</span>
+            </Link>
+          )}
+        </div>
+        <div className="flex flex-row flex-wrap items-center gap-2 flex-shrink-0">
+          {actionButtons}
+          {isOnboarding && (
+            <Button variant="ghost" size="sm" onClick={logout} className="gap-1.5 text-muted-foreground">
+              <LogOut className="h-4 w-4" /> Sign out
+            </Button>
+          )}
+        </div>
+      </div>
+
       {isOnboarding ? (
         <div className="mb-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
+          <div className="mb-3">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold tracking-[0.18em] uppercase text-[#4069FF]">Welcome to Jobly</p>
-              <h1 className="text-xl font-semibold text-gray-900">Complete your profile</h1>
               <p className="text-sm text-muted-foreground mt-0.5">
                 Fill in the sections below, then click <strong>Finish onboarding</strong>. This one-time step is
                 required before you can use the portal.
               </p>
-            </div>
-            <div className="flex flex-row flex-wrap items-center gap-2 flex-shrink-0">
-              {actionButtons}
-              <Button variant="ghost" size="sm" onClick={logout} className="gap-1.5 text-muted-foreground">
-                <LogOut className="h-4 w-4" /> Sign out
-              </Button>
             </div>
           </div>
 
@@ -1137,21 +1151,13 @@ export default function NewEmployee() {
           </div>
         </div>
       ) : (
-        <>
-          <Link to={backTo} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-3">
-            <ArrowLeft className="h-3 w-3" /> {backLabel}
-          </Link>
-          <div className="flex flex-row flex-wrap items-start justify-between gap-3 mb-4">
-            <div className="flex-1 min-w-0">
-              <PageHeader
-                eyebrow={isSelfEdit ? 'My Profile' : isEditMode ? 'HR · Edit' : 'HR · Onboarding'}
-                title={pageTitle}
-                description={pageDescription}
-              />
-            </div>
-            <div className="flex-shrink-0">{actionButtons}</div>
-          </div>
-        </>
+        <div className="mb-4">
+          <PageHeader
+            eyebrow={isSelfEdit ? 'My Profile' : isEditMode ? 'HR · Edit' : 'HR · Onboarding'}
+            title={pageTitle}
+            description={pageDescription}
+          />
+        </div>
       )}
 
       {submitError && (
@@ -1573,160 +1579,74 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 07 Identity & Documents (US) — employee mode: upload-only cards.
-              HR-create / HR-edit modes: number + state/expiry + upload (I-9 metadata). */}
+          {/* 07 Identity & Documents (US) — upload-only cards in ALL modes
+              (HR add-employee, employee onboarding, and self-edit render the
+              same thing). Employees just upload whichever docs apply; the only
+              metadata captured is the expiry date for visa-tied docs (Passport
+              / Green Card / EAD) so HR can track work-authorization expiry. */}
           <SectionCard
             id={SECTION_IDS.identity}
             num="07"
             title="Identity & Documents"
-            description={
-              isOnboarding || isSelfEdit
-                ? 'Upload whichever of these apply to your status. None are required — your HR contact will let you know if anything is missing.'
-                : 'US-issued ID numbers + optional file copies. Used for I-9 verification and payroll tax forms.'
-            }
+            description="Upload whichever of these apply. None are required up front — HR will flag anything still needed."
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
-            {isOnboarding || isSelfEdit ? (
-              // Employee mode — clean upload grid. Number/state inputs are
-              // intentionally hidden, but expiry stays for Passport / Green Card
-              // / EAD (visa-tied docs) so HR can track work-authorization expiry.
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {IDENTITY_DOC_ROWS.map(row => {
-                  const file = form.identityDocFiles[row.type];
-                  const doc = getIdentityDoc(row.type);
-                  const inputId = `id-doc-file-${row.type}`;
-                  return (
-                    <div key={row.type} className="p-4 bg-gray-50/60 rounded-lg border border-gray-100 flex flex-col gap-3">
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{row.label}</p>
-                        {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
-                      </div>
-                      {row.hasExpiry && (
-                        <div className="space-y-1">
-                          <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
-                          <Input
-                            type="date"
-                            value={doc.expiry ?? ''}
-                            onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
-                          />
-                          {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
-                        </div>
-                      )}
-                      <div className="flex items-center gap-2 mt-auto">
-                        <label
-                          htmlFor={inputId}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          {file ? 'Replace' : 'Upload'}
-                        </label>
-                        <input
-                          id={inputId}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          className="hidden"
-                          onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
-                        />
-                        {file && (
-                          <>
-                            <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
-                              Uploaded
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setIdentityDocFile(row.type, null)}
-                              className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
-                            >
-                              Remove
-                            </button>
-                          </>
-                        )}
-                      </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {IDENTITY_DOC_ROWS.map(row => {
+                const file = form.identityDocFiles[row.type];
+                const doc = getIdentityDoc(row.type);
+                const inputId = `id-doc-file-${row.type}`;
+                return (
+                  <div key={row.type} className="p-4 bg-gray-50/60 rounded-lg border border-gray-100 flex flex-col gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-800">{row.label}</p>
+                      {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
                     </div>
-                  );
-                })}
-              </div>
-            ) : (
-              // HR mode — full metadata capture (number / state / expiry) + upload.
-              <div className="space-y-3">
-                {IDENTITY_DOC_ROWS.map(row => {
-                  const doc = getIdentityDoc(row.type);
-                  const file = form.identityDocFiles[row.type];
-                  const inputId = `id-doc-file-${row.type}`;
-                  return (
-                    <div key={row.type} className="grid grid-cols-1 sm:grid-cols-[170px_1fr_auto_auto] gap-2 sm:gap-3 items-start p-3 bg-gray-50/60 rounded-md">
-                      <div className="sm:pt-2">
-                        <p className="text-sm font-medium text-gray-800">{row.label}</p>
-                        {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_120px] gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-[11px] font-medium text-gray-500">ID Number</Label>
-                          <Input
-                            value={doc.number ?? ''}
-                            onChange={e => upsertIdentityDoc(row.type, { number: e.target.value })}
-                            placeholder={row.placeholder}
-                          />
-                        </div>
-                        {row.hasState && (
-                          <div className="space-y-1">
-                            <Label className="text-[11px] font-medium text-gray-500">State</Label>
-                            <Select
-                              value={doc.state || ''}
-                              onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
-                            >
-                              <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
-                              <SelectContent className="max-h-[280px]">
-                                {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code}</SelectItem>)}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        )}
-                        {row.hasExpiry && (
-                          <div className="space-y-1">
-                            <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
-                            <Input
-                              type="date"
-                              value={doc.expiry ?? ''}
-                              onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
-                              placeholder="Expiry"
-                            />
-                            {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
-                          </div>
-                        )}
-                      </div>
-                      <div>
-                        <label
-                          htmlFor={inputId}
-                          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
-                        >
-                          <Upload className="h-3.5 w-3.5" />
-                          {file ? 'Replace' : 'Upload Copy'}
-                        </label>
-                        <input
-                          id={inputId}
-                          type="file"
-                          accept=".pdf,.jpg,.jpeg,.png"
-                          className="hidden"
-                          onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
+                    {row.hasExpiry && (
+                      <div className="space-y-1">
+                        <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
+                        <Input
+                          type="date"
+                          value={doc.expiry ?? ''}
+                          onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
                         />
+                        {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
                       </div>
-                      <div className="flex sm:items-center">
-                        {file ? (
+                    )}
+                    <div className="flex items-center gap-2 mt-auto">
+                      <label
+                        htmlFor={inputId}
+                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
+                      >
+                        <Upload className="h-3.5 w-3.5" />
+                        {file ? 'Replace' : 'Upload'}
+                      </label>
+                      <input
+                        id={inputId}
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        className="hidden"
+                        onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
+                      />
+                      {file && (
+                        <>
                           <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
                             Uploaded
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 font-medium">
-                            Pending
-                          </span>
-                        )}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => setIdentityDocFile(row.type, null)}
+                            className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
+                          >
+                            Remove
+                          </button>
+                        </>
+                      )}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                  </div>
+                );
+              })}
+            </div>
           </SectionCard>
 
           {/* 08 Education */}
