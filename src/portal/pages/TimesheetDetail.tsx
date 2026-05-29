@@ -20,6 +20,18 @@ import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatDateTime, formatCurrency } from '../lib/utils';
 import type { TimesheetEntry } from '../types';
 
+// Human labels for the zero-hour-week leave reasons (mirror of the editable
+// Select options below) so the read-only review view shows a friendly value.
+const LEAVE_REASON_LABELS: Record<string, string> = {
+  medical_leave: 'Medical leave',
+  sick: 'Sick',
+  vacation: 'Vacation / personal time off',
+  unpaid_leave: 'Unpaid leave',
+  bereavement: 'Bereavement',
+  jury_duty: 'Jury duty',
+  other: 'Other',
+};
+
 export default function TimesheetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -349,6 +361,43 @@ export default function TimesheetDetail() {
                   </div>
                 )}
               </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Read-only proof / leave-reason review block — shown once the timesheet
+          is locked (submitted onward). Without this the client-signed proof
+          (and the leave reason) would vanish the moment the employee submits,
+          so neither the employee nor the manager/operations reviewer could see
+          what was attached. */}
+      {!canEdit && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              {timesheet.totalHours === 0 ? 'Leave reason' : 'Client-signed timesheet'}
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-0">
+            {timesheet.totalHours === 0 ? (
+              <p className="text-sm text-gray-700">
+                {timesheet.leaveReason
+                  ? (LEAVE_REASON_LABELS[timesheet.leaveReason] ?? timesheet.leaveReason)
+                  : <span className="text-muted-foreground">No reason recorded.</span>}
+              </p>
+            ) : timesheet.clientSignedUrl ? (
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md bg-gray-50 border max-w-md">
+                <FileText className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                <a href={timesheet.clientSignedUrl} target="_blank" rel="noopener"
+                  className="text-sm text-emerald-700 hover:underline truncate">
+                  {timesheet.clientSignedFilename ?? 'Uploaded proof'}
+                </a>
+                <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium flex-shrink-0">
+                  Client-signed
+                </span>
+              </div>
+            ) : (
+              <p className="text-sm text-amber-600">No client-signed timesheet was attached.</p>
             )}
           </CardContent>
         </Card>
