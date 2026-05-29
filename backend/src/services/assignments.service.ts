@@ -8,7 +8,10 @@ import type { CreateAssignmentInput, UpdateAssignmentInput, ListAssignmentsQuery
 // the list/detail never needs a per-row fetch (kills the N+1 + the 404 spam
 // when an assignment references a soft-deleted employee — the join still
 // returns the name because it doesn't filter on the child's deleted_at).
-const ASSIGNMENT_SELECT = '*, employees(first_name, last_name, display_id), clients(company_name)';
+// `employees!employee_id` disambiguates the embed — assignments has TWO FKs to
+// employees (employee_id + reporting_manager_id), so a bare `employees(...)`
+// embed is ambiguous and 500s. The column hint pins it to the assignee.
+const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, display_id), clients(company_name)';
 
 // Flatten the joined rows to snake_case fields the frontend mapper reads, and
 // overlay a read-time "completed" status: if the engagement's end date has
