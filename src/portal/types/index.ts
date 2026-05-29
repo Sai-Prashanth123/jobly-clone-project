@@ -1,7 +1,30 @@
 export type UserRole = 'admin' | 'hr' | 'operations' | 'finance' | 'employee';
 export type EmployeeStatus = 'active' | 'inactive' | 'onboarding';
 export type TimesheetStatus = 'draft' | 'submitted' | 'manager_approved' | 'client_approved' | 'rejected';
-export type InvoiceStatus = 'draft' | 'sent' | 'paid' | 'overdue';
+export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'partially_paid' | 'paid' | 'overdue';
+export type EstimateStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'converted';
+
+export interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  unitPrice: number;
+  unit: 'hour' | 'item' | 'day' | 'fixed';
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Payment {
+  id: string;
+  invoiceId: string;
+  amount: number;
+  paidOn: string;
+  method: 'bank_transfer' | 'cheque' | 'cash' | 'card' | 'other';
+  reference?: string;
+  notes?: string;
+  createdAt: string;
+}
 export type AssignmentStatus = 'active' | 'completed' | 'pending' | 'terminated';
 export type PayType = 'hourly' | 'salary';
 export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'w2' | '1099' | 'c2c' | 'vendor';
@@ -326,17 +349,21 @@ export interface Timesheet {
 }
 
 export interface InvoiceLineItem {
+  itemName?: string;
   description: string;
-  employeeId: string;
-  timesheetId: string;
+  employeeId?: string;
+  timesheetId?: string;
+  productId?: string;
+  quantity?: number;
   hours: number;
   billRate: number;
+  unitPrice?: number;
   amount: number;
 }
 
 export interface Invoice {
   id: string;
-  invoiceNumber: string; // INV-2026-XXXX
+  invoiceNumber: string; // INV-2026-XXXX / EST-2026-XXXX
   clientId: string;
   issueDate: string;
   dueDate: string;
@@ -345,7 +372,18 @@ export interface Invoice {
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
+  amountPaid?: number;
+  balanceDue?: number;
   status: InvoiceStatus;
+  docType?: 'invoice' | 'estimate';
+  estimateStatus?: EstimateStatus;
+  poNumber?: string;
+  paymentTerms?: string;
+  currency?: string;
+  terms?: string;
+  publicToken?: string;
+  viewedAt?: string;
+  convertedInvoiceId?: string;
   timesheetIds: string[];
   pdfUrl?: string;
   paidAt?: string;

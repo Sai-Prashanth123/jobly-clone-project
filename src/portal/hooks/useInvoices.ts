@@ -12,18 +12,33 @@ function mapInvoice(raw: any): Invoice {
     issueDate: raw.issue_date,
     dueDate: raw.due_date,
     lineItems: (raw.invoice_line_items ?? []).map((li: any) => ({
+      itemName: li.item_name ?? undefined,
       description: li.description,
       employeeId: li.employee_id,
       timesheetId: li.timesheet_id,
+      productId: li.product_id ?? undefined,
+      quantity: li.quantity ?? li.hours,
       hours: li.hours,
       billRate: li.bill_rate,
+      unitPrice: li.bill_rate,
       amount: li.amount,
     })),
     subtotal: raw.subtotal,
     taxRate: raw.tax_rate,
     taxAmount: raw.tax_amount,
     totalAmount: raw.total_amount,
+    amountPaid: Number(raw.amount_paid ?? 0),
+    balanceDue: Math.round(((raw.total_amount ?? 0) - (raw.amount_paid ?? 0)) * 100) / 100,
     status: raw.status,
+    docType: raw.doc_type ?? 'invoice',
+    estimateStatus: raw.estimate_status ?? undefined,
+    poNumber: raw.po_number ?? undefined,
+    paymentTerms: raw.payment_terms ?? undefined,
+    currency: raw.currency ?? 'USD',
+    terms: raw.terms ?? undefined,
+    publicToken: raw.public_token ?? undefined,
+    viewedAt: raw.viewed_at ?? undefined,
+    convertedInvoiceId: raw.converted_invoice_id ?? undefined,
     timesheetIds: (raw.invoice_timesheets ?? []).map((it: any) => it.timesheet_id as string),
     pdfUrl: raw.pdf_url ?? undefined,
     paidAt: raw.paid_at ?? undefined,
@@ -35,7 +50,36 @@ function mapInvoice(raw: any): Invoice {
   };
 }
 
-interface ListParams { status?: string; clientId?: string; page?: number; limit?: number }
+export interface CreateInvoiceBody {
+  clientId: string;
+  docType?: 'invoice' | 'estimate';
+  poNumber?: string | null;
+  paymentTerms?: string;
+  issueDate: string;
+  dueDate?: string | null;
+  currency?: string;
+  lineItems: { itemName?: string | null; description?: string | null; quantity: number; unitPrice: number; productId?: string | null }[];
+  taxRate?: number;
+  notes?: string | null;
+  terms?: string | null;
+}
+
+export function useCreateInvoice() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: CreateInvoiceBody) => {
+      const { data } = await apiClient.post('/invoices', body);
+      return mapInvoice(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      qc.invalidateQueries({ queryKey: ['estimates'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+}
+
+interface ListParams { status?: string; clientId?: string; docType?: 'invoice' | 'estimate'; page?: number; limit?: number }
 
 export function useInvoices(params?: ListParams) {
   return useQuery({
@@ -88,7 +132,7 @@ export function useGenerateInvoice() {
 export function useUpdateInvoice(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { status?: string; paidAt?: string | null; notes?: string | null; taxRate?: number }) => {
+    mutationFn: async (body: { status?: string; estimateStatus?: string; paidAt?: string | null; notes?: string | null; terms?: string | null; poNumber?: string | null; taxRate?: number }) => {
       const { data } = await apiClient.put(`/invoices/${id}`, body);
       return mapInvoice(data.data);
     },

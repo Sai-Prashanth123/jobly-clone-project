@@ -28,6 +28,7 @@ const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
 const TimesheetDetail = lazy(() => import('./pages/TimesheetDetail'));
 const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
 const Reports = lazy(() => import('./pages/Reports'));
+const Products = lazy(() => import('./pages/Products'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const Documents = lazy(() => import('./pages/Documents'));
 
@@ -163,6 +164,14 @@ export default function PortalApp() {
               }
             />
 
+            <Route
+              path="products"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                  <Products />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="assignments"
               element={

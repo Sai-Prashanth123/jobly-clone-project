@@ -13,7 +13,7 @@ import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { InvoiceForm } from '../components/invoices/InvoiceForm';
-import { useInvoices, useGenerateInvoice, useUpdateInvoice, useDeleteInvoice } from '../hooks/useInvoices';
+import { useInvoices, useGenerateInvoice, useCreateInvoice, useUpdateInvoice, useDeleteInvoice } from '../hooks/useInvoices';
 import { useClients } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency, parseNumberInput } from '../lib/utils';
@@ -25,6 +25,7 @@ export default function Invoices() {
   const { data, isLoading } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
   const generateInvoice = useGenerateInvoice();
+  const createInvoice = useCreateInvoice();
   const deleteInvoice = useDeleteInvoice();
   const [showForm, setShowForm] = useState(false);
   const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
@@ -202,7 +203,7 @@ export default function Invoices() {
             <DialogDescription className="sr-only">Select a client and approved timesheets to generate a new invoice.</DialogDescription>
           </DialogHeader>
           <InvoiceForm
-            isGenerating={generateInvoice.isPending}
+            isGenerating={generateInvoice.isPending || createInvoice.isPending}
             onGenerate={async (timesheetIds, clientId, taxRate) => {
               try {
                 const inv = await generateInvoice.mutateAsync({
@@ -216,6 +217,16 @@ export default function Invoices() {
                 navigate(`/portal/invoices/${inv.id}`);
               } catch (err: any) {
                 toast.error(err?.response?.data?.error ?? 'Failed to generate invoice');
+              }
+            }}
+            onCreate={async (body) => {
+              try {
+                const inv = await createInvoice.mutateAsync(body);
+                toast.success(`Invoice ${inv.invoiceNumber} created`);
+                setShowForm(false);
+                navigate(`/portal/invoices/${inv.id}`);
+              } catch (err: any) {
+                toast.error(err?.response?.data?.error ?? 'Failed to create invoice');
               }
             }}
             onCancel={() => setShowForm(false)}

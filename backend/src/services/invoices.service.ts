@@ -5,7 +5,34 @@ import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { addDaysToDate } from '../lib/dateUtils';
-import type { GenerateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
+import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
+import { paymentTermsDays } from '../schemas/invoice.schema';
+
+// Atomically allocate the next invoice/estimate number, inserting `payload`
+// with it. The count+1 approach races under concurrency, so we retry on the
+// 23505 unique-violation with a fresh count. `prefix` is INV or EST.
+async function insertInvoiceWithNumber(prefix: 'INV' | 'EST', payload: Record<string, unknown>) {
+  const year = new Date().getUTCFullYear();
+  let invoice: any = null;
+  let invError: any = null;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const { count } = await supabaseAdmin
+      .from('invoices')
+      .select('*', { count: 'exact', head: true })
+      .eq('doc_type', prefix === 'EST' ? 'estimate' : 'invoice');
+    const number = `${prefix}-${year}-${String((count ?? 0) + 1 + attempt).padStart(4, '0')}`;
+    const result = await supabaseAdmin
+      .from('invoices')
+      .insert({ ...payload, invoice_number: number })
+      .select()
+      .single();
+    if (!result.error) { invoice = result.data; invError = null; break; }
+    invError = result.error;
+    if (result.error.code !== '23505') break;
+  }
+  if (invError || !invoice) throw invError ?? new Error('Failed to allocate an invoice number after retries');
+  return invoice;
+}
 
 export async function listInvoices(query: ListInvoicesQuery) {
   let q = supabaseAdmin
@@ -14,6 +41,8 @@ export async function listInvoices(query: ListInvoicesQuery) {
 
   if (query.status) q = q.eq('status', query.status);
   if (query.clientId) q = q.eq('client_id', query.clientId);
+  // Default the list to real invoices; estimates have their own screen.
+  q = q.eq('doc_type', query.docType ?? 'invoice');
 
   const offset = (query.page - 1) * query.limit;
   q = q.order('created_at', { ascending: false }).range(offset, offset + query.limit - 1);
@@ -220,18 +249,80 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
   return getInvoice(invoice.id);
 }
 
+// Wave-style manual create: free-form line items (+ optional catalog products),
+// P.O. number, payment terms → due date, currency. Used for both invoices and
+// estimates (docType). No timesheet linkage.
+export async function createInvoice(input: CreateInvoiceInput, actorId?: string) {
+  const { data: client, error: clientErr } = await supabaseAdmin
+    .from('clients').select('*').eq('id', input.clientId).single();
+  if (clientErr || !client) throw new NotFoundError('Client not found');
+
+  const lineItems = input.lineItems.map(li => {
+    const qty = Number(li.quantity) || 0;
+    const price = Number(li.unitPrice) || 0;
+    const amount = Math.round(qty * price * 100) / 100;
+    return {
+      item_name: li.itemName ?? null,
+      description: li.description ?? li.itemName ?? '',
+      product_id: li.productId ?? null,
+      quantity: qty,
+      hours: qty,           // kept for PDF/legacy columns (qty shown in the hours column)
+      bill_rate: price,     // unit price shown in the rate column
+      amount,
+    };
+  });
+
+  const subtotal = Math.round(lineItems.reduce((s, li) => s + li.amount, 0) * 100) / 100;
+  const taxAmount = Math.round(subtotal * (input.taxRate / 100) * 100) / 100;
+  const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
+
+  const dueDate = input.paymentTerms === 'custom' && input.dueDate
+    ? input.dueDate
+    : addDaysToDate(input.issueDate, paymentTermsDays(input.paymentTerms));
+
+  const isEstimate = input.docType === 'estimate';
+  const invoice = await insertInvoiceWithNumber(isEstimate ? 'EST' : 'INV', {
+    client_id: input.clientId,
+    issue_date: input.issueDate,
+    due_date: dueDate,
+    subtotal,
+    tax_rate: input.taxRate,
+    tax_amount: taxAmount,
+    total_amount: totalAmount,
+    status: 'draft',
+    doc_type: input.docType,
+    estimate_status: isEstimate ? 'draft' : null,
+    po_number: input.poNumber ?? null,
+    payment_terms: input.paymentTerms,
+    currency: input.currency,
+    notes: input.notes ?? null,
+    terms: input.terms ?? null,
+  });
+
+  const itemsWithInvoiceId = lineItems.map(li => ({ ...li, invoice_id: invoice.id }));
+  await supabaseAdmin.from('invoice_line_items').insert(itemsWithInvoiceId);
+
+  logActivity(actorId ?? null, 'created', 'invoice', invoice.id, invoice.invoice_number ?? invoice.id.slice(0, 8),
+    { doc_type: input.docType });
+
+  return getInvoice(invoice.id);
+}
+
 export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   const inv = await getInvoice(id);
   if (!inv) throw new NotFoundError('Invoice not found');
 
   const updateData: Record<string, unknown> = {};
   if (input.status !== undefined) updateData.status = input.status;
+  if (input.estimateStatus !== undefined) updateData.estimate_status = input.estimateStatus;
   if (input.paidAt !== undefined) updateData.paid_at = input.paidAt;
   if (input.notes !== undefined) updateData.notes = input.notes;
+  if (input.terms !== undefined) updateData.terms = input.terms;
+  if (input.poNumber !== undefined) updateData.po_number = input.poNumber;
   if (input.taxRate !== undefined) {
     updateData.tax_rate = input.taxRate;
-    updateData.tax_amount = inv.subtotal * (input.taxRate / 100);
-    updateData.total_amount = inv.subtotal + (inv.subtotal * (input.taxRate / 100));
+    updateData.tax_amount = Math.round(inv.subtotal * (input.taxRate / 100) * 100) / 100;
+    updateData.total_amount = Math.round((inv.subtotal + inv.subtotal * (input.taxRate / 100)) * 100) / 100;
   }
 
   const { data, error } = await supabaseAdmin

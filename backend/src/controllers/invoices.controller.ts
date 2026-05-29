@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/invoices.service';
 import { exportInvoicesCSV, bulkUpdateInvoiceStatus } from '../services/invoices.service';
-import type { ListInvoicesQuery, GenerateInvoiceInput, UpdateInvoiceInput } from '../schemas/invoice.schema';
+import type { ListInvoicesQuery, GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput } from '../schemas/invoice.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -20,6 +20,13 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
 export async function generate(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.generateInvoice(req.body as GenerateInvoiceInput, req.user?.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.createInvoice(req.body as CreateInvoiceInput, req.user?.id);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 }
