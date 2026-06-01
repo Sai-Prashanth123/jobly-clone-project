@@ -16,6 +16,8 @@ router.use(authenticate);
 router.get('/', requireRole('admin', 'hr', 'operations', 'employee'), validateQuery(listMonthlyTimesheetsQuerySchema), ctrl.list);
 // Hydrate the fill-in page for the logged-in employee's chosen month.
 router.get('/me', requireRole('admin', 'hr', 'employee'), ctrl.getMyMonth);
+// Approved/pending leave coverage for a month (before/after the sheet is saved).
+router.get('/leave-check', requireRole('admin', 'hr', 'employee'), ctrl.leaveCheck);
 router.post('/', requireRole('admin', 'hr', 'employee'), validateBody(upsertMonthlyTimesheetSchema), ctrl.upsert);
 router.get('/:id', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getOne);
 router.get('/:id/pdf', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getPdf);

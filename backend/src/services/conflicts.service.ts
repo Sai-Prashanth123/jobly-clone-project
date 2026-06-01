@@ -130,6 +130,25 @@ export async function getWorkedDays(
   return out;
 }
 
+/** Pure: split worked dates against a leave-coverage map → blocking (approved) + warnings (pending). */
+export function classifyConflicts(
+  workedDates: string[],
+  coverage: Map<string, LeaveDayRef>,
+): { blocking: DayConflict[]; warnings: DayConflict[] } {
+  const blocking: DayConflict[] = [];
+  const warnings: DayConflict[] = [];
+  for (const d of workedDates) {
+    const lr = coverage.get(d);
+    if (!lr) continue;
+    if (lr.status === 'approved') {
+      blocking.push({ date: d, code: 'WORK_ON_APPROVED_LEAVE', severity: 'block', leaveDisplayId: lr.leaveDisplayId, leaveType: lr.leaveType });
+    } else {
+      warnings.push({ date: d, code: 'WORK_ON_PENDING_LEAVE', severity: 'warn', leaveDisplayId: lr.leaveDisplayId, leaveType: lr.leaveType });
+    }
+  }
+  return { blocking, warnings };
+}
+
 /** Given worked days (with hours) → split into blocking (approved) + warning (pending) conflicts. */
 export async function detectLeaveConflictsForDays(
   employeeId: string,
@@ -140,18 +159,7 @@ export async function detectLeaveConflictsForDays(
   const min = worked.reduce((a, b) => (a < b ? a : b));
   const max = worked.reduce((a, b) => (a > b ? a : b));
   const coverage = await getLeaveCoverage(employeeId, min, max);
-  const blocking: DayConflict[] = [];
-  const warnings: DayConflict[] = [];
-  for (const d of worked) {
-    const lr = coverage.get(d);
-    if (!lr) continue;
-    if (lr.status === 'approved') {
-      blocking.push({ date: d, code: 'WORK_ON_APPROVED_LEAVE', severity: 'block', leaveDisplayId: lr.leaveDisplayId, leaveType: lr.leaveType });
-    } else {
-      warnings.push({ date: d, code: 'WORK_ON_PENDING_LEAVE', severity: 'warn', leaveDisplayId: lr.leaveDisplayId, leaveType: lr.leaveType });
-    }
-  }
-  return { blocking, warnings, coverage };
+  return { ...classifyConflicts(worked, coverage), coverage };
 }
 
 // ── Message builders ────────────────────────────────────────────────────────

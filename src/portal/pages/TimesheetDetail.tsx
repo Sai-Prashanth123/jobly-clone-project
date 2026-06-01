@@ -191,6 +191,12 @@ export default function TimesheetDetail() {
         flagSection();
         return;
       }
+      // Consistency warning (non-blocking): marked as leave but no leave request.
+      if (liveTotalHours === 0 && leaveReason && (!leaveByDate || Object.keys(leaveByDate).length === 0)) {
+        toast.warning('This week is marked as leave, but you have no leave request for it.', {
+          description: 'Consider filing a leave request so HR has an approval record.',
+        });
+      }
     }
     try {
       await patchStatus.mutateAsync({ status, rejectionReason });

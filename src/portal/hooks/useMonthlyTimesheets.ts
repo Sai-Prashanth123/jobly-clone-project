@@ -1,7 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 import { isValidId } from '../lib/utils';
+import type { LeaveDayInfo } from './useTimesheets';
 import type { MonthlyTimesheet, MonthlyTimesheetEntry } from '../types';
+
+// Approved/pending leave coverage for a (employee, year, month) — drives the
+// monthly attendance leave overlay + present-on-leave submit guard.
+export function useMonthlyLeaveCheck(employeeId: string | undefined, year: number, month: number) {
+  return useQuery({
+    queryKey: ['monthly-leave-check', employeeId, year, month],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/monthly-timesheets/leave-check', { params: { year, month, employeeId } });
+      return (data.leaveDays ?? {}) as Record<string, LeaveDayInfo>;
+    },
+    enabled: !!year && !!month,
+    meta: { silentError: true },
+  });
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapMonthlyTimesheet(raw: any): MonthlyTimesheet {

@@ -19,8 +19,9 @@ import { useAuth } from '../hooks/useAuth';
 import { useEmployee, useEmployees } from '../hooks/useEmployees';
 import {
   useMyMonth, useUpsertMonthlyTimesheet, useSubmitMonthlyTimesheet,
-  useUploadMonthlyClientProof, useDeleteMonthlyClientProof,
+  useUploadMonthlyClientProof, useDeleteMonthlyClientProof, useMonthlyLeaveCheck,
 } from '../hooks/useMonthlyTimesheets';
+import { LEAVE_TYPE_SHORT } from '../hooks/useTimesheets';
 import { apiClient } from '../lib/apiClient';
 import {
   MONTHS, buildMonthSkeleton, computeHours, computeMonthlySummary,
@@ -93,6 +94,9 @@ export default function MyMonthlyTimesheet() {
   const submit = useSubmitMonthlyTimesheet();
   const uploadProof = useUploadMonthlyClientProof();
   const deleteProof = useDeleteMonthlyClientProof();
+
+  const { data: leaveByDate } = useMonthlyLeaveCheck(targetEmployeeId || undefined, loaded.year, loaded.month);
+  const entriesTableRef = useRef<HTMLDivElement>(null);
 
   const [sheet, setSheet] = useState<MonthlyTimesheet | null>(null);
   const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month));
@@ -214,6 +218,29 @@ export default function MyMonthlyTimesheet() {
   };
 
   const handleSubmit = async () => {
+    // Leave-conflict guards, up front (mirror the backend):
+    //  - a Present day with hours on APPROVED leave is blocked + scrolled to;
+    //  - Present on pending leave, or a Leave day with no leave request, warn.
+    const approvedClash = entries.filter(e => e.status === 'present' && Number(e.hours) > 0 && leaveByDate?.[e.date]?.status === 'approved');
+    if (approvedClash.length > 0) {
+      const dates = approvedClash.map(e => e.date.slice(5)).join(', ');
+      const lvs = [...new Set(approvedClash.map(e => leaveByDate![e.date].leaveDisplayId))].join(', ');
+      toast.error(`You're on approved leave (${lvs}) on ${dates} — those days can't be marked Present with hours.`, {
+        description: 'Set them to Leave, or cancel the leave request.',
+      });
+      entriesTableRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+    const pendingClash = entries.filter(e => e.status === 'present' && Number(e.hours) > 0 && leaveByDate?.[e.date]?.status === 'pending');
+    if (pendingClash.length > 0) {
+      toast.warning(`Heads up: pending leave overlaps Present days (${pendingClash.map(e => e.date.slice(5)).join(', ')}).`);
+    }
+    const leaveNoRequest = entries.filter(e => e.status === 'leave' && !leaveByDate?.[e.date]);
+    if (leaveNoRequest.length > 0) {
+      toast.warning(`${leaveNoRequest.length} day(s) marked Leave have no leave request (${leaveNoRequest.slice(0, 5).map(e => e.date.slice(5)).join(', ')}).`, {
+        description: 'Consider filing a leave request so HR has an approval record.',
+      });
+    }
     try {
       const saved = await ensureSaved();
       if (!saved) return;
@@ -370,7 +397,7 @@ export default function MyMonthlyTimesheet() {
               {loadingMonth ? (
                 <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               ) : (
-                <div className="overflow-x-auto">
+                <div ref={entriesTableRef} className="overflow-x-auto scroll-mt-24">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-400">
@@ -396,7 +423,17 @@ export default function MyMonthlyTimesheet() {
                         return (
                           <tr key={e.date} className={`border-b border-gray-100 ${ROW_TINT[e.status] ?? ''}`}>
                             <td className="px-3 py-2.5 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
-                            <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</td>
+                            <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">
+                              {dateStr}
+                              {leaveByDate?.[e.date] && (
+                                <span
+                                  title={`${leaveByDate[e.date].status} leave ${leaveByDate[e.date].leaveDisplayId} (${LEAVE_TYPE_SHORT[leaveByDate[e.date].leaveType] ?? 'Leave'})`}
+                                  className={`ml-1 inline-block text-[9px] font-semibold px-1 py-0.5 rounded ${leaveByDate[e.date].status === 'approved' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}
+                                >
+                                  {leaveByDate[e.date].status === 'approved' ? 'On leave' : 'Pending'}
+                                </span>
+                              )}
+                            </td>
                             <td className="px-3 py-2.5">
                               <span className={`inline-block min-w-[36px] text-center px-2 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>{e.dayOfWeek}</span>
                             </td>
@@ -414,7 +451,7 @@ export default function MyMonthlyTimesheet() {
                                   disabled={fieldsDisabled}
                                   onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
                                   placeholder="0"
-                                  className="h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                                  className={`h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${leaveByDate?.[e.date]?.status === 'approved' && e.status === 'present' && e.hours > 0 ? 'border-red-400 ring-1 ring-red-300 bg-red-50' : ''}`}
                                 />
                               )}
                             </td>

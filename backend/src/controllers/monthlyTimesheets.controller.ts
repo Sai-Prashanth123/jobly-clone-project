@@ -1,9 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/monthlyTimesheets.service';
+import { getLeaveCoverage } from '../services/conflicts.service';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput, PatchMonthlyStatusInput,
   ListMonthlyTimesheetsQuery,
 } from '../schemas/monthlyTimesheet.schema';
+
+// Per-date approved/pending leave coverage for a (year, month) — drives the
+// monthly attendance leave overlay + the present-on-leave submit guard. Works
+// before the sheet is saved (keyed by year/month, not by sheet id).
+export async function leaveCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    if (!year || !month || month < 1 || month > 12) {
+      res.status(400).json({ success: false, error: 'Valid year and month are required.' });
+      return;
+    }
+    const employeeId = req.user!.role === 'employee'
+      ? req.user!.employeeId
+      : ((req.query.employeeId as string) || req.user!.employeeId);
+    if (!employeeId) { res.json({ success: true, leaveDays: {} }); return; }
+    const mm = String(month).padStart(2, '0');
+    const start = `${year}-${mm}-01`;
+    const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    const end = `${year}-${mm}-${String(lastDay).padStart(2, '0')}`;
+    const coverage = await getLeaveCoverage(employeeId, start, end);
+    const leaveDays: Record<string, { status: string; leaveDisplayId: string; leaveType: string }> = {};
+    for (const [date, ref] of coverage) {
+      leaveDays[date] = { status: ref.status, leaveDisplayId: ref.leaveDisplayId, leaveType: ref.leaveType };
+    }
+    res.json({ success: true, leaveDays });
+  } catch (err) { next(err); }
+}
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
