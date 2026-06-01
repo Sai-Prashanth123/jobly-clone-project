@@ -143,6 +143,22 @@ export default function TimesheetDetail() {
   const billableAmount = timesheet.totalHours * (assignment?.billRate ?? 0);
 
   const handleStatusChange = async (status: string, rejectionReason?: string) => {
+    // Submit-time requirements, checked up front so the error is obvious
+    // immediately (not only after a server round-trip, and never silently):
+    //  - a worked week (> 0 hrs) must have the client-signed timesheet attached;
+    //  - a zero-hour week must have a leave reason.
+    if (status === 'submitted') {
+      if (liveTotalHours > 0 && !timesheet.clientSignedUrl) {
+        toast.error('Upload the client-signed timesheet before submitting.', {
+          description: 'A signed copy is required as proof of the days worked.',
+        });
+        return;
+      }
+      if (liveTotalHours === 0 && !leaveReason) {
+        toast.error('Select a reason for the zero-hour week before submitting.');
+        return;
+      }
+    }
     try {
       await patchStatus.mutateAsync({ status, rejectionReason });
       toast.success(`Timesheet ${status.replace('_', ' ')}`);
