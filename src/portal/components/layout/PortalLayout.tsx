@@ -1,11 +1,32 @@
 import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { PanelLeft } from 'lucide-react';
+import { SidebarInset, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { PortalSidebar } from './PortalSidebar';
 import { MailerStatusBanner } from './MailerStatusBanner';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { CommandPalette } from '../shared/CommandPalette';
 import '../../portal.css';
+
+// When the sidebar is collapsed/off-canvas, its built-in toggle slides away with
+// it — leaving no way to reopen it. This floating button is the always-available
+// "show sidebar" affordance (desktop collapsed + mobile when the sheet is shut).
+function FloatingSidebarToggle() {
+  const { state, isMobile, openMobile, toggleSidebar } = useSidebar();
+  const hidden = isMobile ? !openMobile : state === 'collapsed';
+  if (!hidden) return null;
+  return (
+    <button
+      type="button"
+      onClick={toggleSidebar}
+      aria-label="Show sidebar"
+      title="Show sidebar"
+      className="fixed top-3 left-3 z-50 inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 bg-white/95 shadow-sm backdrop-blur hover:bg-gray-100 text-gray-600 hover:text-gray-900 transition-colors"
+    >
+      <PanelLeft className="h-4 w-4" />
+    </button>
+  );
+}
 
 export function PortalLayout() {
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -29,6 +50,7 @@ export function PortalLayout() {
   return (
     <div className="portal-scope min-h-screen bg-gray-50">
       <SidebarProvider>
+        <FloatingSidebarToggle />
         <PortalSidebar />
         <SidebarInset className="bg-gray-50">
           <main className="p-3 sm:p-4 md:p-6 pb-16">
