@@ -1,14 +1,11 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Plus, FileCheck2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
-import { InvoiceForm } from '../components/invoices/InvoiceForm';
-import { useEstimates, useCreateInvoice, useConvertEstimate } from '../hooks/useInvoices';
+import { useEstimates, useConvertEstimate } from '../hooks/useInvoices';
 import { useClients } from '../hooks/useClients';
 import { formatCurrency, formatDate } from '../lib/utils';
 import type { Invoice } from '../types';
@@ -17,9 +14,7 @@ export default function Estimates() {
   const navigate = useNavigate();
   const { data, isLoading } = useEstimates();
   const { data: clientData } = useClients({ limit: 200 });
-  const createInvoice = useCreateInvoice();
   const convertEstimate = useConvertEstimate();
-  const [showForm, setShowForm] = useState(false);
 
   const estimates = data?.data ?? [];
   const clients = clientData?.data ?? [];
@@ -65,7 +60,7 @@ export default function Estimates() {
         eyebrow="Finance"
         title="Estimates"
         description={isLoading ? 'Loading…' : `${estimates.length} estimate${estimates.length === 1 ? '' : 's'}`}
-        action={<Button onClick={() => setShowForm(true)} className="gap-2"><Plus className="h-4 w-4" /> New Estimate</Button>}
+        action={<Button onClick={() => navigate('/portal/estimates/new')} className="gap-2"><Plus className="h-4 w-4" /> New Estimate</Button>}
       />
 
       {isLoading ? (
@@ -82,31 +77,6 @@ export default function Estimates() {
           emptyDescription="Create an estimate, send it to the client, then convert it to an invoice when accepted."
         />
       )}
-
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>New Estimate</DialogTitle>
-            <DialogDescription className="sr-only">Create an estimate for a client.</DialogDescription>
-          </DialogHeader>
-          <InvoiceForm
-            docType="estimate"
-            isGenerating={createInvoice.isPending}
-            onGenerate={() => { /* estimates are manual-only */ }}
-            onCreate={async (body) => {
-              try {
-                const est = await createInvoice.mutateAsync({ ...body, docType: 'estimate' });
-                toast.success(`Estimate ${est.invoiceNumber} created`);
-                setShowForm(false);
-                navigate(`/portal/invoices/${est.id}`);
-              } catch {
-                /* failed-request toast raised centrally (queryClient.ts) */
-              }
-            }}
-            onCancel={() => setShowForm(false)}
-          />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

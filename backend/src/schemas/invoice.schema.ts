@@ -49,6 +49,15 @@ export const updateInvoiceSchema = z.object({
   terms: z.string().optional().nullable(),
   poNumber: z.string().optional().nullable(),
   taxRate: z.number().min(0).max(100).optional(),
+  // Draft-only full edit (Wave-style): when lineItems is present and the invoice
+  // is still a draft, the whole document is rebuilt from these fields. Ignored
+  // for issued invoices (the service rejects line-item edits there).
+  clientId: z.string().uuid().optional(),
+  paymentTerms: z.enum(PAYMENT_TERMS).optional(),
+  issueDate: ymdDate.optional(),
+  dueDate: ymdDate.optional().nullable(),
+  currency: z.string().max(8).optional(),
+  lineItems: z.array(lineItemSchema).optional(),
 });
 
 export const listInvoicesQuerySchema = z.object({

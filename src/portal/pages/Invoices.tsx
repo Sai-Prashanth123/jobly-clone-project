@@ -1,53 +1,27 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Plus, Loader2, Pencil, Info, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
-import { InvoiceForm } from '../components/invoices/InvoiceForm';
-import { useInvoices, useGenerateInvoice, useCreateInvoice, useUpdateInvoice, useDeleteInvoice } from '../hooks/useInvoices';
+import { useInvoices, useDeleteInvoice } from '../hooks/useInvoices';
 import { useClients } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
-import { formatDate, formatCurrency, parseNumberInput } from '../lib/utils';
-import type { Invoice, InvoiceStatus } from '../types';
+import { formatDate, formatCurrency } from '../lib/utils';
+import type { Invoice } from '../types';
 
 export default function Invoices() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data, isLoading } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
-  const generateInvoice = useGenerateInvoice();
-  const createInvoice = useCreateInvoice();
   const deleteInvoice = useDeleteInvoice();
-  const [showForm, setShowForm] = useState(false);
-  const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
-  const updateInvoice = useUpdateInvoice(editInvoice?.id ?? '');
   const canEdit = user?.role === 'admin' || user?.role === 'finance';
   const canDelete = user?.role === 'admin';
-
-  // Local edit form state
-  const [editStatus, setEditStatus] = useState<InvoiceStatus>('draft');
-  const [editPaidAt, setEditPaidAt] = useState('');
-  const [editNotes, setEditNotes] = useState('');
-  const [editTaxRate, setEditTaxRate] = useState(0);
-
-  // Sync the edit dialog state from the selected invoice each time it opens.
-  useEffect(() => {
-    if (!editInvoice) return;
-    setEditStatus(editInvoice.status);
-    setEditPaidAt(editInvoice.paidAt?.slice(0, 10) ?? '');
-    setEditNotes(editInvoice.notes ?? '');
-    setEditTaxRate(editInvoice.taxRate ?? 0);
-  }, [editInvoice]);
 
   const invoices = data?.data ?? [];
   const clients = clientsData?.data ?? [];
@@ -117,7 +91,7 @@ export default function Invoices() {
             variant="ghost"
             size="sm"
             className="h-8 gap-1 text-muted-foreground hover:text-foreground"
-            onClick={(e) => { e.stopPropagation(); setEditInvoice(i); }}
+            onClick={(e) => { e.stopPropagation(); navigate(`/portal/invoices/${i.id}/edit`); }}
           >
             <Pencil className="h-3.5 w-3.5" />
             Edit
@@ -144,9 +118,9 @@ export default function Invoices() {
         title="Invoices"
         description={isLoading ? 'Loading...' : `${invoices.length} invoices • ${formatCurrency(totalOutstanding)} outstanding`}
         action={
-          <Button onClick={() => setShowForm(true)} className="gap-2">
+          <Button onClick={() => navigate('/portal/invoices/new')} className="gap-2">
             <Plus className="h-4 w-4" />
-            Generate Invoice
+            New Invoice
           </Button>
         }
       />
@@ -198,117 +172,6 @@ export default function Invoices() {
           exportFilename="invoices"
         />
       )}
-
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Generate Invoice</DialogTitle>
-            <DialogDescription className="sr-only">Select a client and approved timesheets to generate a new invoice.</DialogDescription>
-          </DialogHeader>
-          <InvoiceForm
-            isGenerating={generateInvoice.isPending || createInvoice.isPending}
-            onGenerate={async (timesheetIds, clientId, taxRate) => {
-              try {
-                const inv = await generateInvoice.mutateAsync({
-                  clientId,
-                  timesheetIds,
-                  issueDate: new Date().toISOString().split('T')[0],
-                  taxRate,
-                });
-                toast.success(`Invoice ${inv.invoiceNumber} generated`);
-                setShowForm(false);
-                navigate(`/portal/invoices/${inv.id}`);
-              } catch {
-                /* failed-request toast raised centrally (queryClient.ts) */
-              }
-            }}
-            onCreate={async (body) => {
-              try {
-                const inv = await createInvoice.mutateAsync(body);
-                toast.success(`Invoice ${inv.invoiceNumber} created`);
-                setShowForm(false);
-                navigate(`/portal/invoices/${inv.id}`);
-              } catch {
-                /* failed-request toast raised centrally (queryClient.ts) */
-              }
-            }}
-            onCancel={() => setShowForm(false)}
-          />
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!editInvoice} onOpenChange={(open) => { if (!open) setEditInvoice(null); }}>
-        <DialogContent className="w-[95vw] max-w-md">
-          <DialogHeader>
-            <DialogTitle>Edit Invoice {editInvoice?.invoiceNumber}</DialogTitle>
-            <DialogDescription>
-              Line items and amounts are locked once an invoice is issued. You can update status, paid-at date, notes, and tax rate.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select value={editStatus} onValueChange={(v) => setEditStatus(v as InvoiceStatus)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {editStatus === 'paid' && (
-              <div className="space-y-2">
-                <Label>Paid At</Label>
-                <Input type="date" value={editPaidAt} onChange={(e) => setEditPaidAt(e.target.value)} />
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label>Tax Rate (%)</Label>
-              <Input
-                type="number" min={0} max={100} step={0.01}
-                value={editTaxRate}
-                onChange={(e) => setEditTaxRate(parseNumberInput(e.target.value) ?? 0)}
-              />
-              <p className="text-xs text-muted-foreground">Updating the rate recalculates the total on save.</p>
-            </div>
-            <div className="space-y-2">
-              <Label>Notes</Label>
-              <Textarea
-                rows={3}
-                value={editNotes}
-                onChange={(e) => setEditNotes(e.target.value)}
-                placeholder="Internal notes for this invoice…"
-              />
-            </div>
-          </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setEditInvoice(null)} disabled={updateInvoice.isPending}>Cancel</Button>
-            <Button
-              loading={updateInvoice.isPending}
-              loadingText="Saving…"
-              onClick={async () => {
-                if (!editInvoice) return;
-                try {
-                  await updateInvoice.mutateAsync({
-                    status: editStatus,
-                    paidAt: editStatus === 'paid' ? (editPaidAt || null) : null,
-                    notes: editNotes || null,
-                    taxRate: editTaxRate,
-                  });
-                  toast.success(`Invoice ${editInvoice.invoiceNumber} updated`);
-                  setEditInvoice(null);
-                } catch {
-                  /* failed-request toast raised centrally (queryClient.ts) */
-                }
-              }}
-            >
-              Save Changes
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <ConfirmDialog
         open={!!deleteTarget}

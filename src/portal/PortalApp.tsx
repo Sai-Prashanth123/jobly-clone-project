@@ -32,6 +32,11 @@ const Products = lazy(() => import('./pages/Products'));
 const Estimates = lazy(() => import('./pages/Estimates'));
 const Recurring = lazy(() => import('./pages/Recurring'));
 const PublicInvoiceView = lazy(() => import('./pages/PublicInvoiceView'));
+// Full-page finance editors (replace the old popup dialogs)
+const InvoiceEditor = lazy(() => import('./pages/InvoiceEditor'));
+const RecurringEditor = lazy(() => import('./pages/RecurringEditor'));
+const ProductEditor = lazy(() => import('./pages/ProductEditor'));
+const RecordPayment = lazy(() => import('./pages/RecordPayment'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const Documents = lazy(() => import('./pages/Documents'));
 
@@ -196,6 +201,17 @@ export default function PortalApp() {
                 </ProtectedRoute>
               }
             />
+
+            {/* ── Full-page finance editors (replace popup dialogs) ── */}
+            <Route path="products/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><ProductEditor /></ProtectedRoute>} />
+            <Route path="products/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><ProductEditor /></ProtectedRoute>} />
+            <Route path="estimates/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><InvoiceEditor /></ProtectedRoute>} />
+            <Route path="recurring/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecurringEditor /></ProtectedRoute>} />
+            <Route path="recurring/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecurringEditor /></ProtectedRoute>} />
+            <Route path="invoices/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><InvoiceEditor /></ProtectedRoute>} />
+            <Route path="invoices/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><InvoiceEditor /></ProtectedRoute>} />
+            <Route path="invoices/:id/payments/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecordPayment /></ProtectedRoute>} />
+
             <Route
               path="assignments"
               element={

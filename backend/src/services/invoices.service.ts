@@ -403,10 +403,57 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   if (input.notes !== undefined) updateData.notes = input.notes;
   if (input.terms !== undefined) updateData.terms = input.terms;
   if (input.poNumber !== undefined) updateData.po_number = input.poNumber;
-  if (input.taxRate !== undefined) {
+
+  // ── Full draft edit (Wave-style) ──────────────────────────────────────────
+  // When line items are supplied, rebuild the whole document — but only while
+  // it's still a draft. Issued invoices keep their line items frozen.
+  if (input.lineItems !== undefined) {
+    if (inv.status !== 'draft') {
+      throw new ValidationError("Issued invoices can't change their line items.");
+    }
+    const mapped = input.lineItems.map(li => {
+      const qty = Number(li.quantity) || 0;
+      const price = Number(li.unitPrice) || 0;
+      return {
+        invoice_id: id,
+        item_name: li.itemName ?? null,
+        description: li.description ?? li.itemName ?? '',
+        product_id: li.productId ?? null,
+        quantity: qty,
+        hours: qty,
+        bill_rate: price,
+        amount: Math.round(qty * price * 100) / 100,
+      };
+    });
+    const subtotal = Math.round(mapped.reduce((s, li) => s + li.amount, 0) * 100) / 100;
+    const taxRate = input.taxRate ?? inv.tax_rate ?? 0;
+    const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
+
+    const issueDate = input.issueDate ?? inv.issue_date;
+    const paymentTerms = input.paymentTerms ?? inv.payment_terms ?? 'net_30';
+    const dueDate = paymentTerms === 'custom'
+      ? (input.dueDate ?? inv.due_date)
+      : addDaysToDate(issueDate, paymentTermsDays(paymentTerms));
+
+    if (input.clientId !== undefined) updateData.client_id = input.clientId;
+    updateData.issue_date = issueDate;
+    updateData.payment_terms = paymentTerms;
+    updateData.due_date = dueDate;
+    if (input.currency !== undefined) updateData.currency = input.currency;
+    updateData.subtotal = subtotal;
+    updateData.tax_rate = taxRate;
+    updateData.tax_amount = taxAmount;
+    updateData.total_amount = Math.round((subtotal + taxAmount) * 100) / 100;
+
+    await supabaseAdmin.from('invoice_line_items').delete().eq('invoice_id', id);
+    await supabaseAdmin.from('invoice_line_items').insert(mapped);
+  } else if (input.taxRate !== undefined) {
+    // Metadata-only tax change: recompute from the EXISTING subtotal.
+    const subtotal = Number(inv.subtotal) || 0;
+    const taxAmount = Math.round(subtotal * (input.taxRate / 100) * 100) / 100;
     updateData.tax_rate = input.taxRate;
-    updateData.tax_amount = Math.round(inv.subtotal * (input.taxRate / 100) * 100) / 100;
-    updateData.total_amount = Math.round((inv.subtotal + inv.subtotal * (input.taxRate / 100)) * 100) / 100;
+    updateData.tax_amount = taxAmount;
+    updateData.total_amount = Math.round((subtotal + taxAmount) * 100) / 100;
   }
 
   const { data, error } = await supabaseAdmin
@@ -417,7 +464,7 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
     .single();
 
   if (error) throw error;
-  return data;
+  return getInvoice(id);
 }
 
 export async function deleteInvoice(id: string) {

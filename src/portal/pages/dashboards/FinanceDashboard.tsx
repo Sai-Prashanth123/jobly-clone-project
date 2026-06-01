@@ -107,8 +107,8 @@ export function FinanceDashboard() {
 
       <QuickActions
         actions={[
-          { label: 'New Invoice',   to: '/portal/invoices',  icon: FileText, tone: 'green' },
-          { label: 'New Estimate',  to: '/portal/estimates', icon: FileCheck2, tone: 'blue' },
+          { label: 'New Invoice',   to: '/portal/invoices/new',  icon: FileText, tone: 'green' },
+          { label: 'New Estimate',  to: '/portal/estimates/new', icon: FileCheck2, tone: 'blue' },
           { label: 'Recurring',     to: '/portal/recurring', icon: RotateCw, tone: 'cyan' },
           { label: 'Revenue Report', to: '/portal/reports',  icon: BarChart3, tone: 'orange' },
         ]}

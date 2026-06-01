@@ -158,7 +158,13 @@ export function useGenerateInvoice() {
 export function useUpdateInvoice(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { status?: string; estimateStatus?: string; paidAt?: string | null; notes?: string | null; terms?: string | null; poNumber?: string | null; taxRate?: number }) => {
+    mutationFn: async (body: {
+      status?: string; estimateStatus?: string; paidAt?: string | null;
+      notes?: string | null; terms?: string | null; poNumber?: string | null; taxRate?: number;
+      // Draft-only full edit (Wave-style):
+      clientId?: string; paymentTerms?: string; issueDate?: string; dueDate?: string | null; currency?: string;
+      lineItems?: { itemName?: string | null; description?: string | null; quantity: number; unitPrice: number; productId?: string | null }[];
+    }) => {
       const { data } = await apiClient.put(`/invoices/${id}`, body);
       return mapInvoice(data.data);
     },

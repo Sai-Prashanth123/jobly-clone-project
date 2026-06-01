@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -16,13 +16,31 @@ import { useAssignments } from '../../hooks/useAssignments';
 import { useProducts } from '../../hooks/useProducts';
 import type { CreateInvoiceBody } from '../../hooks/useInvoices';
 
+// Prefill shape for edit-draft mode (mapped from an existing draft invoice).
+export interface InvoiceFormInitial {
+  clientId: string;
+  poNumber?: string;
+  paymentTerms?: string;
+  issueDate: string;
+  dueDate?: string;
+  currency?: string;
+  taxRate?: number;
+  notes?: string;
+  terms?: string;
+  lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number; productId?: string }[];
+}
+
+export interface InvoiceFormHandle { submit: () => void }
+
 interface InvoiceFormProps {
-  onGenerate: (timesheetIds: string[], clientId: string, taxRate: number) => void;
-  onCreate: (body: CreateInvoiceBody) => void;
-  onCancel: () => void;
-  isGenerating?: boolean;
+  // Create: timesheet-generate path (invoices only).
+  onGenerate?: (timesheetIds: string[], clientId: string, taxRate: number) => void;
+  // Create OR edit-draft: the page decides whether this POSTs or PUTs.
+  onSubmitManual: (body: CreateInvoiceBody) => void;
   // 'invoice' | 'estimate' — drives labels + which docType the manual create sends.
   docType?: 'invoice' | 'estimate';
+  // Present → edit-draft mode (manual line items only, prefilled).
+  initial?: InvoiceFormInitial;
 }
 
 const PAYMENT_TERMS_OPTIONS = [
@@ -44,28 +62,43 @@ function addDays(dateIso: string, days: number): string {
 
 interface DraftLine { id: string; itemName: string; description: string; quantity: string; unitPrice: string; productId?: string }
 const blankLine = (): DraftLine => ({ id: crypto.randomUUID(), itemName: '', description: '', quantity: '1', unitPrice: '', productId: undefined });
+const linesFromInitial = (initial?: InvoiceFormInitial): DraftLine[] => {
+  if (!initial?.lineItems?.length) return [blankLine()];
+  return initial.lineItems.map(li => ({
+    id: crypto.randomUUID(),
+    itemName: li.itemName ?? '',
+    description: li.description ?? '',
+    quantity: String(li.quantity ?? 1),
+    unitPrice: li.unitPrice != null ? String(li.unitPrice) : '',
+    productId: li.productId,
+  }));
+};
 
-export function InvoiceForm({ onGenerate, onCreate, onCancel, isGenerating = false, docType = 'invoice' }: InvoiceFormProps) {
+export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(function InvoiceForm(
+  { onGenerate, onSubmitManual, docType = 'invoice', initial },
+  ref,
+) {
   const isEstimate = docType === 'estimate';
-  const [mode, setMode] = useState<'manual' | 'timesheets'>(isEstimate ? 'manual' : 'manual');
-  const [clientId, setClientId] = useState('');
+  const isEdit = !!initial;
+  // Edit-draft is manual line items only; create-invoice can toggle to timesheets.
+  const [mode, setMode] = useState<'manual' | 'timesheets'>('manual');
+  const [clientId, setClientId] = useState(initial?.clientId ?? '');
   const [error, setError] = useState('');
 
-  // Shared
-  const [issueDate, setIssueDate] = useState(todayIso());
-  const [taxRate, setTaxRate] = useState(0);
+  const [issueDate, setIssueDate] = useState(initial?.issueDate ?? todayIso());
+  const [taxRate, setTaxRate] = useState(initial?.taxRate ?? 0);
 
-  // Manual builder
-  const [poNumber, setPoNumber] = useState('');
-  const [paymentTerms, setPaymentTerms] = useState('net_30');
-  const [customDueDate, setCustomDueDate] = useState('');
-  const [currency, setCurrency] = useState('USD');
-  const [notes, setNotes] = useState('');
-  const [terms, setTerms] = useState('');
-  const [lines, setLines] = useState<DraftLine[]>([blankLine()]);
+  const [poNumber, setPoNumber] = useState(initial?.poNumber ?? '');
+  const [paymentTerms, setPaymentTerms] = useState(initial?.paymentTerms ?? 'net_30');
+  const [customDueDate, setCustomDueDate] = useState(
+    initial?.paymentTerms === 'custom' ? (initial?.dueDate ?? '') : '',
+  );
+  const [currency, setCurrency] = useState(initial?.currency ?? 'USD');
+  const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [terms, setTerms] = useState(initial?.terms ?? '');
+  const [lines, setLines] = useState<DraftLine[]>(() => linesFromInitial(initial));
   const [catalogPick, setCatalogPick] = useState('');
 
-  // Timesheet builder
   const [selected, setSelected] = useState<string[]>([]);
 
   const { data: clientData } = useClients({ limit: 200 });
@@ -122,7 +155,7 @@ export function InvoiceForm({ onGenerate, onCreate, onCancel, isGenerating = fal
     const p = products.find(x => x.id === productId);
     if (!p) return;
     setLines(prev => [
-      ...prev.filter(l => l.itemName || l.unitPrice || l.description), // drop a single empty starter row
+      ...prev.filter(l => l.itemName || l.unitPrice || l.description),
       { id: crypto.randomUUID(), itemName: p.name, description: p.description ?? '', quantity: '1', unitPrice: String(p.unitPrice), productId: p.id },
     ]);
     setCatalogPick('');
@@ -132,13 +165,14 @@ export function InvoiceForm({ onGenerate, onCreate, onCancel, isGenerating = fal
     if (!clientId) { setError('Please select a client'); return; }
     if (mode === 'timesheets') {
       if (selected.length === 0) { setError('Please select at least one timesheet'); return; }
-      onGenerate(selected, clientId, taxRate);
+      onGenerate?.(selected, clientId, taxRate);
       return;
     }
     const valid = manualLines.filter(l => (l.itemName.trim() || l.description.trim()) && l.amount >= 0 && (l.qty > 0 || l.price > 0));
     if (valid.length === 0) { setError('Add at least one line item with a name and amount'); return; }
     if (paymentTerms === 'custom' && !customDueDate) { setError('Pick a custom due date'); return; }
-    onCreate({
+    setError('');
+    onSubmitManual({
       clientId,
       docType,
       poNumber: poNumber || null,
@@ -159,12 +193,14 @@ export function InvoiceForm({ onGenerate, onCreate, onCancel, isGenerating = fal
     });
   };
 
+  useImperativeHandle(ref, () => ({ submit: handleSubmit }));
+
   const docLabel = isEstimate ? 'Estimate' : 'Invoice';
 
   return (
     <div className="space-y-5">
-      {/* Mode toggle (invoices only; estimates are always manual) */}
-      {!isEstimate && (
+      {/* Mode toggle (create-invoice only; estimates + edit are manual) */}
+      {!isEstimate && !isEdit && (
         <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
           <button type="button" onClick={() => setMode('manual')}
             className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${mode === 'manual' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>
@@ -244,7 +280,6 @@ export function InvoiceForm({ onGenerate, onCreate, onCancel, isGenerating = fal
               </div>
             </CardHeader>
             <CardContent className="space-y-2">
-              {/* header row (desktop) */}
               <div className="hidden sm:grid grid-cols-[1.4fr_2fr_70px_110px_90px_32px] gap-2 text-[11px] font-medium text-gray-400 uppercase tracking-wide px-1">
                 <span>Item</span><span>Description</span><span>Qty</span><span>Unit price</span><span className="text-right">Amount</span><span />
               </div>
@@ -295,7 +330,7 @@ export function InvoiceForm({ onGenerate, onCreate, onCancel, isGenerating = fal
         </>
       )}
 
-      {/* ── TIMESHEET BUILDER (existing) ── */}
+      {/* ── TIMESHEET BUILDER (create-invoice only) ── */}
       {mode === 'timesheets' && clientId && (
         <>
           <Card>
@@ -346,14 +381,6 @@ export function InvoiceForm({ onGenerate, onCreate, onCancel, isGenerating = fal
       )}
 
       {error && <p className="text-sm text-red-500">{error}</p>}
-
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isGenerating}>Cancel</Button>
-        <Button onClick={handleSubmit} disabled={isGenerating} loading={isGenerating}
-          loadingText={isEstimate ? 'Creating…' : 'Creating…'}>
-          {isEstimate ? 'Create estimate' : mode === 'timesheets' ? 'Generate invoice' : 'Create invoice'}
-        </Button>
-      </div>
     </div>
   );
-}
+});
