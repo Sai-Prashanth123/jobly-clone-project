@@ -1,15 +1,32 @@
 import { Input } from '@/components/ui/input';
 import { parseNumberInput } from '../../lib/utils';
+import { type LeaveDayInfo, LEAVE_TYPE_SHORT } from '../../hooks/useTimesheets';
 import type { TimesheetEntry } from '../../types';
 
 interface TimesheetWeekGridProps {
   entries: TimesheetEntry[];
   onChange?: (entries: TimesheetEntry[]) => void;
   readonly?: boolean;
+  // Per-date approved/pending leave for this week — flags day columns where
+  // logging hours conflicts with leave.
+  leaveByDate?: Record<string, LeaveDayInfo>;
 }
 
-export function TimesheetWeekGrid({ entries, onChange, readonly = false }: TimesheetWeekGridProps) {
+function LeaveBadge({ info }: { info: LeaveDayInfo }) {
+  const approved = info.status === 'approved';
+  return (
+    <span
+      title={`${approved ? 'Approved' : 'Pending'} leave ${info.leaveDisplayId} (${LEAVE_TYPE_SHORT[info.leaveType] ?? 'Leave'})`}
+      className={`mt-0.5 inline-block text-[9px] font-semibold px-1 py-0.5 rounded ${approved ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}
+    >
+      {approved ? 'On leave' : 'Leave pending'}
+    </span>
+  );
+}
+
+export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveByDate }: TimesheetWeekGridProps) {
   const totalHours = entries.reduce((s, e) => s + e.hours, 0);
+  const leaveOf = (date: string): LeaveDayInfo | undefined => leaveByDate?.[date];
 
   const handleChange = (index: number, hours: number) => {
     if (!onChange) return;
@@ -30,6 +47,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false }: Times
                 <th key={entry.date} className="px-3 py-2 text-center font-medium text-gray-700 min-w-[90px]">
                   <div>{entry.dayOfWeek.slice(0, 3)}</div>
                   <div className="text-xs text-gray-500 font-normal">{entry.date.slice(5)}</div>
+                  {leaveOf(entry.date) && <LeaveBadge info={leaveOf(entry.date)!} />}
                 </th>
               ))}
               <th className="px-3 py-2 text-center font-semibold text-gray-900 min-w-[70px]">Total</th>
@@ -52,7 +70,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false }: Times
                       value={entry.hours || ''}
                       placeholder="—"
                       onChange={e => handleChange(i, parseNumberInput(e.target.value) ?? 0)}
-                      className="w-full text-center"
+                      className={`w-full text-center ${leaveOf(entry.date)?.status === 'approved' && entry.hours > 0 ? 'border-red-400 ring-1 ring-red-300 bg-red-50' : ''}`}
                       disabled={readonly}
                     />
                   )}
@@ -76,6 +94,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false }: Times
             <div>
               <p className="text-sm font-medium text-gray-900">{entry.dayOfWeek}</p>
               <p className="text-xs text-gray-400">{entry.date.slice(5)}</p>
+              {leaveOf(entry.date) && <LeaveBadge info={leaveOf(entry.date)!} />}
             </div>
             {readonly ? (
               <span className={`text-base font-semibold ${entry.hours > 0 ? 'text-gray-900' : 'text-gray-300'}`}>

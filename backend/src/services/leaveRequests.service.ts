@@ -1,6 +1,9 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
+import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../lib/errors';
 import { parseDateUTC, addDaysToDate, formatDateSafe } from '../lib/dateUtils';
+import {
+  getOverlappingLeave, getWorkedDays, leaveOverlapMessage, workedDaysBlockMessage,
+} from './conflicts.service';
 import {
   createNotification,
   getUserIdsByRole,
@@ -78,10 +81,38 @@ export async function createLeaveRequest(
   if (!employeeId) throw new ValidationError('employeeId is required.');
 
   const { data: emp } = await supabaseAdmin
-    .from('employees').select('id, first_name, last_name, display_id').eq('id', employeeId).maybeSingle();
+    .from('employees').select('id, first_name, last_name, display_id, start_date').eq('id', employeeId).maybeSingle();
   if (!emp) throw new NotFoundError('Employee not found');
 
   const days = businessDaysInclusive(input.startDate, input.endDate);
+
+  // ── Conflict gates (admin can override the worked-day block) ──────────────
+  // 1. No working days in the range (e.g. a weekend-only span).
+  if (days === 0) {
+    throw new ValidationError('That date range has no working days (weekends only) — pick at least one weekday.');
+  }
+  // 2. Range that starts before the employee was hired.
+  if (emp.start_date && input.startDate < String(emp.start_date).slice(0, 10)) {
+    throw new ValidationError(`Leave can't start before the joining date (${formatDateSafe(String(emp.start_date).slice(0, 10))}).`);
+  }
+  // 3. Overlaps an existing pending/approved leave request.
+  const overlaps = await getOverlappingLeave(employeeId, input.startDate, input.endDate);
+  if (overlaps.length > 0) {
+    throw new ConflictError(leaveOverlapMessage(overlaps[0]), {
+      code: 'LEAVE_OVERLAP',
+      overlaps: overlaps.map(o => ({ displayId: o.display_id, status: o.status, startDate: o.start_date, endDate: o.end_date })),
+    });
+  }
+  // 4. Overlaps days already billed (submitted+ timesheet / monthly present). Admin may override.
+  if (actorRole !== 'admin') {
+    const worked = await getWorkedDays(employeeId, input.startDate, input.endDate, { committedOnly: true });
+    if (worked.length > 0) {
+      throw new ConflictError(workedDaysBlockMessage(worked, 'request'), {
+        code: 'LEAVE_OVER_WORKED',
+        worked: worked.map(w => ({ date: w.date, refType: w.refType, refDisplayId: w.refDisplayId })),
+      });
+    }
+  }
 
   const { data: lr, error } = await supabaseAdmin
     .from('leave_requests')
@@ -123,6 +154,7 @@ export async function reviewLeaveRequest(
   id: string,
   input: ReviewLeaveRequestInput,
   reviewerUserId?: string,
+  reviewerRole?: string,
 ) {
   const { data: lr, error: findErr } = await supabaseAdmin
     .from('leave_requests').select(SELECT).eq('id', id).single();
@@ -132,6 +164,17 @@ export async function reviewLeaveRequest(
   }
   if (input.status === 'rejected' && !input.rejectionReason) {
     throw new ValidationError('Add a reason when rejecting a leave request.');
+  }
+  // Approving a leave whose range already has BILLED hours would create the
+  // "worked + on leave" contradiction — block it (admin may override).
+  if (input.status === 'approved' && reviewerRole !== 'admin') {
+    const worked = await getWorkedDays(lr.employee_id, lr.start_date, lr.end_date, { committedOnly: true });
+    if (worked.length > 0) {
+      throw new ConflictError(workedDaysBlockMessage(worked, 'approve'), {
+        code: 'APPROVE_OVER_WORKED',
+        worked: worked.map(w => ({ date: w.date, refType: w.refType, refDisplayId: w.refDisplayId })),
+      });
+    }
   }
 
   const { data: updated, error } = await supabaseAdmin

@@ -42,6 +42,7 @@ export async function review(req: Request, res: Response, next: NextFunction): P
       req.params.id,
       req.body as ReviewLeaveRequestInput,
       req.user!.id,
+      req.user!.role,
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }

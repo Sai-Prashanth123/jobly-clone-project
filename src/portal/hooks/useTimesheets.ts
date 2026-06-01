@@ -68,6 +68,28 @@ export function useTimesheet(id: string | undefined) {
   });
 }
 
+export interface LeaveDayInfo { status: 'approved' | 'pending'; leaveDisplayId: string; leaveType: string }
+
+// Per-date approved/pending leave coverage for a timesheet's week — drives the
+// grid "On leave" overlay and the pre-submit conflict check.
+export function useTimesheetLeaveCheck(id: string | undefined) {
+  return useQuery({
+    queryKey: ['timesheets', id, 'leave-check'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/timesheets/${id}/leave-check`);
+      return (data.leaveDays ?? {}) as Record<string, LeaveDayInfo>;
+    },
+    enabled: isValidId(id),
+    // Background context for an overlay; a transient failure shouldn't toast.
+    meta: { silentError: true },
+  });
+}
+
+export const LEAVE_TYPE_SHORT: Record<string, string> = {
+  medical_leave: 'Medical', sick: 'Sick', vacation: 'Vacation', unpaid_leave: 'Unpaid',
+  bereavement: 'Bereavement', jury_duty: 'Jury duty', other: 'Leave',
+};
+
 export function useCreateTimesheet() {
   const qc = useQueryClient();
   return useMutation({

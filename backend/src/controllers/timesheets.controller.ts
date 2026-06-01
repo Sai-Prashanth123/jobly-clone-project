@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/timesheets.service';
 import { exportTimesheetsCSV, bulkPatchTimesheetStatus } from '../services/timesheets.service';
+import { getLeaveCoverage } from '../services/conflicts.service';
 import type {
   ListTimesheetsQuery, CreateTimesheetInput,
   UpdateTimesheetInput, PatchTimesheetStatusInput,
@@ -21,6 +22,20 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
   try {
     const data = await svc.getTimesheet(req.params.id);
     res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+// Per-date approved/pending leave coverage for this timesheet's week — drives the
+// grid's "On leave" overlay and the pre-submit conflict check on the frontend.
+export async function leaveCheck(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const ts = await svc.getTimesheet(req.params.id);
+    const coverage = await getLeaveCoverage(ts.employee_id, ts.week_start_date, ts.week_end_date);
+    const leaveDays: Record<string, { status: string; leaveDisplayId: string; leaveType: string }> = {};
+    for (const [date, ref] of coverage) {
+      leaveDays[date] = { status: ref.status, leaveDisplayId: ref.leaveDisplayId, leaveType: ref.leaveType };
+    }
+    res.json({ success: true, leaveDays });
   } catch (err) { next(err); }
 }
 

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
 import { isCurrentOrFutureWeekUTC, isWeekBeforeJoiningUTC, isFutureWeekUTC } from '../lib/dateUtils';
+import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import type {
@@ -249,6 +250,13 @@ export async function patchTimesheetStatus(
     }
     if (hours > 0 && !ts.client_signed_url) {
       throw new ValidationError('Upload the client-signed timesheet before submitting.');
+    }
+    // Leave conflict: you can't bill hours on a day you're on APPROVED leave.
+    // (Admin is exempt — handled by the outer `userRole !== 'admin'` guard.)
+    const days = ((ts as any).timesheet_entries ?? []).map((e: any) => ({ date: e.entry_date, hours: Number(e.hours) || 0 }));
+    const { blocking } = await detectLeaveConflictsForDays(ts.employee_id, days);
+    if (blocking.length > 0) {
+      throw new ConflictError(approvedLeaveBlockMessage(blocking), { code: 'TIMESHEET_ON_APPROVED_LEAVE', conflicts: blocking });
     }
   }
 

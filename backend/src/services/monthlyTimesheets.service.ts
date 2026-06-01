@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
 import { isCurrentOrFutureMonthUTC, isMonthBeforeJoiningUTC } from '../lib/dateUtils';
+import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import {
   createNotification, getUserIdsByRole,
   getPortalUserByEmployeeId, getReportingManagerPortalUserId,
@@ -259,6 +260,17 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
   }
   if ((row.total_hours ?? 0) > 0 && !row.client_signed_url) {
     throw new ValidationError('Upload the client-signed timesheet before submitting.');
+  }
+  // Leave conflict: a day marked Present with hours can't fall on APPROVED leave.
+  // (Admin may override.)
+  if (actorRole !== 'admin') {
+    const days = ((row.entries as any[]) ?? [])
+      .filter(e => e?.status === 'present')
+      .map(e => ({ date: e.date as string, hours: Number(e.hours) || 0 }));
+    const { blocking } = await detectLeaveConflictsForDays(row.employee_id, days);
+    if (blocking.length > 0) {
+      throw new ConflictError(approvedLeaveBlockMessage(blocking), { code: 'MONTHLY_PRESENT_ON_APPROVED_LEAVE', conflicts: blocking });
+    }
   }
 
   const { data: updated, error } = await supabaseAdmin

@@ -12,7 +12,7 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { TimesheetWeekGrid } from '../components/timesheets/TimesheetWeekGrid';
 import { TimesheetApprovalActions } from '../components/timesheets/TimesheetApprovalActions';
-import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useDeleteTimesheet, useUploadWeeklyClientProof, useDeleteWeeklyClientProof } from '../hooks/useTimesheets';
+import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useDeleteTimesheet, useUploadWeeklyClientProof, useDeleteWeeklyClientProof, useTimesheetLeaveCheck } from '../hooks/useTimesheets';
 import { useEmployee } from '../hooks/useEmployees';
 import { useClient } from '../hooks/useClients';
 import { useAssignment } from '../hooks/useAssignments';
@@ -54,7 +54,10 @@ export default function TimesheetDetail() {
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Scroll target + flash for the proof/leave section when a submit is blocked.
   const proofSectionRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
   const [submitAttention, setSubmitAttention] = useState(false);
+  // Approved/pending leave per date for this week → grid overlay + submit guard.
+  const { data: leaveByDate } = useTimesheetLeaveCheck(id);
 
   const isOwner = user?.employeeId === timesheet?.employeeId;
   const isAdmin = user?.role === 'admin';
@@ -158,6 +161,24 @@ export default function TimesheetDetail() {
         setSubmitAttention(true);
         window.setTimeout(() => setSubmitAttention(false), 2800);
       };
+      // Leave conflict: you can't bill hours on a day you're on APPROVED leave.
+      const approvedClash = localEntries.filter(e => Number(e.hours) > 0 && leaveByDate?.[e.date]?.status === 'approved');
+      if (approvedClash.length > 0) {
+        const dates = approvedClash.map(e => formatDate(e.date)).join(', ');
+        const lvs = [...new Set(approvedClash.map(e => leaveByDate![e.date].leaveDisplayId))].join(', ');
+        toast.error(`You're on approved leave (${lvs}) on ${dates} — you can't log hours for a day you're on leave.`, {
+          description: 'Set those days to 0 hours, or cancel the leave.',
+        });
+        gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      const pendingClash = localEntries.filter(e => Number(e.hours) > 0 && leaveByDate?.[e.date]?.status === 'pending');
+      if (pendingClash.length > 0) {
+        toast.warning(`Heads up: you have a pending leave request on ${pendingClash.map(e => formatDate(e.date)).join(', ')}.`, {
+          description: 'Submitting anyway — if that leave is approved later, this timesheet may need correcting.',
+        });
+        // non-blocking — continue to the other gates.
+      }
       if (liveTotalHours > 0 && !timesheet.clientSignedUrl) {
         toast.error('Upload the client-signed timesheet before submitting.', {
           description: 'A signed copy is required as proof of the days worked.',
@@ -269,7 +290,7 @@ export default function TimesheetDetail() {
         </Alert>
       )}
 
-      <Card>
+      <Card ref={gridRef} className="scroll-mt-24">
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Weekly Hours Entry</CardTitle>
@@ -296,6 +317,7 @@ export default function TimesheetDetail() {
             entries={localEntries}
             onChange={canEdit ? (entries) => { hasUserEdited.current = true; setLocalEntries(entries); } : undefined}
             readonly={!canEdit}
+            leaveByDate={leaveByDate}
           />
           {canEdit && (
             <div className="mt-4 space-y-1">
