@@ -52,6 +52,9 @@ export default function TimesheetDetail() {
   const [localEntries, setLocalEntries] = useState<TimesheetEntry[]>([]);
   const hasUserEdited = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Scroll target + flash for the proof/leave section when a submit is blocked.
+  const proofSectionRef = useRef<HTMLDivElement>(null);
+  const [submitAttention, setSubmitAttention] = useState(false);
 
   const isOwner = user?.employeeId === timesheet?.employeeId;
   const isAdmin = user?.role === 'admin';
@@ -148,14 +151,23 @@ export default function TimesheetDetail() {
     //  - a worked week (> 0 hrs) must have the client-signed timesheet attached;
     //  - a zero-hour week must have a leave reason.
     if (status === 'submitted') {
+      // Route the user straight to the missing field: scroll the proof/leave
+      // section into view and flash it, so the requirement is unmistakable.
+      const flagSection = () => {
+        proofSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setSubmitAttention(true);
+        window.setTimeout(() => setSubmitAttention(false), 2800);
+      };
       if (liveTotalHours > 0 && !timesheet.clientSignedUrl) {
         toast.error('Upload the client-signed timesheet before submitting.', {
           description: 'A signed copy is required as proof of the days worked.',
         });
+        flagSection();
         return;
       }
       if (liveTotalHours === 0 && !leaveReason) {
         toast.error('Select a reason for the zero-hour week before submitting.');
+        flagSection();
         return;
       }
     }
@@ -310,8 +322,16 @@ export default function TimesheetDetail() {
           backend submit gate enforces these; this surfaces them so the employee
           can satisfy the gate before hitting Submit in the actions bar above. */}
       {canEdit && (
-        <Card>
+        <Card
+          ref={proofSectionRef}
+          className={`scroll-mt-24 transition-all ${submitAttention ? 'ring-2 ring-red-400 shadow-md bg-red-50/30' : ''}`}
+        >
           <CardContent className="pt-6">
+            {submitAttention && (
+              <p className="mb-3 text-sm font-medium text-red-600">
+                ↓ Complete this before submitting.
+              </p>
+            )}
             {liveTotalHours === 0 ? (
               <div className="space-y-1.5">
                 <Label className="text-sm">Reason for a zero-hour week <span className="text-red-500">*</span></Label>
