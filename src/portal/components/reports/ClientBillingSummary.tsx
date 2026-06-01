@@ -5,6 +5,8 @@ import { useInvoices } from '../../hooks/useInvoices';
 import { useClients } from '../../hooks/useClients';
 import { formatCurrency } from '../../lib/utils';
 
+const OUTSTANDING_STATUSES = ['sent', 'viewed', 'partially_paid', 'overdue'];
+
 export function ClientBillingSummary() {
   const { data: invData } = useInvoices({ limit: 1000 });
   const { data: clientData } = useClients({ limit: 200 });
@@ -15,14 +17,17 @@ export function ClientBillingSummary() {
   const rows = clients
     .map(client => {
       const clientInvoices = invoices.filter(i => i.clientId === client.id);
+      const balanceOf = (i: typeof invoices[number]) => i.balanceDue ?? (i.totalAmount - (i.amountPaid ?? 0));
       const totalInvoiced = clientInvoices.reduce((s, i) => s + i.totalAmount, 0);
-      const totalPaid = clientInvoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0);
+      // Collected = actual payments recorded (includes partial payments), not
+      // just fully-paid invoices.
+      const totalPaid = clientInvoices.reduce((s, i) => s + (i.amountPaid ?? 0), 0);
       const totalOutstanding = clientInvoices
-        .filter(i => i.status === 'sent' || i.status === 'overdue')
-        .reduce((s, i) => s + i.totalAmount, 0);
+        .filter(i => OUTSTANDING_STATUSES.includes(i.status))
+        .reduce((s, i) => s + balanceOf(i), 0);
       const overdueAmount = clientInvoices
         .filter(i => i.status === 'overdue')
-        .reduce((s, i) => s + i.totalAmount, 0);
+        .reduce((s, i) => s + balanceOf(i), 0);
       const invoiceCount = clientInvoices.length;
       const collectionRate = totalInvoiced > 0
         ? Math.round((totalPaid / totalInvoiced) * 100)

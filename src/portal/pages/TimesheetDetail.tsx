@@ -203,7 +203,7 @@ export default function TimesheetDetail() {
         <Card>
           <CardContent className="pt-4 pb-4">
             <p className="text-xs text-muted-foreground">Total Hours</p>
-            <p className="font-semibold text-2xl mt-0.5">{timesheet.totalHours}</p>
+            <p className="font-semibold text-2xl mt-0.5">{canEdit ? liveTotalHours : timesheet.totalHours}</p>
           </CardContent>
         </Card>
         <Card>

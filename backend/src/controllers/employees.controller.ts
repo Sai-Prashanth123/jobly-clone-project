@@ -8,7 +8,15 @@ import type { ListEmployeesQuery, CreateEmployeeInput, UpdateEmployeeInput } fro
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await svc.listEmployees(req.query as unknown as ListEmployeesQuery);
+    const role = req.user!.role;
+    const ownId = req.user!.employeeId ?? null;
+    // Employees only ever see themselves; everyone else sees the roster but with
+    // SSN/bank/pay redacted unless they're admin/hr (or their own row).
+    const result = await svc.listEmployees(
+      req.query as unknown as ListEmployeesQuery,
+      role === 'employee' ? { restrictToEmployeeId: ownId } : undefined,
+    );
+    result.data = result.data.map((e: any) => svc.redactEmployee(e, role, e.id === ownId));
     res.json({ success: true, ...result });
   } catch (err) { next(err); }
 }
@@ -21,7 +29,10 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
       throw new ForbiddenError('Employees may only view their own profile');
     }
     const data = await svc.getEmployee(req.params.id);
-    res.json({ success: true, data });
+    // Operations/finance see the profile but not SSN/bank/pay; admin/hr and the
+    // employee viewing their own record see everything.
+    const redacted = svc.redactEmployee(data, req.user!.role, req.user!.employeeId === req.params.id);
+    res.json({ success: true, data: redacted });
   } catch (err) { next(err); }
 }
 
@@ -166,7 +177,7 @@ export async function deleteDoc(req: Request, res: Response, next: NextFunction)
 
 export async function exportEmployees(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const csv = await exportEmployeesCSV({ status: req.query.status as string, department: req.query.department as string });
+    const csv = await exportEmployeesCSV({ status: req.query.status as string, department: req.query.department as string, viewerRole: req.user!.role });
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="employees-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);

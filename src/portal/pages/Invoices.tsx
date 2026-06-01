@@ -59,9 +59,12 @@ export default function Invoices() {
     [invoices, clients],
   );
 
+  // Outstanding = remaining balance across all in-flight unpaid invoices
+  // (sent/viewed/partially_paid/overdue). Mirrors the Finance Dashboard.
+  const OUTSTANDING_STATUSES = ['sent', 'viewed', 'partially_paid', 'overdue'];
   const totalOutstanding = invoices
-    .filter(i => i.status === 'sent' || i.status === 'overdue')
-    .reduce((s, i) => s + i.totalAmount, 0);
+    .filter(i => OUTSTANDING_STATUSES.includes(i.status))
+    .reduce((s, i) => s + (i.balanceDue ?? (i.totalAmount - (i.amountPaid ?? 0))), 0);
 
   const columns: Column<Invoice>[] = [
     {

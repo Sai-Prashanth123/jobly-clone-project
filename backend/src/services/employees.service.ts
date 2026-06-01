@@ -14,14 +14,34 @@ function serializeEmployee(emp: any) {
   };
 }
 
+// Identity + financial fields that only admin/HR (or the employee themselves)
+// may see. Operations/finance manage staffing but must not read SSN, bank
+// details, or pay rate. Redaction happens at the API boundary (list + getOne).
+const SENSITIVE_EMPLOYEE_FIELDS = ['ssn', 'bank_routing_number', 'bank_account_number', 'pay_rate'] as const;
+
+export function redactEmployee(emp: any, viewerRole?: string, isOwn = false): any {
+  if (!emp) return emp;
+  if (viewerRole === 'admin' || viewerRole === 'hr' || isOwn) return emp;
+  const out = { ...emp };
+  for (const f of SENSITIVE_EMPLOYEE_FIELDS) out[f] = null;
+  out.pay_rate = 0; // serializeEmployee coerces null→0; keep the shape numeric
+  return out;
+}
+
 // ── list ─────────────────────────────────────────────────────────────────────
 
-export async function listEmployees(query: ListEmployeesQuery) {
+export async function listEmployees(query: ListEmployeesQuery, opts?: { restrictToEmployeeId?: string | null }) {
   let q = supabaseAdmin
     .from('employees')
     .select('*', { count: 'exact' })
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
+
+  // An employee-role caller may only ever see their OWN record — the list must
+  // never expose the whole roster (and its PII) to a regular employee.
+  if (opts?.restrictToEmployeeId !== undefined) {
+    q = q.eq('id', opts.restrictToEmployeeId ?? '00000000-0000-0000-0000-000000000000');
+  }
 
   if (query.status)     q = q.eq('status', query.status);
   if (query.department) q = q.eq('department', query.department);
@@ -579,7 +599,11 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   // stripped, which caused completeOnboarding to reject submissions even when
   // the wizard reported "all set".)
   if (actorRole === 'employee') {
-    const HR_ONLY = ['status', 'reporting_manager_id', 'email', 'work_email'];
+    // HR-managed fields an employee cannot change about themselves. Personal
+    // `email` is intentionally NOT here — it's the employee's own contact field
+    // (shown editable in self-edit) and is separate from their login
+    // (portal_users.email). work_email/status/reporting_manager stay HR-only.
+    const HR_ONLY = ['status', 'reporting_manager_id', 'work_email'];
     for (const k of HR_ONLY) delete patch[k];
   }
 
@@ -1035,7 +1059,9 @@ export async function getEmployeeTimesheets(employeeId: string) {
 
 // ── CSV export ────────────────────────────────────────────────────────────────
 
-export async function exportEmployeesCSV(query: { status?: string; department?: string }): Promise<string> {
+export async function exportEmployeesCSV(query: { status?: string; department?: string; viewerRole?: string }): Promise<string> {
+  // Operations/finance can export the roster but not the pay column.
+  const canSeePay = query.viewerRole === 'admin' || query.viewerRole === 'hr';
   let q = supabaseAdmin
     .from('employees')
     .select('display_id,first_name,last_name,email,phone,department,job_title,employment_type,start_date,status,visa_type,visa_expiry,pay_rate,pay_type,work_location')
@@ -1051,7 +1077,7 @@ export async function exportEmployeesCSV(query: { status?: string; department?: 
     e.first_name ?? '', e.last_name ?? '', e.email ?? '', e.phone ?? '',
     e.department ?? '', e.job_title ?? '', e.employment_type ?? '', e.start_date ?? '', e.status ?? '',
     e.visa_type ?? '', e.visa_expiry ?? '',
-    e.pay_rate ?? '', e.pay_type ?? '', e.work_location ?? '',
+    canSeePay ? (e.pay_rate ?? '') : '', e.pay_type ?? '', e.work_location ?? '',
   ]);
   return [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
 }

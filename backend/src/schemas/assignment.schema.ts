@@ -7,8 +7,8 @@ export const createAssignmentSchema = z.object({
   role: z.string().min(1),
   startDate: z.string(),
   endDate: z.string().optional().nullable().transform(v => v || null),
-  billRate: z.number().min(0),
-  payRate: z.number().min(0),
+  billRate: z.number().positive('Bill rate must be greater than 0'),
+  payRate: z.number().positive('Pay rate must be greater than 0'),
   maxHoursPerWeek: z.number().int().min(1).max(168).default(40),
   // Status is derived server-side from the dates on create (see
   // assignments.service.createAssignment); accepted but ignored if sent.
@@ -30,8 +30,8 @@ export const updateAssignmentSchema = z.object({
   role: z.string().min(1).optional(),
   startDate: z.string().optional(),
   endDate: z.string().optional().nullable().transform(v => v || null),
-  billRate: z.number().min(0).optional(),
-  payRate: z.number().min(0).optional(),
+  billRate: z.number().positive('Bill rate must be greater than 0').optional(),
+  payRate: z.number().positive('Pay rate must be greater than 0').optional(),
   maxHoursPerWeek: z.number().int().min(1).max(168).optional(),
   status: z.enum(['active','completed','pending','terminated']).optional(),
   billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),

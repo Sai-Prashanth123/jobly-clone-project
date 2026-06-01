@@ -46,7 +46,14 @@ apiClient.interceptors.request.use(config => {
 // so the user lands back where they were after re-authenticating.
 let redirecting = false;
 apiClient.interceptors.response.use(
-  res => { touchActivity(); return res; },
+  res => {
+    touchActivity();
+    // A successful response means the session is alive — clear the 401 redirect
+    // latch so a future genuine 401 can redirect instead of being swallowed if
+    // an earlier redirect was ever interrupted.
+    redirecting = false;
+    return res;
+  },
   err => {
     const status = err.response?.status;
 

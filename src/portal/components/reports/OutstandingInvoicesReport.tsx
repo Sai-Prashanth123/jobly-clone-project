@@ -13,19 +13,26 @@ export function OutstandingInvoicesReport() {
   const invoices = invData?.data ?? [];
   const clients = clientData?.data ?? [];
 
+  // Outstanding = any in-flight unpaid invoice (sent/viewed/partial/overdue),
+  // counting the remaining BALANCE (not the face value) so partial payments
+  // reduce it. Mirrors the Finance Dashboard.
+  const OUTSTANDING_STATUSES = ['sent', 'viewed', 'partially_paid', 'overdue'];
+  const balanceOf = (i: typeof invoices[number]) => i.balanceDue ?? (i.totalAmount - (i.amountPaid ?? 0));
+  const todayMs = Date.parse(new Date().toISOString().slice(0, 10) + 'T00:00:00Z');
+
   const outstanding = invoices
-    .filter(i => i.status === 'sent' || i.status === 'overdue')
+    .filter(i => OUTSTANDING_STATUSES.includes(i.status))
     .map(i => {
       const client = clients.find(c => c.id === i.clientId);
-      const today = new Date();
-      const due = new Date(i.dueDate);
-      const daysOverdue = Math.ceil((today.getTime() - due.getTime()) / (1000 * 60 * 60 * 24));
-      return { ...i, clientName: client?.companyName ?? i.clientId.slice(0, 8), daysOverdue };
+      // UTC-anchored day diff — avoids the ±1 day drift of new Date('YYYY-MM-DD').
+      const dueMs = Date.parse(i.dueDate.slice(0, 10) + 'T00:00:00Z');
+      const daysOverdue = Math.round((todayMs - dueMs) / 86400000);
+      return { ...i, clientName: client?.companyName ?? i.clientId.slice(0, 8), daysOverdue, balance: balanceOf(i) };
     })
     .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
-  const totalOutstanding = outstanding.reduce((s, i) => s + i.totalAmount, 0);
-  const totalOverdue = outstanding.filter(i => i.status === 'overdue').reduce((s, i) => s + i.totalAmount, 0);
+  const totalOutstanding = outstanding.reduce((s, i) => s + i.balance, 0);
+  const totalOverdue = outstanding.filter(i => i.status === 'overdue').reduce((s, i) => s + i.balance, 0);
 
   return (
     <Card>
@@ -68,7 +75,7 @@ export function OutstandingInvoicesReport() {
                   <TableCell className={`text-sm ${inv.daysOverdue > 0 ? 'text-red-600 font-medium' : 'text-gray-700'}`}>
                     {formatDate(inv.dueDate)}
                   </TableCell>
-                  <TableCell className="text-right text-sm font-semibold">{formatCurrency(inv.totalAmount)}</TableCell>
+                  <TableCell className="text-right text-sm font-semibold">{formatCurrency(inv.balance)}</TableCell>
                   <TableCell className={`text-right text-sm font-semibold ${inv.daysOverdue > 0 ? 'text-red-600' : 'text-green-600'}`}>
                     {inv.daysOverdue > 0 ? `+${inv.daysOverdue}d` : `${Math.abs(inv.daysOverdue)}d left`}
                   </TableCell>

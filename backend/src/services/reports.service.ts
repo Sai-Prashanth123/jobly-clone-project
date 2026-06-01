@@ -155,14 +155,18 @@ export async function getTimesheetSummary(startDate: string, endDate: string) {
 export async function getFinancialSummary() {
   const { data: invoices } = await supabaseAdmin
     .from('invoices')
-    .select('status, total_amount');
+    .select('status, total_amount, amount_paid');
 
+  // outstanding/overdue count the remaining BALANCE and include viewed +
+  // partially_paid (previously dropped, which under-reported what's owed).
   const summary = { paid: 0, outstanding: 0, overdue: 0, draft: 0 };
   for (const inv of invoices ?? []) {
-    if (inv.status === 'paid') summary.paid += inv.total_amount;
-    else if (inv.status === 'sent') summary.outstanding += inv.total_amount;
-    else if (inv.status === 'overdue') summary.overdue += inv.total_amount;
-    else if (inv.status === 'draft') summary.draft += inv.total_amount;
+    const total = Number(inv.total_amount) || 0;
+    const balance = Math.round((total - (Number(inv.amount_paid) || 0)) * 100) / 100;
+    if (inv.status === 'paid') summary.paid += total;
+    else if (inv.status === 'overdue') summary.overdue += balance;
+    else if (inv.status === 'sent' || inv.status === 'viewed' || inv.status === 'partially_paid') summary.outstanding += balance;
+    else if (inv.status === 'draft') summary.draft += total;
   }
 
   return summary;
