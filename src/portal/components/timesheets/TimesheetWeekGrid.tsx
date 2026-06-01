@@ -50,7 +50,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false }: Times
                       max={24}
                       step={0.5}
                       value={entry.hours || ''}
-                      placeholder="0"
+                      placeholder="—"
                       onChange={e => handleChange(i, parseNumberInput(e.target.value) ?? 0)}
                       className="w-full text-center"
                       disabled={readonly}
@@ -89,7 +89,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false }: Times
                   max={24}
                   step={0.5}
                   value={entry.hours || ''}
-                  placeholder="0"
+                  placeholder="—"
                   onChange={e => handleChange(i, parseNumberInput(e.target.value) ?? 0)}
                   className="w-20 text-center"
                 />

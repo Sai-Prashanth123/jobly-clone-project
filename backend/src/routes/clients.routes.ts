@@ -12,13 +12,15 @@ const upload = documentUpload;
 router.use(authenticate);
 
 router.get('/', requireRole('admin','operations','finance','employee'), validateQuery(listClientsQuerySchema), ctrl.list);
-// Onboarding new clients is admin-only. Operations manages existing clients
-// (edit / upload docs / archive) but does not onboard new ones.
+// Client management is admin-only ("ultimate boss"): admin creates, edits,
+// archives, and uploads client documents. Operations/finance can READ clients
+// (operations needs the list when creating employee→client assignments) but
+// cannot write to them.
 router.post('/', requireRole('admin'), validateBody(createClientSchema), ctrl.create);
 router.get('/:id', requireRole('admin','operations','finance','employee'), ctrl.getOne);
-router.put('/:id', requireRole('admin','operations'), validateBody(updateClientSchema), ctrl.update);
+router.put('/:id', requireRole('admin'), validateBody(updateClientSchema), ctrl.update);
 router.delete('/:id', requireRole('admin'), ctrl.remove);
 
-router.post('/:id/documents', requireRole('admin','operations'), upload.single('file'), ctrl.uploadDoc);
+router.post('/:id/documents', requireRole('admin'), upload.single('file'), ctrl.uploadDoc);
 
 export default router;

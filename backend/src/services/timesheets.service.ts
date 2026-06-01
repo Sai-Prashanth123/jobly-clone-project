@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isCurrentOrFutureWeekUTC, isWeekBeforeJoiningUTC } from '../lib/dateUtils';
+import { isCurrentOrFutureWeekUTC, isWeekBeforeJoiningUTC, isFutureWeekUTC } from '../lib/dateUtils';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import type {
@@ -60,6 +60,13 @@ export async function getTimesheet(id: string) {
 }
 
 export async function createTimesheet(input: CreateTimesheetInput, actorRole?: string) {
+  // Future-week lockout — NO ONE (incl. admin) can create a timesheet for a week
+  // that hasn't started yet. You can't log hours for time that hasn't happened.
+  if (isFutureWeekUTC(input.weekStartDate)) {
+    throw new ValidationError(
+      `Week of ${input.weekStartDate} hasn't started yet — you can't create a timesheet for a future week.`,
+    );
+  }
   // Period lockout — past weeks are read-only for everyone except admin.
   // Matches a strict corporate payroll cutoff. Admin can still backfill for
   // corrections via a separate audit-logged path.
@@ -216,6 +223,14 @@ export async function patchTimesheetStatus(
   const action = input.status;
   if (!allowed[action]?.includes(userRole)) {
     throw new ForbiddenError(`Role '${userRole}' cannot set status to '${action}'`);
+  }
+
+  // Future-week lockout — NO ONE (incl. admin) can submit a timesheet for a week
+  // that hasn't started yet.
+  if (action === 'submitted' && isFutureWeekUTC(ts.week_start_date)) {
+    throw new ValidationError(
+      `Week of ${ts.week_start_date} hasn't started yet — you can't submit a timesheet for a future week.`,
+    );
   }
 
   // Submit-time gates (only checked when transitioning into `submitted`):

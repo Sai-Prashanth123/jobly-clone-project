@@ -13,11 +13,14 @@ import { useClient, useUpdateClient, useDeleteClient } from '../hooks/useClients
 import { useAssignments } from '../hooks/useAssignments';
 import { useInvoices } from '../hooks/useInvoices';
 import { useEmployees } from '../hooks/useEmployees';
+import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const { data: client, isLoading } = useClient(id);
   const { data: assignmentsData } = useAssignments({ clientId: id, limit: 100 });
   const { data: invoicesData } = useInvoices({ clientId: id, limit: 100 });
@@ -75,17 +78,20 @@ export default function ClientDetail() {
             </div>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
-            <Edit className="h-4 w-4" />
-            Edit
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
-            className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
-            <Trash2 className="h-4 w-4" />
-            Delete
-          </Button>
-        </div>
+        {/* Client management is admin-only — operations/finance see read-only. */}
+        {isAdmin && (
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
+              <Edit className="h-4 w-4" />
+              Edit
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
+              className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">

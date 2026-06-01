@@ -1,6 +1,28 @@
 export type UserRole = 'admin' | 'hr' | 'operations' | 'finance' | 'employee';
 export type EmployeeStatus = 'active' | 'inactive' | 'onboarding';
 export type TimesheetStatus = 'draft' | 'submitted' | 'manager_approved' | 'client_approved' | 'rejected';
+export type LeaveType = 'medical_leave' | 'sick' | 'vacation' | 'unpaid_leave' | 'bereavement' | 'jury_duty' | 'other';
+export type LeaveRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
+
+export interface LeaveRequest {
+  id: string; // UUID
+  displayId?: string; // LV-XXXX
+  employeeId: string;
+  employeeName?: string;
+  employeeDisplayId?: string;
+  leaveType: LeaveType;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  daysRequested: number;
+  reason?: string;
+  status: LeaveRequestStatus;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  rejectionReason?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'partially_paid' | 'paid' | 'overdue';
 export type EstimateStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'converted';
 

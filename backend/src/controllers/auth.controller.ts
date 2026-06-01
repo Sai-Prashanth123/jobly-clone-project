@@ -185,6 +185,11 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
 
     const { data: pu } = await supabaseAdmin
       .from('portal_users').select('id').eq('email', normalized).maybeSingle();
+    // Log the match result server-side (never to the client — the response stays
+    // generic to avoid account enumeration). A "NO MATCH" here is the usual
+    // reason a user reports "I requested a reset but got no email": the address
+    // they typed isn't the one on their portal account.
+    console.log(`[auth.forgotPassword] reset requested for "${normalized}" — ${pu?.id ? 'matched, sending email' : 'NO MATCH, nothing sent'}`);
     if (pu?.id) {
       try {
         await resetUserPassword(pu.id);

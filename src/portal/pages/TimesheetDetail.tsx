@@ -91,6 +91,12 @@ export default function TimesheetDetail() {
     () => localEntries.reduce((s, e) => s + (Number(e.hours) || 0), 0),
     [localEntries],
   );
+  // The client-signed timesheet is the proof for the number of DAYS worked, so
+  // surface that count next to the proof for reviewers.
+  const daysWorked = useMemo(
+    () => localEntries.filter(e => Number(e.hours) > 0).length,
+    [localEntries],
+  );
 
   // Sync localEntries when timesheet loads. Only re-run when the id changes —
   // if we re-ran on every `timesheet.entries` change (e.g. after an autosave
@@ -383,6 +389,11 @@ export default function TimesheetDetail() {
             </CardTitle>
           </CardHeader>
           <CardContent className="pt-0 space-y-2">
+            {timesheet.totalHours > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Days worked this week: <span className="font-medium text-gray-700">{daysWorked}</span> · {timesheet.totalHours} hrs
+              </p>
+            )}
             {timesheet.totalHours === 0 ? (
               <p className="text-sm text-gray-700">
                 {timesheet.leaveReason

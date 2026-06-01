@@ -70,6 +70,16 @@ export function isCurrentOrFutureWeekUTC(weekStart: string): boolean {
   return weekStart >= currentMondayUTC();
 }
 
+/**
+ * True if `weekStart` (a YYYY-MM-DD Monday) is STRICTLY AFTER the current ISO
+ * week's Monday — i.e. a week that hasn't started yet. Used to block creating or
+ * submitting a timesheet for a future week (applies to ALL roles incl. admin —
+ * you can't log hours for a week that hasn't happened).
+ */
+export function isFutureWeekUTC(weekStart: string): boolean {
+  return weekStart > currentMondayUTC();
+}
+
 /** UTC current year and 1-indexed month (matches the columns on monthly_timesheets). */
 export function currentYearMonthUTC(): { year: number; month: number } {
   const now = new Date();

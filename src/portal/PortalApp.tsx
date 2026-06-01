@@ -52,6 +52,9 @@ const MyMonthlyTimesheet = lazy(() => import('./pages/MyMonthlyTimesheet'));
 const MonthlyTimesheets = lazy(() => import('./pages/MonthlyTimesheets'));
 const MonthlyTimesheetDetail = lazy(() => import('./pages/MonthlyTimesheetDetail'));
 
+// Dedicated leave-request workflow (employee applies → HR/admin approve)
+const LeaveRequests = lazy(() => import('./pages/LeaveRequests'));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -258,6 +261,15 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
                   <Documents />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="leave-requests"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
+                  <LeaveRequests />
                 </ProtectedRoute>
               }
             />

@@ -42,7 +42,11 @@ export async function uploadDoc(req: Request, res: Response, next: NextFunction)
   try {
     const file = req.file;
     if (!file) { res.status(400).json({ success: false, error: 'No file provided' }); return; }
-    const data = await storageSvc.uploadDocument('client', req.params.id, file, req.user!.id);
+    // Persist the chosen document name + type (e.g. "Purchase Order (PO)" or a
+    // custom "PO" title) instead of falling back to the raw filename + MIME type.
+    // Mirrors the employee doc-upload controller.
+    const { name, docType } = req.body as { name?: string; docType?: string };
+    const data = await storageSvc.uploadDocument('client', req.params.id, file, req.user!.id, name, docType);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 }

@@ -298,7 +298,8 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
             </div>
             <div className="space-y-2">
               <Label>Default Bill Rate ($/hr)</Label>
-              <Input type="number" min={0} step={0.01} value={form.defaultBillRate}
+              <Input type="number" min={0} step={0.01} inputMode="decimal" placeholder="0.00"
+                value={form.defaultBillRate || ''}
                 onChange={e => set('defaultBillRate', parseNumberInput(e.target.value) ?? 0)} />
             </div>
             <div className="space-y-2">

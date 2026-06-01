@@ -22,10 +22,10 @@ export default function PortalClients() {
   const [showForm, setShowForm] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);
   const updateClient = useUpdateClient(editClient?.id ?? '');
-  // Onboarding a new client is admin-only. Operations manages existing clients
-  // (edit / upload docs / change status), so canEdit stays broader than canCreate.
+  // Client management is admin-only ("ultimate boss") — admin creates, edits,
+  // archives, and uploads client documents. Operations/finance are read-only.
   const canCreate = user?.role === 'admin';
-  const canEdit = user?.role === 'admin' || user?.role === 'operations';
+  const canEdit = user?.role === 'admin';
 
   const clients = data?.data ?? [];
 
@@ -147,9 +147,12 @@ export default function PortalClients() {
             onSubmit={async (data, pendingFiles) => {
               try {
                 const client = await createClient.mutateAsync(data as Partial<Client>);
-                // Upload any documents queued during form fill
+                // Upload any documents queued during form fill. Surface failures
+                // instead of swallowing them — otherwise a doc that fails to
+                // attach looks like a silent "couldn't add" to the user.
+                let docFailures = 0;
                 if (pendingFiles.size > 0) {
-                  await Promise.allSettled(
+                  const results = await Promise.allSettled(
                     Array.from(pendingFiles.values()).map(({ file, name, type }) => {
                       const fd = new FormData();
                       fd.append('file', file);
@@ -160,8 +163,15 @@ export default function PortalClients() {
                       });
                     })
                   );
+                  docFailures = results.filter(r => r.status === 'rejected').length;
                 }
                 toast.success(`Client ${client.displayId ?? client.id} created successfully`);
+                if (docFailures > 0) {
+                  toast.warning(
+                    `Client created, but ${docFailures} document${docFailures === 1 ? '' : 's'} failed to upload — re-add ${docFailures === 1 ? 'it' : 'them'} from the client page.`,
+                    { duration: 9000 },
+                  );
+                }
                 setShowForm(false);
               } catch {
                 /* failed-request toast raised centrally (queryClient.ts) */
