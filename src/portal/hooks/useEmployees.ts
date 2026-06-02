@@ -25,6 +25,11 @@ function mapEmployee(raw: any): Employee {
     employmentType: raw.employment_type,
     startDate: raw.start_date,
     status: raw.status,
+    leaveStartedAt: raw.leave_started_at ?? undefined,
+    leaveReturnDate: raw.leave_return_date ?? undefined,
+    leaveReason: raw.leave_reason ?? undefined,
+    terminatedAt: raw.terminated_at ?? undefined,
+    terminationReason: raw.termination_reason ?? undefined,
     visaType: raw.visa_type ?? undefined,
     visaExpiry: raw.visa_expiry ?? undefined,
     i9Status: raw.i9_status ?? undefined,
@@ -206,6 +211,80 @@ export function useDeleteEmployee() {
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/employees/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+  });
+}
+
+// Part B — place an active employee on extended leave (status → inactive +
+// return window). Auto-reactivates on the return date (scheduler) or via the
+// manual "Return from leave" button below.
+export function usePlaceOnLeave(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { startDate: string; returnDate: string; reason?: string }) => {
+      const { data } = await apiClient.post(`/employees/${id}/leave`, body);
+      return mapEmployee(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees', id] });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+    },
+  });
+}
+
+// Part B — manually bring an employee back from leave (status → active).
+export function useReturnFromLeave(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post(`/employees/${id}/return-from-leave`, {});
+      return mapEmployee(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees', id] });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+    },
+  });
+}
+
+// Part C — terminate an employee: disables their login immediately, keeps the
+// record. status → inactive + terminated_at.
+export function useTerminateEmployee(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { reason?: string; effectiveDate?: string }) => {
+      const { data } = await apiClient.post(`/employees/${id}/terminate`, body);
+      return mapEmployee(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees', id] });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+    },
+  });
+}
+
+// Part C — re-hire a terminated employee: status → active + fresh credentials
+// emailed. Returns the same email/login status shape as resend-credentials.
+export function useRehireEmployee(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post(`/employees/${id}/rehire`, {});
+      return {
+        employee: mapEmployee(data.data),
+        welcomeEmailSent: data.welcomeEmailSent as boolean,
+        warning: data.warning as string | undefined,
+        tempPassword: data.tempPassword as string | undefined,
+        loginEmail: data.loginEmail as string | undefined,
+      };
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees', id] });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+    },
   });
 }
 

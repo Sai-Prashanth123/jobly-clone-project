@@ -164,6 +164,22 @@ export const updateEmployeeSchema = z.object({
   expectedOnboardingCompletedAt: z.string().nullable().optional(),
 });
 
+// Part B — place an employee on extended leave. Both dates are YYYY-MM-DD;
+// cross-field ordering (return > start, return in the future) is enforced in
+// the service so it can compare against today in UTC.
+export const placeOnLeaveSchema = z.object({
+  startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'startDate must be YYYY-MM-DD'),
+  returnDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'returnDate must be YYYY-MM-DD'),
+  reason: z.string().max(500).optional().nullable(),
+});
+
+// Part C — terminate an employee (disable login, keep record). effectiveDate
+// defaults to today in the service when omitted.
+export const terminateEmployeeSchema = z.object({
+  reason: z.string().max(500).optional().nullable(),
+  effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'effectiveDate must be YYYY-MM-DD').optional().nullable(),
+});
+
 export const listEmployeesQuerySchema = z.object({
   status: z.enum(['active','inactive','onboarding']).optional(),
   department: z.string().optional(),
@@ -172,6 +188,8 @@ export const listEmployeesQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(50),
 });
 
+export type PlaceOnLeaveInput = z.infer<typeof placeOnLeaveSchema>;
+export type TerminateEmployeeInput = z.infer<typeof terminateEmployeeSchema>;
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;
 export type ListEmployeesQuery = z.infer<typeof listEmployeesQuerySchema>;

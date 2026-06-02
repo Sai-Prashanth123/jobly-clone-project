@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isCurrentOrFutureWeekUTC, isWeekBeforeJoiningUTC, isFutureWeekUTC } from '../lib/dateUtils';
+import { isWeekBeforeJoiningUTC } from '../lib/dateUtils';
 import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
@@ -61,21 +61,9 @@ export async function getTimesheet(id: string) {
 }
 
 export async function createTimesheet(input: CreateTimesheetInput, actorRole?: string) {
-  // Future-week lockout — NO ONE (incl. admin) can create a timesheet for a week
-  // that hasn't started yet. You can't log hours for time that hasn't happened.
-  if (isFutureWeekUTC(input.weekStartDate)) {
-    throw new ValidationError(
-      `Week of ${input.weekStartDate} hasn't started yet — you can't create a timesheet for a future week.`,
-    );
-  }
-  // Period lockout — past weeks are read-only for everyone except admin.
-  // Matches a strict corporate payroll cutoff. Admin can still backfill for
-  // corrections via a separate audit-logged path.
-  if (actorRole !== 'admin' && !isCurrentOrFutureWeekUTC(input.weekStartDate)) {
-    throw new ValidationError(
-      `Week of ${input.weekStartDate} is closed. Past timesheets cannot be created — contact your admin for a correction.`,
-    );
-  }
+  // Timesheets are active from the joining date onward — including FUTURE weeks
+  // (plan ahead) and elapsed weeks after joining (catch up). The only floor is
+  // the date of joining; admin is unrestricted.
   // Date-of-joining floor — can't log a week that ends before the hire date.
   if (actorRole !== 'admin') {
     const { data: empJoin } = await supabaseAdmin
@@ -154,12 +142,6 @@ export async function updateTimesheet(id: string, input: UpdateTimesheetInput, u
   if (userRole !== 'admin' && !['draft', 'rejected'].includes(ts.status)) {
     throw new ForbiddenError('Can only edit draft or rejected timesheets');
   }
-  // Period lockout for non-admins.
-  if (userRole !== 'admin' && !isCurrentOrFutureWeekUTC(ts.week_start_date)) {
-    throw new ValidationError(
-      `Week of ${ts.week_start_date} is closed. Past timesheets cannot be edited — contact your admin for a correction.`,
-    );
-  }
 
   const totalHours = input.entries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
 
@@ -226,24 +208,13 @@ export async function patchTimesheetStatus(
     throw new ForbiddenError(`Role '${userRole}' cannot set status to '${action}'`);
   }
 
-  // Future-week lockout — NO ONE (incl. admin) can submit a timesheet for a week
-  // that hasn't started yet.
-  if (action === 'submitted' && isFutureWeekUTC(ts.week_start_date)) {
-    throw new ValidationError(
-      `Week of ${ts.week_start_date} hasn't started yet — you can't submit a timesheet for a future week.`,
-    );
-  }
-
-  // Submit-time gates (only checked when transitioning into `submitted`):
-  //  - Past weeks are read-only for non-admins.
+  // Submit-time gates (only checked when transitioning into `submitted`).
+  // Timesheets are active from the joining date → future, so there is no
+  // past/future week lockout here — only the content gates below:
   //  - Zero-hour weeks require leave_reason.
   //  - Non-zero weeks require a client-signed timesheet upload.
+  //  - No hours on a day the employee is on approved leave.
   if (action === 'submitted' && userRole !== 'admin') {
-    if (!isCurrentOrFutureWeekUTC(ts.week_start_date)) {
-      throw new ValidationError(
-        `Week of ${ts.week_start_date} is closed. Past timesheets cannot be submitted — contact your admin for a correction.`,
-      );
-    }
     const hours = Number(ts.total_hours ?? 0);
     if (hours === 0 && !ts.leave_reason) {
       throw new ValidationError('Add a reason (e.g. medical leave, sick, unpaid leave) before submitting a zero-hour timesheet.');
@@ -466,9 +437,9 @@ export async function uploadWeeklyClientProof(
   if (!privileged && !['draft', 'rejected'].includes(ts.status)) {
     throw new ForbiddenError('Proof can only be attached while the timesheet is in draft or rejected state.');
   }
-  if (!privileged && !isCurrentOrFutureWeekUTC(ts.week_start_date)) {
-    throw new ValidationError(`Week of ${ts.week_start_date} is closed.`);
-  }
+  // No week-closed gate: timesheets are open from the joining week onward
+  // (including elapsed-after-joining weeks for catch-up), so proof can be
+  // attached to any draft/rejected week the employee is still completing.
 
   try {
     const { data: existing } = await supabaseAdmin.storage

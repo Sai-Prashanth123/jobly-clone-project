@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -11,7 +11,12 @@ import { DocumentDownloadButton } from '../components/shared/DocumentDownloadBut
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials, useRequestOnboardingChanges } from '../hooks/useEmployees';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials,
+  useRequestOnboardingChanges, usePlaceOnLeave, useReturnFromLeave, useTerminateEmployee, useRehireEmployee,
+} from '../hooks/useEmployees';
 import { useAssignments } from '../hooks/useAssignments';
 import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
@@ -37,10 +42,26 @@ export default function EmployeeDetail() {
   const deleteEmployee = useDeleteEmployee();
   const resendCreds = useResendEmployeeCredentials();
   const requestChanges = useRequestOnboardingChanges(id!);
+  const placeOnLeave = usePlaceOnLeave(id!);
+  const returnFromLeave = useReturnFromLeave(id!);
+  const terminateEmployee = useTerminateEmployee(id!);
+  const rehireEmployee = useRehireEmployee(id!);
+
+  // UTC "today" for date-input defaults/minimums (matches the backend's todayUTC).
+  const todayStr = new Date().toISOString().slice(0, 10);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [changesMessage, setChangesMessage] = useState('');
+  // Part B — place-on-leave dialog.
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const [leaveStart, setLeaveStart] = useState(todayStr);
+  const [leaveReturn, setLeaveReturn] = useState('');
+  const [leaveReason, setLeaveReason] = useState('');
+  // Part C — terminate dialog.
+  const [terminateOpen, setTerminateOpen] = useState(false);
+  const [terminateReason, setTerminateReason] = useState('');
+  const [terminateDate, setTerminateDate] = useState(todayStr);
 
   // Detect a re-submission while this reviewer has the page open: remember the
   // submission timestamp first seen, and flag when a poll brings a newer one.
@@ -77,6 +98,14 @@ export default function EmployeeDetail() {
   const totalHours = empTimesheets.reduce((s, t) => s + t.totalHours, 0);
   const allEmployees = allEmployeesData?.data ?? [];
   const reportingManager = allEmployees.find(e => e.id === employee?.reportingManagerId);
+  const canManage = user?.role === 'admin' || user?.role === 'hr';
+
+  // 'inactive' is overloaded: it backs three distinct states distinguished by
+  // the leave/termination columns. Disambiguate so the action bar + badges show
+  // the right control (Return vs Re-hire vs plain Activate).
+  const isOnLeave = employee.status === 'inactive' && !!employee.leaveReturnDate && !employee.terminatedAt;
+  const isTerminated = employee.status === 'inactive' && !!employee.terminatedAt;
+  const isPlainInactive = employee.status === 'inactive' && !employee.leaveReturnDate && !employee.terminatedAt;
 
   const Field = ({ label, value }: { label: string; value?: string | null }) => (
     // min-w-0 lets the grid cell shrink below its content; break-words +
@@ -136,6 +165,18 @@ export default function EmployeeDetail() {
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-1.5">
               <span className="text-xs font-mono text-blue-600 whitespace-nowrap">{employee.displayId ?? employee.id.slice(0, 8)}</span>
               <StatusBadge status={employee.status} />
+              {isOnLeave && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 bg-sky-100 border border-sky-200 rounded-full px-2 py-0.5 whitespace-nowrap"
+                  title={employee.leaveReason ? `Reason: ${employee.leaveReason}` : undefined}>
+                  <CalendarClock className="h-3 w-3 flex-shrink-0" /> On leave · returns {formatDate(employee.leaveReturnDate)}
+                </span>
+              )}
+              {isTerminated && (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-red-700 bg-red-100 border border-red-200 rounded-full px-2 py-0.5 whitespace-nowrap"
+                  title={employee.terminationReason ? `Reason: ${employee.terminationReason}` : undefined}>
+                  <UserX className="h-3 w-3 flex-shrink-0" /> Terminated · {formatDate(employee.terminatedAt)}
+                </span>
+              )}
               {employee.status === 'onboarding' && employee.onboardingCompletedAt && (
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-100 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap">
                   <Clock className="h-3 w-3 flex-shrink-0" /> Submitted — ready for review
@@ -154,12 +195,12 @@ export default function EmployeeDetail() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:flex-wrap lg:justify-end lg:flex-shrink-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
-          {(employee.status === 'onboarding' || employee.status === 'inactive') && (user?.role === 'admin' || user?.role === 'hr') && (
+          {(employee.status === 'onboarding' || isPlainInactive) && canManage && (
             <Button
               size="sm"
               className="gap-2 bg-green-600 hover:bg-green-700 text-white"
               loading={updateEmployee.isPending}
-              loadingText={employee.status === 'inactive' ? 'Activating…' : 'Approving…'}
+              loadingText={isPlainInactive ? 'Activating…' : 'Approving…'}
               onClick={async () => {
                 try {
                   await updateEmployee.mutateAsync({
@@ -168,7 +209,7 @@ export default function EmployeeDetail() {
                     expectedOnboardingCompletedAt: employee.onboardingCompletedAt ?? null,
                   } as any);
                   toast.success(
-                    employee.status === 'inactive'
+                    isPlainInactive
                       ? `${employee.firstName} is now Active`
                       : 'Employee onboarding approved — now Active',
                   );
@@ -183,7 +224,58 @@ export default function EmployeeDetail() {
               }}
             >
               <CheckCircle2 className="h-4 w-4" />
-              {employee.status === 'inactive' ? 'Activate Employee' : 'Approve Onboarding'}
+              {isPlainInactive ? 'Activate Employee' : 'Approve Onboarding'}
+            </Button>
+          )}
+          {/* Part B — return an on-leave employee early (manual counterpart to
+              the scheduler's auto-reactivation on the return date). */}
+          {isOnLeave && canManage && (
+            <Button
+              size="sm"
+              className="gap-2 bg-sky-600 hover:bg-sky-700 text-white"
+              loading={returnFromLeave.isPending}
+              loadingText="Returning…"
+              onClick={async () => {
+                try {
+                  await returnFromLeave.mutateAsync();
+                  toast.success(`${employee.firstName} is back from leave — now Active.`);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error ?? 'Failed to return employee from leave');
+                }
+              }}
+            >
+              <UserCheck className="h-4 w-4" />
+              Return from leave
+            </Button>
+          )}
+          {/* Part C — re-hire a terminated employee: restores access + emails a
+              fresh temp password. */}
+          {isTerminated && canManage && (
+            <Button
+              size="sm"
+              className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+              loading={rehireEmployee.isPending}
+              loadingText="Re-hiring…"
+              onClick={async () => {
+                try {
+                  const r = await rehireEmployee.mutateAsync();
+                  if (r.welcomeEmailSent) {
+                    toast.success(`${employee.firstName} re-hired — fresh credentials emailed to ${r.loginEmail ?? employee.email}.`);
+                  } else if (r.tempPassword) {
+                    toast.warning(
+                      `${employee.firstName} re-hired. ${r.warning ?? 'Email could not be delivered.'} Login: ${r.loginEmail} · Temp password: ${r.tempPassword}`,
+                      { duration: 30000 },
+                    );
+                  } else {
+                    toast.success(`${employee.firstName} re-hired — access restored.`);
+                  }
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error ?? 'Failed to re-hire employee');
+                }
+              }}
+            >
+              <UserCheck className="h-4 w-4" />
+              Re-hire (restore access)
             </Button>
           )}
           {/* Request Changes — only shown when the employee has actually
@@ -233,6 +325,25 @@ export default function EmployeeDetail() {
                 <Edit className="h-4 w-4" />
                 Edit
               </Button>
+              {/* Part B — place an active employee on extended leave. */}
+              {employee.status === 'active' && (
+                <Button variant="outline" size="sm"
+                  onClick={() => { setLeaveStart(todayStr); setLeaveReturn(''); setLeaveReason(''); setLeaveOpen(true); }}
+                  className="gap-2 text-sky-700 hover:bg-sky-50 border-sky-200">
+                  <CalendarClock className="h-4 w-4" />
+                  Place on leave
+                </Button>
+              )}
+              {/* Part C — terminate (disable login, keep record). Shown for any
+                  non-terminated employee. */}
+              {!isTerminated && (
+                <Button variant="outline" size="sm"
+                  onClick={() => { setTerminateReason(''); setTerminateDate(todayStr); setTerminateOpen(true); }}
+                  className="gap-2 text-red-700 hover:bg-red-50 border-red-200">
+                  <UserX className="h-4 w-4" />
+                  Terminate
+                </Button>
+              )}
               <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
                 className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
                 <Trash2 className="h-4 w-4" />
@@ -569,6 +680,109 @@ export default function EmployeeDetail() {
             >
               <MessageSquareWarning className="h-4 w-4" />
               Send to employee
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Part B — Place-on-extended-leave dialog. Sets status → inactive with a
+          return window; the employee auto-reactivates on the return date. */}
+      <Dialog open={leaveOpen} onOpenChange={(open) => !placeOnLeave.isPending && setLeaveOpen(open)}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Place {employee.firstName} {employee.lastName} on extended leave</DialogTitle>
+            <DialogDescription>
+              Their account becomes inactive (dropped from assignments &amp; active headcount) but their
+              login is kept. They&rsquo;ll reactivate automatically on the return date, or you can bring
+              them back early with &ldquo;Return from leave&rdquo;.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="leave-start">Leave starts</Label>
+              <Input id="leave-start" type="date" value={leaveStart}
+                onChange={(e) => setLeaveStart(e.target.value)} disabled={placeOnLeave.isPending} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="leave-return">Expected return</Label>
+              <Input id="leave-return" type="date" value={leaveReturn} min={leaveStart || todayStr}
+                onChange={(e) => setLeaveReturn(e.target.value)} disabled={placeOnLeave.isPending} />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <Label htmlFor="leave-reason">Reason <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea id="leave-reason" value={leaveReason} rows={3} maxLength={500}
+                placeholder="e.g. Medical leave, sabbatical, parental leave"
+                onChange={(e) => setLeaveReason(e.target.value)} disabled={placeOnLeave.isPending} className="resize-y" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLeaveOpen(false)} disabled={placeOnLeave.isPending}>Cancel</Button>
+            <Button
+              className="gap-2 bg-sky-600 hover:bg-sky-700 text-white"
+              loading={placeOnLeave.isPending}
+              loadingText="Placing…"
+              disabled={!leaveStart || !leaveReturn || leaveReturn <= leaveStart || leaveReturn <= todayStr}
+              onClick={async () => {
+                try {
+                  await placeOnLeave.mutateAsync({ startDate: leaveStart, returnDate: leaveReturn, reason: leaveReason.trim() || undefined });
+                  toast.success(`${employee.firstName} placed on leave — returns ${formatDate(leaveReturn)}.`);
+                  setLeaveOpen(false);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error ?? 'Could not place the employee on leave.');
+                }
+              }}
+            >
+              <CalendarClock className="h-4 w-4" />
+              Place on leave
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Part C — Terminate dialog. Disables the login immediately and ends
+          employment, but KEEPS the record (use Delete to erase data). */}
+      <Dialog open={terminateOpen} onOpenChange={(open) => !terminateEmployee.isPending && setTerminateOpen(open)}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Terminate {employee.firstName} {employee.lastName}?</DialogTitle>
+            <DialogDescription>
+              This <strong>disables their portal login immediately</strong> and ends employment, but keeps
+              the record and history. Use <strong>Delete</strong> instead to permanently erase their data.
+              Re-hire later to restore access.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="term-date">Effective date</Label>
+              <Input id="term-date" type="date" value={terminateDate}
+                onChange={(e) => setTerminateDate(e.target.value)} disabled={terminateEmployee.isPending} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="term-reason">Reason <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <Textarea id="term-reason" value={terminateReason} rows={3} maxLength={500}
+                placeholder="e.g. End of contract, resignation, performance"
+                onChange={(e) => setTerminateReason(e.target.value)} disabled={terminateEmployee.isPending} className="resize-y" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setTerminateOpen(false)} disabled={terminateEmployee.isPending}>Cancel</Button>
+            <Button
+              className="gap-2 bg-red-600 hover:bg-red-700 text-white"
+              loading={terminateEmployee.isPending}
+              loadingText="Terminating…"
+              disabled={!terminateDate}
+              onClick={async () => {
+                try {
+                  await terminateEmployee.mutateAsync({ reason: terminateReason.trim() || undefined, effectiveDate: terminateDate });
+                  toast.success(`${employee.firstName} terminated — their login is now disabled.`);
+                  setTerminateOpen(false);
+                } catch (err: any) {
+                  toast.error(err?.response?.data?.error ?? 'Could not terminate the employee.');
+                }
+              }}
+            >
+              <UserX className="h-4 w-4" />
+              Terminate employee
             </Button>
           </DialogFooter>
         </DialogContent>

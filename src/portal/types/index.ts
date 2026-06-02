@@ -228,6 +228,13 @@ export interface Employee {
   employmentType: EmploymentType;
   startDate: string;
   status: EmployeeStatus;
+  // Extended-leave window (status stays 'inactive'; auto-returns on the date).
+  leaveStartedAt?: string;
+  leaveReturnDate?: string;
+  leaveReason?: string;
+  // Termination (login disabled, record kept; status 'inactive').
+  terminatedAt?: string;
+  terminationReason?: string;
   visaType?: VisaType;
   visaExpiry?: string;
   i9Status?: I9Status;

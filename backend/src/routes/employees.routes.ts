@@ -3,7 +3,7 @@ import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
 import { documentUpload } from '../middleware/upload';
-import { createEmployeeSchema, updateEmployeeSchema, listEmployeesQuerySchema } from '../schemas/employee.schema';
+import { createEmployeeSchema, updateEmployeeSchema, listEmployeesQuerySchema, placeOnLeaveSchema, terminateEmployeeSchema } from '../schemas/employee.schema';
 import * as ctrl from '../controllers/employees.controller';
 
 const router = Router();
@@ -20,6 +20,13 @@ router.get('/:id', requireRole('admin','hr','operations','finance','employee'), 
 router.put('/:id', requireRole('admin','hr','employee'), validateBody(updateEmployeeSchema), ctrl.update);
 router.delete('/:id', requireRole('admin','hr'), ctrl.remove);
 router.post('/:id/resend-credentials', requireRole('admin','hr'), ctrl.resendCredentials);
+
+// Part B — extended leave (status → inactive + return window; login kept).
+router.post('/:id/leave', requireRole('admin','hr'), validateBody(placeOnLeaveSchema), ctrl.placeOnLeave);
+router.post('/:id/return-from-leave', requireRole('admin','hr'), ctrl.returnFromLeave);
+// Part C — terminate (disable login, keep record) + re-hire (restore access).
+router.post('/:id/terminate', requireRole('admin','hr'), validateBody(terminateEmployeeSchema), ctrl.terminate);
+router.post('/:id/rehire', requireRole('admin','hr'), ctrl.rehire);
 
 router.get('/:id/assignments', requireRole('admin','hr','operations'), ctrl.assignments);
 router.get('/:id/timesheets', requireRole('admin','hr','operations'), ctrl.timesheets);

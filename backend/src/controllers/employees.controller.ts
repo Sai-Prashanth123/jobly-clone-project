@@ -112,6 +112,42 @@ export async function remove(req: Request, res: Response, next: NextFunction): P
   } catch (err) { next(err); }
 }
 
+export async function placeOnLeave(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.placeOnExtendedLeave(req.params.id, req.body as any, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function returnFromLeave(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.returnFromLeave(req.params.id, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function terminate(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.terminateEmployee(req.params.id, req.body as any, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function rehire(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await svc.rehireEmployee(req.params.id, req.user?.id);
+    const { _credentials, ...data } = result as any;
+    res.json({
+      success: true,
+      data,
+      welcomeEmailSent: _credentials?.emailSent ?? false,
+      warning: _credentials?.warning,
+      tempPassword: _credentials?.emailSent ? undefined : _credentials?.tempPassword,
+      loginEmail: _credentials?.loginEmail,
+    });
+  } catch (err) { next(err); }
+}
+
 export async function assignments(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.getEmployeeAssignments(req.params.id);

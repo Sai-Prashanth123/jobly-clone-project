@@ -3,6 +3,7 @@ import { supabaseAdmin } from '../config/supabase';
 import { todayUTC, daysBetween } from '../lib/dateUtils';
 import { sendInvoiceReminderEmail, mailerConfigured } from '../lib/mailer';
 import { processDueRecurring } from '../services/recurring.service';
+import { reactivateReturnedEmployees } from '../services/employees.service';
 
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
 
@@ -71,10 +72,12 @@ async function processReminders(): Promise<void> {
 }
 
 // One daily tick. Exported so it can also be triggered manually (admin "Run now").
-export async function runDailyTick(): Promise<{ recurring: number }> {
+export async function runDailyTick(): Promise<{ recurring: number; reactivated: number }> {
   const recurring = await processDueRecurring();
   await processReminders();
-  return { recurring };
+  // Auto-reactivate employees whose extended-leave return date has arrived.
+  const reactivated = await reactivateReturnedEmployees();
+  return { recurring, reactivated };
 }
 
 // Boot the cron scheduler. Guarded by ENABLE_SCHEDULER so local dev / tests

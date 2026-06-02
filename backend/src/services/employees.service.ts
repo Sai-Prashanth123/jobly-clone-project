@@ -4,6 +4,7 @@ import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRequestedEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { computeOnboarding } from '../lib/onboarding';
+import { todayUTC } from '../lib/dateUtils';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
@@ -1033,6 +1034,222 @@ export async function deleteEmployee(id: string, actorId?: string) {
 
   await purgeEmployeeData(id, existing.email);
   logActivity(actorId ?? null, 'deleted', 'employee', id, existing.display_id ?? id.slice(0, 8));
+}
+
+// ── extended leave & termination ───────────────────────────────────────────────
+
+// Internal helper — kill an employee's portal login WITHOUT touching their
+// employee record (the inverse of issueCredentials). Deletes the portal_users
+// row + the Supabase auth user, so the auth middleware's portal_users lookup
+// fails on their very next request (→ 401 "User profile not found"). Reused by
+// terminateEmployee; the record/PII/history are intentionally left intact.
+// Best-effort + idempotent (no login → no-op). Mirrors purgeEmployeeData step 2.
+async function disableEmployeeLogin(empId: string): Promise<void> {
+  try {
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id').eq('employee_id', empId).maybeSingle();
+    if (pu?.id) {
+      await supabaseAdmin.from('portal_users').delete().eq('id', pu.id);
+      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(pu.id);
+      if (authErr) console.error('[disableEmployeeLogin] auth.deleteUser failed for', pu.id, authErr);
+    }
+  } catch (err) {
+    console.error('[disableEmployeeLogin] login cleanup failed for employee', empId, err);
+  }
+}
+
+// Fire-and-forget: notify the employee's portal user (if any) in-app.
+async function notifyEmployeeUser(empId: string, title: string, body: string, type: 'info' | 'success' | 'warning' = 'info'): Promise<void> {
+  try {
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id').eq('employee_id', empId).maybeSingle();
+    if (pu?.id) await createNotification(pu.id, title, body, type, 'employee', empId);
+  } catch (err) {
+    console.error('[employees.service] employee notification failed for', empId, err);
+  }
+}
+
+// Fire-and-forget: notify all HR + admin users in-app.
+async function notifyHrAdmin(title: string, body: string, empId: string, type: 'info' | 'success' | 'warning' = 'info'): Promise<void> {
+  try {
+    const [hrIds, adminIds] = await Promise.all([getUserIdsByRole('hr'), getUserIdsByRole('admin')]);
+    await Promise.all(
+      [...new Set([...hrIds, ...adminIds])].map(uid => createNotification(uid, title, body, type, 'employee', empId)),
+    );
+  } catch (err) {
+    console.error('[employees.service] HR/admin notification failed for', empId, err);
+  }
+}
+
+// ── Part B: extended leave ──────────────────────────────────────────────────
+// Put an active employee on extended leave (maternity/medical/sabbatical):
+// status → inactive + a return window. Login is KEPT (they're coming back). The
+// employee auto-reactivates when the return date passes (scheduler) or HR can
+// click "Return from leave". Inactive already drops them from assignment
+// dropdowns + active headcount.
+export async function placeOnExtendedLeave(
+  id: string,
+  input: { startDate: string; returnDate: string; reason?: string | null },
+  actorId?: string,
+) {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('id, display_id, first_name, last_name, status, terminated_at')
+    .eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+  if (emp.terminated_at) throw new ValidationError('This employee has been terminated. Re-hire them before placing on leave.');
+  if (emp.status === 'onboarding') throw new ValidationError('Employees still onboarding cannot be placed on leave.');
+
+  const today = todayUTC();
+  if (input.returnDate <= input.startDate) {
+    throw new ValidationError('Return date must be after the leave start date.');
+  }
+  if (input.returnDate <= today) {
+    throw new ValidationError('Return date must be in the future.');
+  }
+
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from('employees')
+    .update({
+      status: 'inactive',
+      leave_started_at: input.startDate,
+      leave_return_date: input.returnDate,
+      leave_reason: input.reason ?? null,
+      // Clear any termination metadata defensively — leave and termination are
+      // mutually exclusive states (both ride on 'inactive').
+      terminated_at: null,
+      termination_reason: null,
+    })
+    .eq('id', id).select().single();
+  if (updErr) throw updErr;
+
+  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
+    event: 'placed_on_leave', returnDate: input.returnDate,
+  });
+  void notifyEmployeeUser(id, 'You have been placed on extended leave',
+    `Your account is inactive until your scheduled return on ${input.returnDate}. It will reactivate automatically.`, 'info');
+  return serializeEmployee(updated);
+}
+
+// Bring an employee back from extended leave: status → active, clear the leave
+// window. Manual counterpart to the scheduler's auto-reactivation.
+export async function returnFromLeave(id: string, actorId?: string) {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('id, display_id, status, leave_return_date')
+    .eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+  if (emp.status !== 'inactive' || !emp.leave_return_date) {
+    throw new ValidationError('This employee is not currently on extended leave.');
+  }
+
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from('employees')
+    .update({ status: 'active', leave_started_at: null, leave_return_date: null, leave_reason: null })
+    .eq('id', id).select().single();
+  if (updErr) throw updErr;
+
+  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'returned_from_leave' });
+  void notifyEmployeeUser(id, 'Welcome back from leave', 'Your account is active again — you now have full portal access.', 'success');
+  return serializeEmployee(updated);
+}
+
+// Scheduler job — auto-reactivate everyone whose leave return date has arrived.
+// Only touches genuine on-leave rows (inactive + a return date in the past),
+// never terminated or deleted employees. Returns the count for the tick log.
+export async function reactivateReturnedEmployees(): Promise<number> {
+  const today = todayUTC();
+  const { data: due, error } = await supabaseAdmin
+    .from('employees')
+    .select('id, display_id, first_name, last_name')
+    .eq('status', 'inactive')
+    .is('deleted_at', null)
+    .is('terminated_at', null)
+    .not('leave_return_date', 'is', null)
+    .lte('leave_return_date', today);
+  if (error) { console.error('[scheduler] reactivateReturnedEmployees query failed', error); return 0; }
+
+  let count = 0;
+  for (const emp of due ?? []) {
+    const { error: updErr } = await supabaseAdmin
+      .from('employees')
+      .update({ status: 'active', leave_started_at: null, leave_return_date: null, leave_reason: null })
+      .eq('id', emp.id);
+    if (updErr) { console.error('[scheduler] auto-reactivate failed for', emp.id, updErr); continue; }
+    count++;
+    logActivity(null, 'updated', 'employee', emp.id, emp.display_id ?? emp.id.slice(0, 8), { event: 'auto_returned_from_leave' });
+    void notifyEmployeeUser(emp.id, 'Welcome back from leave', 'Your scheduled return date has arrived — your account is active again.', 'success');
+    void notifyHrAdmin('Employee returned from leave',
+      `${emp.display_id ?? `${emp.first_name} ${emp.last_name}`} has returned from extended leave (auto-reactivated).`, emp.id, 'info');
+  }
+  return count;
+}
+
+// ── Part C: terminate / re-hire ─────────────────────────────────────────────
+// Terminate an employee on the fly: disable their login IMMEDIATELY (delete the
+// portal_users row + auth user) while KEEPING the employee record + all history
+// (PII, past timesheets/invoices). Distinct from deleteEmployee, which purges
+// PII. status → inactive + terminated_at/termination_reason mark the state.
+// Idempotent: terminating an already-terminated employee just refreshes the
+// reason. Re-hire via rehireEmployee re-issues fresh credentials.
+export async function terminateEmployee(
+  id: string,
+  input: { reason?: string | null; effectiveDate?: string | null },
+  actorId?: string,
+) {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('id, display_id, first_name, last_name, status, terminated_at')
+    .eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+
+  const effectiveDate = (input.effectiveDate || todayUTC());
+
+  // Kill the login regardless of prior state (idempotent / self-heals a stale login).
+  await disableEmployeeLogin(id);
+
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from('employees')
+    .update({
+      status: 'inactive',
+      terminated_at: effectiveDate,
+      termination_reason: input.reason ?? null,
+      // Terminating clears any leave window — the two states can't coexist.
+      leave_started_at: null,
+      leave_return_date: null,
+      leave_reason: null,
+    })
+    .eq('id', id).select().single();
+  if (updErr) throw updErr;
+
+  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
+    event: 'terminated', effectiveDate, reason: input.reason ?? undefined,
+  });
+  void notifyHrAdmin('Employee terminated',
+    `${emp.display_id ?? `${emp.first_name} ${emp.last_name}`} has been terminated (effective ${effectiveDate}). Their portal login is disabled; the record is retained.`, id, 'warning');
+  return serializeEmployee(updated);
+}
+
+// Re-hire a terminated employee: status → active, clear the termination
+// metadata, and re-issue a fresh login (new auth user + temp-password email) via
+// resendCredentials. Restores access without touching the retained history.
+export async function rehireEmployee(id: string, actorId?: string) {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('id, display_id, status, terminated_at')
+    .eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+  if (!emp.terminated_at) throw new ValidationError('This employee is not terminated.');
+
+  const { data: updated, error: updErr } = await supabaseAdmin
+    .from('employees')
+    .update({ status: 'active', terminated_at: null, termination_reason: null })
+    .eq('id', id).select().single();
+  if (updErr) throw updErr;
+
+  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'rehired' });
+
+  // Re-issue login + send fresh credentials. Surface the credentials result so
+  // the controller can report email/login status (mirrors resend-credentials).
+  const creds = await resendCredentials(id, actorId);
+  void notifyHrAdmin('Employee re-hired', `${updated.display_id ?? id.slice(0, 8)} has been re-hired and their access restored.`, id, 'success');
+  return { ...serializeEmployee(updated), _credentials: creds };
 }
 
 // ── sub-resources ─────────────────────────────────────────────────────────────

@@ -43,12 +43,9 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
 
   const selectedAsgn = myAssignments.find(a => a.id === assignmentId);
 
-  // Week-picker bounds:
-  //  - max = this week's Monday — you can't log a future week (mirrors the
-  //    backend `isFutureWeekUTC` guard, applies to everyone incl. admin).
-  //  - min = the Monday of the selected employee's joining week — you can't log a
-  //    week that ends before they were hired (mirrors `isWeekBeforeJoiningUTC`).
-  const currentMondayStr = getMondayOfWeek(new Date()).toISOString().split('T')[0];
+  // Week-picker lower bound only: the Monday of the selected employee's joining
+  // week. Timesheets are active from the joining date → future (future weeks are
+  // allowed), so there is no upper bound. Mirrors the backend `isWeekBeforeJoiningUTC`.
   const selectedEmp = selectedAsgn ? employees.find(e => e.id === selectedAsgn.employeeId) : undefined;
   const minWeekStr = selectedEmp?.startDate
     ? getMondayOfWeek(new Date(selectedEmp.startDate)).toISOString().split('T')[0]
@@ -103,11 +100,10 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
           value={weekStart}
           min={minWeekStr}
-          max={currentMondayStr}
           onChange={e => setWeekStart(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          Can't be a future week{minWeekStr ? ', or before the employee’s joining week' : ''}.
+          From the joining week onward — future weeks are allowed{minWeekStr ? '; not before the employee’s joining week' : ''}.
         </p>
       </div>
       <div className="flex justify-end gap-3 pt-2">
