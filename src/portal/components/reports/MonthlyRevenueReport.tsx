@@ -45,7 +45,7 @@ export function MonthlyRevenueReport() {
   return (
     <div className="space-y-4">
       {/* KPI row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4 pb-4 text-center">
             <p className="text-2xl font-bold text-blue-700">{formatCurrency(totalRevenue)}</p>

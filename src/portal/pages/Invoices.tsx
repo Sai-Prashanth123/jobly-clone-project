@@ -102,11 +102,12 @@ export default function Invoices() {
           <Button
             variant="ghost"
             size="sm"
-            className="h-8 gap-1 text-muted-foreground hover:text-foreground"
+            className="h-8 gap-1 px-2 sm:px-3 text-muted-foreground hover:text-foreground"
             onClick={(e) => { e.stopPropagation(); navigate(`/portal/invoices/${i.id}/edit`); }}
+            aria-label="Edit invoice"
           >
             <Pencil className="h-3.5 w-3.5" />
-            Edit
+            <span className="hidden sm:inline">Edit</span>
           </Button>
           {canDelete && i.status === 'draft' && (
             <Button

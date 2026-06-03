@@ -28,8 +28,8 @@ export default function Products() {
       key: 'actions', header: '', getValue: () => '',
       render: p => (
         <div className="flex items-center gap-1 justify-end">
-          <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={e => { e.stopPropagation(); navigate(`/portal/products/${p.id}/edit`); }}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
-          {p.active && <Button variant="ghost" size="sm" className="h-8 gap-1 text-amber-600 hover:bg-amber-50" onClick={e => { e.stopPropagation(); setArchiveTarget(p); }}><Archive className="h-3.5 w-3.5" /> Archive</Button>}
+          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 sm:px-3" aria-label="Edit item" onClick={e => { e.stopPropagation(); navigate(`/portal/products/${p.id}/edit`); }}><Pencil className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Edit</span></Button>
+          {p.active && <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 sm:px-3 text-amber-600 hover:bg-amber-50" aria-label="Archive item" onClick={e => { e.stopPropagation(); setArchiveTarget(p); }}><Archive className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Archive</span></Button>}
         </div>
       ),
     },

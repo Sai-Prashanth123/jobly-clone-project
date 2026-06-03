@@ -40,6 +40,7 @@ export function ConfirmDialog({
   return (
     <AlertDialog open={open} onOpenChange={loading ? undefined : onOpenChange}>
       <AlertDialogContent
+        className="w-[95vw] max-w-md"
         onEscapeKeyDown={e => { if (loading) e.preventDefault(); }}
         onInteractOutside={e => { if (loading) e.preventDefault(); }}
       >

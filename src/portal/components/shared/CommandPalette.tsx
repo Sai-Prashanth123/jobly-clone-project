@@ -58,7 +58,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="p-0 gap-0 max-w-lg overflow-hidden" aria-describedby={undefined}>
+      <DialogContent className="p-0 gap-0 w-[95vw] max-w-lg overflow-hidden" aria-describedby={undefined}>
         <Command className="rounded-lg" shouldFilter={false}>
           <div className="flex items-center border-b px-3 gap-2">
             <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />

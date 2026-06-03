@@ -55,10 +55,10 @@ export default function Recurring() {
             onClick={async e => { e.stopPropagation(); try { await runNow.mutateAsync(t.id); toast.success('Invoice generated'); } catch { /* failed-request toast raised centrally (queryClient.ts) */ } }}>
             <RotateCw className="h-3.5 w-3.5" /> Run now
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={e => { e.stopPropagation(); togglePause(t); }}>
-            {t.status === 'active' ? <><Pause className="h-3.5 w-3.5" /> Pause</> : <><Play className="h-3.5 w-3.5" /> Resume</>}
+          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 sm:px-3" aria-label={t.status === 'active' ? 'Pause' : 'Resume'} onClick={e => { e.stopPropagation(); togglePause(t); }}>
+            {t.status === 'active' ? <><Pause className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Pause</span></> : <><Play className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Resume</span></>}
           </Button>
-          <Button variant="ghost" size="sm" className="h-8 gap-1" onClick={e => { e.stopPropagation(); navigate(`/portal/recurring/${t.id}/edit`); }}><Pencil className="h-3.5 w-3.5" /> Edit</Button>
+          <Button variant="ghost" size="sm" className="h-8 gap-1 px-2 sm:px-3" aria-label="Edit" onClick={e => { e.stopPropagation(); navigate(`/portal/recurring/${t.id}/edit`); }}><Pencil className="h-3.5 w-3.5" /> <span className="hidden sm:inline">Edit</span></Button>
           <Button variant="ghost" size="sm" className="h-8 text-red-600 hover:bg-red-50" onClick={e => { e.stopPropagation(); setDelTarget(t); }}><Trash2 className="h-3.5 w-3.5" /></Button>
         </div>
       ),

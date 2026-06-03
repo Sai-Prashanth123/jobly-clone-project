@@ -60,7 +60,7 @@ export function ClientBillingSummary() {
       <CardContent>
         {/* Totals banner */}
         {rows.length > 0 && (
-          <div className="grid grid-cols-3 gap-3 mb-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
             <div className="text-center p-3 bg-blue-50 rounded-lg">
               <p className="text-lg font-bold text-blue-700">{formatCurrency(grandTotal)}</p>
               <p className="text-xs text-blue-600">Total Invoiced</p>
@@ -76,7 +76,8 @@ export function ClientBillingSummary() {
           </div>
         )}
 
-        <div className="overflow-x-auto">
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto portal-scroll-x">
           <Table>
             <TableHeader>
               <TableRow className="bg-gray-50">
@@ -126,6 +127,53 @@ export function ClientBillingSummary() {
               )}
             </TableBody>
           </Table>
+        </div>
+
+        {/* Mobile card list — one card per client */}
+        <div className="md:hidden space-y-3">
+          {rows.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">No billing data available yet.</p>
+          ) : (
+            rows.map(r => (
+              <div
+                key={r.client.id}
+                className={`rounded-xl border p-3.5 ${r.overdueAmount > 0 ? 'border-red-200 bg-red-50/60' : 'border-gray-200 bg-white'}`}
+              >
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{r.client.companyName}</p>
+                    <p className="text-xs text-muted-foreground truncate">{r.client.industry || '—'}</p>
+                  </div>
+                  <span className="text-xs text-muted-foreground flex-shrink-0">{r.invoiceCount} inv</span>
+                </div>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Invoiced</span>
+                    <span className="font-medium tabular-nums">{formatCurrency(r.totalInvoiced)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Paid</span>
+                    <span className="font-medium tabular-nums text-green-700">{r.totalPaid > 0 ? formatCurrency(r.totalPaid) : '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Outstanding</span>
+                    <span className={`font-medium tabular-nums ${r.totalOutstanding > 0 ? 'text-orange-600' : 'text-muted-foreground'}`}>{r.totalOutstanding > 0 ? formatCurrency(r.totalOutstanding) : '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-muted-foreground">Overdue</span>
+                    <span className={`font-medium tabular-nums ${r.overdueAmount > 0 ? 'text-red-600' : 'text-muted-foreground'}`}>{r.overdueAmount > 0 ? formatCurrency(r.overdueAmount) : '—'}</span>
+                  </div>
+                  <div className="flex items-center justify-between col-span-2 pt-1 border-t border-gray-100">
+                    <span className="text-xs text-muted-foreground">Collection rate</span>
+                    <span className={`font-semibold tabular-nums ${
+                      r.collectionRate >= 80 ? 'text-green-600' :
+                      r.collectionRate >= 50 ? 'text-yellow-600' : 'text-red-600'
+                    }`}>{r.collectionRate}%</span>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </CardContent>
     </Card>

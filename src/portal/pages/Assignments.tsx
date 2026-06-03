@@ -59,7 +59,7 @@ export default function Assignments() {
       header: 'Client',
       render: a => getClientName(a),
     },
-    { key: 'projectName', header: 'Project' },
+    { key: 'projectName', header: 'Project', hideOnMobile: true },
     { key: 'role', header: 'Role', hideOnMobile: true },
     {
       key: 'billRate',

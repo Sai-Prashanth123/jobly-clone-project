@@ -232,7 +232,7 @@ function UsersTab() {
 
       {/* New password dialog */}
       <Dialog open={!!newPwdResult} onOpenChange={v => { if (!v) setNewPwdResult(null); }}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="w-[95vw] max-w-sm">
           <DialogHeader>
             <DialogTitle>Password Reset</DialogTitle>
             <DialogDescription>Share this temporary password with {newPwdResult?.name}. They should change it immediately after logging in.</DialogDescription>

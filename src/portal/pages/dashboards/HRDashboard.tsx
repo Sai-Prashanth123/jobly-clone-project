@@ -87,10 +87,7 @@ export function HRDashboard() {
         />
       </div>
 
-      <div
-        className="grid gap-4 sm:gap-5 portal-animate-in"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}
-      >
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-5 portal-animate-in">
         {[
           {
             title: 'Active',
@@ -146,10 +143,7 @@ export function HRDashboard() {
       </div>
 
       {/* Charts row */}
-      <div
-        className="grid gap-4 sm:gap-5 portal-animate-in"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}
-      >
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 portal-animate-in">
         <Panel
           eyebrow="Last 6 months"
           title="Hiring Trend"

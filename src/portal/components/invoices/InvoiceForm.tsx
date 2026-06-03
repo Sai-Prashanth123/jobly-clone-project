@@ -429,15 +429,25 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                 <span>Item</span><span>Description</span><span>Qty</span><span>Unit price</span><span className="text-right">Amount</span><span />
               </div>
               {manualLines.map(l => (
-                <div key={l.id} className="grid grid-cols-2 sm:grid-cols-[1.4fr_2fr_70px_110px_90px_32px] gap-2 items-center">
+                <div
+                  key={l.id}
+                  className="rounded-lg border border-gray-200 p-3 space-y-2 sm:space-y-0 sm:border-0 sm:p-0 sm:rounded-none sm:grid sm:grid-cols-[1.4fr_2fr_70px_110px_90px_32px] sm:gap-2 sm:items-center"
+                >
                   <Input value={l.itemName} onChange={e => updateLine(l.id, { itemName: e.target.value })} placeholder="Item / service" />
                   <Input value={l.description} onChange={e => updateLine(l.id, { description: e.target.value })} placeholder="Description" />
-                  <Input type="number" min={0} step="any" inputMode="decimal" value={l.quantity} onChange={e => updateLine(l.id, { quantity: e.target.value })} placeholder="1" />
-                  <Input type="number" min={0} step="any" inputMode="decimal" value={l.unitPrice} onChange={e => updateLine(l.id, { unitPrice: e.target.value })} placeholder="0.00" />
-                  <span className="text-sm font-medium text-right tabular-nums">{formatCurrency(l.amount, currency)}</span>
-                  <button type="button" onClick={() => removeLine(l.id)} className="text-gray-400 hover:text-red-600 justify-self-center">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {/* Qty + unit price: 2-up on mobile, separate grid cells on desktop */}
+                  <div className="grid grid-cols-2 gap-2 sm:contents">
+                    <Input type="number" min={0} step="any" inputMode="decimal" value={l.quantity} onChange={e => updateLine(l.id, { quantity: e.target.value })} placeholder="Qty" aria-label="Quantity" />
+                    <Input type="number" min={0} step="any" inputMode="decimal" value={l.unitPrice} onChange={e => updateLine(l.id, { unitPrice: e.target.value })} placeholder="Unit price" aria-label="Unit price" />
+                  </div>
+                  {/* Amount + remove: labelled row on mobile, separate cells on desktop */}
+                  <div className="flex items-center justify-between sm:contents">
+                    <span className="text-xs text-gray-400 sm:hidden">Amount</span>
+                    <span className="text-sm font-medium text-right tabular-nums">{formatCurrency(l.amount, currency)}</span>
+                    <button type="button" onClick={() => removeLine(l.id)} aria-label="Remove line" className="text-gray-400 hover:text-red-600 sm:justify-self-center">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
                 </div>
               ))}
               <Button type="button" variant="outline" size="sm" onClick={addLine} className="gap-1.5 mt-1">

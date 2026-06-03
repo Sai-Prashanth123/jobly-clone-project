@@ -58,7 +58,7 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
         </div>
 
         <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
-          <DialogContent>
+          <DialogContent className="w-[95vw] max-w-lg">
             <DialogHeader>
               <DialogTitle>Reject Timesheet</DialogTitle>
               <DialogDescription className="sr-only">Provide a reason for rejection.</DialogDescription>

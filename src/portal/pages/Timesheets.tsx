@@ -323,7 +323,7 @@ export default function Timesheets() {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
             <DialogTitle>New Timesheet</DialogTitle>
             <DialogDescription className="sr-only">Create a new timesheet for a project assignment.</DialogDescription>

@@ -56,14 +56,14 @@ export default function AssignmentDetail() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/portal/assignments')} className="gap-1">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3 min-w-0">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/portal/assignments')} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
-            Back
+            <span className="hidden sm:inline">Back</span>
           </Button>
-          <div>
-            <h1 className="text-2xl font-semibold">{assignment.projectName}</h1>
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-semibold truncate">{assignment.projectName}</h1>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-xs font-mono text-blue-600">{assignment.displayId ?? assignment.id.slice(0,8)}</span>
               <StatusBadge status={assignment.status} />
@@ -71,7 +71,7 @@ export default function AssignmentDetail() {
           </div>
         </div>
         {canEdit && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2 flex-shrink-0">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
               <Edit className="h-4 w-4" />
               Edit

@@ -178,7 +178,7 @@ export function PortalSidebar() {
               <div
                 ref={dropdownRef}
                 style={{ position: 'fixed', top: dropdownPos.top, left: Math.max(8, dropdownPos.left) }}
-                className="z-[9999] w-[calc(100vw-16px)] sm:w-80 max-w-[320px] rounded-xl border border-gray-200 bg-white shadow-xl"
+                className="z-[9999] w-[calc(100vw-16px)] sm:w-80 max-w-[360px] rounded-xl border border-gray-200 bg-white shadow-xl"
               >
                 <div className="flex items-center justify-between px-3 py-2 border-b">
                   <p className="text-sm font-semibold">Notifications</p>

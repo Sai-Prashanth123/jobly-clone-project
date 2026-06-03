@@ -397,7 +397,8 @@ export default function MyMonthlyTimesheet() {
               {loadingMonth ? (
                 <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
               ) : (
-                <div ref={entriesTableRef} className="overflow-x-auto scroll-mt-24">
+                <>
+                <div ref={entriesTableRef} className="hidden md:block overflow-x-auto scroll-mt-24 portal-scroll-x">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr className="bg-gray-50 text-[11px] uppercase tracking-wide text-gray-400">
@@ -476,6 +477,75 @@ export default function MyMonthlyTimesheet() {
                     </tfoot>
                   </table>
                 </div>
+
+                {/* Mobile — one card per day (mirrors the table inputs/handlers) */}
+                <div className="md:hidden divide-y divide-gray-100">
+                  {entries.map((e, idx) => {
+                    const isWeekend = e.status === 'weekend';
+                    const fieldsDisabled = isLocked || e.status !== 'present';
+                    const dayNum = Number(e.date.slice(-2));
+                    const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[loaded.month - 1].slice(0, 3)}`;
+                    const leave = leaveByDate?.[e.date];
+                    return (
+                      <div key={e.date} className={`px-3 py-3 ${ROW_TINT[e.status] ?? ''}`}>
+                        {/* Header: date + day badge + status */}
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</span>
+                            <span className={`inline-block min-w-[36px] text-center px-2 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>{e.dayOfWeek}</span>
+                            {leave && (
+                              <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${leave.status === 'approved' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                                {leave.status === 'approved' ? 'On leave' : 'Pending'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex-shrink-0 w-[130px]">
+                            {isWeekend ? <DayStatusPill status="weekend" /> : (
+                              <Select value={e.status} onValueChange={v => updateEntry(idx, { status: v as MonthlyDayStatus })} disabled={isLocked}>
+                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                <SelectContent>{DAY_STATUS_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}</SelectContent>
+                              </Select>
+                            )}
+                          </div>
+                        </div>
+
+                        {!isWeekend && (
+                          <div className="space-y-2">
+                            <Input value={e.project} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Project'} onChange={ev => updateEntry(idx, { project: ev.target.value })} className="h-9 text-sm" />
+                            <Input value={e.task} disabled={fieldsDisabled} placeholder={e.status !== 'present' ? '—' : 'Task description'} onChange={ev => updateEntry(idx, { task: ev.target.value })} className="h-9 text-sm" />
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="text-[10px] uppercase tracking-wide text-gray-400">Start</label>
+                                <Input type="time" value={e.startTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { startTime: ev.target.value })} className="h-9 text-sm font-mono" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] uppercase tracking-wide text-gray-400">End</label>
+                                <Input type="time" value={e.endTime} disabled={fieldsDisabled} onChange={ev => updateEntry(idx, { endTime: ev.target.value })} className="h-9 text-sm font-mono" />
+                              </div>
+                              <div>
+                                <label className="text-[10px] uppercase tracking-wide text-gray-400">Hours</label>
+                                <Input
+                                  type="number" min={0} max={24} step={0.5}
+                                  value={e.hours ? String(e.hours) : ''}
+                                  disabled={fieldsDisabled}
+                                  onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
+                                  placeholder="0"
+                                  className={`h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${leave?.status === 'approved' && e.status === 'present' && e.hours > 0 ? 'border-red-400 ring-1 ring-red-300 bg-red-50' : ''}`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                  {/* Monthly total */}
+                  <div className="flex items-center justify-between bg-[#04213F] text-white font-semibold px-4 py-3">
+                    <span className="text-xs uppercase tracking-wide">Monthly Total</span>
+                    <span className="font-mono">{summary.totalHours.toFixed(1)} hrs</span>
+                  </div>
+                </div>
+                </>
               )}
             </CardContent>
           </Card>
