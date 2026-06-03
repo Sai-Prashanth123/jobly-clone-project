@@ -15,9 +15,11 @@ const ACCOUNTS = [
   { role: 'Finance',    email: 'finance@joblysolutions.com', password: 'Jbly#F!n2026',   color: '#10B981' },
 ];
 
-// ── Clean design tokens — minimal, white surface, limited palette ──
+// ── Clean × Elegant tokens — minimal, delicate type, generous whitespace ──
 const TEXT = '#111827';     // near-black headings/text
-const BRAND = '#4069FF';    // Jobly blue (the single accent)
+const BRAND = '#4069FF';    // Jobly blue accent
+// Soft elegant gradient for the left panel — differentiates the two halves, stays graceful.
+const LEFT_BG = 'linear-gradient(160deg, #f4f7ff 0%, #f7f6fc 55%, #f8f9fb 100%)';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -66,17 +68,17 @@ export default function Login() {
     setActive(a.role);
   };
 
-  // Clean input — white, hairline border, blue focus ring. No shadows.
+  // Elegant input — white, hairline border, gentle blue focus ring, smooth transition.
   const inputCls =
-    'h-12 rounded-lg text-sm bg-white border border-gray-200 px-3.5 transition-colors ' +
+    'h-12 rounded-xl text-sm bg-white border border-gray-200 px-4 transition-all duration-200 ' +
     'placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-offset-0 ' +
-    'focus-visible:ring-[#4069FF]/20 focus-visible:border-[#4069FF]';
+    'focus-visible:ring-[#4069FF]/15 focus-visible:border-[#4069FF]';
 
   return (
     <div className="portal-scope min-h-screen flex bg-white">
 
-      {/* ── Left — minimal brand panel (white, ample whitespace) ── */}
-      <div className="hidden lg:flex flex-col justify-between w-[42%] px-16 py-14 border-r border-gray-100">
+      {/* ── Left — tinted brand panel (separates the halves) ── */}
+      <div className="hidden lg:flex flex-col justify-between w-[44%] px-16 py-16" style={{ background: LEFT_BG }}>
         {/* Logo */}
         <div>
           <img
@@ -87,20 +89,20 @@ export default function Login() {
           />
         </div>
 
-        {/* Centre copy — clear hierarchy, generous spacing */}
-        <div className="max-w-[400px]">
-          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase mb-5" style={{ color: BRAND }}>
+        {/* Centre copy — delicate type, generous whitespace */}
+        <div className="max-w-[420px]">
+          <p className="text-[11px] font-semibold tracking-[0.2em] uppercase mb-6" style={{ color: BRAND }}>
             Workforce Platform
           </p>
-          <h1 className="text-[2.25rem] xl:text-[2.6rem] font-semibold leading-[1.12] tracking-tight mb-6" style={{ color: TEXT }}>
-            Manage your <span style={{ color: BRAND }}>entire team</span> from one place.
+          <h1 className="text-[2.4rem] xl:text-[2.75rem] font-semibold leading-[1.14] tracking-[-0.02em] mb-7" style={{ color: TEXT }}>
+            Manage your <span style={{ color: BRAND }}>entire&nbsp;team</span> from one place.
           </h1>
-          <p className="text-[14px] text-gray-500 leading-relaxed">
+          <p className="text-[15px] font-normal text-gray-500 leading-[1.7]">
             Employees, clients, timesheets, approvals, and invoicing — streamlined for staffing agencies.
           </p>
 
           {/* Trust line — minimal */}
-          <div className="mt-9 flex items-center gap-7 text-[12px] text-gray-400">
+          <div className="mt-10 flex items-center gap-8 text-[12.5px] text-gray-400">
             <span className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> SOC&nbsp;2 ready
             </span>
@@ -116,20 +118,20 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── Right — form panel ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-20 bg-white">
+      {/* ── Right — form panel (white) ── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-24 bg-white">
         {/* Back link */}
-        <div className="w-full max-w-[380px] mb-8 sm:mb-12">
+        <div className="w-full max-w-[384px] mb-10 sm:mb-14">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[#4069FF] transition-colors group"
+            className="inline-flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[#4069FF] transition-all duration-200 group"
           >
-            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform duration-200" />
             Back to website
           </Link>
         </div>
 
-        <div className="w-full max-w-[380px] portal-animate-in">
+        <div className="w-full max-w-[384px] portal-animate-in">
 
           {/* Mobile logo */}
           <div className="lg:hidden mb-8">
@@ -138,14 +140,14 @@ export default function Login() {
           </div>
 
           {/* Heading */}
-          <div className="mb-10">
-            <h2 className="text-[1.75rem] font-semibold tracking-tight" style={{ color: TEXT }}>Sign in</h2>
-            <p className="text-[14px] text-gray-500 mt-2">Access your Jobly workspace</p>
+          <div className="mb-11">
+            <h2 className="text-[1.85rem] font-semibold tracking-[-0.01em]" style={{ color: TEXT }}>Sign in</h2>
+            <p className="text-[14px] font-normal text-gray-500 mt-2.5">Access your Jobly workspace</p>
           </div>
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <Label htmlFor="email" className="text-[13px] font-medium text-gray-700">
                 Email address
               </Label>
@@ -161,7 +163,7 @@ export default function Login() {
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-2.5">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password" className="text-[13px] font-medium text-gray-700">
                   Password
@@ -169,7 +171,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => { setFpEmail(email); setFpSent(false); setFpOpen(true); }}
-                  className="text-[12px] text-gray-400 hover:text-[#4069FF] transition-colors"
+                  className="text-[12px] text-gray-400 hover:text-[#4069FF] transition-all duration-200"
                 >
                   Forgot password?
                 </button>
@@ -188,7 +190,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPw(p => !p)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-200"
                 >
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -196,7 +198,7 @@ export default function Login() {
             </div>
 
             {error && (
-              <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm text-red-600 border border-red-200 bg-red-50">
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm text-red-600 border border-red-200 bg-red-50">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
                 {error}
               </div>
@@ -205,7 +207,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-lg font-semibold text-[14px] text-white flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-12 rounded-xl font-medium text-[14px] text-white flex items-center justify-center gap-2 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm hover:shadow-md"
               style={{ background: BRAND }}
               onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#3257e0'; }}
               onMouseLeave={e => { e.currentTarget.style.background = BRAND; }}
@@ -234,7 +236,7 @@ export default function Login() {
                     key={a.role}
                     type="button"
                     onClick={() => quickFill(a)}
-                    className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[13px] font-medium text-left border transition-colors"
+                    className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-[13px] font-medium text-left border transition-all duration-200"
                     style={{
                       borderColor: isActive ? BRAND : '#E5E7EB',
                       background: isActive ? 'rgba(64,105,255,0.05)' : '#ffffff',
@@ -261,7 +263,7 @@ export default function Login() {
           shows the same generic confirmation (the backend never reveals whether
           the email exists). */}
       <Dialog open={fpOpen} onOpenChange={setFpOpen}>
-        <DialogContent className="w-[95vw] max-w-md">
+        <DialogContent className="w-[95vw] max-w-md rounded-2xl">
           <DialogHeader>
             <DialogTitle style={{ color: TEXT }}>Reset your password</DialogTitle>
             <DialogDescription>
@@ -279,7 +281,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setFpOpen(false)}
-                  className="px-4 h-10 rounded-lg text-[13px] font-semibold text-white transition-colors"
+                  className="px-5 h-10 rounded-xl text-[13px] font-medium text-white transition-all duration-200"
                   style={{ background: BRAND }}
                 >
                   Done
@@ -295,7 +297,7 @@ export default function Login() {
               }}
               className="space-y-4"
             >
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 <Label htmlFor="fp-email" className="text-[13px] font-medium text-gray-700">Email address</Label>
                 <Input
                   id="fp-email"
@@ -311,14 +313,14 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setFpOpen(false)}
-                  className="px-4 h-10 rounded-lg text-[13px] font-medium text-gray-500 hover:text-gray-700 transition-colors"
+                  className="px-4 h-10 rounded-xl text-[13px] font-medium text-gray-500 hover:text-gray-700 transition-all duration-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={forgot.isPending}
-                  className="px-4 h-10 rounded-lg text-[13px] font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-colors"
+                  className="px-5 h-10 rounded-xl text-[13px] font-medium text-white flex items-center gap-2 disabled:opacity-50 transition-all duration-200"
                   style={{ background: BRAND }}
                 >
                   {forgot.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</> : 'Send instructions'}
