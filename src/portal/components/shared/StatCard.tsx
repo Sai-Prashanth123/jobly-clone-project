@@ -104,7 +104,7 @@ export function StatCard({
 }: StatCardProps) {
   const body = (
     <div
-      className={`portal-glass-card portal-hover-lift p-3.5 flex flex-col h-full ${
+      className={`portal-glass-card portal-hover-lift p-4 flex flex-col h-full ${
         to ? 'group cursor-pointer' : ''
       } ${className ?? ''}`}
     >
@@ -125,7 +125,7 @@ export function StatCard({
 
       {/* Value row */}
       <div className="flex items-end justify-between gap-2">
-        <p className="text-[1.5rem] leading-none font-semibold text-gray-900 tabular-nums tracking-tight">
+        <p className="portal-metric">
           {value}
         </p>
         {sparkline && sparkline.length >= 2 && (

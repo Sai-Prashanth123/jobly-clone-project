@@ -3,11 +3,12 @@ import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
+import { DashboardHeader } from '../../components/shared/DashboardHeader';
+import { Panel } from '../../components/shared/Panel';
 import { formatDate } from '../../lib/utils';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useTimesheets } from '../../hooks/useTimesheets';
@@ -73,10 +74,11 @@ export function OperationsDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Operations Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Assignment &amp; timesheet management</p>
-      </div>
+      <DashboardHeader
+        eyebrow="Operations"
+        title="Assignments & Approvals"
+        subtitle="Approval velocity, active assignments and timesheets awaiting review."
+      />
 
       <QuickActions
         actions={[
@@ -101,14 +103,11 @@ export function OperationsDashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <CheckCircle className="h-4 w-4 text-emerald-500" />
-              Approval Velocity (Last 8 Weeks)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Last 8 weeks"
+          title="Approval Velocity"
+          icon={<CheckCircle className="text-emerald-500" />}
+        >
             <ResponsiveContainer width="100%" height={220}>
               <LineChart data={velocitySeries} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
@@ -125,17 +124,14 @@ export function OperationsDashboard() {
                 />
               </LineChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-[#4069FF]" />
-              Active Assignments by Client
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Top clients"
+          title="Active Assignments by Client"
+          icon={<Briefcase className="text-[#4069FF]" />}
+          action={{ label: 'Assignments', to: '/portal/assignments' }}
+        >
             {clientSeries.length === 0 ? (
               <p className="text-sm text-muted-foreground py-12 text-center">No active assignments yet.</p>
             ) : (
@@ -149,38 +145,36 @@ export function OperationsDashboard() {
                 </BarChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
+        </Panel>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-4 w-4 text-amber-500" />
-            Timesheets Awaiting Your Approval ({pendingTimesheets.length})
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel
+        eyebrow="Needs review"
+        title={`Timesheets Awaiting Your Approval (${pendingTimesheets.length})`}
+        icon={<Clock className="text-amber-500" />}
+        action={pendingTimesheets.length > 0 ? { label: 'All timesheets', to: '/portal/timesheets' } : undefined}
+        flush={pendingTimesheets.length > 0}
+      >
           {pendingTimesheets.length === 0 ? (
             <div className="flex flex-col items-center py-6 text-center">
               <Inbox className="h-8 w-8 text-gray-300 mb-2" />
               <p className="text-sm text-muted-foreground">No timesheets pending approval. All caught up.</p>
             </div>
           ) : (
-            <div className="space-y-2">
+            <div>
               {pendingTimesheets.slice(0, 8).map(ts => (
                 <Link
                   key={ts.id}
                   to={`/portal/timesheets/${ts.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                  className="portal-data-row"
                 >
-                  <div>
-                    <p className="text-sm font-medium">{getEmpName(ts.employeeId)}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#0b1220] truncate">{getEmpName(ts.employeeId)}</p>
                     <p className="text-xs text-muted-foreground">
                       {getClientName(ts.clientId)} • Week of {formatDate(ts.weekStartDate)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-sm font-semibold tabular-nums">{ts.totalHours} hrs</span>
                     <StatusBadge status={ts.status} />
                   </div>
@@ -188,39 +182,36 @@ export function OperationsDashboard() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-[#4069FF]" />
-            Active Assignments
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
+      <Panel
+        eyebrow="In progress"
+        title="Active Assignments"
+        icon={<Briefcase className="text-[#4069FF]" />}
+        action={{ label: 'All assignments', to: '/portal/assignments' }}
+        flush
+      >
+          <div>
             {activeAssignments.slice(0, 8).map(a => (
               <Link
                 key={a.id}
                 to={`/portal/assignments/${a.id}`}
-                className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                className="portal-data-row"
               >
-                <div>
-                  <p className="text-sm font-medium">{getEmpName(a.employeeId)}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#0b1220] truncate">{getEmpName(a.employeeId)}</p>
                   <p className="text-xs text-muted-foreground">
                     {getClientName(a.clientId)} • {a.projectName}
                   </p>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex-shrink-0">
                   <p className="text-sm font-semibold tabular-nums">${a.billRate}/hr</p>
                   <p className="text-xs text-muted-foreground">Max {a.maxHoursPerWeek} hrs/wk</p>
                 </div>
               </Link>
             ))}
           </div>
-        </CardContent>
-      </Card>
+      </Panel>
     </div>
   );
 }

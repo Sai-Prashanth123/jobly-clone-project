@@ -3,12 +3,13 @@ import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
+import { DashboardHeader } from '../../components/shared/DashboardHeader';
+import { Panel } from '../../components/shared/Panel';
 import { OnboardingBar } from '../../components/employees/OnboardingProgress';
 import { formatDate } from '../../lib/utils';
 import { useEmployees } from '../../hooks/useEmployees';
@@ -69,20 +70,11 @@ export function HRDashboard() {
 
   return (
     <div className="space-y-6 md:space-y-7">
-      <header className="portal-animate-in">
-        <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-gray-400 mb-1.5">
-          Workspace · HR
-        </p>
-        <h1
-          className="font-semibold portal-gradient-text leading-[1.15]"
-          style={{ fontSize: 'clamp(1.25rem, 1.6vw, 1.625rem)', letterSpacing: '-0.015em' }}
-        >
-          HR Dashboard
-        </h1>
-        <p className="text-[13px] text-gray-500 mt-1 max-w-2xl">
-          Workforce overview &amp; compliance.
-        </p>
-      </header>
+      <DashboardHeader
+        eyebrow="Human Resources"
+        title="Workforce & Compliance"
+        subtitle="Headcount, hiring, onboarding and work-authorization status."
+      />
 
       <div className="portal-animate-in">
         <QuickActions
@@ -158,14 +150,12 @@ export function HRDashboard() {
         className="grid gap-4 sm:gap-5 portal-animate-in"
         style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))' }}
       >
-        <Card className="portal-hover-lift">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2 tracking-tight">
-              <UserPlus className="h-4 w-4 text-[#4069FF]" />
-              Hiring Trend (Last 6 Months)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Last 6 months"
+          title="Hiring Trend"
+          icon={<UserPlus className="text-[#4069FF]" />}
+          action={{ label: 'Employees', to: '/portal/employees' }}
+        >
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={hireSeries} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
                 <defs>
@@ -181,17 +171,13 @@ export function HRDashboard() {
                 <Bar dataKey="hires" fill="url(#hr-bar-fill)" radius={[6, 6, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </Panel>
 
-        <Card className="portal-hover-lift">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2 tracking-tight">
-              <Users className="h-4 w-4 text-emerald-500" />
-              Headcount by Department
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Active staff"
+          title="Headcount by Department"
+          icon={<Users className="text-emerald-500" />}
+        >
             {deptData.length === 0 ? (
               <p className="text-sm text-muted-foreground py-12 text-center">No active employees yet.</p>
             ) : (
@@ -227,8 +213,7 @@ export function HRDashboard() {
                 </PieChart>
               </ResponsiveContainer>
             )}
-          </CardContent>
-        </Card>
+        </Panel>
       </div>
 
       {/* Refined alerts */}
@@ -293,20 +278,20 @@ export function HRDashboard() {
         </div>
       )}
 
-      <Card className="portal-hover-lift portal-animate-in">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2 tracking-tight">
-            <Clock className="h-4 w-4 text-[#4069FF]" />
-            Recent Hires
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
+      <Panel
+        eyebrow="Latest joiners"
+        title="Recent Hires"
+        icon={<Clock className="text-[#4069FF]" />}
+        action={{ label: 'All employees', to: '/portal/employees' }}
+        flush
+        className="portal-animate-in"
+      >
+          <div>
             {recentHires.map(emp => (
               <Link
                 key={emp.id}
                 to={`/portal/employees/${emp.id}`}
-                className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                className="portal-data-row"
               >
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center text-xs font-semibold text-blue-600">
@@ -330,30 +315,29 @@ export function HRDashboard() {
               </Link>
             ))}
           </div>
-        </CardContent>
-      </Card>
+      </Panel>
 
       {pendingReview.length > 0 && (
-        <Card className="ring-1 ring-amber-200 portal-hover-lift portal-animate-in">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2 tracking-tight">
-              <Clock className="h-4 w-4 text-amber-600" />
-              Pending onboarding review
-              <span className="ml-1 text-[11px] font-medium text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">
-                {pendingReview.length} awaiting
-              </span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Action queue"
+          title="Pending onboarding review"
+          icon={<Clock className="text-amber-600" />}
+          action={
+            <span className="text-[11px] font-medium text-amber-700 bg-amber-100 rounded-full px-2.5 py-1 whitespace-nowrap">
+              {pendingReview.length} awaiting
+            </span>
+          }
+          className="ring-1 ring-amber-200 portal-animate-in"
+        >
             <p className="text-xs text-muted-foreground mb-2">
               These employees submitted onboarding and need your review &amp; approval before they go Active.
             </p>
-            <div className="space-y-2">
+            <div>
               {pendingReview.map(emp => (
                 <Link
                   key={emp.id}
                   to={`/portal/employees/${emp.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                  className="portal-data-row"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center text-xs font-semibold text-amber-700">
@@ -374,8 +358,7 @@ export function HRDashboard() {
                 </Link>
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </Panel>
       )}
     </div>
   );

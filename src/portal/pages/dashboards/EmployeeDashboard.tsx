@@ -2,12 +2,13 @@ import { Clock, CheckCircle, Send, XCircle, Building2, FileEdit, FolderOpen, Bri
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
+import { DashboardHeader } from '../../components/shared/DashboardHeader';
+import { Panel } from '../../components/shared/Panel';
 import { formatDate } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
 import { useTimesheets } from '../../hooks/useTimesheets';
@@ -71,10 +72,11 @@ export function EmployeeDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Welcome, {user?.name?.split(' ')[0]}</h1>
-        <p className="text-sm text-gray-500 mt-1">Your work summary</p>
-      </div>
+      <DashboardHeader
+        eyebrow="My Workspace"
+        title={`Welcome, ${user?.name?.split(' ')[0] ?? ''}`}
+        subtitle="Your assignments, hours and timesheet status."
+      />
 
       <QuickActions
         actions={[
@@ -102,14 +104,12 @@ export function EmployeeDashboard() {
         ))}
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-4 w-4 text-[#4069FF]" />
-            My Hours per Week (Last 8 Weeks)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel
+        eyebrow="Last 8 weeks"
+        title="My Hours per Week"
+        icon={<Clock className="text-[#4069FF]" />}
+        action={{ label: 'My timesheets', to: '/portal/timesheets' }}
+      >
           <ResponsiveContainer width="100%" height={200}>
             <AreaChart data={hoursSeries} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
               <defs>
@@ -125,8 +125,7 @@ export function EmployeeDashboard() {
               <Area type="monotone" dataKey="hours" stroke="#4069FF" fill="url(#empHours)" strokeWidth={2.5} />
             </AreaChart>
           </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      </Panel>
 
       {rejected.length > 0 && (
         <div className="portal-alert-callout text-red-600">
@@ -159,63 +158,60 @@ export function EmployeeDashboard() {
       )}
 
       {myAssignments.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <Briefcase className="h-4 w-4 text-[#4069FF]" />
-              My Active Assignments
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+        <Panel
+          eyebrow="Current work"
+          title="My Active Assignments"
+          icon={<Briefcase className="text-[#4069FF]" />}
+          action={{ label: 'All assignments', to: '/portal/assignments' }}
+          flush
+        >
+            <div>
               {myAssignments.map(a => (
                 <Link
                   key={a.id}
                   to={`/portal/assignments/${a.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                  className="portal-data-row"
                 >
-                  <div>
-                    <p className="text-sm font-medium">{a.projectName}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#0b1220] truncate">{a.projectName}</p>
                     <p className="text-xs text-muted-foreground">
                       {getClientName(a.clientId)} • {a.role} • Started {formatDate(a.startDate)}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex-shrink-0">
                     <p className="text-sm font-semibold tabular-nums">{a.maxHoursPerWeek} hrs/wk max</p>
                     <StatusBadge status={a.status} />
                   </div>
                 </Link>
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </Panel>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-4 w-4 text-amber-500" />
-            My Recent Timesheets
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel
+        eyebrow="Latest"
+        title="My Recent Timesheets"
+        icon={<Clock className="text-amber-500" />}
+        action={recentTimesheets.length > 0 ? { label: 'My timesheets', to: '/portal/timesheets' } : undefined}
+        flush={recentTimesheets.length > 0}
+      >
           {recentTimesheets.length === 0 ? (
             <p className="text-sm text-muted-foreground">No timesheets yet. Start by creating one.</p>
           ) : (
-            <div className="space-y-2">
+            <div>
               {recentTimesheets.map(ts => (
                 <Link
                   key={ts.id}
                   to={`/portal/timesheets/${ts.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                  className="portal-data-row"
                 >
-                  <div>
-                    <p className="text-sm font-medium">Week of {formatDate(ts.weekStartDate)}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-[#0b1220]">Week of {formatDate(ts.weekStartDate)}</p>
                     <p className="text-xs text-muted-foreground">
                       {getClientName(ts.clientId)} • {ts.totalHours} hrs
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     {(ts.status === 'draft' || ts.status === 'rejected') && (
                       <Send className="h-3.5 w-3.5 text-gray-400" />
                     )}
@@ -225,8 +221,7 @@ export function EmployeeDashboard() {
               ))}
             </div>
           )}
-        </CardContent>
-      </Card>
+      </Panel>
     </div>
   );
 }

@@ -126,6 +126,17 @@
   --radius-button: 10px;
 }
 
+/* ── Typography — IBM Plex Sans (TypeUI "Dashboard" system) ───────
+   Technical, data-platform sans. Scoped to the portal so the public
+   marketing site keeps its Poppins/Lato stack. Tabular figures keep
+   metric columns aligned. ─────────────────────────────────────── */
+.portal-scope {
+  font-family: 'IBM Plex Sans', 'Poppins', system-ui, -apple-system, sans-serif;
+  font-feature-settings: 'cv05' 1, 'ss01' 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
 /* ── Keyframe Animations ─────────────────────────────────────── */
 /* Restrained set — only quiet entrance fades. No infinite-loop or
    "look-at-me" effects: enterprise UI shouldn't have nav items that
@@ -271,6 +282,112 @@
 }
 .portal-chart-card:hover {
   box-shadow: var(--shadow-md);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Dashboard system (TypeUI "Dashboard" — light premium adaptation)
+   Modular grid · glass-like panels · strong data hierarchy
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Panel — the universal content surface for charts, lists, tables.
+   Glass-like top sheen + crisp hairline + soft elevation. */
+.portal-panel {
+  position: relative;
+  background:
+    linear-gradient(180deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%),
+    rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(15, 23, 42, 0.07);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--motion-base), box-shadow var(--motion-base);
+  overflow: hidden;
+}
+.portal-panel:hover {
+  border-color: rgba(15, 23, 42, 0.11);
+  box-shadow: var(--shadow-md);
+}
+/* Hairline sheen along the very top edge — the "cloud-platform" cue. */
+.portal-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(64,105,255,0.35), transparent);
+  opacity: 0.7;
+}
+
+/* Panel header — eyebrow/title left, action/meta right. 8pt rhythm. */
+.portal-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+.portal-panel-body { padding: 16px 18px; }
+.portal-panel-body--flush { padding: 6px 8px; }
+
+/* Eyebrow — tiny uppercase kicker above section titles. */
+.portal-eyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+/* Panel title row */
+.portal-panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #0b1220;
+}
+.portal-panel-title svg { height: 16px; width: 16px; }
+
+/* KPI metric numeral — large, tight, tabular. */
+.portal-metric {
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: #0b1220;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Dashboard page header band — eyebrow + title + live meta. */
+.portal-dash-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Data row inside list panels — quiet hover, hairline divider. */
+.portal-data-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 11px 10px;
+  border-radius: 10px;
+  transition: background var(--motion-fast);
+}
+.portal-data-row:hover { background: rgba(64, 105, 255, 0.04); }
+
+/* Live status pip */
+.portal-livepip {
+  width: 7px; height: 7px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
 }
 
 /* Custom recharts tooltip */

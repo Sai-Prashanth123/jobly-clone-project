@@ -6,12 +6,13 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
+import { DashboardHeader } from '../../components/shared/DashboardHeader';
+import { Panel } from '../../components/shared/Panel';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useClients } from '../../hooks/useClients';
@@ -107,10 +108,11 @@ export function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Admin Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Full system overview</p>
-      </div>
+      <DashboardHeader
+        eyebrow="Administrator"
+        title="System Overview"
+        subtitle="Workforce, clients, revenue and approvals — at a glance."
+      />
 
       <QuickActions
         actions={[
@@ -132,14 +134,12 @@ export function AdminDashboard() {
 
       {/* Charts row — revenue trend + hiring trend */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-              Revenue Trend (Last 6 Months)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Last 6 months"
+          title="Revenue Trend"
+          icon={<TrendingUp className="text-emerald-500" />}
+          action={{ label: 'Invoices', to: '/portal/invoices' }}
+        >
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={revenueSeries} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
                 <defs>
@@ -155,17 +155,14 @@ export function AdminDashboard() {
                 <Area type="monotone" dataKey="revenue" stroke="#10b981" fill="url(#adminRevenue)" strokeWidth={2.5} />
               </AreaChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <UserPlus className="h-4 w-4 text-[#4069FF]" />
-              New Hires (Last 6 Months)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Last 6 months"
+          title="New Hires"
+          icon={<UserPlus className="text-[#4069FF]" />}
+          action={{ label: 'Employees', to: '/portal/employees' }}
+        >
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={hireSeries} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
@@ -175,8 +172,7 @@ export function AdminDashboard() {
                 <Bar dataKey="hires" fill="#4069FF" radius={[6, 6, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </Panel>
       </div>
 
       {/* Secondary metrics row */}
@@ -252,43 +248,41 @@ export function AdminDashboard() {
       )}
 
       {/* Timesheets awaiting approval */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Clock className="h-4 w-4 text-amber-500" />
-            Timesheets Awaiting Approval
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {pendingTimesheets.length === 0 ? (
-            <div className="flex flex-col items-center py-6 text-center">
-              <Inbox className="h-8 w-8 text-gray-300 mb-2" />
-              <p className="text-sm text-muted-foreground">No timesheets pending approval.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingTimesheets.map(ts => (
-                <Link
-                  key={ts.id}
-                  to={`/portal/timesheets/${ts.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{getEmpName(ts.employeeId)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {ts.displayId ?? ts.id.slice(0, 8)} • Week: {formatDate(ts.weekStartDate)}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold tabular-nums">{ts.totalHours} hrs</span>
-                    <StatusBadge status={ts.status} />
-                  </div>
-                </Link>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Panel
+        eyebrow="Needs review"
+        title="Timesheets Awaiting Approval"
+        icon={<Clock className="text-amber-500" />}
+        action={pendingTimesheets.length > 0 ? { label: 'All timesheets', to: '/portal/timesheets' } : undefined}
+        flush={pendingTimesheets.length > 0}
+      >
+        {pendingTimesheets.length === 0 ? (
+          <div className="flex flex-col items-center py-6 text-center">
+            <Inbox className="h-8 w-8 text-gray-300 mb-2" />
+            <p className="text-sm text-muted-foreground">No timesheets pending approval.</p>
+          </div>
+        ) : (
+          <div>
+            {pendingTimesheets.map(ts => (
+              <Link
+                key={ts.id}
+                to={`/portal/timesheets/${ts.id}`}
+                className="portal-data-row"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-[#0b1220] truncate">{getEmpName(ts.employeeId)}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {ts.displayId ?? ts.id.slice(0, 8)} • Week: {formatDate(ts.weekStartDate)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <span className="text-sm font-semibold tabular-nums">{ts.totalHours} hrs</span>
+                  <StatusBadge status={ts.status} />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }

@@ -3,12 +3,13 @@ import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
 } from 'recharts';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
+import { DashboardHeader } from '../../components/shared/DashboardHeader';
+import { Panel } from '../../components/shared/Panel';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { useInvoices } from '../../hooks/useInvoices';
 import { useClients } from '../../hooks/useClients';
@@ -100,10 +101,11 @@ export function FinanceDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-xl sm:text-2xl font-bold portal-gradient-text">Finance Dashboard</h1>
-        <p className="text-sm text-gray-500 mt-1">Revenue &amp; invoice management</p>
-      </div>
+      <DashboardHeader
+        eyebrow="Finance"
+        title="Revenue & Invoicing"
+        subtitle="Cash flow, outstanding balances and the invoice pipeline."
+      />
 
       <QuickActions
         actions={[
@@ -157,35 +159,31 @@ export function FinanceDashboard() {
       </div>
 
       {/* Invoices in progress — Wave-style funnel: count + $ per status. */}
-      <Card>
-        <CardHeader className="pb-2"><CardTitle className="text-base">Invoices in progress</CardTitle></CardHeader>
-        <CardContent>
+      <Panel eyebrow="Pipeline" title="Invoices in progress" action={{ label: 'All invoices', to: '/portal/invoices' }}>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {funnel.map(f => (
-              <Link key={f.status} to="/portal/invoices" className="rounded-lg border border-gray-100 bg-gray-50/60 hover:bg-gray-50 transition-colors p-3 text-center">
+              <Link key={f.status} to="/portal/invoices" className="rounded-xl border border-gray-100 bg-gray-50/60 hover:bg-white hover:border-gray-200 hover:shadow-sm transition-all p-3 text-center">
                 <p className="text-[11px] uppercase tracking-wide text-gray-400">{f.label}</p>
-                <p className="text-xl font-bold tabular-nums mt-0.5">{f.count}</p>
+                <p className="text-xl font-semibold tabular-nums mt-0.5 text-[#0b1220]">{f.count}</p>
                 <p className="text-[11px] text-muted-foreground tabular-nums">{formatCurrency(f.amount)}</p>
               </Link>
             ))}
           </div>
-        </CardContent>
-      </Card>
+      </Panel>
 
       {upcomingRecurring.length > 0 && (
-        <Card>
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2"><RotateCw className="h-4 w-4 text-[#4069FF]" /> Upcoming recurring</CardTitle>
-              <Link to="/portal/recurring" className="text-xs text-blue-600 hover:underline">Manage</Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
+        <Panel
+          eyebrow="Scheduled"
+          title="Upcoming recurring"
+          icon={<RotateCw className="text-[#4069FF]" />}
+          action={{ label: 'Manage', to: '/portal/recurring' }}
+          flush
+        >
+            <div>
               {upcomingRecurring.map(t => (
-                <div key={t.id} className="flex items-center justify-between py-1.5 border-b border-gray-100 last:border-0 text-sm">
+                <div key={t.id} className="portal-data-row text-sm">
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{t.title || t.clientName || 'Recurring invoice'}</p>
+                    <p className="font-medium truncate text-[#0b1220]">{t.title || t.clientName || 'Recurring invoice'}</p>
                     <p className="text-xs text-muted-foreground capitalize">{t.frequency} · {t.clientName ?? ''}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
@@ -195,8 +193,7 @@ export function FinanceDashboard() {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </Panel>
       )}
 
       {/* Status legend — answers "what does Draft mean?" right on the dashboard. */}
@@ -224,14 +221,12 @@ export function FinanceDashboard() {
 
       {/* Charts row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingUp className="h-4 w-4 text-emerald-500" />
-              Revenue (Last 6 Months)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Last 6 months"
+          title="Revenue"
+          icon={<TrendingUp className="text-emerald-500" />}
+          action={{ label: 'Reports', to: '/portal/reports' }}
+        >
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={monthlyRevenue} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
@@ -241,17 +236,13 @@ export function FinanceDashboard() {
                 <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </Panel>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="h-4 w-4 text-[#4069FF]" />
-              Cash Flow — Invoiced vs Collected
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <Panel
+          eyebrow="Last 6 months"
+          title="Cash Flow — Invoiced vs Collected"
+          icon={<DollarSign className="text-[#4069FF]" />}
+        >
             <ResponsiveContainer width="100%" height={220}>
               <AreaChart data={cashFlow} margin={{ top: 5, right: 16, left: 0, bottom: 0 }}>
                 <defs>
@@ -273,8 +264,7 @@ export function FinanceDashboard() {
                 <Area type="monotone" dataKey="Collected" stroke="#10b981" fill="url(#finCollected)" strokeWidth={2.5} />
               </AreaChart>
             </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        </Panel>
       </div>
 
       {totalOverdue > 0 && (
@@ -326,15 +316,14 @@ export function FinanceDashboard() {
         </div>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <FileText className="h-4 w-4 text-[#4069FF]" />
-            Recent Invoices
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
+      <Panel
+        eyebrow="Latest activity"
+        title="Recent Invoices"
+        icon={<FileText className="text-[#4069FF]" />}
+        action={{ label: 'All invoices', to: '/portal/invoices' }}
+        flush={recentInvoices.length > 0}
+      >
+          <div>
             {recentInvoices.length === 0 ? (
               <div className="flex flex-col items-center py-6 text-center">
                 <Inbox className="h-8 w-8 text-gray-300 mb-2" />
@@ -345,15 +334,15 @@ export function FinanceDashboard() {
                 <Link
                   key={inv.id}
                   to={`/portal/invoices/${inv.id}`}
-                  className="flex items-center justify-between py-2.5 px-2 -mx-2 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-gray-50/80"
+                  className="portal-data-row"
                 >
-                  <div>
-                    <p className="text-sm font-semibold">{inv.invoiceNumber}</p>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-[#0b1220]">{inv.invoiceNumber}</p>
                     <p className="text-xs text-muted-foreground">
                       {getClientName(inv.clientId)} • Due {formatDate(inv.dueDate)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 flex-shrink-0">
                     <span className="text-sm font-semibold tabular-nums">{formatCurrency(inv.totalAmount)}</span>
                     <StatusBadge status={inv.status} />
                   </div>
@@ -361,17 +350,13 @@ export function FinanceDashboard() {
               ))
             )}
           </div>
-        </CardContent>
-      </Card>
+      </Panel>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <DollarSign className="h-4 w-4 text-emerald-500" />
-            Revenue by Client (Paid)
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <Panel
+        eyebrow="Paid to date"
+        title="Revenue by Client"
+        icon={<DollarSign className="text-emerald-500" />}
+      >
           {clients.map(client => {
             const paid = invoices
               .filter(i => i.clientId === client.id && i.status === 'paid')
@@ -396,8 +381,7 @@ export function FinanceDashboard() {
               <p className="text-sm text-muted-foreground">No paid invoices yet.</p>
             </div>
           )}
-        </CardContent>
-      </Card>
+      </Panel>
     </div>
   );
 }
