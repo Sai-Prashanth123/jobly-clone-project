@@ -7,6 +7,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import { Eye, EyeOff, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
+import { AuroraBackground } from '@/components/ui/aurora-background';
 
 const ACCOUNTS = [
   { role: 'Admin',      email: 'admin@joblysolutions.com',   password: 'Jbly#Adm!n2026', color: '#4069FF' },
@@ -18,8 +19,6 @@ const ACCOUNTS = [
 // ── Clean × Elegant tokens — minimal, delicate type, generous whitespace ──
 const TEXT = '#111827';     // near-black headings/text
 const BRAND = '#4069FF';    // Jobly blue accent
-// Soft elegant gradient for the left panel — differentiates the two halves, stays graceful.
-const LEFT_BG = 'linear-gradient(160deg, #f4f7ff 0%, #f7f6fc 55%, #f8f9fb 100%)';
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -77,10 +76,13 @@ export default function Login() {
   return (
     <div className="portal-scope min-h-screen flex bg-white">
 
-      {/* ── Left — tinted brand panel (separates the halves) ── */}
-      <div className="hidden lg:flex flex-col justify-between w-[44%] px-16 py-16" style={{ background: LEFT_BG }}>
+      {/* ── Left — animated Aurora brand panel (separates the halves) ── */}
+      <AuroraBackground
+        showRadialGradient
+        className="hidden lg:flex flex-col justify-between items-stretch w-[44%] px-16 py-16 bg-white text-slate-950"
+      >
         {/* Logo */}
-        <div>
+        <div className="relative z-10">
           <img
             src="/assets/img/logo/logo-3.png"
             alt="Jobly Solutions"
@@ -90,19 +92,19 @@ export default function Login() {
         </div>
 
         {/* Centre copy — delicate type, generous whitespace */}
-        <div className="max-w-[420px]">
+        <div className="relative z-10 max-w-[420px]">
           <p className="text-[11px] font-semibold tracking-[0.2em] uppercase mb-6" style={{ color: BRAND }}>
             Workforce Platform
           </p>
           <h1 className="text-[2.4rem] xl:text-[2.75rem] font-semibold leading-[1.14] tracking-[-0.02em] mb-7" style={{ color: TEXT }}>
             Manage your <span style={{ color: BRAND }}>entire&nbsp;team</span> from one place.
           </h1>
-          <p className="text-[15px] font-normal text-gray-500 leading-[1.7]">
+          <p className="text-[15px] font-normal text-gray-600 leading-[1.7]">
             Employees, clients, timesheets, approvals, and invoicing — streamlined for staffing agencies.
           </p>
 
           {/* Trust line — minimal */}
-          <div className="mt-10 flex items-center gap-8 text-[12.5px] text-gray-400">
+          <div className="mt-10 flex items-center gap-8 text-[12.5px] text-gray-500">
             <span className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> SOC&nbsp;2 ready
             </span>
@@ -113,10 +115,10 @@ export default function Login() {
         </div>
 
         {/* Footer */}
-        <div>
-          <p className="text-xs text-gray-400">© 2026 Jobly Solutions</p>
+        <div className="relative z-10">
+          <p className="text-xs text-gray-500">© 2026 Jobly Solutions</p>
         </div>
-      </div>
+      </AuroraBackground>
 
       {/* ── Right — form panel (white) ── */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-24 bg-white">
