@@ -74,12 +74,13 @@ export default function Login() {
     'focus-visible:ring-[#4069FF]/15 focus-visible:border-[#4069FF]';
 
   return (
-    <div className="portal-scope min-h-screen flex bg-white">
+    <div className="portal-scope min-h-screen lg:h-screen lg:overflow-hidden flex bg-white">
 
       {/* ── Left — animated Aurora brand panel (separates the halves) ── */}
       <AuroraBackground
         showRadialGradient
-        className="hidden lg:flex flex-col justify-between items-stretch w-[44%] px-16 py-16 bg-white text-slate-950"
+        style={{ background: 'linear-gradient(160deg, #e9eeff 0%, #eef0fb 46%, #f2edfb 100%)' }}
+        className="hidden lg:flex flex-col justify-between items-stretch w-[44%] px-16 py-16 text-slate-950 border-r border-slate-200/80"
       >
         {/* Logo */}
         <div className="relative z-10">
@@ -121,9 +122,9 @@ export default function Login() {
       </AuroraBackground>
 
       {/* ── Right — form panel (white) ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-24 bg-white">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 lg:px-24 bg-white lg:h-screen lg:overflow-y-auto">
         {/* Back link */}
-        <div className="w-full max-w-[384px] mb-10 sm:mb-14">
+        <div className="w-full max-w-[384px] mb-8 sm:mb-10">
           <Link
             to="/"
             className="inline-flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[#4069FF] transition-all duration-200 group"
@@ -142,7 +143,7 @@ export default function Login() {
           </div>
 
           {/* Heading */}
-          <div className="mb-11">
+          <div className="mb-8">
             <h2 className="text-[1.85rem] font-semibold tracking-[-0.01em]" style={{ color: TEXT }}>Sign in</h2>
             <p className="text-[14px] font-normal text-gray-500 mt-2.5">Access your Jobly workspace</p>
           </div>
@@ -222,7 +223,7 @@ export default function Login() {
           </form>
 
           {/* Account switcher — minimal demo chips */}
-          <div className="mt-12">
+          <div className="mt-9">
             <div className="flex items-center gap-3 mb-5">
               <span className="h-px flex-1 bg-gray-100" />
               <p className="text-[11px] text-gray-400 uppercase tracking-[0.14em] font-medium">
