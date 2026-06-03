@@ -1,7 +1,9 @@
 import PageLayout from '@/components/PageLayout';
 import PageBanner from '@/components/PageBanner';
+import { useContactForm } from '@/hooks/useContactForm';
 
 const Contact = () => {
+  const { fields, set, status, error, submit } = useContactForm();
   return (
     <PageLayout>
       <PageBanner
@@ -99,30 +101,42 @@ const Contact = () => {
                   <h3 className="title color-d_black">Contact Us</h3>
                 </div>
 
-                <form className="hm_contact_form" onSubmit={(e) => e.preventDefault()}>
+                <form className="hm_contact_form" onSubmit={submit}>
                   <div className="form_row clearfix">
                     <label><span className="hm_field_name">Name</span><span className="hm_requires_star">*</span></label>
-                    <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Full Name" required />
+                    <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Full Name" required value={fields.name} onChange={set('name')} />
                   </div>
                   <div className="form_row clearfix">
                     <label><span className="hm_field_name">Email</span><span className="hm_requires_star">*</span></label>
-                    <input className="form_fill_fields hm_input_text form-control" type="email" placeholder="mail@sitename.com" required />
+                    <input className="form_fill_fields hm_input_text form-control" type="email" placeholder="mail@sitename.com" required value={fields.email} onChange={set('email')} />
                   </div>
                   <div className="form_row clearfix">
                     <label><span className="hm_field_name">Phone</span></label>
-                    <input className="form_fill_fields hm_input_text form-control" type="text" />
+                    <input className="form_fill_fields hm_input_text form-control" type="text" value={fields.phone} onChange={set('phone')} />
                   </div>
                   <div className="form_row clearfix">
                     <label><span className="hm_field_name">Subject</span></label>
-                    <input className="form_fill_fields hm_input_text form-control" type="text" />
+                    <input className="form_fill_fields hm_input_text form-control" type="text" value={fields.subject} onChange={set('subject')} />
                   </div>
                   <div className="form_row clearfix">
                     <label><span className="hm_field_name">Message</span><span className="hm_requires_star">*</span></label>
-                    <textarea className="form_fill_fields hm_textarea form-control" required></textarea>
+                    <textarea className="form_fill_fields hm_textarea form-control" required value={fields.message} onChange={set('message')}></textarea>
                   </div>
+                  {/* Honeypot — hidden from users, catches bots */}
+                  <input type="text" name="website" tabIndex={-1} autoComplete="off" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} aria-hidden="true" />
+                  {status === 'success' && (
+                    <div className="form_row clearfix" style={{ background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                      ✓ Thank you! Your message has been sent. We'll get back to you shortly.
+                    </div>
+                  )}
+                  {status === 'error' && error && (
+                    <div className="form_row clearfix" style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                      {error}
+                    </div>
+                  )}
                   <div className="form_row clearfix">
-                    <button type="submit" className="send_button full_button default-btn btn-two theme-btn btn-sm btn-red">
-                      <span>Send Your Message</span>
+                    <button type="submit" disabled={status === 'sending'} className="send_button full_button default-btn btn-two theme-btn btn-sm btn-red">
+                      <span>{status === 'sending' ? 'Sending…' : 'Send Your Message'}</span>
                     </button>
                   </div>
                 </form>

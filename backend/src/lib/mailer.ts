@@ -491,6 +491,60 @@ export async function sendCustomEmail(payload: CustomEmailPayload): Promise<void
   await sendWithRetry({ from: FROM, to: payload.to, subject: payload.subject, html: payload.html });
 }
 
+// ── Public website contact form ──────────────────────────────────────────────
+// Where landing-page "Contact Us" submissions are delivered.
+const CONTACT_TO = process.env.CONTACT_TO?.trim() || 'info@joblysolutions.com';
+
+export interface ContactFormPayload {
+  name: string;
+  email: string;
+  phone?: string;
+  subject?: string;
+  message: string;
+}
+
+export async function sendContactEmail(p: ContactFormPayload): Promise<void> {
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+  }
+  const row = (label: string, value: string) => `
+    <tr>
+      <td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:120px;white-space:nowrap;vertical-align:top;">${label}</td>
+      <td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${value}</td>
+    </tr>`;
+  const html = `
+<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;"><tr><td align="center">
+    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+      <tr><td style="background:linear-gradient(135deg,#2563EB,#0F2942);padding:24px 32px;color:#ffffff;">
+        <div style="font-size:18px;font-weight:700;">New contact-form message</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.85);">joblysolutions.com — Contact Us</div>
+      </td></tr>
+      <tr><td style="padding:24px 32px;">
+        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
+          ${row('Name', esc(p.name))}
+          ${row('Email', `<a href="mailto:${esc(p.email)}" style="color:#2563EB;">${esc(p.email)}</a>`)}
+          ${p.phone ? row('Phone', esc(p.phone)) : ''}
+          ${p.subject ? row('Subject', esc(p.subject)) : ''}
+        </table>
+        <div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Message</div>
+        <div style="font-size:14px;color:#111827;line-height:1.6;white-space:pre-wrap;background:#f9fafb;border-left:3px solid #2563EB;padding:12px 16px;border-radius:4px;">${esc(p.message)}</div>
+        <p style="margin:20px 0 0;color:#9ca3af;font-size:12px;">Reply directly to this email to respond to ${esc(p.name)}.</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+
+  await sendWithRetry({
+    from: FROM,
+    to: CONTACT_TO,
+    replyTo: p.email,
+    subject: `New contact message${p.subject ? `: ${p.subject}` : ''} — from ${p.name}`,
+    html,
+  });
+}
+
 // Scheduled payment reminder. `tone` shapes the copy: upcoming (before due),
 // due (on due date), overdue (after due).
 export async function sendInvoiceReminderEmail(payload: {

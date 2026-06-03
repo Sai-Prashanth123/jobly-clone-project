@@ -1,7 +1,9 @@
 import { useInViewReveal } from '@/hooks/useInViewReveal';
+import { useContactForm } from '@/hooks/useContactForm';
 
 const GetInTouch = () => {
   const revealRef = useInViewReveal<HTMLElement>();
+  const { fields, set, status, error, submit } = useContactForm();
   return (
   <section
     ref={revealRef}
@@ -53,25 +55,37 @@ const GetInTouch = () => {
                 </h6>
                 <h3 className="title color-d_black">Free Consultation</h3>
               </div>
-              <form className="hm_contact_form" onSubmit={e => e.preventDefault()}>
+              <form className="hm_contact_form" onSubmit={submit}>
                 <div className="single-personal-info form_row clearfix">
-                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Full Name" required />
+                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Full Name" required value={fields.name} onChange={set('name')} />
                 </div>
                 <div className="single-personal-info form_row clearfix">
-                  <input className="form_fill_fields hm_input_text form-control" type="email" placeholder="Enter Email" required />
+                  <input className="form_fill_fields hm_input_text form-control" type="email" placeholder="Enter Email" required value={fields.email} onChange={set('email')} />
                 </div>
                 <div className="single-personal-info form_row clearfix">
-                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Phone No" />
+                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Phone No" value={fields.phone} onChange={set('phone')} />
                 </div>
                 <div className="single-personal-info form_row clearfix">
-                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Subject" required />
+                  <input className="form_fill_fields hm_input_text form-control" type="text" placeholder="Subject" value={fields.subject} onChange={set('subject')} />
                 </div>
                 <div className="single-personal-info form_row clearfix">
-                  <textarea className="form_fill_fields hm_textarea form-control" placeholder="Message" required></textarea>
+                  <textarea className="form_fill_fields hm_textarea form-control" placeholder="Message" required value={fields.message} onChange={set('message')}></textarea>
                 </div>
+                {/* Honeypot — hidden from users, catches bots */}
+                <input type="text" name="website" tabIndex={-1} autoComplete="off" style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, opacity: 0 }} aria-hidden="true" />
+                {status === 'success' && (
+                  <div className="form_row clearfix" style={{ background: 'rgba(16,185,129,0.15)', border: '1px solid rgba(16,185,129,0.5)', color: '#a7f3d0', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                    ✓ Thank you! Your message has been sent. We'll be in touch shortly.
+                  </div>
+                )}
+                {status === 'error' && error && (
+                  <div className="form_row clearfix" style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.5)', color: '#fecaca', borderRadius: 8, padding: '12px 16px', marginBottom: 16 }}>
+                    {error}
+                  </div>
+                )}
                 <div className="form_row clearfix">
-                  <button type="submit" className="send_button full_button default-btn btn-two theme-btn btn-sm btn-red">
-                    <span>Send Your Message</span>
+                  <button type="submit" disabled={status === 'sending'} className="send_button full_button default-btn btn-two theme-btn btn-sm btn-red">
+                    <span>{status === 'sending' ? 'Sending…' : 'Send Your Message'}</span>
                   </button>
                 </div>
               </form>

@@ -24,3 +24,13 @@ export const authLimiter = rateLimit({
   keyGenerator,
   message: { success: false, error: 'Too many login attempts, please try again later' },
 });
+
+// Public contact form — stricter to curb spam from the unauthenticated endpoint.
+export const contactLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 minutes
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator,
+  message: { success: false, error: 'Too many messages sent. Please try again in a few minutes.' },
+});
