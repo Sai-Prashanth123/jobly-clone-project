@@ -1,4 +1,4 @@
-import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -109,6 +109,12 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const [mode, setMode] = useState<'manual' | 'timesheets'>('manual');
   const [clientId, setClientId] = useState(initial?.clientId ?? '');
   const [error, setError] = useState('');
+  const errorRef = useRef<HTMLDivElement>(null);
+  // Bring the error banner into view when validation fails — the form is long
+  // and the Save button sits in the page header, so the user may be scrolled away.
+  useEffect(() => {
+    if (error) errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [error]);
 
   const [invoiceNumber, setInvoiceNumber] = useState(initial?.invoiceNumber ?? '');
   const [issueDate, setIssueDate] = useState(initial?.issueDate ?? todayIso());
@@ -299,6 +305,14 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
 
   return (
     <div className="space-y-5">
+      {/* Validation error — shown at the TOP so it's visible next to the
+          Save/Preview action bar (the form is long; a bottom error scrolls off). */}
+      {error && (
+        <div ref={errorRef} role="alert" className="rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
       {/* Mode toggle (create-invoice only; estimates + edit are manual) */}
       {!isEstimate && !isEdit && (
         <div className="inline-flex rounded-lg border border-gray-200 p-0.5 bg-gray-50">
@@ -609,8 +623,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
           )}
         </>
       )}
-
-      {error && <p className="text-sm text-red-500">{error}</p>}
     </div>
   );
 });
