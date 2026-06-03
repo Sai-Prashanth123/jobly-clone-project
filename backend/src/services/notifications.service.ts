@@ -109,15 +109,19 @@ export async function markAllRead(userId: string, role?: string) {
 
 export async function getUnreadCount(userId: string, role?: string) {
   if (role === 'admin') {
-    // Count DISTINCT unread events (collapse fan-out copies).
+    // Count DISTINCT unread events (collapse fan-out copies). Mirror the exact
+    // fetch shape that listNotifications uses (recent rows, then filter in JS) so
+    // the badge always matches the list.
     const { data, error } = await supabaseAdmin
       .from('notifications')
-      .select('title, message, entity_type, entity_id')
-      .eq('admin_read', false)
-      .limit(1000);
+      .select('title, message, entity_type, entity_id, admin_read')
+      .order('created_at', { ascending: false })
+      .limit(400);
     if (error) throw error;
     const seen = new Set<string>();
-    for (const n of data ?? []) seen.add(eventKey(n));
+    for (const n of data ?? []) {
+      if (!n.admin_read) seen.add(eventKey(n));
+    }
     return seen.size;
   }
   const { count, error } = await supabaseAdmin
