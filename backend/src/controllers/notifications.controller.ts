@@ -4,28 +4,28 @@ import * as svc from '../services/notifications.service';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.listNotifications(req.user!.id);
+    const data = await svc.listNotifications(req.user!.id, req.user!.role);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
 
 export async function unreadCount(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const count = await svc.getUnreadCount(req.user!.id);
+    const count = await svc.getUnreadCount(req.user!.id, req.user!.role);
     res.json({ success: true, data: { count } });
   } catch (err) { next(err); }
 }
 
 export async function markRead(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await svc.markRead(req.params.id, req.user!.id);
+    await svc.markRead(req.params.id, req.user!.id, req.user!.role);
     res.json({ success: true });
   } catch (err) { next(err); }
 }
 
 export async function markAllRead(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await svc.markAllRead(req.user!.id);
+    await svc.markAllRead(req.user!.id, req.user!.role);
     res.json({ success: true });
   } catch (err) { next(err); }
 }

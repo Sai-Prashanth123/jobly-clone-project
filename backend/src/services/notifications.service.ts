@@ -21,7 +21,46 @@ export async function createNotification(
   if (error) console.warn('[notifications.service] createNotification failed:', error.message);
 }
 
-export async function listNotifications(userId: string) {
+// A notification "event" can exist as several per-recipient rows (a role
+// fan-out creates one per user). For the admin all-notifications view we collapse
+// those copies into one by this content key so admin doesn't see duplicates.
+function eventKey(n: { title: string; message: string; entity_type: string | null; entity_id: string | null }): string {
+  return [n.title, n.message, n.entity_type ?? '', n.entity_id ?? ''].join('|');
+}
+
+// Constrain an admin update to all rows that share a notification's content
+// (so marking one copy read marks the whole event read for the admin).
+function matchEvent(query: any, n: { title: string; message: string; entity_type: string | null; entity_id: string | null }) {
+  let q = query.eq('title', n.title).eq('message', n.message);
+  q = n.entity_type === null ? q.is('entity_type', null) : q.eq('entity_type', n.entity_type);
+  q = n.entity_id === null ? q.is('entity_id', null) : q.eq('entity_id', n.entity_id);
+  return q;
+}
+
+export async function listNotifications(userId: string, role?: string) {
+  // Admin sees EVERY notification in the system (its own read state via
+  // admin_read), with fan-out copies de-duplicated to one per event.
+  if (role === 'admin') {
+    const { data, error } = await supabaseAdmin
+      .from('notifications')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(400);
+    if (error) throw error;
+    const seen = new Set<string>();
+    const out: any[] = [];
+    for (const n of data ?? []) {
+      const key = eventKey(n);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      // Present the admin's own read flag as `read` so the UI works unchanged.
+      out.push({ ...n, read: !!n.admin_read });
+    }
+    // Unread first, then most recent.
+    out.sort((a, b) => (a.read === b.read ? (a.created_at < b.created_at ? 1 : -1) : (a.read ? 1 : -1)));
+    return out.slice(0, 50);
+  }
+
   const { data, error } = await supabaseAdmin
     .from('notifications')
     .select('*')
@@ -34,7 +73,15 @@ export async function listNotifications(userId: string) {
   return data ?? [];
 }
 
-export async function markRead(notificationId: string, userId: string) {
+export async function markRead(notificationId: string, userId: string, role?: string) {
+  if (role === 'admin') {
+    const { data: n } = await supabaseAdmin
+      .from('notifications').select('title, message, entity_type, entity_id').eq('id', notificationId).maybeSingle();
+    if (!n) return;
+    const { error } = await matchEvent(supabaseAdmin.from('notifications').update({ admin_read: true }), n);
+    if (error) throw error;
+    return;
+  }
   const { error } = await supabaseAdmin
     .from('notifications')
     .update({ read: true })
@@ -44,7 +91,13 @@ export async function markRead(notificationId: string, userId: string) {
   if (error) throw error;
 }
 
-export async function markAllRead(userId: string) {
+export async function markAllRead(userId: string, role?: string) {
+  if (role === 'admin') {
+    const { error } = await supabaseAdmin
+      .from('notifications').update({ admin_read: true }).eq('admin_read', false);
+    if (error) throw error;
+    return;
+  }
   const { error } = await supabaseAdmin
     .from('notifications')
     .update({ read: true })
@@ -54,7 +107,19 @@ export async function markAllRead(userId: string) {
   if (error) throw error;
 }
 
-export async function getUnreadCount(userId: string) {
+export async function getUnreadCount(userId: string, role?: string) {
+  if (role === 'admin') {
+    // Count DISTINCT unread events (collapse fan-out copies).
+    const { data, error } = await supabaseAdmin
+      .from('notifications')
+      .select('title, message, entity_type, entity_id')
+      .eq('admin_read', false)
+      .limit(1000);
+    if (error) throw error;
+    const seen = new Set<string>();
+    for (const n of data ?? []) seen.add(eventKey(n));
+    return seen.size;
+  }
   const { count, error } = await supabaseAdmin
     .from('notifications')
     .select('*', { count: 'exact', head: true })
