@@ -44,7 +44,7 @@ interface ListParams {
   limit?: number;
 }
 
-export function useTimesheets(params?: ListParams) {
+export function useTimesheets(params?: ListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['timesheets', params],
     queryFn: async () => {
@@ -54,6 +54,7 @@ export function useTimesheets(params?: ListParams) {
         total: data.total as number,
       };
     },
+    enabled: options?.enabled ?? true,
   });
 }
 

@@ -23,7 +23,10 @@ export function InvoicePrintView({ invoice, client }: InvoicePrintViewProps) {
         {/* Header */}
         <div className="flex justify-between items-start mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">INVOICE</h1>
+            <img src="/assets/img/logo/logo-3.png" alt="Jobly Solutions"
+              className="h-10 w-auto object-contain mb-3"
+              onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
+            <h1 className="text-2xl font-bold text-gray-900">{invoice.docType === 'estimate' ? 'ESTIMATE' : 'INVOICE'}</h1>
             <p className="text-lg text-blue-600 font-semibold mt-1">{invoice.invoiceNumber}</p>
           </div>
           <div className="text-right">

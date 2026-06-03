@@ -147,13 +147,18 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
 
   const [selected, setSelected] = useState<string[]>([]);
 
+  // The timesheet picker (and its employee/assignment lookups) only exists in
+  // create-mode's "From approved timesheets" tab. Edit mode is manual-only, so
+  // gate those 3 heavy queries off there — they were the main cause of the slow
+  // Edit open. Clients + products are still needed in both modes.
+  const needsTimesheetData = !isEdit && mode === 'timesheets';
   const { data: clientData } = useClients({ limit: 200 });
   const { data: productData } = useProducts({ active: true });
   const { data: tsData } = useTimesheets({
     limit: 200, status: 'client_approved', clientId: clientId || undefined, excludeInvoiced: true,
-  });
-  const { data: empData } = useEmployees({ limit: 500 });
-  const { data: assignData } = useAssignments({ limit: 200 });
+  }, { enabled: needsTimesheetData });
+  const { data: empData } = useEmployees({ limit: 500 }, { enabled: needsTimesheetData });
+  const { data: assignData } = useAssignments({ limit: 200 }, { enabled: needsTimesheetData });
 
   const clients = clientData?.data ?? [];
   const products = productData?.data ?? [];

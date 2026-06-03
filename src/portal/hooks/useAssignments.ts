@@ -53,7 +53,7 @@ function mapAssignment(raw: any): Assignment {
 
 interface ListParams { status?: string; employeeId?: string; clientId?: string; page?: number; limit?: number }
 
-export function useAssignments(params?: ListParams) {
+export function useAssignments(params?: ListParams, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['assignments', params],
     queryFn: async () => {
@@ -63,6 +63,7 @@ export function useAssignments(params?: ListParams) {
         total: data.total as number,
       };
     },
+    enabled: options?.enabled ?? true,
   });
 }
 

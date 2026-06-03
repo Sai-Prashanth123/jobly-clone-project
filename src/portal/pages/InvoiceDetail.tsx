@@ -76,7 +76,10 @@ export default function InvoiceDetail() {
             <Download className="h-4 w-4" />
             PDF
           </Button>
-          {invoice.status === 'draft' && (
+          {/* Send (draft) or Resend (already issued) — hidden once fully paid.
+              The backend re-sends the email + re-attaches the PDF and only a
+              draft advances to 'sent' (never downgrades a viewed/overdue one). */}
+          {invoice.status !== 'paid' && (
             <Button
               size="sm"
               className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
@@ -86,7 +89,7 @@ export default function InvoiceDetail() {
                 try {
                   const r = await sendInvoice.mutateAsync();
                   if (r.emailSent) {
-                    toast.success('Invoice sent to client via email');
+                    toast.success(invoice.status === 'draft' ? 'Invoice sent to client via email' : 'Invoice re-sent to client');
                   } else {
                     toast.warning(
                       r.warning ?? 'Invoice was prepared but the email could not be delivered. Try again or check the client billing email.',
@@ -99,19 +102,7 @@ export default function InvoiceDetail() {
               }}
             >
               <Send className="h-4 w-4" />
-              Send to Client
-            </Button>
-          )}
-          {invoice.publicToken && (
-            <Button variant="outline" size="sm" className="gap-2"
-              onClick={() => {
-                const url = `${window.location.origin}/portal/i/${invoice.publicToken}`;
-                navigator.clipboard?.writeText(url).then(
-                  () => toast.success('Share link copied'),
-                  () => window.open(url, '_blank'),
-                );
-              }}>
-              Share link
+              {invoice.status === 'draft' ? 'Send to Client' : 'Resend'}
             </Button>
           )}
           {canPay && (

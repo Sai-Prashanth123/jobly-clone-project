@@ -272,15 +272,24 @@ export interface InvoiceEmailPayload {
   invoiceNumber: string;
   issueDate: string;
   dueDate: string;
+  currency?: string;
   subtotal: number;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number;
+  discountAmount?: number;
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
+  amountPaid?: number;
+  balanceDue?: number;
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
   pdfUrl?: string;
+  pdfBuffer?: Buffer;
+  pdfFileName?: string;
   notes?: string;
-  lineItems: { description: string; hours: number; billRate: number; amount: number }[];
+  terms?: string;
+  lineItems: { itemName?: string; description: string; quantity: number; unitPrice: number; amount: number; isHours?: boolean }[];
 }
 
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<void> {
@@ -289,20 +298,46 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
   }
   const {
     to, clientName, contactName, invoiceNumber,
-    issueDate, dueDate, subtotal, taxRate, taxAmount, totalAmount,
-    billingPeriodStart, billingPeriodEnd, pdfUrl, notes, lineItems,
+    issueDate, dueDate, currency, subtotal, discountType, discountValue, discountAmount,
+    taxRate, taxAmount, totalAmount, amountPaid, balanceDue,
+    billingPeriodStart, billingPeriodEnd, pdfUrl, pdfBuffer, pdfFileName, notes, terms, lineItems,
   } = payload;
 
-  const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n);
+  // Currency-aware; guard against a bad/legacy code (Intl throws) → USD.
+  let cf: Intl.NumberFormat;
+  try { cf = new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD' }); }
+  catch { cf = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }); }
+  const fmt = (n: number) => cf.format(Number(n) || 0);
   const fmtDate = (s: string) => formatDateSafe(s, { long: true }) || s;
+
+  const allHours = lineItems.length > 0 && lineItems.every(li => li.isHours);
+  const qtyHeader = allHours ? 'Hours' : 'Qty';
+  const priceHeader = allHours ? 'Rate' : 'Unit price';
 
   const lineRows = lineItems.map(li => `
     <tr>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${esc(li.description)}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">${esc(li.hours)}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">$${esc(li.billRate)}/hr</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${li.itemName ? `<strong>${esc(li.itemName)}</strong><br><span style="color:#6b7280;font-size:12px;">${esc(li.description)}</span>` : esc(li.description)}</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">${esc(li.quantity)}</td>
+      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">${fmt(li.unitPrice)}${li.isHours ? '/hr' : ''}</td>
       <td style="padding:10px 12px;font-size:13px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;text-align:right;">${fmt(li.amount)}</td>
     </tr>`).join('');
+
+  const discountRow = discountAmount && discountAmount > 0 ? `<tr>
+                <td style="padding:6px 16px;font-size:13px;color:#6b7280;">Discount${discountType === 'percentage' && discountValue ? ` (${esc(discountValue)}%)` : ''}</td>
+                <td style="padding:6px 16px;font-size:13px;color:#111827;text-align:right;">−${fmt(discountAmount)}</td>
+              </tr>` : '';
+  const taxRow = taxRate > 0 ? `<tr>
+                <td style="padding:6px 16px;font-size:13px;color:#6b7280;">Tax (${esc(taxRate)}%)</td>
+                <td style="padding:6px 16px;font-size:13px;color:#111827;text-align:right;">${fmt(taxAmount)}</td>
+              </tr>` : '';
+  const paidRows = amountPaid && amountPaid > 0 ? `<tr>
+                <td style="padding:6px 16px;font-size:13px;color:#059669;">Amount paid</td>
+                <td style="padding:6px 16px;font-size:13px;color:#059669;text-align:right;">−${fmt(amountPaid)}</td>
+              </tr>
+              <tr>
+                <td style="padding:6px 16px;font-size:13px;font-weight:700;color:#111827;">Balance due</td>
+                <td style="padding:6px 16px;font-size:13px;font-weight:700;color:#111827;text-align:right;">${fmt(balanceDue ?? (totalAmount - amountPaid))}</td>
+              </tr>` : '';
 
   const html = `
 <!DOCTYPE html>
@@ -313,7 +348,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <tr>
-          <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
+          <td style="background:linear-gradient(135deg,#2563EB,#0F2942);padding:32px 40px;">
             <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Invoice from Jobly Solutions</h1>
             <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${esc(invoiceNumber)}</p>
           </td>
@@ -322,7 +357,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
           <td style="padding:32px 40px;">
             <p style="margin:0 0 20px;color:#374151;font-size:15px;">Dear <strong>${esc(contactName)}</strong>,</p>
             <p style="margin:0 0 28px;color:#374151;font-size:14px;line-height:1.6;">
-              Please find attached the invoice for staffing services rendered to <strong>${esc(clientName)}</strong>.
+              Please find your invoice <strong>attached as a PDF</strong> for services rendered to <strong>${esc(clientName)}</strong>.
               ${billingPeriodStart && billingPeriodEnd ? `Billing period: <strong>${esc(fmtDate(billingPeriodStart))}</strong> to <strong>${esc(fmtDate(billingPeriodEnd))}</strong>.` : ''}
             </p>
 
@@ -330,8 +365,8 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
               <thead>
                 <tr style="background:#f9fafb;">
                   <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Description</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Hours</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Rate</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">${qtyHeader}</th>
+                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">${priceHeader}</th>
                   <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Amount</th>
                 </tr>
               </thead>
@@ -343,14 +378,13 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
                 <td style="padding:6px 16px;font-size:13px;color:#6b7280;">Subtotal</td>
                 <td style="padding:6px 16px;font-size:13px;color:#111827;text-align:right;">${fmt(subtotal)}</td>
               </tr>
-              ${taxRate > 0 ? `<tr>
-                <td style="padding:6px 16px;font-size:13px;color:#6b7280;">Tax (${esc(taxRate)}%)</td>
-                <td style="padding:6px 16px;font-size:13px;color:#111827;text-align:right;">${fmt(taxAmount)}</td>
-              </tr>` : ''}
+              ${discountRow}
+              ${taxRow}
               <tr style="background:#f9fafb;">
-                <td style="padding:10px 16px;font-size:15px;font-weight:700;color:#111827;border-top:2px solid #e5e7eb;">Total Due</td>
-                <td style="padding:10px 16px;font-size:15px;font-weight:700;color:#4069FF;border-top:2px solid #e5e7eb;text-align:right;">${fmt(totalAmount)}</td>
+                <td style="padding:10px 16px;font-size:15px;font-weight:700;color:#111827;border-top:2px solid #e5e7eb;">Total</td>
+                <td style="padding:10px 16px;font-size:15px;font-weight:700;color:#2563EB;border-top:2px solid #e5e7eb;text-align:right;">${fmt(totalAmount)}</td>
               </tr>
+              ${paidRows}
             </table>
 
             <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:28px;">
@@ -364,11 +398,12 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
               </tr>
             </table>
 
-            ${notes ? `<p style="margin:0 0 24px;font-size:13px;color:#6b7280;background:#f9fafb;border-left:3px solid #4069FF;padding:12px 16px;border-radius:4px;">${esc(notes)}</p>` : ''}
+            ${notes ? `<p style="margin:0 0 16px;font-size:13px;color:#6b7280;background:#f9fafb;border-left:3px solid #2563EB;padding:12px 16px;border-radius:4px;">${esc(notes)}</p>` : ''}
+            ${terms ? `<p style="margin:0 0 24px;font-size:12px;color:#9ca3af;line-height:1.6;">${esc(terms)}</p>` : ''}
 
             ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0">
               <tr><td align="center" style="padding:8px 0 24px;">
-                <a href="${esc(pdfUrl)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
+                <a href="${esc(pdfUrl)}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
                   Download Invoice PDF →
                 </a>
               </td></tr>
@@ -395,6 +430,11 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
     to,
     subject: `Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`,
     html,
+    attachments: pdfBuffer ? [{
+      filename: pdfFileName ?? `${invoiceNumber}.pdf`,
+      content: pdfBuffer,
+      contentType: 'application/pdf',
+    }] : undefined,
   });
 }
 

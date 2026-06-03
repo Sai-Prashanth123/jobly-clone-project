@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../lib/errors';
-import { generateInvoicePDF } from '../lib/pdfGenerator';
+import { generateInvoicePDF, type InvoicePDFData } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
@@ -620,13 +620,15 @@ export async function sendInvoice(id: string) {
     .eq('id', inv.client_id)
     .single();
 
-  // Generate PDF and get signed URL
-  const pdfUrl = await getInvoicePDF(id);
-
   const recipientEmail = client?.billing_contact_email || client?.contact_email;
   if (!recipientEmail) {
     throw new ValidationError('Client has no billing email address on file. Add one in the client profile and try again.');
   }
+
+  // Generate the PDF once and reuse the buffer both as the email attachment and
+  // the storage signed URL (download link).
+  const { buffer: pdfBuffer, signedUrl: pdfUrl } = await renderAndStoreInvoicePDF(id);
+  const pdfData = buildInvoicePdfData(inv, client);
 
   // Attempt to send the email. Capture success/failure so the caller can
   // surface a structured warning instead of throwing a generic 500. Mirrors
@@ -641,19 +643,30 @@ export async function sendInvoice(id: string) {
       invoiceNumber: inv.invoice_number,
       issueDate: inv.issue_date,
       dueDate: inv.due_date,
-      subtotal: inv.subtotal,
-      taxRate: inv.tax_rate ?? 0,
-      taxAmount: inv.tax_amount ?? 0,
-      totalAmount: inv.total_amount,
+      currency: pdfData.currency,
+      subtotal: pdfData.subtotal,
+      discountType: pdfData.discountType,
+      discountValue: pdfData.discountValue,
+      discountAmount: pdfData.discountAmount,
+      taxRate: pdfData.taxRate,
+      taxAmount: pdfData.taxAmount,
+      totalAmount: pdfData.totalAmount,
+      amountPaid: pdfData.amountPaid,
+      balanceDue: pdfData.balanceDue,
       billingPeriodStart: inv.billing_period_start ?? undefined,
       billingPeriodEnd: inv.billing_period_end ?? undefined,
       pdfUrl: pdfUrl ?? undefined,
+      pdfBuffer,
+      pdfFileName: `${inv.invoice_number}.pdf`,
       notes: inv.notes ?? undefined,
-      lineItems: (inv.invoice_line_items ?? []).map((li: Record<string, unknown>) => ({
-        description: String(li.description ?? ''),
-        hours: Number(li.hours ?? 0),
-        billRate: Number(li.bill_rate ?? 0),
-        amount: Number(li.amount ?? 0),
+      terms: inv.terms ?? undefined,
+      lineItems: pdfData.lineItems.map(li => ({
+        itemName: li.itemName,
+        description: li.description,
+        quantity: li.quantity,
+        unitPrice: li.unitPrice,
+        amount: li.amount,
+        isHours: li.isHours,
       })),
     });
     emailSent = true;
@@ -662,9 +675,10 @@ export async function sendInvoice(id: string) {
     console.error('[invoices.service] sendInvoiceEmail failed for invoice', id, err);
   }
 
-  // Mark invoice as 'sent' only when the email actually went out. Otherwise
-  // leave it as draft so the user can retry without confusion.
-  const newStatus = emailSent ? 'sent' : inv.status;
+  // Re-send aware: only a DRAFT advances to 'sent' on a successful email. A
+  // re-send of an already sent/viewed/overdue invoice keeps its current status
+  // (never downgrade), and a failed send never changes status.
+  const newStatus = emailSent && inv.status === 'draft' ? 'sent' : inv.status;
   const { data, error } = await supabaseAdmin
     .from('invoices')
     .update({ status: newStatus })
@@ -730,60 +744,90 @@ export async function bulkUpdateInvoiceStatus(ids: string[], status: string) {
   return { updated: ids.length };
 }
 
-export async function getInvoicePDF(id: string) {
-  const inv = await getInvoice(id);
+// Human label for a payment-terms code (used on the PDF/email).
+const PAYMENT_TERM_LABELS: Record<string, string> = {
+  on_receipt: 'Due on receipt', net_7: 'Net 7', net_14: 'Net 14',
+  net_30: 'Net 30', net_45: 'Net 45', net_60: 'Net 60', custom: 'Custom',
+};
 
-  const { data: client } = await supabaseAdmin
-    .from('clients')
-    .select('*')
-    .eq('id', inv.client_id)
-    .single();
+// Map the invoice + client DB rows to the premium PDF data shape. Prefers the
+// client's billing address, falls back to the primary address. (The old code
+// read client.address — a column that doesn't exist — so the address was always
+// blank; this fixes that.)
+function buildInvoicePdfData(inv: any, client: any): InvoicePDFData {
+  const addr = (street?: string, city?: string, state?: string, zip?: string, country?: string): string[] => {
+    const lines: string[] = [];
+    if (street) lines.push(street);
+    const cityLine = [city, [state, zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+    if (cityLine) lines.push(cityLine);
+    if (country && country !== 'US' && country !== 'USA') lines.push(country);
+    return lines;
+  };
+  const clientAddressLines = (client?.billing_street || client?.billing_city)
+    ? addr(client?.billing_street, client?.billing_city, client?.billing_state, client?.billing_zip, client?.billing_country)
+    : addr(client?.address_street, client?.address_city, client?.address_state, client?.address_zip, client?.address_country);
 
-  const pdfBuffer = await generateInvoicePDF({
+  const amountPaid = Number(inv.amount_paid ?? 0);
+  return {
     invoiceNumber: inv.invoice_number,
+    docType: inv.doc_type === 'estimate' ? 'estimate' : 'invoice',
+    status: inv.status,
     clientName: client?.company_name ?? 'Unknown Client',
-    clientAddress: client?.address ? `${client.address}` : undefined,
+    clientContactName: client?.billing_contact_name || client?.contact_name || undefined,
+    clientContactEmail: client?.billing_contact_email || client?.contact_email || undefined,
+    clientAddressLines,
     issueDate: inv.issue_date,
     dueDate: inv.due_date,
+    poNumber: inv.po_number ?? undefined,
+    paymentTerms: inv.payment_terms ? (PAYMENT_TERM_LABELS[inv.payment_terms] ?? inv.payment_terms) : undefined,
+    currency: inv.currency ?? 'USD',
     lineItems: (inv.invoice_line_items ?? []).map((li: Record<string, unknown>) => ({
+      itemName: li.item_name ? String(li.item_name) : undefined,
       description: String(li.description ?? ''),
-      hours: Number(li.hours ?? 0),
-      billRate: Number(li.bill_rate ?? 0),
+      quantity: Number(li.quantity ?? li.hours ?? 0),
+      unitPrice: Number(li.bill_rate ?? 0),
       amount: Number(li.amount ?? 0),
+      isHours: !!li.timesheet_id,
     })),
-    subtotal: inv.subtotal,
+    subtotal: Number(inv.subtotal ?? 0),
+    discountType: inv.discount_type ?? null,
+    discountValue: inv.discount_value != null ? Number(inv.discount_value) : undefined,
     discountAmount: Number(inv.discount_amount ?? 0),
-    taxRate: inv.tax_rate ?? 0,
-    taxAmount: inv.tax_amount ?? 0,
-    totalAmount: inv.total_amount,
-  });
+    taxRate: Number(inv.tax_rate ?? 0),
+    taxAmount: Number(inv.tax_amount ?? 0),
+    totalAmount: Number(inv.total_amount ?? 0),
+    amountPaid,
+    balanceDue: Math.round((Number(inv.total_amount ?? 0) - amountPaid) * 100) / 100,
+    notes: inv.notes ?? undefined,
+    terms: inv.terms ?? undefined,
+  };
+}
 
-  // Upload to Supabase Storage
+// Generate the invoice PDF, upload it to storage, cache the signed URL, and
+// return BOTH the raw buffer (for emailing as an attachment) and the signed URL.
+async function renderAndStoreInvoicePDF(id: string): Promise<{ buffer: Buffer; signedUrl: string | null }> {
+  const inv = await getInvoice(id);
+  const { data: client } = await supabaseAdmin.from('clients').select('*').eq('id', inv.client_id).single();
+
+  const buffer = await generateInvoicePDF(buildInvoicePdfData(inv, client));
+
   const fileName = `${inv.invoice_number}.pdf`;
   const { error: uploadError } = await supabaseAdmin
-    .storage
-    .from('invoices')
-    .upload(fileName, pdfBuffer, {
-      contentType: 'application/pdf',
-      upsert: true,
-    });
-
+    .storage.from('invoices')
+    .upload(fileName, buffer, { contentType: 'application/pdf', upsert: true });
   if (uploadError) throw uploadError;
 
-  // Get signed URL (7 days — the link is embedded in the invoice email and
-  // must survive spam-folder delays. 1 hour was too short.)
+  // 7-day signed URL — the link is embedded in the invoice email and must
+  // survive spam-folder delays.
   const { data: urlData } = await supabaseAdmin
-    .storage
-    .from('invoices')
-    // `download` → Content-Disposition: attachment so the link saves the PDF
-    // (under its real name) instead of opening inline in a tab.
+    .storage.from('invoices')
     .createSignedUrl(fileName, 7 * 24 * 60 * 60, { download: fileName });
 
-  // Cache pdf_url on invoice
-  await supabaseAdmin
-    .from('invoices')
-    .update({ pdf_url: urlData?.signedUrl })
-    .eq('id', id);
+  await supabaseAdmin.from('invoices').update({ pdf_url: urlData?.signedUrl }).eq('id', id);
+  return { buffer, signedUrl: urlData?.signedUrl ?? null };
+}
 
-  return urlData?.signedUrl ?? null;
+export async function getInvoicePDF(id: string): Promise<string | null> {
+  const { signedUrl } = await renderAndStoreInvoicePDF(id);
+  return signedUrl;
 }

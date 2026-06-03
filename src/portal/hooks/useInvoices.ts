@@ -137,6 +137,9 @@ export function useInvoice(id: string | undefined) {
       return mapInvoice(data.data);
     },
     enabled: isValidId(id),
+    // Detail and editor share this key; a 60s window means clicking Edit right
+    // after viewing reuses the cached invoice (no refetch, no loading spinner).
+    staleTime: 60_000,
   });
 }
 
