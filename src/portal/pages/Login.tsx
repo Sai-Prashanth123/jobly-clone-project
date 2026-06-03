@@ -15,11 +15,9 @@ const ACCOUNTS = [
   { role: 'Finance',    email: 'finance@joblysolutions.com', password: 'Jbly#F!n2026',   color: '#10B981' },
 ];
 
-// ── Neumorphism tokens (soft dual-shadow surfaces; see portal.css .neu-*) ──
-const INK = '#1E293B';      // readable heading ink
-const BRAND = '#4069FF';    // Jobly blue
-const TEAL = '#32CDDC';     // Jobly teal accent
-const CANVAS = '#eceef4';   // tinted neumorphic surface
+// ── Clean design tokens — minimal, white surface, limited palette ──
+const TEXT = '#111827';     // near-black headings/text
+const BRAND = '#4069FF';    // Jobly blue (the single accent)
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -68,16 +66,19 @@ export default function Login() {
     setActive(a.role);
   };
 
-  // Soft inset neumorphic field (sharper corners).
-  const inputCls = 'h-12 rounded-lg text-sm px-3.5 neu-input placeholder:text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0';
+  // Clean input — white, hairline border, blue focus ring. No shadows.
+  const inputCls =
+    'h-12 rounded-lg text-sm bg-white border border-gray-200 px-3.5 transition-colors ' +
+    'placeholder:text-gray-400 focus-visible:ring-2 focus-visible:ring-offset-0 ' +
+    'focus-visible:ring-[#4069FF]/20 focus-visible:border-[#4069FF]';
 
   return (
-    <div className="portal-scope neu-canvas min-h-screen flex" style={{ background: CANVAS }}>
+    <div className="portal-scope min-h-screen flex bg-white">
 
-      {/* ── Left — neumorphic brand panel ── */}
-      <div className="hidden lg:flex flex-col justify-between w-[44%] px-14 py-12 relative">
+      {/* ── Left — minimal brand panel (white, ample whitespace) ── */}
+      <div className="hidden lg:flex flex-col justify-between w-[42%] px-16 py-14 border-r border-gray-100">
         {/* Logo */}
-        <div className="relative z-10">
+        <div>
           <img
             src="/assets/img/logo/logo-3.png"
             alt="Jobly Solutions"
@@ -86,49 +87,49 @@ export default function Login() {
           />
         </div>
 
-        {/* Centre copy — soft extruded panel, sharper corners */}
-        <div className="relative z-10 neu-raised rounded-lg p-8 max-w-[440px]" style={{ background: CANVAS }}>
-          <p className="text-[11px] font-extrabold tracking-[0.22em] uppercase mb-4" style={{ color: BRAND }}>
+        {/* Centre copy — clear hierarchy, generous spacing */}
+        <div className="max-w-[400px]">
+          <p className="text-[11px] font-semibold tracking-[0.18em] uppercase mb-5" style={{ color: BRAND }}>
             Workforce Platform
           </p>
-          <h1 className="text-[2.1rem] xl:text-[2.5rem] font-black leading-[1.08] tracking-tight mb-5" style={{ color: INK }}>
-            Manage your <span style={{ color: TEAL }}>entire team</span> from one place.
+          <h1 className="text-[2.25rem] xl:text-[2.6rem] font-semibold leading-[1.12] tracking-tight mb-6" style={{ color: TEXT }}>
+            Manage your <span style={{ color: BRAND }}>entire team</span> from one place.
           </h1>
-          <p className="text-[13px] text-slate-500 leading-relaxed mb-6">
+          <p className="text-[14px] text-gray-500 leading-relaxed">
             Employees, clients, timesheets, approvals, and invoicing — streamlined for staffing agencies.
           </p>
 
-          {/* Trust badges — small soft raised chips */}
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="inline-flex items-center gap-1.5 neu-raised-sm rounded-md px-2.5 py-1.5 text-[11px] font-bold" style={{ background: CANVAS, color: INK }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }} /> SOC&nbsp;2 ready
+          {/* Trust line — minimal */}
+          <div className="mt-9 flex items-center gap-7 text-[12px] text-gray-400">
+            <span className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> SOC&nbsp;2 ready
             </span>
-            <span className="inline-flex items-center gap-1.5 neu-raised-sm rounded-md px-2.5 py-1.5 text-[11px] font-bold" style={{ background: CANVAS, color: INK }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: TEAL }} /> SSO via Supabase
+            <span className="flex items-center gap-2">
+              <span className="w-1.5 h-1.5 rounded-full" style={{ background: BRAND }} /> SSO via Supabase
             </span>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="relative z-10">
-          <p className="text-xs text-slate-400 font-medium">© 2026 Jobly Solutions</p>
+        <div>
+          <p className="text-xs text-gray-400">© 2026 Jobly Solutions</p>
         </div>
       </div>
 
       {/* ── Right — form panel ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-20">
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-20 bg-white">
         {/* Back link */}
-        <div className="w-full max-w-[400px] mb-6 sm:mb-10">
+        <div className="w-full max-w-[380px] mb-8 sm:mb-12">
           <Link
             to="/"
-            className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-400 hover:text-[#4069FF] transition-colors group"
+            className="inline-flex items-center gap-1.5 text-[13px] text-gray-400 hover:text-[#4069FF] transition-colors group"
           >
             <ArrowLeft className="h-3.5 w-3.5 group-hover:-translate-x-0.5 transition-transform" />
             Back to website
           </Link>
         </div>
 
-        <div className="w-full max-w-[400px] portal-animate-in">
+        <div className="w-full max-w-[380px] portal-animate-in">
 
           {/* Mobile logo */}
           <div className="lg:hidden mb-8">
@@ -137,15 +138,15 @@ export default function Login() {
           </div>
 
           {/* Heading */}
-          <div className="mb-9">
-            <h2 className="text-[1.8rem] font-black tracking-tight" style={{ color: INK }}>Sign in</h2>
-            <p className="text-[13px] text-slate-500 mt-1.5">Access your Jobly workspace</p>
+          <div className="mb-10">
+            <h2 className="text-[1.75rem] font-semibold tracking-tight" style={{ color: TEXT }}>Sign in</h2>
+            <p className="text-[14px] text-gray-500 mt-2">Access your Jobly workspace</p>
           </div>
 
           {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-1.5">
-              <Label htmlFor="email" className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#64748B' }}>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-[13px] font-medium text-gray-700">
                 Email address
               </Label>
               <Input
@@ -160,10 +161,19 @@ export default function Login() {
               />
             </div>
 
-            <div className="space-y-1.5">
-              <Label htmlFor="password" className="text-[11px] font-bold uppercase tracking-widest" style={{ color: '#64748B' }}>
-                Password
-              </Label>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password" className="text-[13px] font-medium text-gray-700">
+                  Password
+                </Label>
+                <button
+                  type="button"
+                  onClick={() => { setFpEmail(email); setFpSent(false); setFpOpen(true); }}
+                  className="text-[12px] text-gray-400 hover:text-[#4069FF] transition-colors"
+                >
+                  Forgot password?
+                </button>
+              </div>
               <div className="relative">
                 <Input
                   id="password"
@@ -178,28 +188,15 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPw(p => !p)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#1E293B] transition-colors z-10"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                 >
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            <div className="flex justify-end -mt-1">
-              <button
-                type="button"
-                onClick={() => { setFpEmail(email); setFpSent(false); setFpOpen(true); }}
-                className="text-[12px] font-semibold text-slate-400 hover:text-[#4069FF] transition-colors"
-              >
-                Forgot password?
-              </button>
-            </div>
-
             {error && (
-              <div
-                className="flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-semibold neu-inset"
-                style={{ background: CANVAS, color: '#DC2626' }}
-              >
+              <div className="flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm text-red-600 border border-red-200 bg-red-50">
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
                 {error}
               </div>
@@ -208,24 +205,26 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="neu-btn-primary w-full h-12 rounded-lg font-extrabold text-[13px] text-white flex items-center justify-center gap-2"
-              style={{ marginTop: '8px' }}
+              className="w-full h-12 rounded-lg font-semibold text-[14px] text-white flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: BRAND }}
+              onMouseEnter={e => { if (!loading) e.currentTarget.style.background = '#3257e0'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = BRAND; }}
             >
               {loading
                 ? <><Loader2 className="h-4 w-4 animate-spin" />Signing in…</>
-                : <><span>Sign In</span><ArrowRight className="h-4 w-4" /></>
+                : <><span>Sign in</span><ArrowRight className="h-4 w-4" /></>
               }
             </button>
           </form>
 
-          {/* Account switcher — soft neumorphic demo chips */}
-          <div className="mt-10">
-            <div className="flex items-center gap-3 mb-4">
-              <span className="h-px flex-1" style={{ background: 'rgba(15,23,42,0.10)' }} />
-              <p className="text-[10px] uppercase tracking-[0.16em] font-extrabold" style={{ color: 'rgba(30,41,59,0.55)' }}>
+          {/* Account switcher — minimal demo chips */}
+          <div className="mt-12">
+            <div className="flex items-center gap-3 mb-5">
+              <span className="h-px flex-1 bg-gray-100" />
+              <p className="text-[11px] text-gray-400 uppercase tracking-[0.14em] font-medium">
                 Demo accounts
               </p>
-              <span className="h-px flex-1" style={{ background: 'rgba(15,23,42,0.10)' }} />
+              <span className="h-px flex-1 bg-gray-100" />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {ACCOUNTS.map(a => {
@@ -235,8 +234,14 @@ export default function Login() {
                     key={a.role}
                     type="button"
                     onClick={() => quickFill(a)}
-                    className={`neu-raised-sm neu-chip ${isActive ? 'is-active' : ''} flex items-center gap-2.5 px-3 py-2.5 rounded-md text-[12px] font-bold text-left`}
-                    style={{ background: CANVAS, color: isActive ? a.color : INK }}
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-lg text-[13px] font-medium text-left border transition-colors"
+                    style={{
+                      borderColor: isActive ? BRAND : '#E5E7EB',
+                      background: isActive ? 'rgba(64,105,255,0.05)' : '#ffffff',
+                      color: isActive ? BRAND : '#374151',
+                    }}
+                    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = '#F9FAFB'; e.currentTarget.style.borderColor = '#D1D5DB'; } }}
+                    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#E5E7EB'; } }}
                   >
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: a.color }} />
                     {a.role}
@@ -244,7 +249,7 @@ export default function Login() {
                 );
               })}
             </div>
-            <p className="text-[11px] text-slate-400 text-center mt-3.5">
+            <p className="text-[12px] text-gray-400 text-center mt-4">
               Click a role to auto-fill credentials, then sign in.
             </p>
           </div>
@@ -256,9 +261,9 @@ export default function Login() {
           shows the same generic confirmation (the backend never reveals whether
           the email exists). */}
       <Dialog open={fpOpen} onOpenChange={setFpOpen}>
-        <DialogContent className="w-[95vw] max-w-md rounded-2xl neu-raised border-0" style={{ background: CANVAS }}>
+        <DialogContent className="w-[95vw] max-w-md">
           <DialogHeader>
-            <DialogTitle className="font-black" style={{ color: INK }}>Reset your password</DialogTitle>
+            <DialogTitle style={{ color: TEXT }}>Reset your password</DialogTitle>
             <DialogDescription>
               Enter your account email and we'll send reset instructions.
             </DialogDescription>
@@ -274,7 +279,8 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setFpOpen(false)}
-                  className="neu-btn-primary px-4 h-10 rounded-lg text-[13px] font-extrabold text-white"
+                  className="px-4 h-10 rounded-lg text-[13px] font-semibold text-white transition-colors"
+                  style={{ background: BRAND }}
                 >
                   Done
                 </button>
@@ -289,8 +295,8 @@ export default function Login() {
               }}
               className="space-y-4"
             >
-              <div className="space-y-1.5">
-                <Label htmlFor="fp-email">Email address</Label>
+              <div className="space-y-2">
+                <Label htmlFor="fp-email" className="text-[13px] font-medium text-gray-700">Email address</Label>
                 <Input
                   id="fp-email"
                   type="email"
@@ -305,14 +311,15 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setFpOpen(false)}
-                  className="px-4 h-10 rounded-lg text-[13px] font-bold text-slate-500 hover:text-[#1E293B] transition-colors"
+                  className="px-4 h-10 rounded-lg text-[13px] font-medium text-gray-500 hover:text-gray-700 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={forgot.isPending}
-                  className="neu-btn-primary px-4 h-10 rounded-lg text-[13px] font-extrabold text-white flex items-center gap-2"
+                  className="px-4 h-10 rounded-lg text-[13px] font-semibold text-white flex items-center gap-2 disabled:opacity-50 transition-colors"
+                  style={{ background: BRAND }}
                 >
                   {forgot.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</> : 'Send instructions'}
                 </button>
