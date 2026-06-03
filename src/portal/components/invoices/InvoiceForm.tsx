@@ -17,6 +17,7 @@ import { useEmployees } from '../../hooks/useEmployees';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useProducts } from '../../hooks/useProducts';
 import { useUploadInvoiceAttachment, useDeleteInvoiceAttachment, type CreateInvoiceBody } from '../../hooks/useInvoices';
+import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates';
 import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
 import type { InvoiceAttachment, InvoiceStatus } from '../../types';
 
@@ -34,6 +35,7 @@ export interface InvoiceFormInitial {
   taxRate?: number;
   discountType?: 'percentage' | 'fixed' | null;
   discountValue?: number;
+  invoiceTemplateId?: string;
   amountPaid?: number;
   notes?: string;
   terms?: string;
@@ -126,6 +128,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     initial?.paymentTerms === 'custom' ? (initial?.dueDate ?? '') : '',
   );
   const [currency, setCurrency] = useState(initial?.currency ?? 'USD');
+  const [invoiceTemplateId, setInvoiceTemplateId] = useState(initial?.invoiceTemplateId ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [terms, setTerms] = useState(initial?.terms ?? '');
   const [footerOpen, setFooterOpen] = useState(!!initial?.terms);
@@ -160,6 +163,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const { data: empData } = useEmployees({ limit: 500 }, { enabled: needsTimesheetData });
   const { data: assignData } = useAssignments({ limit: 200 }, { enabled: needsTimesheetData });
 
+  const { data: invoiceThemes } = useInvoiceTemplates();
   const clients = clientData?.data ?? [];
   const products = productData?.data ?? [];
   const clientTimesheets = tsData?.data ?? [];
@@ -277,6 +281,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
       taxRate,
       discountType,
       discountValue: discountType ? discountValue : null,
+      invoiceTemplateId: invoiceTemplateId || null,
       notes: notes || null,
       terms: terms || null,
       lineItems: valid.map(l => ({
@@ -388,6 +393,18 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                   ? <Input type="date" value={customDueDate} onChange={e => setCustomDueDate(e.target.value)} />
                   : <Input value={dueDate} disabled />}
               </div>
+              {(invoiceThemes && invoiceThemes.length > 0) && (
+                <div className="space-y-1.5">
+                  <Label>Template / theme</Label>
+                  <Select value={invoiceTemplateId || '__default'} onValueChange={v => setInvoiceTemplateId(v === '__default' ? '' : v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default">Default theme</SelectItem>
+                      {invoiceThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (default)' : ''}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </CardContent>
           </Card>
 

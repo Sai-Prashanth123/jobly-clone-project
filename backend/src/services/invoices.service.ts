@@ -5,6 +5,7 @@ import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { uploadDocument, deleteDocument } from './storage.service';
+import { getInvoiceTheme } from './invoiceTemplates.service';
 import { addDaysToDate, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
 import { paymentTermsDays } from '../schemas/invoice.schema';
@@ -350,6 +351,7 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
     po_number: input.poNumber ?? null,
     payment_terms: input.paymentTerms,
     currency: input.currency,
+    invoice_template_id: input.invoiceTemplateId ?? null,
     notes: input.notes ?? null,
     terms: input.terms ?? null,
   }, input.invoiceNumber || undefined);
@@ -461,6 +463,7 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   if (input.notes !== undefined) updateData.notes = input.notes;
   if (input.terms !== undefined) updateData.terms = input.terms;
   if (input.poNumber !== undefined) updateData.po_number = input.poNumber;
+  if (input.invoiceTemplateId !== undefined) updateData.invoice_template_id = input.invoiceTemplateId;
 
   // ── Editable invoice number (drafts only) ─────────────────────────────────
   if (input.invoiceNumber !== undefined && input.invoiceNumber !== inv.invoice_number) {
@@ -708,6 +711,24 @@ export async function sendInvoice(id: string) {
   return { invoice: data, emailSent, warning };
 }
 
+// Bulk-send: email several invoices at once (reuses the single send path which
+// attaches the PDF + advances draft→sent). Per-invoice errors are captured so
+// one bad recipient doesn't fail the whole batch.
+export async function bulkSendInvoices(ids: string[]) {
+  let sent = 0;
+  const failed: { id: string; invoiceNumber?: string; error: string }[] = [];
+  for (const id of ids.slice(0, 100)) {
+    try {
+      const r = await sendInvoice(id);
+      if (r.emailSent) sent++;
+      else failed.push({ id, invoiceNumber: r.invoice?.invoice_number, error: r.warning ?? 'Email not delivered' });
+    } catch (err: any) {
+      failed.push({ id, error: err?.message ?? 'Send failed' });
+    }
+  }
+  return { sent, failed, total: ids.length };
+}
+
 // ── CSV export ────────────────────────────────────────────────────────────────
 
 export async function exportInvoicesCSV(query: { status?: string; clientId?: string }): Promise<string> {
@@ -809,7 +830,8 @@ async function renderAndStoreInvoicePDF(id: string): Promise<{ buffer: Buffer; s
   const inv = await getInvoice(id);
   const { data: client } = await supabaseAdmin.from('clients').select('*').eq('id', inv.client_id).single();
 
-  const buffer = await generateInvoicePDF(buildInvoicePdfData(inv, client));
+  const theme = await getInvoiceTheme(inv.invoice_template_id);
+  const buffer = await generateInvoicePDF(buildInvoicePdfData(inv, client), theme);
 
   const fileName = `${inv.invoice_number}.pdf`;
   const { error: uploadError } = await supabaseAdmin

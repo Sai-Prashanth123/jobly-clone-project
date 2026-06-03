@@ -39,6 +39,7 @@ const ProductEditor = lazy(() => import('./pages/ProductEditor'));
 const RecordPayment = lazy(() => import('./pages/RecordPayment'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const Documents = lazy(() => import('./pages/Documents'));
+const EmailTemplates = lazy(() => import('./pages/EmailTemplates'));
 
 // HR drill-down pages (linked from HRDashboard cards)
 const HrActiveEmployees = lazy(() => import('./pages/hr/ActiveEmployees'));
@@ -182,6 +183,14 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'finance']}>
                   <Products />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="templates"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                  <EmailTemplates />
                 </ProtectedRoute>
               }
             />

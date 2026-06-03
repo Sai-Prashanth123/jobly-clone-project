@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Pencil, Info, Trash2 } from 'lucide-react';
+import { Plus, Loader2, Pencil, Info, Trash2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
-import { useInvoices, useDeleteInvoice } from '../hooks/useInvoices';
+import { useInvoices, useDeleteInvoice, useSendBulkInvoices } from '../hooks/useInvoices';
 import { useClients } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
@@ -19,9 +19,21 @@ export default function Invoices() {
   const { data, isLoading } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
   const deleteInvoice = useDeleteInvoice();
+  const bulkSend = useSendBulkInvoices();
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
+  const [selected, setSelected] = useState<Invoice[]>([]);
   const canEdit = user?.role === 'admin' || user?.role === 'finance';
   const canDelete = user?.role === 'admin';
+
+  const sendSelected = async () => {
+    const ids = selected.map(i => i.id);
+    if (ids.length === 0) return;
+    try {
+      const r = await bulkSend.mutateAsync(ids);
+      if (r.failed.length === 0) toast.success(`Sent ${r.sent} invoice${r.sent !== 1 ? 's' : ''} to clients.`);
+      else toast.warning(`Sent ${r.sent}/${r.total}. ${r.failed.length} failed: ${r.failed.map(f => f.invoiceNumber || f.id.slice(0, 8)).slice(0, 5).join(', ')}`, { duration: 15000 });
+    } catch { toast.error('Bulk send failed.'); }
+  };
 
   const invoices = data?.data ?? [];
   const clients = clientsData?.data ?? [];
@@ -155,6 +167,15 @@ export default function Invoices() {
         </div>
       </div>
 
+      {canEdit && selected.length > 0 && (
+        <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-blue-200 bg-blue-50/60 px-3 py-2">
+          <span className="text-sm font-medium text-blue-800">{selected.length} invoice{selected.length !== 1 ? 's' : ''} selected</span>
+          <Button size="sm" className="gap-2" loading={bulkSend.isPending} loadingText="Sending…" onClick={sendSelected}>
+            <Send className="h-4 w-4" /> Send selected to clients
+          </Button>
+        </div>
+      )}
+
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -167,6 +188,8 @@ export default function Invoices() {
           searchKeys={['invoiceNumber', 'issueDate', 'dueDate', 'clientName', 'status']}
           getRowKey={i => i.id}
           onRowClick={i => navigate(`/portal/invoices/${i.id}`)}
+          selectable={canEdit}
+          onSelectionChange={(rows) => setSelected(rows as unknown as Invoice[])}
           emptyTitle="No invoices yet"
           emptyDescription="Generate your first invoice from approved timesheets."
           exportFilename="invoices"

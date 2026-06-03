@@ -17,6 +17,7 @@ router.post('/', requireRole('admin','finance'), validateBody(createInvoiceSchem
 router.post('/:id/convert', requireRole('admin','finance'), ctrl.convert);
 router.get('/export', requireRole('admin', 'finance'), ctrl.exportInvoices);
 router.patch('/bulk-status', requireRole('admin', 'finance'), ctrl.bulkInvoiceStatus);
+router.post('/bulk-send', requireRole('admin', 'finance'), ctrl.bulkSend);
 router.get('/:id', requireRole('admin','finance'), ctrl.getOne);
 router.put('/:id', requireRole('admin','finance'), validateBody(updateInvoiceSchema), ctrl.update);
 router.delete('/:id', requireRole('admin'), ctrl.remove);

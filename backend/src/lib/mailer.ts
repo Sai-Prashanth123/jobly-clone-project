@@ -438,6 +438,59 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
   });
 }
 
+// ── Generic / template emails (Finance "Email clients" blast) ─────────────────
+
+// Replace {{placeholder}} tokens with per-recipient values. Unknown tokens
+// resolve to '' so a literal {{x}} never reaches the recipient.
+export function renderTemplate(html: string, vars: Record<string, string>): string {
+  return (html || '').replace(/\{\{\s*([a-z_]+)\s*\}\}/gi, (_m, key: string) => vars[key.toLowerCase()] ?? '');
+}
+
+// Wrap finance-authored header/body/footer HTML into the branded email shell.
+// The header/body/footer must already be sanitized + placeholder-rendered.
+export function buildBrandedEmail(parts: { headerHtml?: string; bodyHtml: string; footerHtml?: string }): string {
+  const { headerHtml = '', bodyHtml, footerHtml = '' } = parts;
+  return `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+        <tr>
+          <td style="background:linear-gradient(135deg,#2563EB,#0F2942);padding:28px 40px;color:#ffffff;">
+            <div style="font-size:20px;font-weight:700;">Jobly Solutions</div>
+            <div style="font-size:13px;color:rgba(255,255,255,0.85);">Workforce Management</div>
+          </td>
+        </tr>
+        <tr><td style="padding:32px 40px;color:#374151;font-size:14px;line-height:1.6;">
+          ${headerHtml ? `<div style="margin-bottom:16px;color:#0F2942;">${headerHtml}</div>` : ''}
+          <div>${bodyHtml}</div>
+          ${footerHtml ? `<div style="margin-top:24px;padding-top:20px;border-top:1px solid #f3f4f6;color:#6b7280;font-size:13px;">${footerHtml}</div>` : ''}
+        </td></tr>
+        <tr>
+          <td style="background:#f9fafb;padding:18px 40px;border-top:1px solid #f3f4f6;">
+            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · billing@joblysolutions.com · www.joblysolutions.com</p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+export interface CustomEmailPayload { to: string | string[]; subject: string; html: string }
+
+// Send a fully-rendered custom email (used by the bulk client mailer).
+export async function sendCustomEmail(payload: CustomEmailPayload): Promise<void> {
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+  }
+  await sendWithRetry({ from: FROM, to: payload.to, subject: payload.subject, html: payload.html });
+}
+
 // Scheduled payment reminder. `tone` shapes the copy: upcoming (before due),
 // due (on due date), overdue (after due).
 export async function sendInvoiceReminderEmail(payload: {

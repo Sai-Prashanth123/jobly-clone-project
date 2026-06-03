@@ -50,6 +50,7 @@ export const createInvoiceSchema = z.object({
   lineItems: z.array(lineItemSchema).min(1),
   taxRate: z.number().min(0).max(100).default(0),
   ...discountFields,
+  invoiceTemplateId: z.string().uuid().optional().nullable(),
   notes: z.string().optional().nullable(),
   terms: z.string().optional().nullable(),
 }).refine(v => v.paymentTerms !== 'custom' || !!v.dueDate, {
@@ -67,6 +68,7 @@ export const updateInvoiceSchema = z.object({
   taxRate: z.number().min(0).max(100).optional(),
   // Editable invoice number — service applies it on drafts only (locked once issued).
   invoiceNumber: z.string().trim().max(60).optional(),
+  invoiceTemplateId: z.string().uuid().optional().nullable(),
   ...discountFields,
   // Draft-only full edit (Wave-style): when lineItems is present and the invoice
   // is still a draft, the whole document is rebuilt from these fields. Ignored

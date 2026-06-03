@@ -132,6 +132,16 @@ export async function deletePayment(req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 }
 
+export async function bulkSend(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { ids } = req.body as { ids: string[] };
+    if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ success: false, error: 'ids must be a non-empty array' }); return; }
+    if (ids.length > 100) { res.status(400).json({ success: false, error: 'Cannot send more than 100 invoices at once' }); return; }
+    const result = await svc.bulkSendInvoices(ids);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
 export async function bulkInvoiceStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { ids, status } = req.body as { ids: string[]; status: string };

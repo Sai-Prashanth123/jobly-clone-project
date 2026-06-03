@@ -151,6 +151,7 @@ export default function InvoiceEditor() {
         taxRate: invoice!.taxRate,
         discountType: invoice!.discountType,
         discountValue: invoice!.discountValue,
+        invoiceTemplateId: invoice!.invoiceTemplateId,
         amountPaid: invoice!.amountPaid,
         notes: invoice!.notes,
         terms: invoice!.terms,

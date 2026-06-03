@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Printer } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates';
 import type { Invoice, Client } from '../../types';
 
 interface InvoicePrintViewProps {
@@ -10,6 +11,10 @@ interface InvoicePrintViewProps {
 }
 
 export function InvoicePrintView({ invoice, client }: InvoicePrintViewProps) {
+  // Resolve the invoice's theme accent (its template → default → built-in blue).
+  const { data: themes } = useInvoiceTemplates();
+  const accent = (themes?.find(t => t.id === invoice.invoiceTemplateId)?.accentColor)
+    || (themes?.find(t => t.isDefault)?.accentColor) || '#2563EB';
   return (
     <div>
       <div className="portal-no-print flex justify-end mb-4">
@@ -26,8 +31,8 @@ export function InvoicePrintView({ invoice, client }: InvoicePrintViewProps) {
             <img src="/assets/img/logo/logo-3.png" alt="Jobly Solutions"
               className="h-10 w-auto object-contain mb-3"
               onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} />
-            <h1 className="text-2xl font-bold text-gray-900">{invoice.docType === 'estimate' ? 'ESTIMATE' : 'INVOICE'}</h1>
-            <p className="text-lg text-blue-600 font-semibold mt-1">{invoice.invoiceNumber}</p>
+            <h1 className="text-2xl font-bold" style={{ color: accent }}>{invoice.docType === 'estimate' ? 'ESTIMATE' : 'INVOICE'}</h1>
+            <p className="text-lg font-semibold mt-1" style={{ color: accent }}>{invoice.invoiceNumber}</p>
           </div>
           <div className="text-right">
             <p className="text-xl font-bold text-gray-900">Jobly Solutions</p>

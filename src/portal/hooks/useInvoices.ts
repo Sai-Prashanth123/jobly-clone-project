@@ -37,6 +37,7 @@ function mapInvoice(raw: any): Invoice {
     estimateStatus: raw.estimate_status ?? undefined,
     poNumber: raw.po_number ?? undefined,
     paymentTerms: raw.payment_terms ?? undefined,
+    invoiceTemplateId: raw.invoice_template_id ?? undefined,
     currency: raw.currency ?? 'USD',
     terms: raw.terms ?? undefined,
     publicToken: raw.public_token ?? undefined,
@@ -69,6 +70,7 @@ export interface CreateInvoiceBody {
   taxRate?: number;
   discountType?: 'percentage' | 'fixed' | null;
   discountValue?: number | null;
+  invoiceTemplateId?: string | null;
   notes?: string | null;
   terms?: string | null;
 }
@@ -174,6 +176,7 @@ export function useUpdateInvoice(id: string) {
       status?: string; estimateStatus?: string; paidAt?: string | null;
       notes?: string | null; terms?: string | null; poNumber?: string | null; taxRate?: number;
       invoiceNumber?: string; discountType?: 'percentage' | 'fixed' | null; discountValue?: number | null;
+      invoiceTemplateId?: string | null;
       // Draft-only full edit (Wave-style):
       clientId?: string; paymentTerms?: string; issueDate?: string; dueDate?: string | null; currency?: string;
       lineItems?: { itemName?: string | null; description?: string | null; quantity: number; unitPrice: number; productId?: string | null }[];
@@ -281,6 +284,26 @@ export function useDeletePayment(invoiceId: string) {
       qc.invalidateQueries({ queryKey: ['invoices'] });
       qc.invalidateQueries({ queryKey: ['invoices', invoiceId] });
       qc.invalidateQueries({ queryKey: ['invoices', invoiceId, 'payments'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+}
+
+export interface BulkSendResult {
+  sent: number;
+  total: number;
+  failed: { id: string; invoiceNumber?: string; error: string }[];
+}
+
+export function useSendBulkInvoices() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const { data } = await apiClient.post('/invoices/bulk-send', { ids });
+      return data.data as BulkSendResult;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
     },
   });

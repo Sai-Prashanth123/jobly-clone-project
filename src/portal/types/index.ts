@@ -412,6 +412,7 @@ export interface Invoice {
   estimateStatus?: EstimateStatus;
   poNumber?: string;
   paymentTerms?: string;
+  invoiceTemplateId?: string;
   currency?: string;
   terms?: string;
   publicToken?: string;

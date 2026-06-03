@@ -52,7 +52,15 @@ function makeMoney(currency: string): (n: number) => string {
   return (n: number) => fmt.format(Number(n) || 0);
 }
 
-export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
+// A selectable invoice theme parameterizes the renderer (it is NOT free-form
+// layout code). Absent fields fall back to the Classic defaults.
+export interface InvoiceTheme {
+  accentColor?: string;   // hex — recolors the doc label, number, table header, total band
+  headerStyle?: string;   // 'plain' | 'band' (a top accent stripe)
+  footerText?: string;
+}
+
+export function generateInvoicePDF(data: InvoicePDFData, theme?: InvoiceTheme): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50, size: 'A4' });
     const chunks: Buffer[] = [];
@@ -60,8 +68,9 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
 
-    // Palette + geometry
-    const blue = '#2563EB';
+    // Palette + geometry. `accent` is the theme color used for the doc label,
+    // number, table-header fill, and total band.
+    const accent = (theme?.accentColor && /^#[0-9a-f]{6}$/i.test(theme.accentColor)) ? theme.accentColor : '#2563EB';
     const navy = '#0F2942';
     const gray = '#6B7280';
     const lightGray = '#9CA3AF';
@@ -86,15 +95,18 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
       return t + '…';
     };
 
-    // ── Header: logo (left) + document block (right) ──────────────────────────
+    // ── Header: optional accent stripe + logo (left) + document block (right) ──
+    if (theme?.headerStyle === 'band') {
+      doc.rect(0, 0, PAGE_W, 8).fill(accent);
+    }
     try {
       doc.image(getJoblyLogoBuffer(), M, 44, { width: 120 });   // width-only keeps aspect
     } catch {
       doc.fillColor(navy).fontSize(20).font('Helvetica-Bold').text('Jobly Solutions', M, 48);
     }
-    doc.fillColor(navy).fontSize(26).font('Helvetica-Bold')
+    doc.fillColor(accent).fontSize(26).font('Helvetica-Bold')
       .text(docLabel, RIGHT - 240, 44, { width: 240, align: 'right' });
-    doc.fillColor(blue).fontSize(12).font('Helvetica-Bold')
+    doc.fillColor(accent).fontSize(12).font('Helvetica-Bold')
       .text(data.invoiceNumber, RIGHT - 240, 76, { width: 240, align: 'right' });
     doc.fillColor(gray).fontSize(9).font('Helvetica')
       .text('Jobly Solutions · Workforce Management', RIGHT - 260, 94, { width: 260, align: 'right' })
@@ -148,7 +160,7 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
     const colW = [250, 60, 95, 90];
 
     const drawTableHeader = (top: number) => {
-      doc.rect(M, top, CONTENT_W, 26).fill(navy);
+      doc.rect(M, top, CONTENT_W, 26).fill(accent);
       doc.fillColor('#ffffff').fontSize(9.5).font('Helvetica-Bold');
       doc.text('Description', colX[0] + 8, top + 8, { width: colW[0] - 12, align: 'left' });
       doc.text(qtyHeader, colX[1], top + 8, { width: colW[1] - 8, align: 'right' });
@@ -198,7 +210,7 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
     const totLabelX = 330, totValX = M + 405, totValW = 90;
     const totalRow = (label: string, value: string, opts: { bold?: boolean; highlight?: boolean; color?: string } = {}) => {
       if (opts.highlight) {
-        doc.rect(totLabelX - 4, y - 5, RIGHT - totLabelX + 4, 26).fill(navy);
+        doc.rect(totLabelX - 4, y - 5, RIGHT - totLabelX + 4, 26).fill(accent);
         doc.fillColor('#ffffff').fontSize(12).font('Helvetica-Bold');
         doc.text(label, totLabelX + 6, y + 2, { width: 120, align: 'left' });
         doc.text(value, totValX, y + 2, { width: totValW, align: 'right' });
@@ -246,7 +258,7 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
     const footerY = doc.page.height - 50;
     doc.rect(0, footerY, PAGE_W, 50).fill('#F3F4F6');
     doc.fillColor(gray).fontSize(8).font('Helvetica')
-      .text('Jobly Solutions  ·  billing@joblysolutions.com  ·  www.joblysolutions.com', M, footerY + 18, {
+      .text(theme?.footerText || 'Jobly Solutions  ·  billing@joblysolutions.com  ·  www.joblysolutions.com', M, footerY + 18, {
         width: CONTENT_W, align: 'center', lineBreak: false,
       });
 
