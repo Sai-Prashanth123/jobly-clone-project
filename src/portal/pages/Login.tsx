@@ -15,21 +15,11 @@ const ACCOUNTS = [
   { role: 'Finance',    email: 'finance@joblysolutions.com', password: 'Jbly#F!n2026',   color: '#10B981' },
 ];
 
-// ── Paper × Neobrutalism tokens ──
-const INK = '#0F172A';      // chunky border + hard-shadow ink (near-black slate)
+// ── Neumorphism tokens (soft dual-shadow surfaces; see portal.css .neu-*) ──
+const INK = '#1E293B';      // readable heading ink
 const BRAND = '#4069FF';    // Jobly blue
 const TEAL = '#32CDDC';     // Jobly teal accent
-// Faint dot-grid texture (Paper + Neobrutalism) for the brand panel.
-const DOT_GRID: React.CSSProperties = {
-  backgroundColor: '#ffffff',
-  backgroundImage: 'radial-gradient(rgba(15,23,42,0.07) 1px, transparent 1px)',
-  backgroundSize: '22px 22px',
-};
-// Neobrutalist primary button (chunky border + hard offset shadow that "presses").
-const NB_BTN =
-  'rounded-xl font-extrabold text-white bg-[#4069FF] border-2 border-[#0F172A] shadow-[3px_3px_0_#0F172A] ' +
-  'hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[2px_2px_0_#0F172A] ' +
-  'active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all disabled:opacity-60';
+const CANVAS = '#eceef4';   // tinted neumorphic surface
 
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
@@ -78,20 +68,14 @@ export default function Login() {
     setActive(a.role);
   };
 
-  // Shared input styling — white field, chunky ink border, brand-blue hard focus shadow.
-  const inputCls =
-    'h-12 rounded-xl text-sm bg-white border-2 border-[#0F172A] px-3.5 transition-all ' +
-    'placeholder:text-gray-300 focus-visible:ring-0 focus-visible:ring-offset-0 ' +
-    'focus:border-[#4069FF] focus:shadow-[3px_3px_0_#4069FF]';
+  // Soft inset neumorphic field (sharper corners).
+  const inputCls = 'h-12 rounded-lg text-sm px-3.5 neu-input placeholder:text-slate-400 focus-visible:ring-0 focus-visible:ring-offset-0';
 
   return (
-    <div className="portal-scope min-h-screen flex bg-white">
+    <div className="portal-scope neu-canvas min-h-screen flex" style={{ background: CANVAS }}>
 
-      {/* ── Left — white neobrutalist brand panel ── */}
-      <div
-        className="hidden lg:flex flex-col justify-between w-[44%] px-14 py-12 relative overflow-hidden border-r-2 border-[#0F172A]"
-        style={DOT_GRID}
-      >
+      {/* ── Left — neumorphic brand panel ── */}
+      <div className="hidden lg:flex flex-col justify-between w-[44%] px-14 py-12 relative">
         {/* Logo */}
         <div className="relative z-10">
           <img
@@ -102,8 +86,8 @@ export default function Login() {
           />
         </div>
 
-        {/* Centre copy — chunky bordered paper card */}
-        <div className="relative z-10 bg-white border-2 border-[#0F172A] rounded-2xl shadow-[7px_7px_0_#0F172A] p-8 max-w-[440px]">
+        {/* Centre copy — soft extruded panel, sharper corners */}
+        <div className="relative z-10 neu-raised rounded-lg p-8 max-w-[440px]" style={{ background: CANVAS }}>
           <p className="text-[11px] font-extrabold tracking-[0.22em] uppercase mb-4" style={{ color: BRAND }}>
             Workforce Platform
           </p>
@@ -114,12 +98,12 @@ export default function Login() {
             Employees, clients, timesheets, approvals, and invoicing — streamlined for staffing agencies.
           </p>
 
-          {/* Trust badges — neobrutalist chips */}
-          <div className="flex flex-wrap items-center gap-2.5">
-            <span className="inline-flex items-center gap-1.5 bg-white border-2 border-[#0F172A] rounded-lg px-2.5 py-1 text-[11px] font-bold shadow-[2px_2px_0_#0F172A]" style={{ color: INK }}>
+          {/* Trust badges — small soft raised chips */}
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="inline-flex items-center gap-1.5 neu-raised-sm rounded-md px-2.5 py-1.5 text-[11px] font-bold" style={{ background: CANVAS, color: INK }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#10B981' }} /> SOC&nbsp;2 ready
             </span>
-            <span className="inline-flex items-center gap-1.5 bg-white border-2 border-[#0F172A] rounded-lg px-2.5 py-1 text-[11px] font-bold shadow-[2px_2px_0_#0F172A]" style={{ color: INK }}>
+            <span className="inline-flex items-center gap-1.5 neu-raised-sm rounded-md px-2.5 py-1.5 text-[11px] font-bold" style={{ background: CANVAS, color: INK }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: TEAL }} /> SSO via Supabase
             </span>
           </div>
@@ -131,8 +115,8 @@ export default function Login() {
         </div>
       </div>
 
-      {/* ── Right — form panel (clean white) ── */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-20 bg-white">
+      {/* ── Right — form panel ── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 sm:px-8 py-8 sm:py-12 lg:px-20">
         {/* Back link */}
         <div className="w-full max-w-[400px] mb-6 sm:mb-10">
           <Link
@@ -194,7 +178,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setShowPw(p => !p)}
-                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#0F172A] transition-colors"
+                  className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[#1E293B] transition-colors z-10"
                 >
                   {showPw ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -213,8 +197,8 @@ export default function Login() {
 
             {error && (
               <div
-                className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold border-2 shadow-[3px_3px_0_#DC2626]"
-                style={{ background: '#FEF2F2', borderColor: '#DC2626', color: '#B91C1C' }}
+                className="flex items-center gap-2.5 px-4 py-3 rounded-lg text-sm font-semibold neu-inset"
+                style={{ background: CANVAS, color: '#DC2626' }}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
                 {error}
@@ -224,7 +208,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-12 rounded-xl font-extrabold text-[13px] text-white bg-[#4069FF] border-2 border-[#0F172A] flex items-center justify-center gap-2 shadow-[4px_4px_0_#0F172A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0_#0F172A] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all disabled:opacity-60 disabled:cursor-not-allowed disabled:translate-x-0 disabled:translate-y-0 disabled:shadow-[4px_4px_0_#0F172A]"
+              className="neu-btn-primary w-full h-12 rounded-lg font-extrabold text-[13px] text-white flex items-center justify-center gap-2"
               style={{ marginTop: '8px' }}
             >
               {loading
@@ -234,16 +218,16 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Account switcher — neobrutalist demo chips */}
+          {/* Account switcher — soft neumorphic demo chips */}
           <div className="mt-10">
             <div className="flex items-center gap-3 mb-4">
-              <span className="h-0.5 flex-1" style={{ background: 'rgba(15,23,42,0.12)' }} />
-              <p className="text-[10px] uppercase tracking-[0.16em] font-extrabold" style={{ color: 'rgba(15,23,42,0.55)' }}>
+              <span className="h-px flex-1" style={{ background: 'rgba(15,23,42,0.10)' }} />
+              <p className="text-[10px] uppercase tracking-[0.16em] font-extrabold" style={{ color: 'rgba(30,41,59,0.55)' }}>
                 Demo accounts
               </p>
-              <span className="h-0.5 flex-1" style={{ background: 'rgba(15,23,42,0.12)' }} />
+              <span className="h-px flex-1" style={{ background: 'rgba(15,23,42,0.10)' }} />
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {ACCOUNTS.map(a => {
                 const isActive = active === a.role;
                 return (
@@ -251,12 +235,8 @@ export default function Login() {
                     key={a.role}
                     type="button"
                     onClick={() => quickFill(a)}
-                    className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-[12px] font-bold text-left border-2 bg-white shadow-[2px_2px_0_#0F172A] hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-[1px_1px_0_#0F172A] active:translate-x-[2px] active:translate-y-[2px] active:shadow-none transition-all"
-                    style={{
-                      borderColor: isActive ? a.color : INK,
-                      background: isActive ? `${a.color}14` : '#ffffff',
-                      color: isActive ? a.color : INK,
-                    }}
+                    className={`neu-raised-sm neu-chip ${isActive ? 'is-active' : ''} flex items-center gap-2.5 px-3 py-2.5 rounded-md text-[12px] font-bold text-left`}
+                    style={{ background: CANVAS, color: isActive ? a.color : INK }}
                   >
                     <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: a.color }} />
                     {a.role}
@@ -276,7 +256,7 @@ export default function Login() {
           shows the same generic confirmation (the backend never reveals whether
           the email exists). */}
       <Dialog open={fpOpen} onOpenChange={setFpOpen}>
-        <DialogContent className="w-[95vw] max-w-md border-2 border-[#0F172A] rounded-2xl shadow-[6px_6px_0_#0F172A]">
+        <DialogContent className="w-[95vw] max-w-md rounded-2xl neu-raised border-0" style={{ background: CANVAS }}>
           <DialogHeader>
             <DialogTitle className="font-black" style={{ color: INK }}>Reset your password</DialogTitle>
             <DialogDescription>
@@ -294,7 +274,7 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setFpOpen(false)}
-                  className={`${NB_BTN} px-4 h-10 text-[13px]`}
+                  className="neu-btn-primary px-4 h-10 rounded-lg text-[13px] font-extrabold text-white"
                 >
                   Done
                 </button>
@@ -325,14 +305,14 @@ export default function Login() {
                 <button
                   type="button"
                   onClick={() => setFpOpen(false)}
-                  className="px-4 h-10 rounded-lg text-[13px] font-bold text-slate-500 hover:text-[#0F172A] transition-colors"
+                  className="px-4 h-10 rounded-lg text-[13px] font-bold text-slate-500 hover:text-[#1E293B] transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={forgot.isPending}
-                  className={`${NB_BTN} px-4 h-10 text-[13px] flex items-center gap-2`}
+                  className="neu-btn-primary px-4 h-10 rounded-lg text-[13px] font-extrabold text-white flex items-center gap-2"
                 >
                   {forgot.isPending ? <><Loader2 className="h-4 w-4 animate-spin" /> Sending…</> : 'Send instructions'}
                 </button>

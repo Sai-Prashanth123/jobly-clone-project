@@ -404,3 +404,37 @@
   pointer-events: none;
   height: 0;
 }
+
+/* ── Neumorphism (login page) — soft dual shadows on a tinted canvas ── */
+.neu-canvas { background: #eceef4; }
+.neu-raised   { box-shadow: 7px 7px 18px #c7cbd8, -7px -7px 18px #ffffff; }
+.neu-raised-sm{ box-shadow: 4px 4px 11px #c9cdda, -4px -4px 11px #ffffff; }
+.neu-inset    { box-shadow: inset 5px 5px 11px #c7cbd8, inset -5px -5px 11px #ffffff; }
+
+/* Soft inset input field */
+.neu-input {
+  background: #eceef4 !important;
+  border: 0 !important;
+  box-shadow: inset 4px 4px 9px #c7cbd8, inset -4px -4px 9px #ffffff;
+  transition: box-shadow .2s ease;
+}
+.neu-input:focus, .neu-input:focus-visible {
+  box-shadow: inset 4px 4px 9px #c7cbd8, inset -4px -4px 9px #ffffff, 0 0 0 2px rgba(64,105,255,0.40) !important;
+  outline: none !important;
+}
+
+/* Soft raised demo chip → presses inward on click */
+.neu-chip { transition: box-shadow .15s ease; }
+.neu-chip:hover  { box-shadow: 6px 6px 14px #c7cbd8, -6px -6px 14px #ffffff; }
+.neu-chip:active { box-shadow: inset 4px 4px 9px #c7cbd8, inset -4px -4px 9px #ffffff; }
+.neu-chip.is-active { box-shadow: inset 4px 4px 9px #c7cbd8, inset -4px -4px 9px #ffffff; }
+
+/* Soft brand button → extruded, pushes in on press */
+.neu-btn-primary {
+  background: #4069FF;
+  box-shadow: 6px 6px 15px rgba(64,105,255,0.38), -5px -5px 13px rgba(255,255,255,0.9);
+  transition: box-shadow .15s ease, transform .12s ease;
+}
+.neu-btn-primary:hover:not(:disabled)  { box-shadow: 4px 4px 11px rgba(64,105,255,0.42), -3px -3px 9px rgba(255,255,255,0.9); }
+.neu-btn-primary:active:not(:disabled) { box-shadow: inset 4px 4px 11px rgba(26,48,140,0.55), inset -3px -3px 9px rgba(120,150,255,0.45); transform: translateY(1px); }
+.neu-btn-primary:disabled { opacity: .6; cursor: not-allowed; }
