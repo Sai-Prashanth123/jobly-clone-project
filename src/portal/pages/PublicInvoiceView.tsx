@@ -94,6 +94,7 @@ export default function PublicInvoiceView() {
         <div className="px-8 py-4 flex justify-end">
           <div className="w-64 space-y-1 text-sm">
             <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{formatCurrency(data.subtotal, cur)}</span></div>
+            {Number(data.discount_amount) > 0 && <div className="flex justify-between text-gray-600"><span>Discount{data.discount_type === 'percentage' && data.discount_value ? ` (${data.discount_value}%)` : ''}</span><span>−{formatCurrency(data.discount_amount, cur)}</span></div>}
             {Number(data.tax_rate) > 0 && <div className="flex justify-between text-gray-600"><span>Tax ({data.tax_rate}%)</span><span>{formatCurrency(data.tax_amount, cur)}</span></div>}
             <div className="flex justify-between font-semibold text-base border-t pt-2"><span>Total</span><span>{formatCurrency(data.total_amount, cur)}</span></div>
             {!isEstimate && Number(data.amount_paid) > 0 && (

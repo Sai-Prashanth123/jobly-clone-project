@@ -98,6 +98,12 @@ export function InvoicePrintView({ invoice, client }: InvoicePrintViewProps) {
               <span className="text-gray-500">Subtotal</span>
               <span>{formatCurrency(invoice.subtotal)}</span>
             </div>
+            {!!invoice.discountAmount && invoice.discountAmount > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500">Discount{invoice.discountType === 'percentage' && invoice.discountValue ? ` (${invoice.discountValue}%)` : ''}</span>
+                <span>−{formatCurrency(invoice.discountAmount)}</span>
+              </div>
+            )}
             {invoice.taxRate > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-500">Tax ({invoice.taxRate.toFixed(1)}%)</span>

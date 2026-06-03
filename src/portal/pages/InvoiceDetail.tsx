@@ -2,10 +2,11 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Trash2, Loader2, Download, Send, DollarSign } from 'lucide-react';
+import { ArrowLeft, Trash2, Loader2, Download, Send, DollarSign, Paperclip } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
+import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { InvoicePrintView } from '../components/invoices/InvoicePrintView';
 import { useInvoice, useDeleteInvoice, useGetInvoicePDF, useSendInvoice, useInvoicePayments, useDeletePayment } from '../hooks/useInvoices';
 import { useClient } from '../hooks/useClients';
@@ -192,6 +193,22 @@ export default function InvoiceDetail() {
               <p className="text-sm font-semibold">
                 {formatDate(invoice.billingPeriodStart ?? '')} → {formatDate(invoice.billingPeriodEnd ?? '')}
               </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {(invoice.attachments && invoice.attachments.length > 0) && (
+        <Card className="portal-no-print">
+          <CardContent className="pt-4 pb-4">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1.5"><Paperclip className="h-3.5 w-3.5" /> Attachments</p>
+            <div className="space-y-2">
+              {invoice.attachments.map(a => (
+                <div key={a.id} className="flex items-center justify-between gap-2 text-sm border-b border-gray-100 last:border-0 pb-2 last:pb-0">
+                  <span className="truncate flex items-center gap-2 min-w-0"><Paperclip className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" /> {a.name}</span>
+                  <DocumentDownloadButton docId={a.id} label="Download" />
+                </div>
+              ))}
             </div>
           </CardContent>
         </Card>

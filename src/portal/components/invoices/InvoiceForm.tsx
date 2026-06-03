@@ -1,4 +1,4 @@
-import { useState, forwardRef, useImperativeHandle } from 'react';
+import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
@@ -7,17 +7,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Plus, Trash2 } from 'lucide-react';
-import { formatCurrency, formatDate, parseNumberInput } from '../../lib/utils';
+import { Plus, Trash2, ChevronDown, ChevronRight, Paperclip, UploadCloud, X, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { formatCurrency, formatDate, parseNumberInput, computeDiscount } from '../../lib/utils';
+import { CURRENCIES, currencyLabel } from '../../lib/currencies';
 import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useProducts } from '../../hooks/useProducts';
-import type { CreateInvoiceBody } from '../../hooks/useInvoices';
+import { useUploadInvoiceAttachment, useDeleteInvoiceAttachment, type CreateInvoiceBody } from '../../hooks/useInvoices';
+import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
+import type { InvoiceAttachment, InvoiceStatus } from '../../types';
 
 // Prefill shape for edit-draft mode (mapped from an existing draft invoice).
 export interface InvoiceFormInitial {
+  id?: string;
+  invoiceNumber?: string;
+  status?: InvoiceStatus;
   clientId: string;
   poNumber?: string;
   paymentTerms?: string;
@@ -25,12 +32,21 @@ export interface InvoiceFormInitial {
   dueDate?: string;
   currency?: string;
   taxRate?: number;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number;
+  amountPaid?: number;
   notes?: string;
   terms?: string;
+  attachments?: InvoiceAttachment[];
   lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number; productId?: string }[];
 }
 
-export interface InvoiceFormHandle { submit: () => void }
+export interface InvoiceFormHandle {
+  submit: () => void;
+  // Files the user dropped before the invoice existed (create mode); the page
+  // uploads these to the new invoice id after create resolves.
+  getPendingAttachments: () => File[];
+}
 
 interface InvoiceFormProps {
   // Create: timesheet-generate path (invoices only).
@@ -52,6 +68,15 @@ const PAYMENT_TERMS_OPTIONS = [
   { value: 'net_60', label: 'Net 60', days: 60 },
   { value: 'custom', label: 'Custom date', days: -1 },
 ];
+
+// Mirrors backend ALLOWED_MIME_TYPES (middleware/upload.ts) for instant feedback.
+const ALLOWED_MIME = new Set([
+  'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain', 'text/csv',
+]);
+const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 function addDays(dateIso: string, days: number): string {
@@ -85,6 +110,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const [clientId, setClientId] = useState(initial?.clientId ?? '');
   const [error, setError] = useState('');
 
+  const [invoiceNumber, setInvoiceNumber] = useState(initial?.invoiceNumber ?? '');
   const [issueDate, setIssueDate] = useState(initial?.issueDate ?? todayIso());
   const [taxRate, setTaxRate] = useState(initial?.taxRate ?? 0);
 
@@ -96,8 +122,22 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const [currency, setCurrency] = useState(initial?.currency ?? 'USD');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [terms, setTerms] = useState(initial?.terms ?? '');
+  const [footerOpen, setFooterOpen] = useState(!!initial?.terms);
   const [lines, setLines] = useState<DraftLine[]>(() => linesFromInitial(initial));
   const [catalogPick, setCatalogPick] = useState('');
+
+  // ── Discount (Wave "Add a discount") — manual mode only ──
+  const [discountMode, setDiscountMode] = useState<'none' | 'percentage' | 'fixed'>(initial?.discountType ?? 'none');
+  const [discountValueStr, setDiscountValueStr] = useState(
+    initial?.discountValue ? String(initial.discountValue) : '',
+  );
+
+  // ── Attachments ──
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+  const uploadAttachment = useUploadInvoiceAttachment(initial?.id ?? '');
+  const deleteAttachment = useDeleteInvoiceAttachment(initial?.id ?? '');
 
   const [selected, setSelected] = useState<string[]>([]);
 
@@ -143,9 +183,17 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   });
   const tsSubtotal = tsPreview.reduce((s, t) => s + t.amount, 0);
 
+  // Shared totals. Discount only ever applies in manual mode (the control isn't
+  // rendered in timesheet mode, so discountMode stays 'none' there → no effect).
   const subtotal = mode === 'manual' ? manualSubtotal : tsSubtotal;
-  const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
-  const total = Math.round((subtotal + taxAmount) * 100) / 100;
+  const discountType = discountMode === 'none' ? null : discountMode;
+  const discountValue = parseNumberInput(discountValueStr) ?? 0;
+  const discountAmount = computeDiscount(subtotal, discountType, discountValue);
+  const discountedSubtotal = Math.round((subtotal - discountAmount) * 100) / 100;
+  const taxAmount = Math.round(discountedSubtotal * (taxRate / 100) * 100) / 100;
+  const total = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
+  const amountPaid = initial?.amountPaid ?? 0;
+  const amountDue = Math.round((total - amountPaid) * 100) / 100;
 
   const updateLine = (id: string, patch: Partial<DraftLine>) =>
     setLines(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
@@ -161,6 +209,38 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     setCatalogPick('');
   };
 
+  // ── Attachment handling ──
+  const validateFile = (file: File): string | null => {
+    if (file.size > MAX_FILE_BYTES) return `${file.name} is larger than 20MB.`;
+    if (!ALLOWED_MIME.has(file.type)) return `${file.name}: that file type isn't allowed.`;
+    return null;
+  };
+  const acceptFiles = (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const list = Array.from(files);
+    for (const f of list) {
+      const err = validateFile(f);
+      if (err) { toast.error(err); continue; }
+      if (initial?.id) {
+        // Edit mode: upload immediately to the existing invoice.
+        const fd = new FormData();
+        fd.append('file', f);
+        uploadAttachment.mutate(fd, {
+          onSuccess: () => toast.success(`${f.name} attached`),
+          onError: () => toast.error(`Could not attach ${f.name}`),
+        });
+      } else {
+        // Create mode: hold locally; the page uploads after the invoice saves.
+        setPendingFiles(prev => [...prev, f]);
+      }
+    }
+  };
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    acceptFiles(e.dataTransfer.files);
+  };
+
   const handleSubmit = () => {
     if (!clientId) { setError('Please select a client'); return; }
     if (mode === 'timesheets') {
@@ -171,16 +251,21 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     const valid = manualLines.filter(l => (l.itemName.trim() || l.description.trim()) && l.amount >= 0 && (l.qty > 0 || l.price > 0));
     if (valid.length === 0) { setError('Add at least one line item with a name and amount'); return; }
     if (paymentTerms === 'custom' && !customDueDate) { setError('Pick a custom due date'); return; }
+    if (discountMode !== 'none' && discountValue <= 0) { setError('Enter a discount amount, or remove the discount'); return; }
+    if (discountMode === 'percentage' && discountValue > 100) { setError('A percentage discount cannot exceed 100%'); return; }
     setError('');
     onSubmitManual({
       clientId,
       docType,
+      invoiceNumber: invoiceNumber.trim() || undefined,
       poNumber: poNumber || null,
       paymentTerms,
       issueDate,
       dueDate: paymentTerms === 'custom' ? customDueDate : null,
       currency,
       taxRate,
+      discountType,
+      discountValue: discountType ? discountValue : null,
       notes: notes || null,
       terms: terms || null,
       lineItems: valid.map(l => ({
@@ -193,9 +278,24 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     });
   };
 
-  useImperativeHandle(ref, () => ({ submit: handleSubmit }));
+  useImperativeHandle(ref, () => ({ submit: handleSubmit, getPendingAttachments: () => pendingFiles }));
 
   const docLabel = isEstimate ? 'Estimate' : 'Invoice';
+  const existingAttachments = initial?.attachments ?? [];
+
+  // ── Currency dropdown (reused beside Total + nowhere else) ──
+  const currencySelect = (
+    <Select value={currency} onValueChange={setCurrency}>
+      <SelectTrigger className="h-8 w-[210px] text-xs"><SelectValue /></SelectTrigger>
+      <SelectContent>
+        {CURRENCIES.map(c => <SelectItem key={c.code} value={c.code}>{currencyLabel(c)}</SelectItem>)}
+        {/* Preserve a non-standard currency already on the invoice. */}
+        {!CURRENCIES.some(c => c.code === currency) && currency && (
+          <SelectItem value={currency}>{currency}</SelectItem>
+        )}
+      </SelectContent>
+    </Select>
+  );
 
   return (
     <div className="space-y-5">
@@ -231,7 +331,20 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
       {mode === 'manual' && (
         <>
           <Card>
-            <CardHeader><CardTitle className="text-base">{docLabel} details</CardTitle></CardHeader>
+            <CardHeader>
+              {/* Editable invoice number — Wave shows it at the top of the document. */}
+              <div className="flex flex-col gap-1 max-w-xs">
+                <Label htmlFor="invoiceNumber" className="text-xs uppercase tracking-wide text-gray-400">{docLabel} number</Label>
+                <Input
+                  id="invoiceNumber"
+                  value={invoiceNumber}
+                  onChange={e => setInvoiceNumber(e.target.value)}
+                  placeholder={isEdit ? undefined : `Auto (${isEstimate ? 'EST' : 'INV'}-${new Date().getUTCFullYear()}-####)`}
+                  className="font-mono text-base font-semibold"
+                />
+                {!isEdit && <p className="text-[11px] text-muted-foreground">Leave blank to auto-number, or type your own.</p>}
+              </div>
+            </CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="space-y-1.5">
                 <Label>P.O. / S.O. number</Label>
@@ -255,10 +368,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                 {paymentTerms === 'custom'
                   ? <Input type="date" value={customDueDate} onChange={e => setCustomDueDate(e.target.value)} />
                   : <Input value={dueDate} disabled />}
-              </div>
-              <div className="space-y-1.5">
-                <Label>Currency</Label>
-                <Input value={currency} onChange={e => setCurrency(e.target.value.toUpperCase().slice(0, 8))} className="w-28" />
               </div>
             </CardContent>
           </Card>
@@ -289,7 +398,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                   <Input value={l.description} onChange={e => updateLine(l.id, { description: e.target.value })} placeholder="Description" />
                   <Input type="number" min={0} step="any" inputMode="decimal" value={l.quantity} onChange={e => updateLine(l.id, { quantity: e.target.value })} placeholder="1" />
                   <Input type="number" min={0} step="any" inputMode="decimal" value={l.unitPrice} onChange={e => updateLine(l.id, { unitPrice: e.target.value })} placeholder="0.00" />
-                  <span className="text-sm font-medium text-right tabular-nums">{formatCurrency(l.amount)}</span>
+                  <span className="text-sm font-medium text-right tabular-nums">{formatCurrency(l.amount, currency)}</span>
                   <button type="button" onClick={() => removeLine(l.id)} className="text-gray-400 hover:text-red-600 justify-self-center">
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -301,29 +410,150 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
             </CardContent>
           </Card>
 
+          {/* ── Totals (Wave document layout) ── */}
           <Card>
-            <CardContent className="pt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="space-y-3">
-                <div className="space-y-1.5">
-                  <Label>Notes (shown to client)</Label>
-                  <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="Thanks for your business!" />
+            <CardContent className="pt-6 flex justify-end">
+              <div className="w-full max-w-sm space-y-2 text-sm">
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Subtotal</span><span className="tabular-nums">{formatCurrency(subtotal, currency)}</span>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Terms / footer</Label>
-                  <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={2} placeholder="Payment instructions, late-fee policy…" />
+
+                {/* Add a discount */}
+                {discountMode === 'none' ? (
+                  <button type="button" onClick={() => { setDiscountMode('percentage'); setDiscountValueStr(''); }}
+                    className="text-sm font-medium text-blue-600 hover:text-blue-700 inline-flex items-center gap-1">
+                    <Plus className="h-3.5 w-3.5" /> Add a discount
+                  </button>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className="inline-flex rounded-md border border-gray-200 p-0.5 bg-gray-50">
+                        <button type="button" onClick={() => setDiscountMode('percentage')}
+                          className={`px-2 py-1 text-xs font-medium rounded ${discountMode === 'percentage' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>%</button>
+                        <button type="button" onClick={() => setDiscountMode('fixed')}
+                          className={`px-2 py-1 text-xs font-medium rounded ${discountMode === 'fixed' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>{currency}</button>
+                      </div>
+                      <Input type="number" min={0} step="any" inputMode="decimal"
+                        value={discountValueStr} onChange={e => setDiscountValueStr(e.target.value)}
+                        placeholder={discountMode === 'percentage' ? '10' : '0.00'} className="h-8 w-24" />
+                      <button type="button" onClick={() => { setDiscountMode('none'); setDiscountValueStr(''); }}
+                        className="text-gray-400 hover:text-red-600" aria-label="Remove discount">
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Discount{discountMode === 'percentage' && discountValue > 0 ? ` (${discountValue}%)` : ''}</span>
+                      <span className="tabular-nums">−{formatCurrency(discountAmount, currency)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Tax */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="taxRate" className="text-muted-foreground">Tax %</Label>
+                    <Input id="taxRate" type="number" min={0} max={100} step="any" inputMode="decimal" placeholder="0"
+                      value={taxRate || ''} onChange={e => setTaxRate(Math.max(0, Math.min(100, parseNumberInput(e.target.value) ?? 0)))}
+                      className="h-8 w-20" />
+                  </div>
+                  {taxRate > 0 && <span className="text-muted-foreground tabular-nums">{formatCurrency(taxAmount, currency)}</span>}
                 </div>
-              </div>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center gap-3 justify-end">
-                  <Label htmlFor="taxRate" className="text-muted-foreground">Tax %</Label>
-                  <Input id="taxRate" type="number" min={0} max={100} step="any" inputMode="decimal" placeholder="0"
-                    value={taxRate || ''} onChange={e => setTaxRate(Math.max(0, Math.min(100, parseNumberInput(e.target.value) ?? 0)))}
-                    className="w-24" />
+
+                <Separator />
+                {/* Total + currency dropdown beside it (Wave) */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-base">Total</span>
+                    {currencySelect}
+                  </div>
+                  <span className="font-semibold text-base tabular-nums">{formatCurrency(total, currency)}</span>
                 </div>
-                <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-                {taxRate > 0 && <div className="flex justify-between text-muted-foreground"><span>Tax ({taxRate}%)</span><span>{formatCurrency(taxAmount)}</span></div>}
-                <div className="flex justify-between font-semibold text-base border-t pt-2"><span>Total</span><span>{formatCurrency(total)}</span></div>
+
+                {/* Amount due */}
+                <div className="flex justify-between border-t pt-2 font-semibold">
+                  <span>Amount due</span><span className="tabular-nums">{formatCurrency(amountDue, currency)}</span>
+                </div>
                 <p className="text-xs text-muted-foreground text-right">Due {dueDate}</p>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* ── Notes + Footer + Attachments ── */}
+          <Card>
+            <CardContent className="pt-6 space-y-5">
+              <div className="space-y-1.5">
+                <Label>Notes / Terms (shown to client)</Label>
+                <Textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2}
+                  placeholder="Enter notes or terms of service that are visible to your customer" />
+              </div>
+
+              {/* Collapsible Footer (maps to the invoice `terms` column) */}
+              <div className="border rounded-md">
+                <button type="button" onClick={() => setFooterOpen(o => !o)}
+                  className="w-full flex items-center justify-between px-3 py-2.5 text-sm font-medium">
+                  <span>Footer</span>
+                  {footerOpen ? <ChevronDown className="h-4 w-4 text-gray-400" /> : <ChevronRight className="h-4 w-4 text-gray-400" />}
+                </button>
+                {footerOpen && (
+                  <div className="px-3 pb-3">
+                    <Textarea value={terms} onChange={e => setTerms(e.target.value)} rows={2}
+                      placeholder="Payment instructions, late-fee policy, thank-you note…" />
+                  </div>
+                )}
+              </div>
+
+              {/* Attachments */}
+              <div className="space-y-2">
+                <Label className="flex items-center gap-1.5"><Paperclip className="h-4 w-4" /> Attachments</Label>
+                <div
+                  onDragOver={e => { e.preventDefault(); setDragOver(true); }}
+                  onDragLeave={() => setDragOver(false)}
+                  onDrop={onDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`cursor-pointer rounded-lg border-2 border-dashed px-4 py-8 text-center transition-colors ${dragOver ? 'border-blue-400 bg-blue-50/50' : 'border-gray-200 hover:border-gray-300'}`}
+                >
+                  <UploadCloud className="h-8 w-8 mx-auto text-gray-300" />
+                  <p className="mt-2 text-sm text-muted-foreground">Drag files here or click to upload</p>
+                  <p className="text-xs text-gray-400">Max 20MB</p>
+                  {uploadAttachment.isPending && (
+                    <p className="mt-1 text-xs text-blue-600 inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</p>
+                  )}
+                  <input ref={fileInputRef} type="file" multiple className="hidden"
+                    onChange={e => { acceptFiles(e.target.files); e.target.value = ''; }} />
+                </div>
+
+                {/* Pending (create mode) */}
+                {pendingFiles.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {pendingFiles.map((f, i) => (
+                      <li key={`${f.name}-${i}`} className="flex items-center justify-between rounded-md border bg-gray-50 px-3 py-2 text-sm">
+                        <span className="truncate">{f.name} <span className="text-xs text-muted-foreground">· uploads after save</span></span>
+                        <button type="button" onClick={() => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))}
+                          className="text-gray-400 hover:text-red-600"><X className="h-4 w-4" /></button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {/* Existing (edit mode) */}
+                {existingAttachments.length > 0 && (
+                  <ul className="space-y-1.5">
+                    {existingAttachments.map(a => (
+                      <li key={a.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
+                        <span className="truncate flex items-center gap-2"><Paperclip className="h-3.5 w-3.5 text-gray-400" /> {a.name}</span>
+                        <div className="flex items-center gap-2">
+                          <DocumentDownloadButton docId={a.id} label="Download" />
+                          <button type="button" onClick={() => deleteAttachment.mutate(a.id, {
+                            onSuccess: () => toast.success('Attachment removed'),
+                            onError: () => toast.error('Could not remove attachment'),
+                          })} className="text-gray-400 hover:text-red-600" aria-label="Delete attachment">
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -352,7 +582,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                           <p className="text-xs text-muted-foreground">{asgn?.projectName} • Week of {formatDate(t.weekStartDate)} • {t.totalHours} hrs</p>
                         </div>
                         <div className="text-sm font-semibold text-right">
-                          <div>{formatCurrency(amount)}</div>
+                          <div>{formatCurrency(amount, currency)}</div>
                           <div className="text-xs text-muted-foreground">@ ${asgn?.billRate ?? 0}/hr</div>
                         </div>
                       </label>
@@ -371,9 +601,9 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                     value={taxRate || ''} onChange={e => setTaxRate(Math.max(0, Math.min(100, parseNumberInput(e.target.value) ?? 0)))} className="w-24" />
                 </div>
                 <Separator />
-                <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(subtotal)}</span></div>
-                {taxRate > 0 && <div className="flex justify-between text-muted-foreground"><span>Tax ({taxRate}%)</span><span>{formatCurrency(taxAmount)}</span></div>}
-                <div className="flex justify-between font-semibold text-base border-t pt-2"><span>Total</span><span>{formatCurrency(total)}</span></div>
+                <div className="flex justify-between text-muted-foreground"><span>Subtotal</span><span>{formatCurrency(subtotal, currency)}</span></div>
+                {taxRate > 0 && <div className="flex justify-between text-muted-foreground"><span>Tax ({taxRate}%)</span><span>{formatCurrency(taxAmount, currency)}</span></div>}
+                <div className="flex justify-between font-semibold text-base border-t pt-2"><span>Total</span><span>{formatCurrency(total, currency)}</span></div>
               </CardContent>
             </Card>
           )}

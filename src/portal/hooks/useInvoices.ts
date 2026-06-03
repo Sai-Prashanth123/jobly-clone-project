@@ -24,6 +24,9 @@ function mapInvoice(raw: any): Invoice {
       amount: li.amount,
     })),
     subtotal: raw.subtotal,
+    discountType: raw.discount_type ?? null,
+    discountValue: raw.discount_value != null ? Number(raw.discount_value) : 0,
+    discountAmount: raw.discount_amount != null ? Number(raw.discount_amount) : 0,
     taxRate: raw.tax_rate,
     taxAmount: raw.tax_amount,
     totalAmount: raw.total_amount,
@@ -40,6 +43,9 @@ function mapInvoice(raw: any): Invoice {
     viewedAt: raw.viewed_at ?? undefined,
     convertedInvoiceId: raw.converted_invoice_id ?? undefined,
     timesheetIds: (raw.invoice_timesheets ?? []).map((it: any) => it.timesheet_id as string),
+    attachments: (raw.attachments ?? []).map((a: { id: string; name: string; type: string; uploaded_at: string }) => ({
+      id: a.id, name: a.name, type: a.type, uploadedAt: a.uploaded_at,
+    })),
     pdfUrl: raw.pdf_url ?? undefined,
     paidAt: raw.paid_at ?? undefined,
     notes: raw.notes ?? undefined,
@@ -53,6 +59,7 @@ function mapInvoice(raw: any): Invoice {
 export interface CreateInvoiceBody {
   clientId: string;
   docType?: 'invoice' | 'estimate';
+  invoiceNumber?: string;
   poNumber?: string | null;
   paymentTerms?: string;
   issueDate: string;
@@ -60,6 +67,8 @@ export interface CreateInvoiceBody {
   currency?: string;
   lineItems: { itemName?: string | null; description?: string | null; quantity: number; unitPrice: number; productId?: string | null }[];
   taxRate?: number;
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number | null;
   notes?: string | null;
   terms?: string | null;
 }
@@ -161,6 +170,7 @@ export function useUpdateInvoice(id: string) {
     mutationFn: async (body: {
       status?: string; estimateStatus?: string; paidAt?: string | null;
       notes?: string | null; terms?: string | null; poNumber?: string | null; taxRate?: number;
+      invoiceNumber?: string; discountType?: 'percentage' | 'fixed' | null; discountValue?: number | null;
       // Draft-only full edit (Wave-style):
       clientId?: string; paymentTerms?: string; issueDate?: string; dueDate?: string | null; currency?: string;
       lineItems?: { itemName?: string | null; description?: string | null; quantity: number; unitPrice: number; productId?: string | null }[];
@@ -184,6 +194,37 @@ export function useDeleteInvoice() {
       qc.invalidateQueries({ queryKey: ['invoices'] });
       qc.invalidateQueries({ queryKey: ['invoices', id] });
       qc.invalidateQueries({ queryKey: ['reports'] });
+    },
+  });
+}
+
+// ── Attachments ──────────────────────────────────────────────────────────────
+// Upload a file to an invoice. Mirrors useUploadEmployeeDocument; the response
+// attachment list rides inside GET /invoices/:id so we invalidate that query.
+export function useUploadInvoiceAttachment(invoiceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (formData: FormData) => {
+      const { data } = await apiClient.post(`/invoices/${invoiceId}/attachments`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return data.data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices', invoiceId] });
+    },
+  });
+}
+
+export function useDeleteInvoiceAttachment(invoiceId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (docId: string) => {
+      const { data } = await apiClient.delete(`/invoices/${invoiceId}/attachments/${docId}`);
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['invoices', invoiceId] });
     },
   });
 }

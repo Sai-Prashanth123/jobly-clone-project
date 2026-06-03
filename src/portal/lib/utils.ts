@@ -76,3 +76,17 @@ export function parseNumberInput(value: string): number | undefined {
   const n = Number(trimmed);
   return Number.isFinite(n) ? n : undefined;
 }
+
+// Resolve a document-level invoice discount to a dollar amount applied to the
+// subtotal (Wave's "Add a discount", applied BEFORE tax). MUST stay byte-identical
+// to the backend's computeDiscountAmount in invoices.service.ts (same formula,
+// rounding, clamping) so the on-screen total matches the persisted total.
+export function computeDiscount(
+  subtotal: number,
+  discountType?: 'percentage' | 'fixed' | null,
+  discountValue?: number | null,
+): number {
+  if (!discountType || !discountValue || discountValue <= 0 || subtotal <= 0) return 0;
+  const raw = discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue;
+  return Math.round(Math.min(Math.max(raw, 0), subtotal) * 100) / 100;
+}

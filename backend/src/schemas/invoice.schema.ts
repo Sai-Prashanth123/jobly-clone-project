@@ -14,6 +14,19 @@ const lineItemSchema = z.object({
   productId: z.string().uuid().optional().nullable(),
 });
 
+// Document-level discount (Wave's "Add a discount"): percentage or fixed amount,
+// applied to the subtotal BEFORE tax. Shared by create + update. The resolved
+// dollar amount is computed server-side; here we only validate the user's input.
+const discountFields = {
+  discountType: z.enum(['percentage', 'fixed']).optional().nullable(),
+  discountValue: z.number().min(0).optional().nullable(),
+};
+// A percentage discount can't exceed 100; a fixed one is clamped to the subtotal
+// in the service. Applied to whichever schema spreads `discountFields`.
+const discountRefine = (v: { discountType?: string | null; discountValue?: number | null }) =>
+  v.discountType !== 'percentage' || (v.discountValue ?? 0) <= 100;
+const discountRefineOpts = { message: 'A percentage discount cannot exceed 100%.', path: ['discountValue'] };
+
 // Generate from approved timesheets (existing flow, kept).
 export const generateInvoiceSchema = z.object({
   clientId: z.string().uuid(),
@@ -27,6 +40,8 @@ export const generateInvoiceSchema = z.object({
 export const createInvoiceSchema = z.object({
   clientId: z.string().uuid(),
   docType: z.enum(['invoice', 'estimate']).default('invoice'),
+  // Optional custom number; blank → the service auto-allocates INV/EST-YYYY-####.
+  invoiceNumber: z.string().trim().max(60).optional(),
   poNumber: z.string().max(100).optional().nullable(),
   paymentTerms: z.enum(PAYMENT_TERMS).default('net_30'),
   issueDate: ymdDate,
@@ -34,12 +49,13 @@ export const createInvoiceSchema = z.object({
   currency: z.string().max(8).default('USD'),
   lineItems: z.array(lineItemSchema).min(1),
   taxRate: z.number().min(0).max(100).default(0),
+  ...discountFields,
   notes: z.string().optional().nullable(),
   terms: z.string().optional().nullable(),
 }).refine(v => v.paymentTerms !== 'custom' || !!v.dueDate, {
   message: 'A due date is required when payment terms are "custom".',
   path: ['dueDate'],
-});
+}).refine(discountRefine, discountRefineOpts);
 
 export const updateInvoiceSchema = z.object({
   status: z.enum(INVOICE_STATUSES).optional(),
@@ -49,6 +65,9 @@ export const updateInvoiceSchema = z.object({
   terms: z.string().optional().nullable(),
   poNumber: z.string().optional().nullable(),
   taxRate: z.number().min(0).max(100).optional(),
+  // Editable invoice number — service applies it on drafts only (locked once issued).
+  invoiceNumber: z.string().trim().max(60).optional(),
+  ...discountFields,
   // Draft-only full edit (Wave-style): when lineItems is present and the invoice
   // is still a draft, the whole document is rebuilt from these fields. Ignored
   // for issued invoices (the service rejects line-item edits there).
@@ -58,7 +77,7 @@ export const updateInvoiceSchema = z.object({
   dueDate: ymdDate.optional().nullable(),
   currency: z.string().max(8).optional(),
   lineItems: z.array(lineItemSchema).optional(),
-});
+}).refine(discountRefine, discountRefineOpts);
 
 export const listInvoicesQuerySchema = z.object({
   status: z.enum(INVOICE_STATUSES).optional(),

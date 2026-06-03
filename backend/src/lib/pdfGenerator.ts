@@ -14,6 +14,7 @@ export interface InvoicePDFData {
     amount: number;
   }>;
   subtotal: number;
+  discountAmount?: number;
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
@@ -123,6 +124,9 @@ export function generateInvoicePDF(data: InvoicePDFData): Promise<Buffer> {
     };
 
     addTotalRow('Subtotal:', `$${data.subtotal.toFixed(2)}`);
+    if (data.discountAmount && data.discountAmount > 0) {
+      addTotalRow('Discount:', `-$${data.discountAmount.toFixed(2)}`);
+    }
     if (data.taxRate > 0) {
       addTotalRow(`Tax (${(data.taxRate * 100).toFixed(1)}%):`, `$${data.taxAmount.toFixed(2)}`);
     }

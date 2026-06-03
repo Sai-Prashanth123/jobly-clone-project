@@ -398,6 +398,10 @@ export interface Invoice {
   dueDate: string;
   lineItems: InvoiceLineItem[];
   subtotal: number;
+  // Document-level discount (Wave's "Add a discount"), applied to subtotal before tax.
+  discountType?: 'percentage' | 'fixed' | null;
+  discountValue?: number;
+  discountAmount?: number;
   taxRate: number;
   taxAmount: number;
   totalAmount: number;
@@ -414,6 +418,7 @@ export interface Invoice {
   viewedAt?: string;
   convertedInvoiceId?: string;
   timesheetIds: string[];
+  attachments?: InvoiceAttachment[];
   pdfUrl?: string;
   paidAt?: string;
   notes?: string;
@@ -421,6 +426,13 @@ export interface Invoice {
   billingPeriodEnd?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface InvoiceAttachment {
+  id: string;
+  name: string;
+  type: string;       // mime type or doc-type label
+  uploadedAt: string;
 }
 
 export interface NavItem {

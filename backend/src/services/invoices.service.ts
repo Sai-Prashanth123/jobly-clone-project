@@ -4,14 +4,51 @@ import { generateInvoicePDF } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
+import { uploadDocument, deleteDocument } from './storage.service';
 import { addDaysToDate, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
 import { paymentTermsDays } from '../schemas/invoice.schema';
 
-// Atomically allocate the next invoice/estimate number, inserting `payload`
-// with it. The count+1 approach races under concurrency, so we retry on the
-// 23505 unique-violation with a fresh count. `prefix` is INV or EST.
-async function insertInvoiceWithNumber(prefix: 'INV' | 'EST', payload: Record<string, unknown>) {
+// Resolve a document-level discount to a dollar amount applied to the subtotal.
+// Percentage → subtotal * value/100; fixed → value. Clamped to [0, subtotal] and
+// rounded to cents. EXPORTED + the frontend's lib/utils.computeDiscount MUST stay
+// byte-identical (same formula, rounding, clamping) so the on-screen preview and
+// the persisted totals match to the cent.
+export function computeDiscountAmount(
+  subtotal: number,
+  discountType?: string | null,
+  discountValue?: number | null,
+): number {
+  if (!discountType || !discountValue || discountValue <= 0 || subtotal <= 0) return 0;
+  const raw = discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue;
+  return Math.round(Math.min(Math.max(raw, 0), subtotal) * 100) / 100;
+}
+
+// Allocate an invoice/estimate number and insert `payload`. When `explicitNumber`
+// is given (the user typed a custom number), do a single insert and surface a
+// duplicate as a friendly 409. Otherwise auto-allocate `${prefix}-${year}-####`;
+// the count+1 approach races under concurrency, so retry on the 23505
+// unique-violation with a fresh count. `prefix` is INV or EST.
+async function insertInvoiceWithNumber(
+  prefix: 'INV' | 'EST',
+  payload: Record<string, unknown>,
+  explicitNumber?: string,
+) {
+  if (explicitNumber) {
+    const { data, error } = await supabaseAdmin
+      .from('invoices')
+      .insert({ ...payload, invoice_number: explicitNumber })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === '23505') {
+        throw new ConflictError(`Invoice number "${explicitNumber}" is already in use. Choose a different number.`);
+      }
+      throw error;
+    }
+    return data;
+  }
+
   const year = new Date().getUTCFullYear();
   let invoice: any = null;
   let invError: any = null;
@@ -60,7 +97,18 @@ export async function getInvoice(id: string) {
     .single();
 
   if (error || !data) throw new NotFoundError('Invoice not found');
-  return data;
+
+  // Attachments are polymorphic (documents.entity_type='invoice'), not a FK child
+  // of invoices, so they need a second query. Detail + editor + getPDF all read
+  // through getInvoice, so they all see attachments. (listInvoices stays lean.)
+  const { data: attachments } = await supabaseAdmin
+    .from('documents')
+    .select('id, name, type, uploaded_at')
+    .eq('entity_type', 'invoice')
+    .eq('entity_id', id)
+    .order('uploaded_at', { ascending: false });
+
+  return { ...data, attachments: attachments ?? [] };
 }
 
 export async function generateInvoice(input: GenerateInvoiceInput, actorId?: string) {
@@ -272,9 +320,13 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
     };
   });
 
+  // subtotal is the raw line-item sum; the discount applies BEFORE tax, so tax +
+  // total are computed on the discounted subtotal (Wave behavior).
   const subtotal = Math.round(lineItems.reduce((s, li) => s + li.amount, 0) * 100) / 100;
-  const taxAmount = Math.round(subtotal * (input.taxRate / 100) * 100) / 100;
-  const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
+  const discountAmount = computeDiscountAmount(subtotal, input.discountType, input.discountValue);
+  const discountedSubtotal = Math.round((subtotal - discountAmount) * 100) / 100;
+  const taxAmount = Math.round(discountedSubtotal * (input.taxRate / 100) * 100) / 100;
+  const totalAmount = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
 
   const dueDate = input.paymentTerms === 'custom' && input.dueDate
     ? input.dueDate
@@ -286,6 +338,9 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
     issue_date: input.issueDate,
     due_date: dueDate,
     subtotal,
+    discount_type: input.discountType ?? null,
+    discount_value: input.discountValue ?? 0,
+    discount_amount: discountAmount,
     tax_rate: input.taxRate,
     tax_amount: taxAmount,
     total_amount: totalAmount,
@@ -297,7 +352,7 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
     currency: input.currency,
     notes: input.notes ?? null,
     terms: input.terms ?? null,
-  });
+  }, input.invoiceNumber || undefined);
 
   const itemsWithInvoiceId = lineItems.map(li => ({ ...li, invoice_id: invoice.id }));
   await supabaseAdmin.from('invoice_line_items').insert(itemsWithInvoiceId);
@@ -326,6 +381,9 @@ export async function convertEstimate(estimateId: string, actorId?: string) {
     issue_date: issueDate,
     due_date: dueDate,
     subtotal: est.subtotal,
+    discount_type: est.discount_type ?? null,
+    discount_value: est.discount_value ?? 0,
+    discount_amount: est.discount_amount ?? 0,
     tax_rate: est.tax_rate,
     tax_amount: est.tax_amount,
     total_amount: est.total_amount,
@@ -404,6 +462,20 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   if (input.terms !== undefined) updateData.terms = input.terms;
   if (input.poNumber !== undefined) updateData.po_number = input.poNumber;
 
+  // ── Editable invoice number (drafts only) ─────────────────────────────────
+  if (input.invoiceNumber !== undefined && input.invoiceNumber !== inv.invoice_number) {
+    if (inv.status !== 'draft') {
+      throw new ValidationError("Issued invoices can't change their number.");
+    }
+    if (input.invoiceNumber) updateData.invoice_number = input.invoiceNumber;
+  }
+
+  // The discount type/value in effect for this update: explicit input wins,
+  // else fall back to what's already stored (so a line-item-only edit keeps the
+  // existing discount). Used by both recompute branches below.
+  const discountType = input.discountType !== undefined ? input.discountType : inv.discount_type;
+  const discountValue = input.discountValue !== undefined ? input.discountValue : inv.discount_value;
+
   // ── Full draft edit (Wave-style) ──────────────────────────────────────────
   // When line items are supplied, rebuild the whole document — but only while
   // it's still a draft. Issued invoices keep their line items frozen.
@@ -426,8 +498,10 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
       };
     });
     const subtotal = Math.round(mapped.reduce((s, li) => s + li.amount, 0) * 100) / 100;
+    const discountAmount = computeDiscountAmount(subtotal, discountType, discountValue);
+    const discountedSubtotal = Math.round((subtotal - discountAmount) * 100) / 100;
     const taxRate = input.taxRate ?? inv.tax_rate ?? 0;
-    const taxAmount = Math.round(subtotal * (taxRate / 100) * 100) / 100;
+    const taxAmount = Math.round(discountedSubtotal * (taxRate / 100) * 100) / 100;
 
     const issueDate = input.issueDate ?? inv.issue_date;
     const paymentTerms = input.paymentTerms ?? inv.payment_terms ?? 'net_30';
@@ -441,19 +515,28 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
     updateData.due_date = dueDate;
     if (input.currency !== undefined) updateData.currency = input.currency;
     updateData.subtotal = subtotal;
+    updateData.discount_type = discountType ?? null;
+    updateData.discount_value = discountValue ?? 0;
+    updateData.discount_amount = discountAmount;
     updateData.tax_rate = taxRate;
     updateData.tax_amount = taxAmount;
-    updateData.total_amount = Math.round((subtotal + taxAmount) * 100) / 100;
+    updateData.total_amount = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
 
     await supabaseAdmin.from('invoice_line_items').delete().eq('invoice_id', id);
     await supabaseAdmin.from('invoice_line_items').insert(mapped);
-  } else if (input.taxRate !== undefined) {
-    // Metadata-only tax change: recompute from the EXISTING subtotal.
+  } else if (input.taxRate !== undefined || input.discountType !== undefined || input.discountValue !== undefined) {
+    // Metadata-only tax/discount change: recompute from the EXISTING (raw) subtotal.
     const subtotal = Number(inv.subtotal) || 0;
-    const taxAmount = Math.round(subtotal * (input.taxRate / 100) * 100) / 100;
-    updateData.tax_rate = input.taxRate;
+    const discountAmount = computeDiscountAmount(subtotal, discountType, discountValue);
+    const discountedSubtotal = Math.round((subtotal - discountAmount) * 100) / 100;
+    const taxRate = input.taxRate ?? inv.tax_rate ?? 0;
+    const taxAmount = Math.round(discountedSubtotal * (taxRate / 100) * 100) / 100;
+    updateData.discount_type = discountType ?? null;
+    updateData.discount_value = discountValue ?? 0;
+    updateData.discount_amount = discountAmount;
+    updateData.tax_rate = taxRate;
     updateData.tax_amount = taxAmount;
-    updateData.total_amount = Math.round((subtotal + taxAmount) * 100) / 100;
+    updateData.total_amount = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
   }
 
   const { data, error } = await supabaseAdmin
@@ -463,7 +546,12 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505' && updateData.invoice_number) {
+      throw new ConflictError(`Invoice number "${updateData.invoice_number}" is already in use. Choose a different number.`);
+    }
+    throw error;
+  }
   return getInvoice(id);
 }
 
@@ -484,8 +572,43 @@ export async function deleteInvoice(id: string) {
     }
   }
 
+  // Best-effort: purge attachment files + their `documents` rows (polymorphic,
+  // so no FK cascade) to avoid orphaned storage objects / rows.
+  try {
+    const { data: docs } = await supabaseAdmin
+      .from('documents').select('id, storage_path')
+      .eq('entity_type', 'invoice').eq('entity_id', id);
+    if (docs && docs.length > 0) {
+      await supabaseAdmin.storage.from('invoices').remove(docs.map(d => d.storage_path));
+      await supabaseAdmin.from('documents').delete().eq('entity_type', 'invoice').eq('entity_id', id);
+    }
+  } catch (err) {
+    console.error('[invoices.service] attachment cleanup failed for invoice', id, err);
+  }
+
   const { error } = await supabaseAdmin.from('invoices').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ── Attachments ────────────────────────────────────────────────────────────────
+// Upload a file attachment to an invoice (reuses the generic documents table +
+// the 'invoices' storage bucket via storage.service). Verifies the invoice
+// exists first so we never strand a file under a non-existent invoice id.
+export async function addInvoiceAttachment(invoiceId: string, file: Express.Multer.File, uploadedBy: string) {
+  await getInvoice(invoiceId); // 404s if the invoice doesn't exist
+  return uploadDocument('invoice', invoiceId, file, uploadedBy);
+}
+
+// Delete an invoice attachment — but only after confirming the document really
+// belongs to THIS invoice (prevents removing another entity's doc via a guessed id).
+export async function removeInvoiceAttachment(invoiceId: string, docId: string) {
+  const { data: doc, error } = await supabaseAdmin
+    .from('documents').select('id, entity_type, entity_id').eq('id', docId).single();
+  if (error || !doc) throw new NotFoundError('Attachment not found');
+  if (doc.entity_type !== 'invoice' || doc.entity_id !== invoiceId) {
+    throw new ForbiddenError('That attachment does not belong to this invoice.');
+  }
+  await deleteDocument(docId);
 }
 
 export async function sendInvoice(id: string) {
@@ -629,6 +752,7 @@ export async function getInvoicePDF(id: string) {
       amount: Number(li.amount ?? 0),
     })),
     subtotal: inv.subtotal,
+    discountAmount: Number(inv.discount_amount ?? 0),
     taxRate: inv.tax_rate ?? 0,
     taxAmount: inv.tax_amount ?? 0,
     totalAmount: inv.total_amount,

@@ -72,6 +72,22 @@ export async function send(req: Request, res: Response, next: NextFunction): Pro
   } catch (err) { next(err); }
 }
 
+export async function uploadAttachment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const file = req.file;
+    if (!file) { res.status(400).json({ success: false, error: 'No file provided' }); return; }
+    const data = await svc.addInvoiceAttachment(req.params.id, file, req.user!.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function deleteAttachment(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await svc.removeInvoiceAttachment(req.params.id, req.params.docId);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+}
+
 export async function exportInvoices(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const csv = await exportInvoicesCSV({ status: req.query.status as string, clientId: req.query.clientId as string });
