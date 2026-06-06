@@ -34,6 +34,12 @@ interface DataTableProps<T> {
   selectable?: boolean;
   onSelectionChange?: (items: T[]) => void;
   exportFilename?: string;
+  /**
+   * Optional bespoke mobile card. When omitted, a card is auto-derived from the
+   * columns (each column → a label/value row) so phones show the SAME data as
+   * the desktop table — no clipped/hidden columns.
+   */
+  renderMobileCard?: (item: T) => React.ReactNode;
 }
 
 function escapeCsvCell(val: string): string {
@@ -57,6 +63,7 @@ export function DataTable<T>({
   selectable,
   onSelectionChange,
   exportFilename,
+  renderMobileCard,
 }: DataTableProps<T>) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -236,8 +243,67 @@ export function DataTable<T>({
         </div>
       )}
 
-      {/* Table with horizontal scroll on mobile + sticky header on tall lists */}
-      <div className="rounded-xl border border-gray-200 bg-white overflow-x-auto max-h-[640px] overflow-y-auto shadow-[var(--shadow-sm)] portal-scroll-x">
+      {/* Mobile — one card per row so phones show the SAME data as the desktop
+          table (no clipped/hidden columns). Auto-derived from the columns unless
+          the page supplies its own renderMobileCard. */}
+      <div className="md:hidden space-y-2.5">
+        {paged.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white py-12">
+            <EmptyState title={emptyTitle} description={emptyDescription} />
+          </div>
+        ) : (
+          paged.map(item => {
+            const rowKey = getRowKey(item);
+            const isSelected = selected.has(rowKey);
+            if (renderMobileCard) {
+              return (
+                <div
+                  key={rowKey}
+                  className={`rounded-xl border border-gray-200 bg-white p-3.5 shadow-[var(--shadow-sm)] ${onRowClick ? 'cursor-pointer hover:border-gray-300' : ''} ${isSelected ? 'ring-1 ring-blue-300' : ''}`}
+                  onClick={() => onRowClick?.(item)}
+                >
+                  {renderMobileCard(item)}
+                </div>
+              );
+            }
+            const labeledCols = columns.filter(c => c.header && c.key !== 'actions');
+            const actionCols = columns.filter(c => !c.header || c.key === 'actions');
+            return (
+              <div
+                key={rowKey}
+                className={`rounded-xl border border-gray-200 bg-white p-3.5 shadow-[var(--shadow-sm)] ${onRowClick ? 'cursor-pointer hover:border-gray-300 transition-colors' : ''} ${isSelected ? 'ring-1 ring-blue-300' : ''}`}
+                onClick={() => onRowClick?.(item)}
+              >
+                <div className="space-y-2">
+                  {selectable && (
+                    <div className="flex justify-end" onClick={e => { e.stopPropagation(); toggleRow(rowKey); }}>
+                      <Checkbox checked={isSelected} onCheckedChange={() => toggleRow(rowKey)} aria-label="Select row" />
+                    </div>
+                  )}
+                  {labeledCols.map(col => (
+                    <div key={col.key} className="flex items-start justify-between gap-3 text-sm">
+                      <span className="text-xs text-gray-500 flex-shrink-0 pt-0.5">{col.header}</span>
+                      <span className="text-right min-w-0 break-words">
+                        {col.render ? col.render(item) : String((item as Record<string, unknown>)[col.key] ?? '—')}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                {actionCols.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-gray-100 flex flex-wrap items-center justify-end gap-1">
+                    {actionCols.map(col => (
+                      <span key={col.key}>{col.render ? col.render(item) : null}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })
+        )}
+      </div>
+
+      {/* Desktop — full table (horizontal scroll + sticky header on tall lists) */}
+      <div className="hidden md:block rounded-xl border border-gray-200 bg-white overflow-x-auto max-h-[640px] overflow-y-auto shadow-[var(--shadow-sm)] portal-scroll-x">
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
             <TableRow className="bg-gray-50">
