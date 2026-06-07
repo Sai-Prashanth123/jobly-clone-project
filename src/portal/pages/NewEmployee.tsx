@@ -572,6 +572,7 @@ export default function NewEmployee() {
     // Visa expiry is only required for visa types that actually have one.
     if (requireForCreate) {
       const reqs: { key: string; label: string; section: string; ok: boolean }[] = [
+        { key: 'profilePhoto',         label: 'Profile photo',                 section: SECTION_IDS.personal,      ok: !!form.profilePhotoFile },
         { key: 'dob',                  label: 'Date of birth',                 section: SECTION_IDS.personal,      ok: !!form.dob },
         { key: 'maritalStatus',        label: 'Marital status',                section: SECTION_IDS.personal,      ok: !!form.maritalStatus },
         { key: 'nationality',          label: 'Nationality',                   section: SECTION_IDS.personal,      ok: !!form.nationality.trim() },
@@ -1280,7 +1281,7 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4 mb-4">
               {/* Profile Photo upload tile (matches reference HTML) */}
               <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo</p>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo {requireForCreate && <RequiredMark />}</p>
                 <label
                   htmlFor="profile-photo"
                   className="block border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-[#4069FF] hover:bg-blue-50/40 transition-colors cursor-pointer text-center"
@@ -1319,6 +1320,7 @@ export default function NewEmployee() {
                     Remove
                   </button>
                 )}
+                <FieldError msg={errors.profilePhoto} />
               </div>
 
               {/* Name + DOB + Age + Gender */}

@@ -9,6 +9,7 @@ import {
   SidebarMenuItem,
   SidebarFooter,
   SidebarTrigger,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
@@ -74,6 +75,13 @@ export function PortalSidebar() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
+  const { setOpenMobile } = useSidebar();
+
+  // Close the mobile sidebar sheet whenever the route changes. Without this the
+  // Sheet's dark overlay stays open over the newly-navigated page, so a row/nav
+  // tap "looks" like it did nothing until you tap the backdrop. Covers nav
+  // links, DataTable row clicks, command palette, profile/notification links.
+  useEffect(() => { setOpenMobile(false); }, [location.pathname, setOpenMobile]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [changePwOpen, setChangePwOpen] = useState(false);
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 });
@@ -267,6 +275,7 @@ export function PortalSidebar() {
                 >
                   <Link
                     to={item.path}
+                    onClick={() => setOpenMobile(false)}
                     className={`flex items-center gap-3 pl-3 pr-3 py-2 rounded-lg text-[13px] transition-colors duration-150 ${
                       isActive
                         ? 'text-[#4069FF] font-semibold'
