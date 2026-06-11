@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../config/supabase';
 
 export async function logActivity(
   actorId: string | null,
-  action: 'created' | 'updated' | 'deleted' | 'status_changed' | 'uploaded_client_proof' | 'removed_client_proof' | 'downloaded_pdf' | 'requested_changes' | 'reopened',
+  action: 'created' | 'updated' | 'deleted' | 'status_changed' | 'sent' | 'uploaded_client_proof' | 'removed_client_proof' | 'downloaded_pdf' | 'requested_changes' | 'reopened',
   entityType: 'employee' | 'client' | 'assignment' | 'timesheet' | 'monthly_timesheet' | 'invoice' | 'portal_user' | 'product' | 'payment' | 'recurring_invoice' | 'leave_request',
   entityId: string,
   entityLabel: string,

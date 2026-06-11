@@ -1,5 +1,6 @@
 import nodemailer from 'nodemailer';
 import { formatDateSafe } from './dateUtils';
+import { getJoblyLogoBuffer } from './joblyLogo';
 
 // HTML-escape any user-supplied string before it lands in an email body.
 // Without this a client whose company name is `<img src=x onerror=...>` (or a
@@ -348,7 +349,12 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <tr>
-          <td style="background:linear-gradient(135deg,#2563EB,#0F2942);padding:32px 40px;">
+          <td style="background:#ffffff;padding:26px 40px 6px;">
+            <img src="cid:joblylogo" alt="Jobly Solutions" height="40" style="display:block;border:0;outline:none;text-decoration:none;height:40px;width:auto;">
+          </td>
+        </tr>
+        <tr>
+          <td style="background:linear-gradient(135deg,#2563EB,#0F2942);padding:26px 40px;">
             <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Invoice from Jobly Solutions</h1>
             <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${esc(invoiceNumber)}</p>
           </td>
@@ -425,16 +431,28 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
 </body>
 </html>`;
 
+  // Inline logo (cid) renders the brand mark in the header; the PDF rides as a
+  // normal attachment. nodemailer treats `cid` attachments as inline.
+  const attachments: nodemailer.SendMailOptions['attachments'] = [{
+    filename: 'jobly-logo.png',
+    content: getJoblyLogoBuffer(),
+    cid: 'joblylogo',
+    contentDisposition: 'inline',
+  }];
+  if (pdfBuffer) {
+    attachments.push({
+      filename: pdfFileName ?? `${invoiceNumber}.pdf`,
+      content: pdfBuffer,
+      contentType: 'application/pdf',
+    });
+  }
+
   await sendWithRetry({
     from: FROM,
     to,
     subject: `Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`,
     html,
-    attachments: pdfBuffer ? [{
-      filename: pdfFileName ?? `${invoiceNumber}.pdf`,
-      content: pdfBuffer,
-      contentType: 'application/pdf',
-    }] : undefined,
+    attachments,
   });
 }
 

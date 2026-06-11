@@ -97,6 +97,9 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
     }
     void downloadPdf();
     setExternalOpened(true);
+    // Clicking "Send via Gmail/Outlook" is a send action — mark a draft as sent
+    // so finance has a record (logged server-side via the update endpoint).
+    if (invoice.status === 'draft') markSent.mutate({ status: 'sent' });
   };
 
   const sendViaJobly = async () => {
@@ -107,16 +110,6 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
       } else {
         toast.warning(r.warning ?? 'Invoice was prepared but the email could not be delivered. Check the client billing email.', { duration: 12000 });
       }
-      onOpenChange(false);
-    } catch {
-      /* central toast */
-    }
-  };
-
-  const markAsSent = async () => {
-    try {
-      await markSent.mutateAsync({ status: 'sent' });
-      toast.success('Invoice marked as sent');
       onOpenChange(false);
     } catch {
       /* central toast */
@@ -154,9 +147,26 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
           </div>
         </div>
 
-        {/* Send with your own email */}
+        {/* Primary: Send via Jobly (production email — branded + PDF attached) */}
+        <div className="space-y-1.5">
+          <Button type="button" className="w-full gap-2 h-11 bg-blue-600 hover:bg-blue-700 text-white text-[15px]" onClick={sendViaJobly} disabled={sendInvoice.isPending}>
+            {sendInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+            Send to client via Jobly
+          </Button>
+          <p className="text-[11px] text-muted-foreground text-center">
+            Recommended — sends a branded email with your logo and the invoice <strong>PDF attached</strong>, then marks it sent.
+          </p>
+        </div>
+
+        {/* Divider */}
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-gray-200" />
+          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">or send from your own email</span>
+          <span className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        {/* Secondary: open the user's own Gmail/Outlook compose */}
         <div className="space-y-2">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Send with your email</p>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             <Button type="button" variant="outline" className="justify-center gap-2" onClick={() => openExternal('gmail')}>
               <Mail className="h-4 w-4 text-red-500" /> Gmail
@@ -168,39 +178,22 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
               <Mail className="h-4 w-4 text-gray-500" /> Mail app
             </Button>
           </div>
-          <button
-            type="button"
-            onClick={() => openExternal('outlook-personal')}
-            className="text-[11px] text-muted-foreground hover:text-foreground underline"
-          >
-            Using a personal Outlook.com / Hotmail account?
-          </button>
+          <p className="text-[11px] text-muted-foreground leading-relaxed">
+            Opens your mailbox with the message + a link to the invoice, and downloads the PDF for you to attach.
+            (A mail link can't auto-attach the PDF or include the logo — use “Send via Jobly” for that.)
+            {' '}
+            <button type="button" onClick={() => openExternal('outlook-personal')} className="underline hover:text-foreground">
+              Personal Outlook.com?
+            </button>
+          </p>
 
           {externalOpened && (
-            <div className="rounded-lg border border-blue-100 bg-blue-50/60 p-3 text-xs text-blue-900 space-y-2">
-              <p>We opened your email with the message prefilled and downloaded the PDF — attach it and hit send in your mailbox.</p>
-              {invoice.status === 'draft' && (
-                <Button type="button" size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white" onClick={markAsSent} disabled={markSent.isPending}>
-                  {markSent.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
-                  Mark this invoice as sent
-                </Button>
-              )}
+            <div className="rounded-lg border border-emerald-100 bg-emerald-50/60 p-3 text-xs text-emerald-900 flex items-start gap-2">
+              <Check className="h-4 w-4 flex-shrink-0 mt-0.5" />
+              <span>Opened in your email and downloaded the PDF{invoice.status === 'draft' ? ' — this invoice is now marked as sent' : ''}. Attach the PDF and hit send.</span>
             </div>
           )}
         </div>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3">
-          <span className="h-px flex-1 bg-gray-200" />
-          <span className="text-[11px] text-muted-foreground uppercase tracking-wide">or</span>
-          <span className="h-px flex-1 bg-gray-200" />
-        </div>
-
-        {/* Send via Jobly */}
-        <Button type="button" className="w-full gap-2 bg-blue-600 hover:bg-blue-700 text-white" onClick={sendViaJobly} disabled={sendInvoice.isPending}>
-          {sendInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-          Send via Jobly (PDF attached)
-        </Button>
 
         <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
           <Checkbox checked={dontShow} onCheckedChange={v => persistPref(!!v)} />

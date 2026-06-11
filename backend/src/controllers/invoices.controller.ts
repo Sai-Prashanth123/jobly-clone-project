@@ -36,6 +36,13 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.updateInvoice(req.params.id, req.body as UpdateInvoiceInput);
+    // Log when an invoice is marked Sent here (e.g. the user sent it from their
+    // own Gmail/Outlook and clicked "mark as sent") so finance has a trail.
+    if ((req.body as { status?: string })?.status === 'sent') {
+      void import('../lib/activityLogger').then(({ logActivity }) =>
+        logActivity(req.user?.id ?? null, 'sent', 'invoice', req.params.id, data?.invoice_number ?? req.params.id.slice(0, 8)),
+      );
+    }
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
@@ -63,6 +70,12 @@ export async function getPDF(req: Request, res: Response, next: NextFunction): P
 export async function send(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await svc.sendInvoice(req.params.id);
+    // Audit the send (who emailed which invoice to the client, and when).
+    if (result.emailSent) {
+      void import('../lib/activityLogger').then(({ logActivity }) =>
+        logActivity(req.user?.id ?? null, 'sent', 'invoice', req.params.id, result.invoice?.invoice_number ?? req.params.id.slice(0, 8)),
+      );
+    }
     res.json({
       success: true,
       data: result.invoice,
