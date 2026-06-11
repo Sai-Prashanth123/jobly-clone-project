@@ -514,10 +514,12 @@ export default function NewEmployee() {
     ? presentFilled
     : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
   const onboardingChecklist = [
-    // Personal (photo intentionally NOT required — optional but recommended)
+    // Personal
+    { id: 'photo',       label: 'Profile photo',                  section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview },
     { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
     // Contact
     { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
+    { id: 'linkedin',    label: 'LinkedIn URL',                   section: SECTION_IDS.contact,       done: !!form.linkedinUrl.trim() && /^https?:\/\/.+/i.test(form.linkedinUrl.trim()) },
     { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
     { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
     // Employment
@@ -527,9 +529,10 @@ export default function NewEmployee() {
     // Education
     { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
     // Emergency
-    { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() },
-    // Payroll + bank: HR-owned (captured via HR-create/HR-edit), not part of the
-    // employee-side checklist.
+    { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
+    // Payroll — bank / direct-deposit details the employee provides (pay rate &
+    // payment type stay HR-owned, so they're not in the employee checklist).
+    { id: 'bank',        label: 'Bank details (direct deposit)',  section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && /^\d{9}$/.test(form.bankRoutingNumber) && !!form.bankAccountNumber.trim() },
     // Declaration
     { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
   ];
@@ -1243,7 +1246,7 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4 mb-4">
               {/* Profile Photo upload tile (matches reference HTML) */}
               <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo</p>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo {isOnboarding && <RequiredMark />}</p>
                 <label
                   htmlFor="profile-photo"
                   className="block border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-[#4069FF] hover:bg-blue-50/40 transition-colors cursor-pointer text-center"
@@ -1393,7 +1396,7 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>LinkedIn URL</Label>
+                <Label>LinkedIn URL {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.linkedinUrl} onChange={e => set('linkedinUrl', e.target.value)} placeholder="https://linkedin.com/in/…" />
               </div>
               <div>
@@ -1836,7 +1839,7 @@ export default function NewEmployee() {
                 <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', e.target.value)} />
               </div>
               <div className="sm:col-span-2">
-                <Label>Address</Label>
+                <Label>Address {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.emergencyContact.address} onChange={e => setEmergency('address', e.target.value)} />
               </div>
             </div>
@@ -1853,7 +1856,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Pay Rate (USD) {isOnboarding && <RequiredMark />}</Label>
+                <Label>Pay Rate (USD)</Label>
                 <Input
                   type="number"
                   min={0}
@@ -1874,7 +1877,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Payment Type {isOnboarding && <RequiredMark />}</Label>
+                <Label>Payment Type</Label>
                 <Select value={form.paymentType || ''} onValueChange={v => set('paymentType', v as FormState['paymentType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
