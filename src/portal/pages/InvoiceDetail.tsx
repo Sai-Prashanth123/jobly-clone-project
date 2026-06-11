@@ -8,6 +8,7 @@ import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { InvoicePrintView } from '../components/invoices/InvoicePrintView';
+import { SendInvoiceDialog, SEND_PREF_KEY } from '../components/invoices/SendInvoiceDialog';
 import { useInvoice, useDeleteInvoice, useGetInvoicePDF, useSendInvoice, useInvoicePayments, useDeletePayment } from '../hooks/useInvoices';
 import { useClient } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
@@ -26,6 +27,21 @@ export default function InvoiceDetail() {
   const deletePayment = useDeletePayment(id!);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [sendOpen, setSendOpen] = useState(false);
+
+  // Direct server-send (used when the user opted to skip the chooser dialog).
+  const directSend = async () => {
+    try {
+      const r = await sendInvoice.mutateAsync();
+      if (r.emailSent) {
+        toast.success(invoice?.status === 'draft' ? 'Invoice sent to client via email' : 'Invoice re-sent to client');
+      } else {
+        toast.warning(r.warning ?? 'Invoice was prepared but the email could not be delivered. Check the client billing email.', { duration: 12000 });
+      }
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
+    }
+  };
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -85,20 +101,11 @@ export default function InvoiceDetail() {
               className="gap-2 bg-blue-600 hover:bg-blue-700 text-white"
               loading={sendInvoice.isPending}
               loadingText="Sending…"
-              onClick={async () => {
-                try {
-                  const r = await sendInvoice.mutateAsync();
-                  if (r.emailSent) {
-                    toast.success(invoice.status === 'draft' ? 'Invoice sent to client via email' : 'Invoice re-sent to client');
-                  } else {
-                    toast.warning(
-                      r.warning ?? 'Invoice was prepared but the email could not be delivered. Try again or check the client billing email.',
-                      { duration: 12000 },
-                    );
-                  }
-                } catch {
-                  /* failed-request toast raised centrally (queryClient.ts) */
-                }
+              onClick={() => {
+                // Honor the "always send via Jobly" preference; otherwise open
+                // the Gmail / Outlook / Send-via-Jobly chooser.
+                if (localStorage.getItem(SEND_PREF_KEY) === 'direct') void directSend();
+                else setSendOpen(true);
               }}
             >
               <Send className="h-4 w-4" />
@@ -206,6 +213,13 @@ export default function InvoiceDetail() {
       )}
 
       <InvoicePrintView invoice={invoice} client={client} />
+
+      <SendInvoiceDialog
+        invoice={invoice}
+        client={client}
+        open={sendOpen}
+        onOpenChange={setSendOpen}
+      />
 
       <ConfirmDialog
         open={deleteOpen}
