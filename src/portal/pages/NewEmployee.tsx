@@ -68,10 +68,6 @@ const VISA_OPTIONS = [
   { value: 'other',    label: 'Other' },
 ];
 
-// Visa types that carry an expiry / work-auth end date. Citizens & green-card
-// holders don't, so visa-expiry (and the EAD doc) aren't required for them.
-const VISA_TYPES_WITH_EXPIRY = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'other']);
-
 const I9_OPTIONS = [
   { value: 'pending',  label: 'Pending' },
   { value: 'complete', label: 'Complete' },
@@ -346,9 +342,6 @@ export default function NewEmployee() {
   const isSelfEdit = isOnboarding || (!params.id && location.pathname.startsWith('/portal/profile'));
   const editId = params.id ?? (isSelfEdit ? user?.employeeId : undefined);
   const isEditMode = !!editId;
-  // Admin/HR creating a brand-new employee (not editing, not self-onboarding).
-  // The client requires a fuller set of fields up front in this flow.
-  const requireForCreate = !isEditMode && !isSelfEdit;
 
   // Only admin/hr/operations can list the full roster (the reporting-manager
   // dropdown). For a self-editing employee the call would 403, so skip it.
@@ -565,41 +558,10 @@ export default function NewEmployee() {
 
     if (form.ssn && !/^\d{4}$/.test(form.ssn)) flag('ssn', 'SSN must be exactly 4 digits', SECTION_IDS.immigration);
 
+    // Admin/HR create needs only first/last name + email (above). The full
+    // profile is the EMPLOYEE's responsibility to complete during onboarding —
+    // enforced by the onboarding checklist below, not at admin-create time.
     let missingItems: { label: string; section: string }[] | undefined;
-
-    // Admin/HR create: the client requires this fuller set of DATA fields up
-    // front. Photo + identity-document FILES are recommended but non-blocking.
-    // Visa expiry is only required for visa types that actually have one.
-    if (requireForCreate) {
-      const reqs: { key: string; label: string; section: string; ok: boolean }[] = [
-        { key: 'profilePhoto',         label: 'Profile photo',                 section: SECTION_IDS.personal,      ok: !!form.profilePhotoFile },
-        { key: 'dob',                  label: 'Date of birth',                 section: SECTION_IDS.personal,      ok: !!form.dob },
-        { key: 'maritalStatus',        label: 'Marital status',                section: SECTION_IDS.personal,      ok: !!form.maritalStatus },
-        { key: 'nationality',          label: 'Nationality',                   section: SECTION_IDS.personal,      ok: !!form.nationality.trim() },
-        { key: 'phone',                label: 'Mobile number',                 section: SECTION_IDS.contact,       ok: !!form.phone.trim() },
-        { key: 'linkedinUrl',          label: 'LinkedIn URL',                  section: SECTION_IDS.contact,       ok: !!form.linkedinUrl.trim() && /^https?:\/\/.+/i.test(form.linkedinUrl.trim()) },
-        { key: 'addressStreet',        label: 'Present address',               section: SECTION_IDS.presentAddr,   ok: presentFilled },
-        { key: 'permanentAddress',     label: 'Permanent address',             section: SECTION_IDS.permanentAddr, ok: permFilled },
-        { key: 'jobTitle',             label: 'Job title',                     section: SECTION_IDS.employment,    ok: !!form.jobTitle.trim() },
-        { key: 'startDate',            label: 'Start date',                    section: SECTION_IDS.employment,    ok: !!form.startDate },
-        { key: 'visaType',             label: 'Visa / work-authorization type', section: SECTION_IDS.immigration,  ok: !!form.visaType },
-        { key: 'visaExpiry',           label: 'Visa / work-auth expiry',       section: SECTION_IDS.immigration,   ok: !(form.visaType && VISA_TYPES_WITH_EXPIRY.has(form.visaType)) || !!form.visaExpiry },
-        { key: 'i9Status',             label: 'I-9 status',                    section: SECTION_IDS.immigration,   ok: !!form.i9Status },
-        { key: 'ssn',                  label: 'SSN (last 4 digits)',           section: SECTION_IDS.immigration,   ok: /^\d{4}$/.test(form.ssn) },
-        { key: 'emergencyName',        label: 'Emergency contact name',        section: SECTION_IDS.emergency,     ok: !!form.emergencyContact.name.trim() },
-        { key: 'emergencyRelationship', label: 'Emergency contact relationship', section: SECTION_IDS.emergency,   ok: !!form.emergencyContact.relationship.trim() },
-        { key: 'emergencyPhone',       label: 'Emergency contact phone',       section: SECTION_IDS.emergency,     ok: !!form.emergencyContact.phone.trim() },
-        { key: 'emergencyAddress',     label: 'Emergency contact address',     section: SECTION_IDS.emergency,     ok: !!form.emergencyContact.address.trim() },
-        { key: 'bankName',             label: 'Bank name',                     section: SECTION_IDS.payroll,       ok: !!form.bankName.trim() },
-        { key: 'bankRoutingNumber',    label: 'Bank routing number (9 digits)', section: SECTION_IDS.payroll,      ok: /^\d{9}$/.test(form.bankRoutingNumber) },
-        { key: 'bankAccountNumber',    label: 'Bank account number',           section: SECTION_IDS.payroll,       ok: !!form.bankAccountNumber.trim() },
-      ];
-      const failed = reqs.filter(r => !r.ok);
-      if (failed.length) {
-        missingItems = failed.map(r => ({ label: r.label, section: r.section }));
-        for (const r of failed) flag(r.key, `${r.label} is required`, r.section);
-      }
-    }
 
     // Onboarding submit: every item in the live checklist must be done. We
     // flag a marker error per missing item (so the section badges turn red)
@@ -1281,7 +1243,7 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4 mb-4">
               {/* Profile Photo upload tile (matches reference HTML) */}
               <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo {requireForCreate && <RequiredMark />}</p>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo</p>
                 <label
                   htmlFor="profile-photo"
                   className="block border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-[#4069FF] hover:bg-blue-50/40 transition-colors cursor-pointer text-center"
@@ -1320,7 +1282,6 @@ export default function NewEmployee() {
                     Remove
                   </button>
                 )}
-                <FieldError msg={errors.profilePhoto} />
               </div>
 
               {/* Name + DOB + Age + Gender */}
@@ -1340,7 +1301,7 @@ export default function NewEmployee() {
                   <FieldError msg={errors.lastName} />
                 </div>
                 <div>
-                  <Label>Date of Birth {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                  <Label>Date of Birth {isOnboarding && <RequiredMark />}</Label>
                   <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
                   <FieldError msg={errors.dob} />
                 </div>
@@ -1363,7 +1324,7 @@ export default function NewEmployee() {
             {/* Demographics + language row */}
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div>
-                <Label>Marital Status {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Marital Status {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.maritalStatus} onValueChange={v => set('maritalStatus', v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1381,7 +1342,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Nationality {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Nationality {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="United States" />
               </div>
               <div>
@@ -1422,7 +1383,7 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>Mobile Phone {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
                 <FieldError msg={errors.phone} />
               </div>
@@ -1432,7 +1393,7 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>LinkedIn URL {requireForCreate && <RequiredMark />}</Label>
+                <Label>LinkedIn URL</Label>
                 <Input value={form.linkedinUrl} onChange={e => set('linkedinUrl', e.target.value)} placeholder="https://linkedin.com/in/…" />
               </div>
               <div>
@@ -1453,17 +1414,17 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
               <div className="sm:col-span-6">
-                <Label>Street Address {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Street Address {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.address.street} onChange={e => setAddress('street', e.target.value)} />
                 <FieldError msg={errors.addressStreet} />
               </div>
               <div className="sm:col-span-3">
-                <Label>City {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>City {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.address.city} onChange={e => setAddress('city', e.target.value)} />
                 <FieldError msg={errors.addressCity} />
               </div>
               <div className="sm:col-span-2">
-                <Label>State {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>State {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.address.state} onValueChange={v => setAddress('state', v)}>
                   <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
                   <SelectContent className="max-h-[280px]">
@@ -1473,7 +1434,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.addressState} />
               </div>
               <div className="sm:col-span-1">
-                <Label>ZIP {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.address.zip} onChange={e => setAddress('zip', e.target.value)} placeholder="94103" />
                 <FieldError msg={errors.addressZip} />
               </div>
@@ -1505,15 +1466,15 @@ export default function NewEmployee() {
             {!form.permanentSameAsPresent && (
               <div className="grid grid-cols-1 sm:grid-cols-6 gap-4">
                 <div className="sm:col-span-6">
-                  <Label>Street Address {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                  <Label>Street Address {isOnboarding && <RequiredMark />}</Label>
                   <Input value={form.permanentAddress.street} onChange={e => setPermanentAddress('street', e.target.value)} />
                 </div>
                 <div className="sm:col-span-3">
-                  <Label>City {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                  <Label>City {isOnboarding && <RequiredMark />}</Label>
                   <Input value={form.permanentAddress.city} onChange={e => setPermanentAddress('city', e.target.value)} />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label>State {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                  <Label>State {isOnboarding && <RequiredMark />}</Label>
                   <Select value={form.permanentAddress.state} onValueChange={v => setPermanentAddress('state', v)}>
                     <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
                     <SelectContent className="max-h-[280px]">
@@ -1522,7 +1483,7 @@ export default function NewEmployee() {
                   </Select>
                 </div>
                 <div className="sm:col-span-1">
-                  <Label>ZIP {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                  <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
                   <Input value={form.permanentAddress.zip} onChange={e => setPermanentAddress('zip', e.target.value)} />
                 </div>
                 <div className="sm:col-span-6">
@@ -1548,7 +1509,7 @@ export default function NewEmployee() {
                 <Input value={form.department} onChange={e => set('department', e.target.value)} placeholder="Engineering" />
               </div>
               <div>
-                <Label>Job Title {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Job Title {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.jobTitle} onChange={e => set('jobTitle', e.target.value)} placeholder="Senior Software Engineer" />
               </div>
               <div>
@@ -1561,7 +1522,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Start Date {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Start Date {isOnboarding && <RequiredMark />}</Label>
                 <Input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
                 <FieldError msg={errors.startDate} />
               </div>
@@ -1583,7 +1544,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Visa Type {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Visa Type {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1593,13 +1554,13 @@ export default function NewEmployee() {
                 <FieldError msg={errors.visaType} />
               </div>
               <div>
-                <Label>Work Authorization Expiry {(isOnboarding || (requireForCreate && VISA_TYPES_WITH_EXPIRY.has(form.visaType))) && <RequiredMark />}</Label>
+                <Label>Work Authorization Expiry {isOnboarding && <RequiredMark />}</Label>
                 <Input type="date" value={form.visaExpiry} onChange={e => set('visaExpiry', e.target.value)} />
                 {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />
               </div>
               <div>
-                <Label>I-9 Status {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>I-9 Status {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.i9Status || ''} onValueChange={v => set('i9Status', v as FormState['i9Status'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1609,7 +1570,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.i9Status} />
               </div>
               <div>
-                <Label>SSN — Last 4 digits {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>SSN — Last 4 digits {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.ssn}
                   onChange={e => set('ssn', e.target.value.replace(/\D/g, '').slice(0, 4))}
@@ -1852,12 +1813,12 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Contact Name {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Contact Name {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.emergencyContact.name} onChange={e => setEmergency('name', e.target.value)} />
                 <FieldError msg={errors.emergencyName} />
               </div>
               <div>
-                <Label>Relationship {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Relationship {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.emergencyContact.relationship || ''} onValueChange={v => setEmergency('relationship', v)}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1866,7 +1827,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
               <div>
-                <Label>Mobile Phone {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.emergencyContact.phone} onChange={e => setEmergency('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
                 <FieldError msg={errors.emergencyPhone} />
               </div>
@@ -1875,7 +1836,7 @@ export default function NewEmployee() {
                 <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', e.target.value)} />
               </div>
               <div className="sm:col-span-2">
-                <Label>Address {requireForCreate && <RequiredMark />}</Label>
+                <Label>Address</Label>
                 <Input value={form.emergencyContact.address} onChange={e => setEmergency('address', e.target.value)} />
               </div>
             </div>
@@ -1937,11 +1898,11 @@ export default function NewEmployee() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Bank Details (ACH Direct Deposit)</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <Label>Bank Name {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Bank Name {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.bankName} onChange={e => set('bankName', e.target.value)} placeholder="Chase" />
               </div>
               <div>
-                <Label>Routing Number (9 digits) {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Routing Number (9 digits) {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.bankRoutingNumber}
                   onChange={e => set('bankRoutingNumber', e.target.value.replace(/\D/g, '').slice(0, 9))}
@@ -1951,7 +1912,7 @@ export default function NewEmployee() {
                 />
               </div>
               <div>
-                <Label>Account Number {(isOnboarding || requireForCreate) && <RequiredMark />}</Label>
+                <Label>Account Number {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.bankAccountNumber}
                   onChange={e => set('bankAccountNumber', e.target.value)}
