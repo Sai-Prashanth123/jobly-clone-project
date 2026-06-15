@@ -29,7 +29,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.createAssignment(req.body as CreateAssignmentInput);
+    const data = await svc.createAssignment(req.body as CreateAssignmentInput, req.user?.id);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 }

@@ -62,6 +62,8 @@ function mapClient(raw: any): Client {
       url: d.storage_url ?? undefined,
     })),
     status: raw.status,
+    createdByName: raw.portal_users?.name ?? undefined,
+    createdByRole: raw.portal_users?.role ?? undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };

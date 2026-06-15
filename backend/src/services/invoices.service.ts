@@ -75,7 +75,7 @@ async function insertInvoiceWithNumber(
 export async function listInvoices(query: ListInvoicesQuery) {
   let q = supabaseAdmin
     .from('invoices')
-    .select('*, invoice_line_items(*), invoice_timesheets(*)', { count: 'exact' });
+    .select('*, invoice_line_items(*), invoice_timesheets(*), portal_users!created_by(name, role)', { count: 'exact' });
 
   if (query.status) q = q.eq('status', query.status);
   if (query.clientId) q = q.eq('client_id', query.clientId);

@@ -19,7 +19,7 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.createClient(req.body as CreateClientInput);
+    const data = await svc.createClient(req.body as CreateClientInput, req.user?.id);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 }

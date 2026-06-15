@@ -93,6 +93,19 @@ export default function Invoices() {
       render: i => <StatusBadge status={i.status} />,
       getValue: i => i.status,
     },
+    {
+      key: 'createdBy',
+      header: 'Created By',
+      hideOnMobile: true,
+      render: (i: Invoice) => i.createdByName ? (
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+          i.createdByRole === 'admin' ? 'bg-blue-50 text-blue-700' :
+          i.createdByRole === 'hr' ? 'bg-purple-50 text-purple-700' :
+          i.createdByRole === 'operations' ? 'bg-amber-50 text-amber-700' :
+          i.createdByRole === 'finance' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-600'
+        }`}>{i.createdByName}</span>
+      ) : <span className="text-xs text-muted-foreground">—</span>,
+    },
     ...(canEdit ? [{
       key: 'actions',
       header: '',

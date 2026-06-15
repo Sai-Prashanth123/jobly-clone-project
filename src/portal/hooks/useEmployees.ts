@@ -94,6 +94,8 @@ function mapEmployee(raw: any): Employee {
     onboardingChangeRequestedAt: raw.onboarding_change_requested_at ?? null,
     onboardingChangeRequestedBy: raw.onboarding_change_requested_by ?? null,
 
+    createdByName: raw.portal_users?.name ?? undefined,
+    createdByRole: raw.portal_users?.role ?? undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };

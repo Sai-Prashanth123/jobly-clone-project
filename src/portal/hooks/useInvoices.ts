@@ -52,6 +52,8 @@ function mapInvoice(raw: any): Invoice {
     notes: raw.notes ?? undefined,
     billingPeriodStart: raw.billing_period_start ?? undefined,
     billingPeriodEnd: raw.billing_period_end ?? undefined,
+    createdByName: raw.portal_users?.name ?? undefined,
+    createdByRole: raw.portal_users?.role ?? undefined,
     createdAt: raw.created_at,
     updatedAt: raw.updated_at,
   };

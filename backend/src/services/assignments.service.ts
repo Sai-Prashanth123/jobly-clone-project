@@ -11,7 +11,7 @@ import type { CreateAssignmentInput, UpdateAssignmentInput, ListAssignmentsQuery
 // `employees!employee_id` disambiguates the embed — assignments has TWO FKs to
 // employees (employee_id + reporting_manager_id), so a bare `employees(...)`
 // embed is ambiguous and 500s. The column hint pins it to the assignee.
-const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, display_id), clients(company_name)';
+const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, display_id), clients(company_name), portal_users!created_by(name, role)';
 
 // Flatten the joined rows to snake_case fields the frontend mapper reads, and
 // overlay a read-time "completed" status: if the engagement's end date has
@@ -74,7 +74,7 @@ export async function getAssignment(id: string) {
   return decorateAssignment(data);
 }
 
-export async function createAssignment(input: CreateAssignmentInput) {
+export async function createAssignment(input: CreateAssignmentInput, actorId?: string) {
   // Status is derived from the dates, NOT taken from the client — a new
   // assignment is Pending if its start date is in the future, otherwise Active.
   // (Completed/Terminated are end-states an admin/ops sets later via edit; the
@@ -98,6 +98,7 @@ export async function createAssignment(input: CreateAssignmentInput) {
       billing_type: input.billingType ?? null,
       work_location: input.workLocation ?? null,
       reporting_manager_id: input.reportingManagerId ?? null,
+      created_by: actorId ?? null,
     })
     .select()
     .single();

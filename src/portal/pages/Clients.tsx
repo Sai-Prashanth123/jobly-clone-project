@@ -88,6 +88,19 @@ export default function PortalClients() {
       getValue: c => c.status,
       sortable: true,
     },
+    {
+      key: 'createdBy',
+      header: 'Created By',
+      hideOnMobile: true,
+      render: (c: Client) => c.createdByName ? (
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+          c.createdByRole === 'admin' ? 'bg-blue-50 text-blue-700' :
+          c.createdByRole === 'hr' ? 'bg-purple-50 text-purple-700' :
+          c.createdByRole === 'operations' ? 'bg-amber-50 text-amber-700' :
+          c.createdByRole === 'finance' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-600'
+        }`}>{c.createdByName}</span>
+      ) : <span className="text-xs text-muted-foreground">—</span>,
+    },
     ...(canEdit ? [{
       key: 'actions',
       header: '',

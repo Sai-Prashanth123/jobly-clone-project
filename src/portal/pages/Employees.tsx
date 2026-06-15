@@ -85,6 +85,19 @@ export default function Employees() {
       sortable: true,
     },
     {
+      key: 'createdBy',
+      header: 'Created By',
+      hideOnMobile: true,
+      render: e => e.createdByName ? (
+        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+          e.createdByRole === 'admin' ? 'bg-blue-50 text-blue-700' :
+          e.createdByRole === 'hr' ? 'bg-purple-50 text-purple-700' :
+          e.createdByRole === 'operations' ? 'bg-amber-50 text-amber-700' :
+          e.createdByRole === 'finance' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-600'
+        }`}>{e.createdByName}</span>
+      ) : <span className="text-xs text-muted-foreground">—</span>,
+    },
+    {
       key: 'profile',
       header: 'Profile',
       hideOnMobile: true,

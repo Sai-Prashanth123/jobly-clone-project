@@ -3,7 +3,7 @@ import { NotFoundError, ConflictError } from '../lib/errors';
 import type { CreateClientInput, UpdateClientInput, ListClientsQuery } from '../schemas/client.schema';
 
 export async function listClients(query: ListClientsQuery) {
-  let q = supabaseAdmin.from('clients').select('*', { count: 'exact' }).is('deleted_at', null);
+  let q = supabaseAdmin.from('clients').select('*, portal_users!created_by(name, role)', { count: 'exact' }).is('deleted_at', null);
 
   if (query.status) q = q.eq('status', query.status);
   if (query.search) {
@@ -41,7 +41,7 @@ export async function getClient(id: string) {
   return { ...data, documents: docs ?? [] };
 }
 
-export async function createClient(input: CreateClientInput) {
+export async function createClient(input: CreateClientInput, actorId?: string) {
   const { data: existing } = await supabaseAdmin
     .from('clients')
     .select('id')
@@ -81,6 +81,7 @@ export async function createClient(input: CreateClientInput) {
       billing_country: rest.billingCountry ?? null,
       tax_id: rest.taxId ?? null,
       status: rest.status,
+      created_by: actorId ?? null,
     })
     .select()
     .single();

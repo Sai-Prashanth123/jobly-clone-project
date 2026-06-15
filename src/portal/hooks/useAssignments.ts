@@ -48,6 +48,8 @@ function mapAssignment(raw: any): Assignment {
     employeeName: raw.employee_name ?? undefined,
     employeeDisplayId: raw.employee_display_id ?? undefined,
     clientName: raw.client_name ?? undefined,
+    createdByName: raw.portal_users?.name ?? undefined,
+    createdByRole: raw.portal_users?.role ?? undefined,
   };
 }
 

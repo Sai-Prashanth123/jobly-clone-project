@@ -34,7 +34,7 @@ export function redactEmployee(emp: any, viewerRole?: string, isOwn = false): an
 export async function listEmployees(query: ListEmployeesQuery, opts?: { restrictToEmployeeId?: string | null }) {
   let q = supabaseAdmin
     .from('employees')
-    .select('*', { count: 'exact' })
+    .select('*, portal_users!created_by(name, role)', { count: 'exact' })
     .is('deleted_at', null)
     .order('created_at', { ascending: false });
 

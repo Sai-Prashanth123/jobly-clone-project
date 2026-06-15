@@ -282,6 +282,8 @@ export interface Employee {
   bloodGroup?: string;
   identityDocuments?: IdentityDocumentEntry[];
 
+  createdByName?: string;
+  createdByRole?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -318,6 +320,8 @@ export interface Client {
   taxId?: string;
   documents: ClientDocument[];
   status: 'active' | 'inactive';
+  createdByName?: string;
+  createdByRole?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -344,6 +348,8 @@ export interface Assignment {
   employeeName?: string;
   employeeDisplayId?: string;
   clientName?: string;
+  createdByName?: string;
+  createdByRole?: string;
 }
 
 export interface TimesheetEntry {
@@ -425,6 +431,8 @@ export interface Invoice {
   notes?: string;
   billingPeriodStart?: string;
   billingPeriodEnd?: string;
+  createdByName?: string;
+  createdByRole?: string;
   createdAt: string;
   updatedAt: string;
 }
