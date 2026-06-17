@@ -9,22 +9,18 @@
 // declaration, and the required document uploads. Payroll + bank details are
 // HR-only (collected by HR via the HR-create / HR-edit screens, not the employee wizard).
 
-export const ONBOARDING_REQUIRED_DOCS = {
-  requireOneOfIdentity: [
-    "Driver's License",
-    'State-Issued ID',
-    'Passport',
-    'Permanent Resident Card',
-    'Employment Authorization Document',
-  ] as readonly string[],
-  requiredDocTypes: [
-    'Resume',
-    'I-9 Form',
-    'W-4',
-    'Offer Letter',
-    'Social Security Number',
-  ] as readonly string[],
-};
+export const ONBOARDING_REQUIRED_DOCS = [
+  "Driver's License",
+  'State-Issued ID',
+  'Passport',
+  'Permanent Resident Card',
+  'Employment Authorization Document',
+  'Resume',
+  'I-9 Form',
+  'W-4',
+  'Offer Letter',
+  'Social Security Number',
+] as const;
 
 export interface OnboardingItem {
   id: string;
@@ -97,12 +93,7 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
         && nonEmpty(emp.emergency_contact_phone),
     },
 
-    {
-      id: 'identity_doc',
-      label: 'Identity document (at least one: DL, State ID, Passport, Green Card, or EAD)',
-      done: ONBOARDING_REQUIRED_DOCS.requireOneOfIdentity.some(t => docTypes.has(t)),
-    },
-    ...ONBOARDING_REQUIRED_DOCS.requiredDocTypes.map(t => ({
+    ...ONBOARDING_REQUIRED_DOCS.map(t => ({
       id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
       label: `${t} (upload required)`,
       done: docTypes.has(t),
