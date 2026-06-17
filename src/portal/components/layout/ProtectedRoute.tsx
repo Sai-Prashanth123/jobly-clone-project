@@ -40,7 +40,7 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
   }, [denied, mustReset]);
 
   if (!isAuthenticated) {
-    return <Navigate to={`/portal/login?redirect=${encodeURIComponent(location.pathname + location.search)}`} replace />;
+    return <Navigate to="/portal/login" replace />;
   }
 
   // A user still on a one-time temporary password must set their own password

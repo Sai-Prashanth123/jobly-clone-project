@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { Navigate, useNavigate, Link } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useAuth, useForgotPassword } from '../hooks/useAuth';
@@ -23,7 +23,6 @@ const BRAND = '#4069FF';    // Jobly blue accent
 export default function Login() {
   const { login, isAuthenticated } = useAuth();
   const navigate = useNavigate();
-  const [params] = useSearchParams();
 
   const [email, setEmail]       = useState('');
   const [password, setPassword] = useState('');
@@ -37,14 +36,8 @@ export default function Login() {
   const [fpEmail, setFpEmail]   = useState('');
   const [fpSent, setFpSent]     = useState(false);
 
-  // Only honour redirects to in-portal paths to prevent open-redirect to external sites.
-  const safeRedirect = (() => {
-    const raw = params.get('redirect');
-    return raw && raw.startsWith('/portal/') ? raw : '/portal/dashboard';
-  })();
-
   if (isAuthenticated) {
-    return <Navigate to={safeRedirect} replace />;
+    return <Navigate to="/portal/dashboard" replace />;
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,7 +46,7 @@ export default function Login() {
     setError('');
     const result = await login(email, password);
     if (result.success) {
-      navigate(safeRedirect, { replace: true });
+      navigate('/portal/dashboard', { replace: true });
     } else {
       setError(result.error ?? 'Invalid credentials. Please try again.');
       setLoading(false);

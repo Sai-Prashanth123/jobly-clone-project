@@ -71,13 +71,7 @@ apiClient.interceptors.response.use(
     if (status === 401 && !redirecting) {
       redirecting = true;
       sessionStorage.clear();
-      const here = window.location.pathname + window.location.search;
-      // Don't loop back to login itself; only set redirect for in-portal pages.
-      const redirectParam =
-        here.startsWith('/portal/') && !here.startsWith('/portal/login')
-          ? `?redirect=${encodeURIComponent(here)}`
-          : '';
-      window.location.href = `/portal/login${redirectParam}`;
+      window.location.href = '/portal/login';
       return Promise.reject(err);
     }
 
