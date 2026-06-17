@@ -12,7 +12,7 @@ router.use(authenticate);
  * emails will silently fail at send time.
  */
 router.get('/mailer-status', (_req: Request, res: Response) => {
-  const fromAddress = process.env.GMAIL_USER?.trim() ?? null;
+  const fromAddress = process.env.MAIL_FROM?.trim() || process.env.GMAIL_USER?.trim() || null;
   res.json({
     success: true,
     data: {

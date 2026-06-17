@@ -465,11 +465,7 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   if (input.poNumber !== undefined) updateData.po_number = input.poNumber;
   if (input.invoiceTemplateId !== undefined) updateData.invoice_template_id = input.invoiceTemplateId;
 
-  // ── Editable invoice number (drafts only) ─────────────────────────────────
   if (input.invoiceNumber !== undefined && input.invoiceNumber !== inv.invoice_number) {
-    if (inv.status !== 'draft') {
-      throw new ValidationError("Issued invoices can't change their number.");
-    }
     if (input.invoiceNumber) updateData.invoice_number = input.invoiceNumber;
   }
 
@@ -479,13 +475,7 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   const discountType = input.discountType !== undefined ? input.discountType : inv.discount_type;
   const discountValue = input.discountValue !== undefined ? input.discountValue : inv.discount_value;
 
-  // ── Full draft edit (Wave-style) ──────────────────────────────────────────
-  // When line items are supplied, rebuild the whole document — but only while
-  // it's still a draft. Issued invoices keep their line items frozen.
   if (input.lineItems !== undefined) {
-    if (inv.status !== 'draft') {
-      throw new ValidationError("Issued invoices can't change their line items.");
-    }
     const mapped = input.lineItems.map(li => {
       const qty = Number(li.quantity) || 0;
       const price = Number(li.unitPrice) || 0;
@@ -555,6 +545,13 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
     }
     throw error;
   }
+
+  if (inv.status !== 'draft' && input.lineItems !== undefined) {
+    void import('../lib/activityLogger').then(({ logActivity }) =>
+      logActivity(null, 'updated', 'invoice', id, inv.invoice_number ?? id.slice(0, 8)),
+    );
+  }
+
   return getInvoice(id);
 }
 
@@ -674,9 +671,13 @@ export async function sendInvoice(id: string) {
     });
     emailSent = true;
   } catch (err: any) {
-    warning = `Invoice was prepared but the email could not be delivered (${err?.code ?? ''} ${err?.message ?? 'send failed'}).`;
+    warning = `Invoice was prepared but the email could not be delivered (${err?.code ?? ''} ${err?.message ?? 'send failed'}). Check that SMTP credentials are correct in Azure App Settings and that the MAIL_FROM address is a verified sender.`;
     console.error('[invoices.service] sendInvoiceEmail failed for invoice', id, err);
   }
+
+  console.log('[invoices.service] sendInvoice result', {
+    invoiceId: id, invoiceNumber: inv.invoice_number, recipientEmail, emailSent, warning: warning ?? null,
+  });
 
   // Re-send aware: only a DRAFT advances to 'sent' on a successful email. A
   // re-send of an already sent/viewed/overdue invoice keeps its current status

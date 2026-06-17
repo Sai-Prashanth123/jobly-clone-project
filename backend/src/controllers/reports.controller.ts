@@ -63,3 +63,15 @@ export async function billingByClient(req: Request, res: Response, next: NextFun
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
+
+export async function revenueByDateRange(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { startDate, endDate } = req.query as { startDate?: string; endDate?: string };
+    if (!startDate || !endDate) {
+      res.status(400).json({ success: false, error: 'startDate and endDate are required' });
+      return;
+    }
+    const data = await svc.getRevenueByDateRange(startDate, endDate);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}

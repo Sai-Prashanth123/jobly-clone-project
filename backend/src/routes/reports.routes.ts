@@ -12,6 +12,7 @@ router.get('/visa-expiry',          requireRole('admin','finance','operations'),
 router.get('/missing-timesheets',   requireRole('admin','finance','operations'), ctrl.missingTimesheets);
 router.get('/timesheet-summary',    requireRole('admin','finance','operations'), ctrl.timesheetSummary);
 router.get('/financial-summary',    requireRole('admin','finance','operations'),      ctrl.financialSummary);
+router.get('/revenue-by-date-range', requireRole('admin','finance','operations'), ctrl.revenueByDateRange);
 router.get('/profitability',        requireRole('admin','finance','operations'),      ctrl.profitability);
 router.get('/billing-by-client',    requireRole('admin','finance','operations'),      ctrl.billingByClient);
 

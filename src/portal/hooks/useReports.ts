@@ -72,3 +72,22 @@ export function useBillingByClient() {
     },
   });
 }
+
+export function useRevenueByDateRange(startDate?: string, endDate?: string) {
+  return useQuery({
+    queryKey: ['reports', 'revenue-by-date-range', startDate, endDate],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/reports/revenue-by-date-range', {
+        params: { startDate, endDate },
+      });
+      return data.data as {
+        totalInvoiced: number;
+        totalPaid: number;
+        totalOutstanding: number;
+        invoiceCount: number;
+        monthlyBreakdown: { month: string; monthLabel: string; invoiced: number; paid: number; outstanding: number; count: number }[];
+      };
+    },
+    enabled: !!startDate && !!endDate,
+  });
+}

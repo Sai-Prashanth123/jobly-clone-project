@@ -36,7 +36,7 @@ export default function InvoiceDetail() {
       if (r.emailSent) {
         toast.success(invoice?.status === 'draft' ? 'Invoice sent to client via email' : 'Invoice re-sent to client');
       } else {
-        toast.warning(r.warning ?? 'Invoice was prepared but the email could not be delivered. Check the client billing email.', { duration: 12000 });
+        toast.error(r.warning ?? 'Invoice was prepared but the email could not be delivered. Check the client billing email and server email configuration.', { duration: 20000 });
       }
     } catch {
       /* failed-request toast raised centrally (queryClient.ts) */

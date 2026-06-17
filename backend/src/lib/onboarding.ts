@@ -2,13 +2,29 @@
 // Used to (a) gate dashboard access, (b) show HR a completion % + what's missing,
 // (c) validate the "Finish onboarding" action server-side.
 //
-// File uploads + I-9 metadata (DL number, passport expiry, etc.) are intentionally
-// NOT in this checklist. Employees often lack scans on day 1; HR collects missing
-// items via the change-request flow (see employees.service.ts:requestOnboardingChanges).
-// Strict checklist covers data the employee can always provide themselves: personal
-// details (no photo — optional), addresses, employment, immigration status + SSN-last-4,
-// education, emergency contact, declaration. Payroll + bank details are HR-only
-// (collected by HR via the HR-create / HR-edit screens, not the employee wizard).
+// Document uploads are required: at least one identity document (DL, State ID,
+// Passport, Green Card, or EAD) plus each doc in ONBOARDING_REQUIRED_DOCS.requiredDocTypes.
+// Strict checklist covers personal details (no photo — optional), addresses,
+// employment, immigration status + SSN-last-4, education, emergency contact,
+// declaration, and the required document uploads. Payroll + bank details are
+// HR-only (collected by HR via the HR-create / HR-edit screens, not the employee wizard).
+
+export const ONBOARDING_REQUIRED_DOCS = {
+  requireOneOfIdentity: [
+    "Driver's License",
+    'State-Issued ID',
+    'Passport',
+    'Permanent Resident Card',
+    'Employment Authorization Document',
+  ] as readonly string[],
+  requiredDocTypes: [
+    'Resume',
+    'I-9 Form',
+    'W-4',
+    'Offer Letter',
+    'Social Security Number',
+  ] as readonly string[],
+};
 
 export interface OnboardingItem {
   id: string;
@@ -27,10 +43,6 @@ const nonEmpty = (v: unknown): boolean => typeof v === 'string' && v.trim() !== 
 const numPositive = (v: unknown): boolean => v != null && !Number.isNaN(Number(v)) && Number(v) > 0;
 
 export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingResult {
-  // docTypes was previously read for the `id_upload` + `resume` checklist items;
-  // both are dropped (employees often don't have scans on day 1). Param kept so
-  // existing callers (services/employees.service.ts) don't need to change.
-  void docTypes;
   const education: any[] = Array.isArray(emp.education) ? emp.education : [];
 
   const checks: OnboardingItem[] = [
@@ -85,8 +97,16 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
         && nonEmpty(emp.emergency_contact_phone),
     },
 
-    // Payroll + bank are HR-owned (captured via HR-create/HR-edit screens, not the
-    // employee wizard) so they're not in the employee-side strict checklist.
+    {
+      id: 'identity_doc',
+      label: 'Identity document (at least one: DL, State ID, Passport, Green Card, or EAD)',
+      done: ONBOARDING_REQUIRED_DOCS.requireOneOfIdentity.some(t => docTypes.has(t)),
+    },
+    ...ONBOARDING_REQUIRED_DOCS.requiredDocTypes.map(t => ({
+      id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+      label: `${t} (upload required)`,
+      done: docTypes.has(t),
+    })),
   ];
 
   const done = checks.filter(c => c.done).length;

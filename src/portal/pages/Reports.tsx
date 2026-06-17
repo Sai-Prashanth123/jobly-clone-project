@@ -14,6 +14,7 @@ import { MonthlyRevenueReport } from '../components/reports/MonthlyRevenueReport
 import { OutstandingInvoicesReport } from '../components/reports/OutstandingInvoicesReport';
 import { PaymentsReceivedReport } from '../components/reports/PaymentsReceivedReport';
 import { ProfitabilityReport } from '../components/reports/ProfitabilityReport';
+import { RevenueComparisonReport } from '../components/reports/RevenueComparisonReport';
 
 export default function Reports() {
   return (
@@ -119,6 +120,13 @@ export default function Reports() {
         {/* ── FINANCIAL REPORTS ──────────────────────────────────────────── */}
         <TabsContent value="financial">
           <div className="space-y-8">
+            <section>
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                Revenue Comparison
+              </h2>
+              <RevenueComparisonReport />
+            </section>
+
             <section>
               <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                 Monthly Revenue

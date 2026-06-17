@@ -489,6 +489,29 @@ export default function NewEmployee() {
     return { filled, total: checks.length };
   }, [form, isOnboarding, isSelfEdit]);
 
+  // Live self-onboarding checklist — mirrors the backend computeOnboarding so the
+  // wizard can show what's still missing in real time and highlight the relevant
+  // sections (no need to submit to find out). Drives the header chips + per-section
+  // red "Needs info" markers when in onboarding mode. Includes required document
+  // uploads (identity + key forms) that must be completed before onboarding can finish.
+  const REQUIRED_IDENTITY_DOC_LABELS = [
+    "Driver's License",
+    'State-Issued ID',
+    'Passport',
+    'Permanent Resident Card',
+    'Employment Authorization Document',
+  ];
+  const REQUIRED_DOC_TYPES = ['Resume', 'I-9 Form', 'W-4', 'Offer Letter', 'Social Security Number'];
+
+  const uploadedDocTypes = new Set<string>([
+    ...(existingEmployee?.documents ?? []).map(d => d.type),
+    ...Object.entries(form.identityDocFiles ?? {}).filter(([, v]) => v).map(([k]) => {
+      const row = IDENTITY_DOC_ROWS.find(r => r.type === k);
+      return row?.label ?? k;
+    }),
+    ...form.documents.filter(d => d.type).map(d => d.type),
+  ]);
+
   // Per-section completion — drives the green check shown on each section header
   // so the user gets positive "this section is done" feedback as they fill it.
   const sectionComplete: Record<string, boolean> = {
@@ -500,15 +523,12 @@ export default function NewEmployee() {
     [SECTION_IDS.emergency]:   !!form.emergencyContact.name.trim() && !!form.emergencyContact.phone.trim(),
     [SECTION_IDS.payroll]:     (parseNumberInput(form.payRate) ?? 0) > 0,
     [SECTION_IDS.review]:      isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
+    ...(isOnboarding ? {
+      [SECTION_IDS.identity]:    REQUIRED_IDENTITY_DOC_LABELS.some(l => uploadedDocTypes.has(l)),
+      [SECTION_IDS.documents]:   REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
+    } : {}),
   };
 
-  // Live self-onboarding checklist — mirrors the backend computeOnboarding so the
-  // wizard can show what's still missing in real time and highlight the relevant
-  // sections (no need to submit to find out). Drives the header chips + per-section
-  // red "Needs info" markers when in onboarding mode.
-  // File uploads + I-9 metadata (DL number, passport expiry, etc.) are intentionally
-  // NOT in this checklist — employees often don't have scans on day 1; HR collects
-  // missing items via the change-request flow.
   const presentFilled = [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim());
   const permFilled = form.permanentSameAsPresent
     ? presentFilled
@@ -530,8 +550,16 @@ export default function NewEmployee() {
     { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
     // Emergency
     { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
-    // Payroll — bank / direct-deposit details the employee provides (pay rate &
-    // payment type stay HR-owned, so they're not in the employee checklist).
+    // Documents
+    { id: 'identity_doc', label: 'Identity document (at least one)', section: SECTION_IDS.identity,
+      done: REQUIRED_IDENTITY_DOC_LABELS.some(l => uploadedDocTypes.has(l)) },
+    ...REQUIRED_DOC_TYPES.map(t => ({
+      id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+      label: t,
+      section: SECTION_IDS.documents,
+      done: uploadedDocTypes.has(t),
+    })),
+    // Payroll
     { id: 'bank',        label: 'Bank details (direct deposit)',  section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && /^\d{9}$/.test(form.bankRoutingNumber) && !!form.bankAccountNumber.trim() },
     // Declaration
     { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
@@ -1593,11 +1621,20 @@ export default function NewEmployee() {
               / Green Card / EAD) so HR can track work-authorization expiry. */}
           <SectionCard
             id={SECTION_IDS.identity}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.identity) : undefined}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description="Upload whichever of these apply. None are required up front — HR will flag anything still needed."
+            description={isOnboarding
+              ? 'At least one identity document upload is required (DL, State ID, Passport, Green Card, or EAD).'
+              : 'Upload whichever of these apply. None are required up front — HR will flag anything still needed.'}
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
+            {isOnboarding && !REQUIRED_IDENTITY_DOC_LABELS.some(l => uploadedDocTypes.has(l)) && (
+              <p className="text-[11px] text-red-600 mb-2">
+                At least one identity document upload is required to complete onboarding.
+              </p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {IDENTITY_DOC_ROWS.map(row => {
                 const file = form.identityDocFiles[row.type];
@@ -1926,15 +1963,26 @@ export default function NewEmployee() {
           </SectionCard>
 
           {/* 12 Documents — drag-and-drop multi-file upload with inline classification.
-              Optional in onboarding mode (no checklist entry); HR can request specific
-              uploads via the change-request flow if anything is still needed. */}
+              During onboarding, Resume / I-9 Form / W-4 / Offer Letter / SSN are required. */}
           <SectionCard
             id={SECTION_IDS.documents}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.documents) : undefined}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.documents)}
             num="12"
             title="Documents"
-            description="Optional. Drag files in (or click to browse), then choose a type for each."
+            description={isOnboarding
+              ? 'Upload required documents: Resume, I-9 Form, W-4, Offer Letter, Social Security Number.'
+              : 'Optional. Drag files in (or click to browse), then choose a type for each.'}
             icon={<FileText className="h-4 w-4 text-[#4069FF]" />}
           >
+            {isOnboarding && (() => {
+              const missing = REQUIRED_DOC_TYPES.filter(t => !uploadedDocTypes.has(t));
+              return missing.length > 0 ? (
+                <p className="text-[11px] text-red-600 mb-2">
+                  Required uploads still needed: {missing.join(', ')}
+                </p>
+              ) : null;
+            })()}
             <div
               onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
               onDragLeave={() => setDocDragOver(false)}

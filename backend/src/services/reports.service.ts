@@ -256,6 +256,73 @@ export async function getBillingByClient() {
     .sort((a, b) => b.totalBilled - a.totalBilled);
 }
 
+export async function getRevenueByDateRange(startDate: string, endDate: string) {
+  const { data, error } = await supabaseAdmin
+    .from('invoices')
+    .select('id, invoice_number, client_id, issue_date, status, total_amount, amount_paid, paid_at')
+    .gte('issue_date', startDate)
+    .lte('issue_date', endDate);
+
+  if (error) throw error;
+
+  let totalInvoiced = 0;
+  let totalPaid = 0;
+  let totalOutstanding = 0;
+  const monthMap = new Map<string, { invoiced: number; paid: number; outstanding: number; count: number }>();
+
+  for (const inv of data ?? []) {
+    const total = Number(inv.total_amount) || 0;
+    const amountPaid = Number(inv.amount_paid) || 0;
+    totalInvoiced += total;
+
+    if (inv.status === 'paid') {
+      totalPaid += total;
+    } else if (['sent', 'viewed', 'partially_paid', 'overdue'].includes(inv.status)) {
+      totalOutstanding += Math.round((total - amountPaid) * 100) / 100;
+    }
+
+    const month = inv.issue_date.substring(0, 7);
+    const existing = monthMap.get(month);
+    if (existing) {
+      existing.invoiced += total;
+      if (inv.status === 'paid') existing.paid += total;
+      else if (['sent', 'viewed', 'partially_paid', 'overdue'].includes(inv.status)) {
+        existing.outstanding += Math.round((total - amountPaid) * 100) / 100;
+      }
+      existing.count += 1;
+    } else {
+      monthMap.set(month, {
+        invoiced: total,
+        paid: inv.status === 'paid' ? total : 0,
+        outstanding: ['sent', 'viewed', 'partially_paid', 'overdue'].includes(inv.status)
+          ? Math.round((total - amountPaid) * 100) / 100
+          : 0,
+        count: 1,
+      });
+    }
+  }
+
+  const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monthlyBreakdown = [...monthMap.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, vals]) => {
+      const [yyyy, mm] = month.split('-');
+      return {
+        month,
+        monthLabel: `${MONTH_LABELS[parseInt(mm, 10) - 1]} ${yyyy}`,
+        ...vals,
+      };
+    });
+
+  return {
+    totalInvoiced,
+    totalPaid,
+    totalOutstanding,
+    invoiceCount: (data ?? []).length,
+    monthlyBreakdown,
+  };
+}
+
 /**
  * Returns the ISO date string of the Monday that is `weeksOffset` weeks away
  * from the current week's Monday (UTC).

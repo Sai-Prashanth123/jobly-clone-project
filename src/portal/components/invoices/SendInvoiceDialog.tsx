@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Mail, Send, Check, Loader2 } from 'lucide-react';
+import { Mail, Send, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSendInvoice, useGetInvoicePDF, useUpdateInvoice } from '../../hooks/useInvoices';
 import {
@@ -52,6 +52,7 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
   const [subject, setSubject] = useState(defaultSubject);
   const [message, setMessage] = useState(defaultMessage);
   const [externalOpened, setExternalOpened] = useState(false);
+  const [sendError, setSendError] = useState<string | null>(null);
   const [dontShow, setDontShow] = useState(() => localStorage.getItem(SEND_PREF_KEY) === 'direct');
 
   const publicUrl = invoice.publicToken ? publicInvoiceUrl(invoice.publicToken) : undefined;
@@ -103,14 +104,16 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
   };
 
   const sendViaJobly = async () => {
+    setSendError(null);
     try {
       const r = await sendInvoice.mutateAsync();
       if (r.emailSent) {
         toast.success(invoice.status === 'draft' ? 'Invoice sent to client via email' : 'Invoice re-sent to client');
+        onOpenChange(false);
       } else {
-        toast.warning(r.warning ?? 'Invoice was prepared but the email could not be delivered. Check the client billing email.', { duration: 12000 });
+        const msg = r.warning ?? 'The email could not be delivered. Check the client billing email and server email configuration.';
+        setSendError(msg);
       }
-      onOpenChange(false);
     } catch {
       /* central toast */
     }
@@ -146,6 +149,16 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
             />
           </div>
         </div>
+
+        {sendError && (
+          <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2.5 text-sm text-red-800 flex items-start gap-2">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="font-medium">Email delivery failed</p>
+              <p className="text-xs mt-0.5">{sendError}</p>
+            </div>
+          </div>
+        )}
 
         {/* Primary: Send via Jobly (production email — branded + PDF attached) */}
         <div className="space-y-1.5">
