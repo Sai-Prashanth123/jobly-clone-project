@@ -2,19 +2,14 @@
 // Used to (a) gate dashboard access, (b) show HR a completion % + what's missing,
 // (c) validate the "Finish onboarding" action server-side.
 //
-// Document uploads are required: at least one identity document (DL, State ID,
-// Passport, Green Card, or EAD) plus each doc in ONBOARDING_REQUIRED_DOCS.requiredDocTypes.
+// Identity documents (DL, State ID, Passport, Green Card, EAD) are optional.
+// Employment documents in ONBOARDING_REQUIRED_DOCS are mandatory.
 // Strict checklist covers personal details (no photo — optional), addresses,
 // employment, immigration status + SSN-last-4, education, emergency contact,
 // declaration, and the required document uploads. Payroll + bank details are
 // HR-only (collected by HR via the HR-create / HR-edit screens, not the employee wizard).
 
 export const ONBOARDING_REQUIRED_DOCS = [
-  "Driver's License",
-  'State-Issued ID',
-  'Passport',
-  'Permanent Resident Card',
-  'Employment Authorization Document',
   'Resume',
   'I-9 Form',
   'W-4',

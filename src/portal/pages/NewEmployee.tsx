@@ -495,11 +495,6 @@ export default function NewEmployee() {
   // red "Needs info" markers when in onboarding mode. Includes required document
   // uploads (identity + key forms) that must be completed before onboarding can finish.
   const ALL_REQUIRED_DOC_TYPES = [
-    "Driver's License",
-    'State-Issued ID',
-    'Passport',
-    'Permanent Resident Card',
-    'Employment Authorization Document',
     'Resume',
     'I-9 Form',
     'W-4',
@@ -528,8 +523,7 @@ export default function NewEmployee() {
     [SECTION_IDS.payroll]:     (parseNumberInput(form.payRate) ?? 0) > 0,
     [SECTION_IDS.review]:      isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
     ...(isOnboarding ? {
-      [SECTION_IDS.identity]:    ALL_REQUIRED_DOC_TYPES.slice(0, 5).every(t => uploadedDocTypes.has(t)),
-      [SECTION_IDS.documents]:   ALL_REQUIRED_DOC_TYPES.slice(5).every(t => uploadedDocTypes.has(t)),
+      [SECTION_IDS.documents]:   ALL_REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
     } : {}),
   };
 
@@ -555,13 +549,7 @@ export default function NewEmployee() {
     // Emergency
     { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
     // Documents
-    ...ALL_REQUIRED_DOC_TYPES.slice(0, 5).map(t => ({
-      id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-      label: t,
-      section: SECTION_IDS.identity,
-      done: uploadedDocTypes.has(t),
-    })),
-    ...ALL_REQUIRED_DOC_TYPES.slice(5).map(t => ({
+    ...ALL_REQUIRED_DOC_TYPES.map(t => ({
       id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
       label: t,
       section: SECTION_IDS.documents,
@@ -1633,19 +1621,9 @@ export default function NewEmployee() {
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description={isOnboarding
-              ? 'All identity documents must be uploaded (DL, State ID, Passport, Green Card, EAD).'
-              : 'Upload whichever of these apply. None are required up front — HR will flag anything still needed.'}
+            description="Upload whichever of these apply. None are required — HR will flag anything still needed."
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
-            {isOnboarding && (() => {
-              const missing = ALL_REQUIRED_DOC_TYPES.slice(0, 5).filter(t => !uploadedDocTypes.has(t));
-              return missing.length > 0 ? (
-                <p className="text-[11px] text-red-600 mb-2">
-                  Required uploads still needed: {missing.join(', ')}
-                </p>
-              ) : null;
-            })()}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {IDENTITY_DOC_ROWS.map(row => {
                 const file = form.identityDocFiles[row.type];
@@ -1987,7 +1965,7 @@ export default function NewEmployee() {
             icon={<FileText className="h-4 w-4 text-[#4069FF]" />}
           >
             {isOnboarding && (() => {
-              const missing = ALL_REQUIRED_DOC_TYPES.slice(5).filter(t => !uploadedDocTypes.has(t));
+              const missing = ALL_REQUIRED_DOC_TYPES.filter(t => !uploadedDocTypes.has(t));
               return missing.length > 0 ? (
                 <p className="text-[11px] text-red-600 mb-2">
                   Required uploads still needed: {missing.join(', ')}
