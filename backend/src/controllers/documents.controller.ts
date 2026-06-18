@@ -31,6 +31,13 @@ export async function getPreviewUrl(req: Request, res: Response, next: NextFunct
   } catch (err) { next(err); }
 }
 
+export async function renderDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await storageSvc.renderDocument(req.params.id, req.user!);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     await storageSvc.deleteDocument(req.params.id);

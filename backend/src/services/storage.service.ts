@@ -1,5 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
+import mammoth from 'mammoth';
+import * as XLSX from 'xlsx';
 
 const BUCKET_MAP: Record<string, string> = {
   employee: 'employee-docs',
@@ -154,6 +156,87 @@ export async function getDocumentPreviewUrl(
     .createSignedUrl(doc.storage_path, 3600);  // no download: true → inline rendering
 
   return { url: data?.signedUrl ?? null, mimeType: doc.type ?? null, name: doc.name ?? 'document' };
+}
+
+// Self-hosted document render: downloads from Supabase, converts to HTML server-side.
+// Supports: docx→mammoth HTML, xlsx/csv→SheetJS HTML table, txt/md/json→<pre> wrap.
+// PDF and images are handled client-side via the signed URL — this returns null for those.
+export async function renderDocument(
+  docId: string,
+  user: { role: string; employeeId?: string | null },
+): Promise<{ html: string; kind: 'docx' | 'sheet' | 'text' | 'passthrough'; name: string; inlineUrl?: string }> {
+  const { data: doc, error } = await supabaseAdmin
+    .from('documents')
+    .select('*')
+    .eq('id', docId)
+    .single();
+
+  if (error || !doc) throw new NotFoundError('Document not found');
+
+  if (user.role === 'employee') {
+    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
+    if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
+  }
+
+  const name: string = doc.name ?? 'document';
+  const ext = (name.split('.').pop() ?? '').toLowerCase();
+  const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
+
+  // PDF and images: return inline signed URL so client renders them natively.
+  if (ext === 'pdf' || ['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) {
+    const { data: urlData } = await supabaseAdmin.storage.from(bucket).createSignedUrl(doc.storage_path, 3600);
+    return { html: '', kind: 'passthrough', name, inlineUrl: urlData?.signedUrl ?? undefined };
+  }
+
+  // Download the file bytes from Supabase storage.
+  const { data: fileData, error: dlErr } = await supabaseAdmin.storage.from(bucket).download(doc.storage_path);
+  if (dlErr || !fileData) throw new Error('Failed to download document for rendering');
+
+  const buffer = Buffer.from(await fileData.arrayBuffer());
+
+  // DOCX → HTML via mammoth (preserves headings, bold, lists, tables).
+  if (ext === 'docx' || ext === 'doc') {
+    const result = await mammoth.convertToHtml({ buffer });
+    return { html: wrapHtml(result.value, name), kind: 'docx', name };
+  }
+
+  // XLSX / XLS / CSV → HTML table via SheetJS.
+  if (['xlsx', 'xls', 'csv', 'ods'].includes(ext)) {
+    const wb = XLSX.read(buffer, { type: 'buffer' });
+    let html = '';
+    for (const sheetName of wb.SheetNames) {
+      const ws = wb.Sheets[sheetName];
+      const table = XLSX.utils.sheet_to_html(ws, { id: `sheet-${sheetName}`, editable: false });
+      html += `<h3 style="margin:1em 0 0.3em;font-family:sans-serif;font-size:13px;color:#555">${escHtml(sheetName)}</h3>${table}`;
+    }
+    return { html: wrapHtml(html, name, true), kind: 'sheet', name };
+  }
+
+  // Plain text / markdown / JSON / XML → escaped <pre>.
+  if (['txt','md','json','xml','html','htm','csv'].includes(ext)) {
+    const text = buffer.toString('utf-8');
+    const pre = `<pre style="font-family:monospace;font-size:12px;white-space:pre-wrap;word-break:break-word;padding:1rem">${escHtml(text)}</pre>`;
+    return { html: wrapHtml(pre, name), kind: 'text', name };
+  }
+
+  // Unsupported — return empty so client shows download prompt.
+  return { html: '', kind: 'passthrough', name };
+}
+
+function escHtml(s: string): string {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function wrapHtml(body: string, _name: string, wide = false): string {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+  body{margin:1rem ${wide ? '0.5rem' : '2rem'};font-family:Georgia,serif;font-size:14px;line-height:1.6;color:#222}
+  table{border-collapse:collapse;width:100%;font-size:12px;font-family:sans-serif}
+  td,th{border:1px solid #ccc;padding:4px 8px;white-space:nowrap}
+  th{background:#f5f5f5;font-weight:600}
+  h1,h2,h3{font-family:sans-serif}
+  img{max-width:100%}
+</style></head><body>${body}</body></html>`;
 }
 
 export async function deleteDocument(docId: string) {
