@@ -106,7 +106,7 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
   const sendViaJobly = async () => {
     setSendError(null);
     try {
-      const r = await sendInvoice.mutateAsync();
+      const r = await sendInvoice.mutateAsync(to.trim() ? { recipientEmail: to.trim() } : undefined);
       if (r.emailSent) {
         toast.success(invoice.status === 'draft' ? 'Invoice sent to client via email' : 'Invoice re-sent to client');
         onOpenChange(false);

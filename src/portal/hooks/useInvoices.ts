@@ -323,17 +323,17 @@ export function useGetInvoicePDF() {
 export function useSendInvoice(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const { data } = await apiClient.post(`/invoices/${id}/send`);
+    mutationFn: async (body?: { recipientEmail?: string }) => {
+      const { data } = await apiClient.post(`/invoices/${id}/send`, body ?? {});
       return {
         invoice: mapInvoice(data.data),
         emailSent: data.emailSent as boolean,
         warning: data.warning as string | undefined,
       };
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['invoices'] });
-      qc.invalidateQueries({ queryKey: ['invoices', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['invoices', id], updated.invoice);
+      qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
     },
   });
 }

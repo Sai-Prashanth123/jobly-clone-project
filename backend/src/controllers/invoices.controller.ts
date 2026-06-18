@@ -69,7 +69,8 @@ export async function getPDF(req: Request, res: Response, next: NextFunction): P
 
 export async function send(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const result = await svc.sendInvoice(req.params.id);
+    const recipientEmail = (req.body as any)?.recipientEmail?.trim() || undefined;
+    const result = await svc.sendInvoice(req.params.id, recipientEmail);
     // Audit the send (who emailed which invoice to the client, and when).
     if (result.emailSent) {
       void import('../lib/activityLogger').then(({ logActivity }) =>

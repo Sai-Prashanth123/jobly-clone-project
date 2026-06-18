@@ -611,7 +611,7 @@ export async function removeInvoiceAttachment(invoiceId: string, docId: string) 
   await deleteDocument(docId);
 }
 
-export async function sendInvoice(id: string) {
+export async function sendInvoice(id: string, recipientEmailOverride?: string) {
   const inv = await getInvoice(id);
 
   const { data: client } = await supabaseAdmin
@@ -620,7 +620,9 @@ export async function sendInvoice(id: string) {
     .eq('id', inv.client_id)
     .single();
 
-  const recipientEmail = client?.billing_contact_email || client?.contact_email;
+  // Use the caller-supplied address (edited in the Send dialog) if provided,
+  // otherwise fall back to the client's stored billing / contact email.
+  const recipientEmail = recipientEmailOverride || client?.billing_contact_email || client?.contact_email;
   if (!recipientEmail) {
     throw new ValidationError('Client has no billing email address on file. Add one in the client profile and try again.');
   }
