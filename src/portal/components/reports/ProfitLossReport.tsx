@@ -24,6 +24,7 @@ export function ProfitLossReport() {
     basis: 'accrual',
   });
   const [view, setView] = useState<'summary' | 'details'>('summary');
+  const [detailStatus, setDetailStatus] = useState<'all' | 'paid' | 'unpaid'>('all');
 
   const { data, isLoading } = useProfitLoss(applied.start, applied.end, applied.basis);
 
@@ -115,7 +116,7 @@ export function ProfitLossReport() {
           </div>
 
           {/* View Toggle */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             {(['summary', 'details'] as const).map(v => (
               <button key={v} onClick={() => setView(v)}
                 className={`px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${view === v ? 'bg-[#4069FF] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
@@ -125,6 +126,16 @@ export function ProfitLossReport() {
             <span className="text-xs text-muted-foreground ml-2">
               {new Date(applied.start + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} – {new Date(applied.end + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
             </span>
+            {view === 'details' && (
+              <div className="flex gap-2 ml-auto">
+                {(['all','paid','unpaid'] as const).map(s => (
+                  <button key={s} onClick={() => setDetailStatus(s)}
+                    className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${detailStatus === s ? 'bg-[#4069FF] text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                    {s === 'all' ? 'All' : s === 'paid' ? 'Paid' : 'Unpaid'}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {view === 'summary' ? (
@@ -155,37 +166,46 @@ export function ProfitLossReport() {
           ) : (
             <Card>
               <CardContent className="pt-4 pb-2">
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">INVOICE DETAILS ({data.invoiceCount})</p>
-                {data.detailRows.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">No invoices in this period.</p>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200">
-                          {['Invoice #', 'Client', 'Date', 'Amount', 'Status'].map(h => (
-                            <th key={h} className="pb-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide pr-4">{h}</th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {data.detailRows.map((row, i) => (
-                          <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
-                            <td className="py-2 pr-4 font-mono text-blue-600">{row.invoiceNumber}</td>
-                            <td className="py-2 pr-4">{row.clientName}</td>
-                            <td className="py-2 pr-4 text-muted-foreground">{row.date ? new Date(row.date + 'T00:00:00').toLocaleDateString() : '—'}</td>
-                            <td className="py-2 pr-4 font-medium">{formatCurrency(row.amount)}</td>
-                            <td className="py-2 pr-4">
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${row.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : row.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
-                                {row.status.toUpperCase()}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
+                {(() => {
+                  const filteredDetails = data.detailRows.filter(r =>
+                    detailStatus === 'all' ? true : detailStatus === 'paid' ? r.status === 'paid' : r.status !== 'paid'
+                  );
+                  return (
+                    <>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">INVOICE DETAILS ({filteredDetails.length})</p>
+                      {filteredDetails.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">No invoices in this period.</p>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead>
+                              <tr className="border-b border-gray-200">
+                                {['Invoice #', 'Client', 'Date', 'Amount', 'Status'].map(h => (
+                                  <th key={h} className="pb-2 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide pr-4">{h}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {filteredDetails.map((row, i) => (
+                                <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
+                                  <td className="py-2 pr-4 font-mono text-blue-600">{row.invoiceNumber}</td>
+                                  <td className="py-2 pr-4">{row.clientName}</td>
+                                  <td className="py-2 pr-4 text-muted-foreground">{row.date ? new Date(row.date + 'T00:00:00').toLocaleDateString() : '—'}</td>
+                                  <td className="py-2 pr-4 font-medium">{formatCurrency(row.amount)}</td>
+                                  <td className="py-2 pr-4">
+                                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${row.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : row.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>
+                                      {row.status.toUpperCase()}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </CardContent>
             </Card>
           )}

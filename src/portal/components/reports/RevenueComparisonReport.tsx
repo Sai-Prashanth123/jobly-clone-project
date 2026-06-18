@@ -18,14 +18,13 @@ function lastDayOfMonth(year: number, month: number): Date {
 function getDefaultRanges() {
   const now = new Date();
   const y = now.getUTCFullYear();
-  const m = now.getUTCMonth();
-
-  const r1Start = toYMD(new Date(Date.UTC(y, m - 6, 1)));
-  const r1End = toYMD(lastDayOfMonth(y, m - 1));
-  const r2Start = toYMD(new Date(Date.UTC(y, m - 12, 1)));
-  const r2End = toYMD(lastDayOfMonth(y, m - 7));
-
-  return { r1Start, r1End, r2Start, r2End };
+  const todayStr = `${y}-${String(now.getUTCMonth()+1).padStart(2,'0')}-${String(now.getUTCDate()).padStart(2,'0')}`;
+  return {
+    r1Start: `${y}-01-01`,
+    r1End: todayStr,
+    r2Start: `${y-1}-01-01`,
+    r2End: `${y-1}-12-31`,
+  };
 }
 
 export function RevenueComparisonReport() {

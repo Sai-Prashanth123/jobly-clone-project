@@ -15,13 +15,14 @@ export function PaymentsReceivedReport() {
   const { data: invData } = useInvoices({ limit: 1000 });
   const { data: clientData } = useClients({ limit: 200 });
   const [clientFilter, setClientFilter] = useState('all');
-  const [monthsBack, setMonthsBack] = useState(6);
+  const [monthsBack, setMonthsBack] = useState(0);
 
   const invoices = invData?.data ?? [];
   const clients = clientData?.data ?? [];
 
   // Build the cutoff date string for filtering
   const cutoffMonth = useMemo(() => {
+    if (monthsBack === 0) return `${new Date().getUTCFullYear()}-01`;
     const now = new Date();
     const d = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
@@ -45,9 +46,17 @@ export function PaymentsReceivedReport() {
   // Monthly grouping
   const now = new Date();
   const months: string[] = [];
-  for (let i = monthsBack - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  if (monthsBack === 0) {
+    const y = now.getUTCFullYear();
+    const m = now.getUTCMonth();
+    for (let i = 0; i <= m; i++) {
+      months.push(`${y}-${String(i + 1).padStart(2, '0')}`);
+    }
+  } else {
+    for (let i = monthsBack - 1; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
   }
 
   const monthlyPaid = months.map(m => ({
@@ -84,8 +93,9 @@ export function PaymentsReceivedReport() {
             <div className="space-y-1">
               <p className="text-xs font-medium text-gray-600">Period</p>
               <Select value={String(monthsBack)} onValueChange={v => setMonthsBack(Number(v))}>
-                <SelectTrigger className="w-36 h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="w-44 h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="0">This year (Jan–today)</SelectItem>
                   <SelectItem value="3">Last 3 months</SelectItem>
                   <SelectItem value="6">Last 6 months</SelectItem>
                   <SelectItem value="12">Last 12 months</SelectItem>
@@ -121,7 +131,7 @@ export function PaymentsReceivedReport() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-sm">Payments — Last {monthsBack} Months</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">Payments — {monthsBack === 0 ? 'This Year' : `Last ${monthsBack} Months`}</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2">
               {monthlyPaid.map(m => {
@@ -172,6 +182,58 @@ export function PaymentsReceivedReport() {
           </CardContent>
         </Card>
       )}
+
+      {/* Year-over-year client revenue comparison */}
+      {(() => {
+        const y = new Date().getUTCFullYear();
+        const years = [y-2, y-1, y];
+        const clientRevByYear = clients
+          .map(c => {
+            const byYear = years.map(yr => ({
+              year: yr,
+              total: invoices.filter(i => i.clientId === c.id && i.issueDate.startsWith(String(yr))).reduce((s, i) => s + i.totalAmount, 0),
+            }));
+            if (byYear.every(b => b.total === 0)) return null;
+            return { name: c.companyName, byYear };
+          })
+          .filter(Boolean)
+          .sort((a, b) => (b!.byYear[2].total - a!.byYear[2].total));
+        if (clientRevByYear.length === 0) return null;
+        return (
+          <Card>
+            <CardHeader><CardTitle className="text-sm">Revenue by Client — Year over Year</CardTitle></CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-gray-50">
+                      <TableHead className="font-semibold">Client</TableHead>
+                      {years.map(yr => <TableHead key={yr} className="text-right font-semibold">{yr}</TableHead>)}
+                      <TableHead className="text-right font-semibold">Trend</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {clientRevByYear.map(c => {
+                      const prev = c!.byYear[1].total;
+                      const curr = c!.byYear[2].total;
+                      const trend = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null;
+                      return (
+                        <TableRow key={c!.name}>
+                          <TableCell className="font-medium text-sm">{c!.name}</TableCell>
+                          {c!.byYear.map(b => <TableCell key={b.year} className="text-right text-sm">{b.total > 0 ? formatCurrency(b.total) : '—'}</TableCell>)}
+                          <TableCell className={`text-right text-sm font-semibold ${trend === null ? '' : trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                            {trend === null ? '—' : `${trend > 0 ? '+' : ''}${trend}%`}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
       {/* Paid Invoice Details */}
       <Card>
