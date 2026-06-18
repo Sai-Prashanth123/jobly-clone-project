@@ -164,11 +164,8 @@ export function useCreateEmployee() {
       };
     },
     onSuccess: ({ employee }) => {
-      // Pre-populate the detail query so the immediate navigate to
-      // /portal/employees/:id finds the new employee in cache (no loading
-      // flash on the detail page) — feels instant after create.
       qc.setQueryData(['employees', employee.id], employee);
-      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
     },
   });
 }
@@ -194,16 +191,13 @@ export function useUpdateEmployee(id: string) {
       const { data } = await apiClient.put(`/employees/${id}`, toSnake(body));
       return mapEmployee(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
-      // Status flips (active ↔ inactive ↔ onboarding) change which assignments
-      // the operations dashboard considers active.
-      qc.invalidateQueries({ queryKey: ['assignments'] });
+    onSuccess: (updated) => {
+      // Instant detail update — no round-trip wait.
+      qc.setQueryData(['employees', id], updated);
+      // Mark lists stale so they refresh in the background on next focus/mount.
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
-    // Call sites handle errors contextually (EmployeeDetail's stale-review 409
-    // shows a re-submit warning + refetch; NewEmployee shows an inline form
-    // error). Keep the global handler quiet so those don't double-toast.
     meta: { silentError: true },
   });
 }
@@ -226,10 +220,10 @@ export function usePlaceOnLeave(id: string) {
       const { data } = await apiClient.post(`/employees/${id}/leave`, body);
       return mapEmployee(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
-      qc.invalidateQueries({ queryKey: ['assignments'] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['employees', id], updated);
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
 }
@@ -242,10 +236,10 @@ export function useReturnFromLeave(id: string) {
       const { data } = await apiClient.post(`/employees/${id}/return-from-leave`, {});
       return mapEmployee(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
-      qc.invalidateQueries({ queryKey: ['assignments'] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['employees', id], updated);
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
 }
@@ -259,10 +253,10 @@ export function useTerminateEmployee(id: string) {
       const { data } = await apiClient.post(`/employees/${id}/terminate`, body);
       return mapEmployee(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
-      qc.invalidateQueries({ queryKey: ['assignments'] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['employees', id], updated);
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
 }
@@ -282,10 +276,10 @@ export function useRehireEmployee(id: string) {
         loginEmail: data.loginEmail as string | undefined,
       };
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
-      qc.invalidateQueries({ queryKey: ['assignments'] });
+    onSuccess: ({ employee }) => {
+      qc.setQueryData(['employees', id], employee);
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
 }
@@ -299,9 +293,9 @@ export function useCompleteOnboarding(id: string) {
       const { data } = await apiClient.post(`/employees/${id}/onboarding/complete`, {});
       return mapEmployee(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['employees', id], updated);
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
     },
   });
 }
@@ -313,19 +307,14 @@ export function useCompleteOnboarding(id: string) {
 export function useRequestOnboardingChanges(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    // expectedSubmittedAt = the onboarding_completed_at HR reviewed. Sent so the
-    // backend can 409 if the employee re-submitted/reopened since (stale review).
     mutationFn: async ({ message, expectedSubmittedAt }: { message: string; expectedSubmittedAt?: string | null }) => {
       const { data } = await apiClient.post(`/employees/${id}/onboarding/request-changes`, { message, expectedSubmittedAt });
-      return data.data;
+      return mapEmployee(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['employees', id], updated);
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
     },
-    // EmployeeDetail handles the stale-review 409 with a bespoke "employee
-    // re-submitted — showing the latest" warning + refetch; keep the global
-    // handler quiet here so it doesn't double-toast.
     meta: { silentError: true },
   });
 }
@@ -337,11 +326,11 @@ export function useReopenOnboarding(id: string) {
   return useMutation({
     mutationFn: async () => {
       const { data } = await apiClient.post(`/employees/${id}/onboarding/reopen`, {});
-      return data.data;
+      return mapEmployee(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['employees', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['employees', id], updated);
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
     },
   });
 }
@@ -356,8 +345,8 @@ export function useUploadEmployeeDocument(employeeId: string) {
       return data;
     },
     onSuccess: () => {
+      // Documents live inside the employee detail — invalidate to get fresh list.
       qc.invalidateQueries({ queryKey: ['employees', employeeId] });
-      qc.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 }
@@ -371,7 +360,6 @@ export function useDeleteEmployeeDocument(employeeId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['employees', employeeId] });
-      qc.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 }

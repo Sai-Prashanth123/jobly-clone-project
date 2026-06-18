@@ -102,7 +102,10 @@ export function useCreateClient() {
       const { data } = await apiClient.post('/clients', sanitizeClient(body));
       return mapClient(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
+    onSuccess: (created) => {
+      qc.setQueryData(['clients', created.id], created);
+      qc.invalidateQueries({ queryKey: ['clients'], refetchType: 'none' });
+    },
   });
 }
 
@@ -113,9 +116,9 @@ export function useUpdateClient(id: string) {
       const { data } = await apiClient.put(`/clients/${id}`, sanitizeClient(body));
       return mapClient(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['clients'] });
-      qc.invalidateQueries({ queryKey: ['clients', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['clients', id], updated);
+      qc.invalidateQueries({ queryKey: ['clients'], refetchType: 'none' });
     },
   });
 }

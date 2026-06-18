@@ -37,7 +37,8 @@ export const queryClient = new QueryClient({
   }),
   defaultOptions: {
     queries: {
-      staleTime: 30_000,       // 30 seconds
+      staleTime: 60_000,        // 60 s — lists won't refetch on every tab switch
+      gcTime: 5 * 60_000,       // keep unused cache for 5 min (was default 5 min, explicit now)
       retry: 1,
       refetchOnWindowFocus: false,
     },

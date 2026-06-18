@@ -114,7 +114,10 @@ export function useCreateTimesheet() {
       });
       return mapTimesheet(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets'] }),
+    onSuccess: (created) => {
+      qc.setQueryData(['timesheets', created.id], created);
+      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
+    },
   });
 }
 
@@ -132,11 +135,11 @@ export function useUpdateTimesheetEntries(id: string) {
         notes: payload.notes,
         ...(payload.leaveReason !== undefined ? { leaveReason: payload.leaveReason } : {}),
       });
-      return data;
+      return mapTimesheet(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['timesheets'] });
-      qc.invalidateQueries({ queryKey: ['timesheets', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['timesheets', id], updated);
+      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
     },
   });
 }
@@ -153,9 +156,9 @@ export function useUploadWeeklyClientProof(id: string) {
       });
       return mapTimesheet(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['timesheets'] });
-      qc.invalidateQueries({ queryKey: ['timesheets', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['timesheets', id], updated);
+      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
     },
   });
 }
@@ -167,9 +170,9 @@ export function useDeleteWeeklyClientProof(id: string) {
       const { data } = await apiClient.delete(`/timesheets/${id}/client-proof`);
       return mapTimesheet(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['timesheets'] });
-      qc.invalidateQueries({ queryKey: ['timesheets', id] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['timesheets', id], updated);
+      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
     },
   });
 }
@@ -177,14 +180,14 @@ export function useDeleteWeeklyClientProof(id: string) {
 export function usePatchTimesheetStatus(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: { status: string; rejectionReason?: string }) =>
-      apiClient.patch(`/timesheets/${id}/status`, body),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['timesheets'] });
-      qc.invalidateQueries({ queryKey: ['timesheets', id] });
-      // Status changes alter approved-hours totals on dashboards + invoice
-      // eligibility (only client_approved timesheets are invoiceable).
-      qc.invalidateQueries({ queryKey: ['reports'] });
+    mutationFn: async (body: { status: string; rejectionReason?: string }) => {
+      const { data } = await apiClient.patch(`/timesheets/${id}/status`, body);
+      return mapTimesheet(data.data);
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(['timesheets', id], updated);
+      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
     },
   });
 }

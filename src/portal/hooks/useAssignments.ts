@@ -87,9 +87,9 @@ export function useCreateAssignment() {
       const { data } = await apiClient.post('/assignments', sanitizeAssignment(body));
       return mapAssignment(data.data);
     },
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['assignments'] });
-      if (data?.employeeId) qc.invalidateQueries({ queryKey: ['employees', data.employeeId] });
+    onSuccess: (created) => {
+      qc.setQueryData(['assignments', created.id], created);
+      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
 }
@@ -101,10 +101,9 @@ export function useUpdateAssignment(id: string) {
       const { data } = await apiClient.put(`/assignments/${id}`, sanitizeAssignment(body));
       return mapAssignment(data.data);
     },
-    onSuccess: (data) => {
-      qc.invalidateQueries({ queryKey: ['assignments'] });
-      qc.invalidateQueries({ queryKey: ['assignments', id] });
-      if (data?.employeeId) qc.invalidateQueries({ queryKey: ['employees', data.employeeId] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['assignments', id], updated);
+      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
 }

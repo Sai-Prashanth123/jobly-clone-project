@@ -110,10 +110,11 @@ export function useCreateInvoice() {
       const { data } = await apiClient.post('/invoices', body);
       return mapInvoice(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['invoices'] });
-      qc.invalidateQueries({ queryKey: ['estimates'] });
-      qc.invalidateQueries({ queryKey: ['reports'] });
+    onSuccess: (created) => {
+      qc.setQueryData(['invoices', created.id], created);
+      qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['estimates'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
     },
   });
 }
@@ -179,17 +180,16 @@ export function useUpdateInvoice(id: string) {
       notes?: string | null; terms?: string | null; poNumber?: string | null; taxRate?: number;
       invoiceNumber?: string; discountType?: 'percentage' | 'fixed' | null; discountValue?: number | null;
       invoiceTemplateId?: string | null;
-      // Draft-only full edit (Wave-style):
       clientId?: string; paymentTerms?: string; issueDate?: string; dueDate?: string | null; currency?: string;
       lineItems?: { itemName?: string | null; description?: string | null; quantity: number; unitPrice: number; productId?: string | null }[];
     }) => {
       const { data } = await apiClient.put(`/invoices/${id}`, body);
       return mapInvoice(data.data);
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['invoices'] });
-      qc.invalidateQueries({ queryKey: ['invoices', id] });
-      qc.invalidateQueries({ queryKey: ['reports'] });
+    onSuccess: (updated) => {
+      qc.setQueryData(['invoices', id], updated);
+      qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
     },
   });
 }
