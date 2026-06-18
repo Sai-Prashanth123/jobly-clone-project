@@ -64,7 +64,7 @@ export default function EmployeeDetail() {
   const [terminateReason, setTerminateReason] = useState('');
   const [terminateDate, setTerminateDate] = useState(todayStr);
   // Document preview
-  const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string; mimeType?: string | null } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string } | null>(null);
 
   // Detect a re-submission while this reviewer has the page open: remember the
   // submission timestamp first seen, and flag when a poll brings a newer one.
@@ -593,7 +593,7 @@ export default function EmployeeDetail() {
                     <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name, mimeType: doc.type })}>
+                    <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}>
                       Preview
                     </Button>
                     <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
@@ -610,7 +610,6 @@ export default function EmployeeDetail() {
         onOpenChange={open => { if (!open) setPreviewDoc(null); }}
         docId={previewDoc?.id ?? ''}
         fileName={previewDoc?.name ?? ''}
-        mimeType={previewDoc?.mimeType}
       />
 
       {empAssignments.length > 0 && (

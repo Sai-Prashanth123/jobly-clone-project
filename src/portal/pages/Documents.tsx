@@ -76,7 +76,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
   const [file, setFile] = useState<File | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
-  const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string; mimeType?: string | null } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string } | null>(null);
 
   const handleUpload = async () => {
     if (!docType || !file) {
@@ -202,7 +202,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name, mimeType: doc.type })}>
+                    <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}>
                       Preview
                     </Button>
                     <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
@@ -240,7 +240,6 @@ function DocumentManager({ employee }: { employee: Employee }) {
         onOpenChange={open => { if (!open) setPreviewDoc(null); }}
         docId={previewDoc?.id ?? ''}
         fileName={previewDoc?.name ?? ''}
-        mimeType={previewDoc?.mimeType}
       />
     </div>
   );
