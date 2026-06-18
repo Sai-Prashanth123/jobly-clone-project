@@ -291,6 +291,7 @@ export interface InvoiceEmailPayload {
   notes?: string;
   terms?: string;
   lineItems: { itemName?: string; description: string; quantity: number; unitPrice: number; amount: number; isHours?: boolean }[];
+  attachmentFiles?: { filename: string; content: Buffer; contentType?: string }[];
 }
 
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<void> {
@@ -445,6 +446,11 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
       content: pdfBuffer,
       contentType: 'application/pdf',
     });
+  }
+  if (payload.attachmentFiles) {
+    for (const f of payload.attachmentFiles) {
+      attachments.push({ filename: f.filename, content: f.content, contentType: f.contentType });
+    }
   }
 
   await sendWithRetry({

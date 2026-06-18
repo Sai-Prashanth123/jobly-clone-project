@@ -1,28 +1,42 @@
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { TrendingUp } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TrendingUp, Download } from 'lucide-react';
 import { useInvoices } from '../../hooks/useInvoices';
+import { useClients } from '../../hooks/useClients';
 import { formatCurrency } from '../../lib/utils';
+import { exportToCsv } from '../../lib/exportCsv';
 
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const currentYear = new Date().getUTCFullYear();
 
 export function MonthlyRevenueReport() {
   const { data: invData } = useInvoices({ limit: 1000 });
-  const invoices = invData?.data ?? [];
+  const { data: clientData } = useClients({ limit: 200 });
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const [clientFilter, setClientFilter] = useState('all');
 
-  const now = new Date();
-  const months: { key: string; label: string }[] = [];
-  for (let i = 11; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push({
-      key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`,
-      label: `${MONTH_LABELS[d.getMonth()]} ${d.getFullYear()}`,
-    });
-  }
+  const invoices = invData?.data ?? [];
+  const clients = clientData?.data ?? [];
+
+  const yearOptions = [currentYear, currentYear - 1, currentYear - 2].map(y => String(y));
+
+  const filteredInvoices = useMemo(() => invoices.filter(inv => {
+    if (!inv.issueDate.startsWith(selectedYear)) return false;
+    if (clientFilter !== 'all' && inv.clientId !== clientFilter) return false;
+    return true;
+  }), [invoices, selectedYear, clientFilter]);
+
+  const months: { key: string; label: string }[] = Array.from({ length: 12 }, (_, i) => ({
+    key: `${selectedYear}-${String(i + 1).padStart(2, '0')}`,
+    label: `${MONTH_LABELS[i]} ${selectedYear}`,
+  }));
 
   const rows = months.map(({ key, label }) => {
-    const monthInvoices = invoices.filter(inv => inv.issueDate.startsWith(key));
+    const monthInvoices = filteredInvoices.filter(inv => inv.issueDate.startsWith(key));
     const invoiced = monthInvoices.reduce((s, i) => s + i.totalAmount, 0);
     const paid = monthInvoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0);
     const outstanding = monthInvoices
@@ -42,14 +56,49 @@ export function MonthlyRevenueReport() {
   const totalPaid = rows.reduce((s, r) => s + r.paid, 0);
   const totalOutstanding = rows.reduce((s, r) => s + r.outstanding, 0);
 
+  const handleExport = () => exportToCsv(`monthly-revenue-${selectedYear}`, rows.filter(r => r.count > 0).map(r => ({
+    Month: r.label, Invoices: r.count, Invoiced: r.invoiced, Paid: r.paid, Outstanding: r.outstanding,
+    'Collection %': r.invoiced > 0 ? Math.round((r.paid / r.invoiced) * 100) : 0,
+  })));
+
   return (
     <div className="space-y-4">
+      {/* Filter Controls */}
+      <Card>
+        <CardContent className="pt-3 pb-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Year</p>
+              <Select value={selectedYear} onValueChange={setSelectedYear}>
+                <SelectTrigger className="w-28 h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {yearOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Client</p>
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-44 h-9 text-sm"><SelectValue placeholder="All clients" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All clients</SelectItem>
+                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" className="h-9 gap-1.5 mt-4 ml-auto" onClick={handleExport} disabled={totalRevenue === 0}>
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPI row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-4 pb-4 text-center">
             <p className="text-2xl font-bold text-blue-700">{formatCurrency(totalRevenue)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Total Invoiced (12 mo)</p>
+            <p className="text-xs text-muted-foreground mt-1">Total Invoiced ({selectedYear})</p>
           </CardContent>
         </Card>
         <Card>
@@ -71,7 +120,7 @@ export function MonthlyRevenueReport() {
         <CardHeader>
           <CardTitle className="text-base flex items-center gap-2">
             <TrendingUp className="h-4 w-4 text-blue-500" />
-            Monthly Revenue — Last 12 Months
+            Monthly Revenue — {selectedYear}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -144,7 +193,7 @@ export function MonthlyRevenueReport() {
                 {rows.every(r => r.count === 0) && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      No invoice data available.
+                      No invoice data available for {selectedYear}.
                     </TableCell>
                   </TableRow>
                 )}

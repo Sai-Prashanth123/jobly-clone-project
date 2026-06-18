@@ -1,31 +1,51 @@
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DollarSign, Download } from 'lucide-react';
 import { useInvoices } from '../../hooks/useInvoices';
 import { useClients } from '../../hooks/useClients';
 import { formatCurrency, formatDate } from '../../lib/utils';
+import { exportToCsv } from '../../lib/exportCsv';
 
 const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export function PaymentsReceivedReport() {
   const { data: invData } = useInvoices({ limit: 1000 });
   const { data: clientData } = useClients({ limit: 200 });
+  const [clientFilter, setClientFilter] = useState('all');
+  const [monthsBack, setMonthsBack] = useState(6);
 
   const invoices = invData?.data ?? [];
   const clients = clientData?.data ?? [];
 
-  const paid = invoices
+  // Build the cutoff date string for filtering
+  const cutoffMonth = useMemo(() => {
+    const now = new Date();
+    const d = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, [monthsBack]);
+
+  const paid = useMemo(() => invoices
     .filter(i => i.status === 'paid')
+    .filter(i => {
+      if (clientFilter !== 'all' && i.clientId !== clientFilter) return false;
+      // filter to within the monthsBack window
+      const dateKey = (i.paidAt ?? i.issueDate).slice(0, 7);
+      return dateKey >= cutoffMonth;
+    })
     .map(i => {
       const client = clients.find(c => c.id === i.clientId);
       return { ...i, clientName: client?.companyName ?? i.clientId.slice(0, 8) };
     })
-    .sort((a, b) => (b.paidAt ?? '').localeCompare(a.paidAt ?? ''));
+    .sort((a, b) => (b.paidAt ?? '').localeCompare(a.paidAt ?? '')),
+  [invoices, clients, clientFilter, cutoffMonth]);
 
   // Monthly grouping
   const now = new Date();
   const months: string[] = [];
-  for (let i = 5; i >= 0; i--) {
+  for (let i = monthsBack - 1; i >= 0; i--) {
     const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
     months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
   }
@@ -43,14 +63,53 @@ export function PaymentsReceivedReport() {
   const byClient = clients
     .map(c => ({
       name: c.companyName,
+      id: c.id,
       total: paid.filter(i => i.clientId === c.id).reduce((s, i) => s + i.totalAmount, 0),
       count: paid.filter(i => i.clientId === c.id).length,
     }))
     .filter(c => c.total > 0)
     .sort((a, b) => b.total - a.total);
 
+  const handleExport = () => exportToCsv('payments-received', paid.map(i => ({
+    'Invoice #': i.invoiceNumber, Client: i.clientName,
+    'Invoice Date': i.issueDate, 'Payment Date': i.paidAt ?? '—', Amount: i.totalAmount,
+  })));
+
   return (
     <div className="space-y-4">
+      {/* Filter Controls */}
+      <Card>
+        <CardContent className="pt-3 pb-3">
+          <div className="flex flex-wrap gap-2 items-center">
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Period</p>
+              <Select value={String(monthsBack)} onValueChange={v => setMonthsBack(Number(v))}>
+                <SelectTrigger className="w-36 h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="3">Last 3 months</SelectItem>
+                  <SelectItem value="6">Last 6 months</SelectItem>
+                  <SelectItem value="12">Last 12 months</SelectItem>
+                  <SelectItem value="24">Last 24 months</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <p className="text-xs font-medium text-gray-600">Client</p>
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-44 h-9 text-sm"><SelectValue placeholder="All clients" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All clients</SelectItem>
+                  {clients.map(c => <SelectItem key={c.id} value={c.id}>{c.companyName}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="outline" size="sm" className="h-9 gap-1.5 mt-4 ml-auto" onClick={handleExport} disabled={paid.length === 0}>
+              <Download className="h-3.5 w-3.5" /> Export CSV
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* KPI + Monthly Bars */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Card>
@@ -62,7 +121,7 @@ export function PaymentsReceivedReport() {
         </Card>
 
         <Card>
-          <CardHeader><CardTitle className="text-sm">Payments — Last 6 Months</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-sm">Payments — Last {monthsBack} Months</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2">
               {monthlyPaid.map(m => {
@@ -164,7 +223,7 @@ export function PaymentsReceivedReport() {
                 {paid.length === 0 && (
                   <TableRow>
                     <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
-                      No payments received yet.
+                      No payments received in this period.
                     </TableCell>
                   </TableRow>
                 )}

@@ -239,6 +239,16 @@ function wrapHtml(body: string, _name: string, wide = false): string {
 </style></head><body>${body}</body></html>`;
 }
 
+export async function downloadDocumentBuffer(
+  storagePath: string,
+  entityType: 'employee' | 'client' | 'invoice',
+): Promise<Buffer | null> {
+  const bucket = BUCKET_MAP[entityType];
+  const { data, error } = await supabaseAdmin.storage.from(bucket).download(storagePath);
+  if (error || !data) return null;
+  return Buffer.from(await data.arrayBuffer());
+}
+
 export async function deleteDocument(docId: string) {
   const { data: doc, error } = await supabaseAdmin
     .from('documents')

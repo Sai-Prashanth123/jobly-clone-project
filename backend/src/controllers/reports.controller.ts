@@ -75,3 +75,15 @@ export async function revenueByDateRange(req: Request, res: Response, next: Next
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
+
+export async function profitLoss(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { startDate, endDate, basis } = req.query as { startDate?: string; endDate?: string; basis?: string };
+    if (!startDate || !endDate) {
+      res.status(400).json({ success: false, error: 'startDate and endDate are required' });
+      return;
+    }
+    const data = await svc.getProfitLoss(startDate, endDate, (basis === 'cash' ? 'cash' : 'accrual'));
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}

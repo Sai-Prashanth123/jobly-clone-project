@@ -15,6 +15,7 @@ import { OutstandingInvoicesReport } from '../components/reports/OutstandingInvo
 import { PaymentsReceivedReport } from '../components/reports/PaymentsReceivedReport';
 import { ProfitabilityReport } from '../components/reports/ProfitabilityReport';
 import { RevenueComparisonReport } from '../components/reports/RevenueComparisonReport';
+import { ProfitLossReport } from '../components/reports/ProfitLossReport';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Reports() {
@@ -123,6 +124,13 @@ export default function Reports() {
         {user?.role !== 'operations' && (
           <TabsContent value="financial">
             <div className="space-y-8">
+              <section>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Profit &amp; Loss
+                </h2>
+                <ProfitLossReport />
+              </section>
+
               <section>
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
                   Revenue Comparison

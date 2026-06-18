@@ -15,5 +15,6 @@ router.get('/financial-summary',    requireRole('admin','finance'),      ctrl.fi
 router.get('/revenue-by-date-range', requireRole('admin','finance'), ctrl.revenueByDateRange);
 router.get('/profitability',        requireRole('admin','finance'),      ctrl.profitability);
 router.get('/billing-by-client',    requireRole('admin','finance'),      ctrl.billingByClient);
+router.get('/profit-loss', requireRole('admin','finance'), ctrl.profitLoss);
 
 export default router;

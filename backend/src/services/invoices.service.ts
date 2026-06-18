@@ -4,7 +4,7 @@ import { generateInvoicePDF, type InvoicePDFData } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
-import { uploadDocument, deleteDocument } from './storage.service';
+import { uploadDocument, deleteDocument, downloadDocumentBuffer } from './storage.service';
 import { getInvoiceTheme } from './invoiceTemplates.service';
 import { addDaysToDate, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
@@ -628,6 +628,21 @@ export async function sendInvoice(id: string) {
   // Generate the PDF once and reuse the buffer both as the email attachment and
   // the storage signed URL (download link).
   const { buffer: pdfBuffer, signedUrl: pdfUrl } = await renderAndStoreInvoicePDF(id);
+
+  // Fetch all uploaded attachments for this invoice and download their buffers
+  // so they can be included in the email alongside the generated PDF.
+  const { data: attachmentDocs } = await supabaseAdmin
+    .from('documents')
+    .select('id, name, storage_path, type')
+    .eq('entity_type', 'invoice')
+    .eq('entity_id', id);
+
+  const attachmentFiles: { filename: string; content: Buffer; contentType?: string }[] = [];
+  for (const doc of (attachmentDocs ?? [])) {
+    const buf = await downloadDocumentBuffer(doc.storage_path, 'invoice');
+    if (buf) attachmentFiles.push({ filename: doc.name ?? 'attachment', content: buf, contentType: doc.type ?? undefined });
+  }
+
   const pdfData = buildInvoicePdfData(inv, client);
 
   // Attempt to send the email. Capture success/failure so the caller can
@@ -668,6 +683,7 @@ export async function sendInvoice(id: string) {
         amount: li.amount,
         isHours: li.isHours,
       })),
+      attachmentFiles: attachmentFiles.length > 0 ? attachmentFiles : undefined,
     });
     emailSent = true;
   } catch (err: any) {

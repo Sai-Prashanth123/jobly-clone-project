@@ -323,6 +323,85 @@ export async function getRevenueByDateRange(startDate: string, endDate: string) 
   };
 }
 
+export async function getProfitLoss(startDate: string, endDate: string, basis: 'accrual' | 'cash') {
+  // Fetch invoices based on accounting basis
+  let query = supabaseAdmin
+    .from('invoices')
+    .select('id, invoice_number, client_id, issue_date, paid_at, status, total_amount, amount_paid, tax_amount')
+    .is('deleted_at', null);
+
+  if (basis === 'cash') {
+    // Cash basis: only invoices that have been paid, within paid_at range
+    query = query.eq('status', 'paid').gte('paid_at', startDate).lte('paid_at', endDate);
+  } else {
+    // Accrual basis: all invoices issued in range (paid or unpaid)
+    query = query.gte('issue_date', startDate).lte('issue_date', endDate);
+  }
+
+  const { data: invoices } = await query;
+  const rows = (invoices ?? []) as any[];
+
+  // Fetch client names
+  const clientIds = [...new Set(rows.map((r: any) => r.client_id).filter(Boolean))];
+  const clientMap: Record<string, string> = {};
+  if (clientIds.length > 0) {
+    const { data: clients } = await supabaseAdmin.from('clients').select('id, company_name').in('id', clientIds);
+    for (const c of (clients ?? [])) clientMap[c.id] = c.company_name;
+  }
+
+  let totalIncome = 0;
+  const monthlyMap: Record<string, { income: number; count: number }> = {};
+
+  for (const inv of rows) {
+    const amount = Number(inv.total_amount ?? 0);
+    totalIncome += amount;
+    const dateKey = basis === 'cash' ? (inv.paid_at ?? inv.issue_date) : inv.issue_date;
+    const month = String(dateKey ?? '').slice(0, 7); // YYYY-MM
+    if (!monthlyMap[month]) monthlyMap[month] = { income: 0, count: 0 };
+    monthlyMap[month].income += amount;
+    monthlyMap[month].count += 1;
+  }
+
+  const monthlyBreakdown = Object.entries(monthlyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([month, v]) => ({
+      month,
+      monthLabel: new Date(month + '-02').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      income: Math.round(v.income * 100) / 100,
+      count: v.count,
+    }));
+
+  const grossProfit = totalIncome; // No COGS tracked yet
+  const operatingExpenses = 0;     // No expense tracking yet
+  const netProfit = grossProfit - operatingExpenses;
+  const grossProfitPct = totalIncome > 0 ? Math.round((grossProfit / totalIncome) * 10000) / 100 : 0;
+  const netProfitPct = totalIncome > 0 ? Math.round((netProfit / totalIncome) * 10000) / 100 : 0;
+
+  const detailRows = rows.map((inv: any) => ({
+    invoiceNumber: inv.invoice_number,
+    clientName: clientMap[inv.client_id] ?? 'Unknown',
+    date: basis === 'cash' ? (inv.paid_at ?? inv.issue_date) : inv.issue_date,
+    amount: Math.round(Number(inv.total_amount ?? 0) * 100) / 100,
+    status: inv.status,
+  }));
+
+  return {
+    basis,
+    startDate,
+    endDate,
+    totalIncome: Math.round(totalIncome * 100) / 100,
+    costOfGoodsSold: 0,
+    grossProfit: Math.round(grossProfit * 100) / 100,
+    operatingExpenses: 0,
+    netProfit: Math.round(netProfit * 100) / 100,
+    grossProfitPct,
+    netProfitPct,
+    monthlyBreakdown,
+    detailRows,
+    invoiceCount: rows.length,
+  };
+}
+
 /**
  * Returns the ISO date string of the Monday that is `weeksOffset` weeks away
  * from the current week's Monday (UTC).
