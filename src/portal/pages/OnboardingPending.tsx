@@ -27,7 +27,7 @@ export default function OnboardingPending() {
 
   // Poll for HR approval / change-request updates.
   useEffect(() => {
-    const id = setInterval(() => { void refreshUser(); }, 20000);
+    const id = setInterval(() => { void refreshUser(); }, 5000);
     return () => clearInterval(id);
   }, [refreshUser]);
 

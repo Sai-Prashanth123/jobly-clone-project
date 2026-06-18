@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
+import { DocumentPreviewDialog } from '../components/shared/DocumentPreviewDialog';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
@@ -62,6 +63,8 @@ export default function EmployeeDetail() {
   const [terminateOpen, setTerminateOpen] = useState(false);
   const [terminateReason, setTerminateReason] = useState('');
   const [terminateDate, setTerminateDate] = useState(todayStr);
+  // Document preview
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string; mimeType?: string | null } | null>(null);
 
   // Detect a re-submission while this reviewer has the page open: remember the
   // submission timestamp first seen, and flag when a poll brings a newer one.
@@ -195,38 +198,52 @@ export default function EmployeeDetail() {
           </div>
         </div>
         <div className="flex flex-col sm:flex-row sm:flex-wrap lg:justify-end lg:flex-shrink-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
-          {(employee.status === 'onboarding' || isPlainInactive) && canManage && (
-            <Button
-              size="sm"
-              className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-              loading={updateEmployee.isPending}
-              loadingText={isPlainInactive ? 'Activating…' : 'Approving…'}
-              onClick={async () => {
-                try {
-                  await updateEmployee.mutateAsync({
-                    status: 'active',
-                    // Guard token: the submission this reviewer is approving.
-                    expectedOnboardingCompletedAt: employee.onboardingCompletedAt ?? null,
-                  } as any);
-                  toast.success(
-                    isPlainInactive
-                      ? `${employee.firstName} is now Active`
-                      : 'Employee onboarding approved — now Active',
-                  );
-                } catch (err: any) {
-                  if (err?.response?.status === 409) {
-                    toast.warning(err.response.data?.error ?? 'The employee changed their submission — showing the latest.', { duration: 10000 });
-                    qc.invalidateQueries({ queryKey: ['employees', id] });
-                  } else {
-                    toast.error(err?.response?.data?.error ?? 'Failed to activate employee');
+          {(employee.status === 'onboarding' || isPlainInactive) && canManage && (() => {
+            const onboardingComplete = isPlainInactive || (employee.onboarding?.complete === true);
+            const pct = employee.onboarding?.percent ?? 0;
+            return onboardingComplete ? (
+              <Button
+                size="sm"
+                className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                loading={updateEmployee.isPending}
+                loadingText={isPlainInactive ? 'Activating…' : 'Approving…'}
+                onClick={async () => {
+                  try {
+                    await updateEmployee.mutateAsync({
+                      status: 'active',
+                      expectedOnboardingCompletedAt: employee.onboardingCompletedAt ?? null,
+                    } as any);
+                    toast.success(
+                      isPlainInactive
+                        ? `${employee.firstName} is now Active`
+                        : 'Employee onboarding approved — now Active',
+                    );
+                  } catch (err: any) {
+                    if (err?.response?.status === 409) {
+                      toast.warning(err.response.data?.error ?? 'The employee changed their submission — showing the latest.', { duration: 10000 });
+                      qc.invalidateQueries({ queryKey: ['employees', id] });
+                    } else {
+                      toast.error(err?.response?.data?.error ?? 'Failed to activate employee');
+                    }
                   }
-                }
-              }}
-            >
-              <CheckCircle2 className="h-4 w-4" />
-              {isPlainInactive ? 'Activate Employee' : 'Approve Onboarding'}
-            </Button>
-          )}
+                }}
+              >
+                <CheckCircle2 className="h-4 w-4" />
+                {isPlainInactive ? 'Activate Employee' : 'Approve Onboarding'}
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="gap-2"
+                variant="outline"
+                disabled
+                title={`Profile is only ${pct}% complete — employee must finish onboarding before approval`}
+              >
+                <CheckCircle2 className="h-4 w-4 text-gray-400" />
+                Approve ({pct}% complete)
+              </Button>
+            );
+          })()}
           {/* Part B — return an on-leave employee early (manual counterpart to
               the scheduler's auto-reactivation on the return date). */}
           {isOnLeave && canManage && (
@@ -575,13 +592,26 @@ export default function EmployeeDetail() {
                     <p className="text-sm font-medium">{doc.name}</p>
                     <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
                   </div>
-                  <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name, mimeType: doc.type })}>
+                      Preview
+                    </Button>
+                    <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
+                  </div>
                 </div>
               ))}
             </div>
           </CardContent>
         </Card>
       )}
+
+      <DocumentPreviewDialog
+        open={!!previewDoc}
+        onOpenChange={open => { if (!open) setPreviewDoc(null); }}
+        docId={previewDoc?.id ?? ''}
+        fileName={previewDoc?.name ?? ''}
+        mimeType={previewDoc?.mimeType}
+      />
 
       {empAssignments.length > 0 && (
         <Card>

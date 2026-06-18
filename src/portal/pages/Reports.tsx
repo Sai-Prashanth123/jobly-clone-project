@@ -15,8 +15,10 @@ import { OutstandingInvoicesReport } from '../components/reports/OutstandingInvo
 import { PaymentsReceivedReport } from '../components/reports/PaymentsReceivedReport';
 import { ProfitabilityReport } from '../components/reports/ProfitabilityReport';
 import { RevenueComparisonReport } from '../components/reports/RevenueComparisonReport';
+import { useAuth } from '../hooks/useAuth';
 
 export default function Reports() {
+  const { user } = useAuth();
   return (
     <div>
       <PageHeader
@@ -25,11 +27,11 @@ export default function Reports() {
       />
 
       <Tabs defaultValue="employees">
-        <TabsList className="mb-6 grid w-full grid-cols-2 sm:grid-cols-4 h-auto gap-1">
+        <TabsList className={`mb-6 grid w-full h-auto gap-1 ${user?.role === 'operations' ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'}`}>
           <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="clients">Clients</TabsTrigger>
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
-          <TabsTrigger value="financial">Financial</TabsTrigger>
+          {user?.role !== 'operations' && <TabsTrigger value="financial">Financial</TabsTrigger>}
         </TabsList>
 
         {/* ── EMPLOYEE REPORTS ───────────────────────────────────────────── */}
@@ -118,44 +120,46 @@ export default function Reports() {
         </TabsContent>
 
         {/* ── FINANCIAL REPORTS ──────────────────────────────────────────── */}
-        <TabsContent value="financial">
-          <div className="space-y-8">
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Revenue Comparison
-              </h2>
-              <RevenueComparisonReport />
-            </section>
+        {user?.role !== 'operations' && (
+          <TabsContent value="financial">
+            <div className="space-y-8">
+              <section>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Revenue Comparison
+                </h2>
+                <RevenueComparisonReport />
+              </section>
 
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Monthly Revenue
-              </h2>
-              <MonthlyRevenueReport />
-            </section>
+              <section>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Monthly Revenue
+                </h2>
+                <MonthlyRevenueReport />
+              </section>
 
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Outstanding Invoices
-              </h2>
-              <OutstandingInvoicesReport />
-            </section>
+              <section>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Outstanding Invoices
+                </h2>
+                <OutstandingInvoicesReport />
+              </section>
 
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Payments Received
-              </h2>
-              <PaymentsReceivedReport />
-            </section>
+              <section>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Payments Received
+                </h2>
+                <PaymentsReceivedReport />
+              </section>
 
-            <section>
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-                Profitability Report
-              </h2>
-              <ProfitabilityReport />
-            </section>
-          </div>
-        </TabsContent>
+              <section>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                  Profitability Report
+                </h2>
+                <ProfitabilityReport />
+              </section>
+            </div>
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

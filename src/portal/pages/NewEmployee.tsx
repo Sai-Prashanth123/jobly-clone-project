@@ -479,7 +479,7 @@ export default function NewEmployee() {
       !!form.email && !!form.phone,                                                 // Contact
       !!form.address.street && !!form.address.city && !!form.address.state && !!form.address.zip, // Present Addr
       !!form.startDate,                                                             // Employment
-      !!form.visaType && !!form.visaExpiry && !!form.i9Status && /^\d{4}$/.test(form.ssn), // Immigration
+      !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn), // Immigration
       !!form.emergencyContact.name && !!form.emergencyContact.phone,                // Emergency
       // Payroll: HR-side only. Hidden + not required in employee onboarding / self-edit.
       ...(isOnboarding || isSelfEdit ? [] : [!!form.payRate && Number(form.payRate) > 0]),
@@ -511,58 +511,61 @@ export default function NewEmployee() {
     ...form.documents.filter(d => d.type).map(d => d.type),
   ]);
 
-  // Per-section completion — drives the green check shown on each section header
-  // so the user gets positive "this section is done" feedback as they fill it.
-  const sectionComplete: Record<string, boolean> = {
+  // Per-section completion — drives the green check shown on each section header.
+  // Memoized so it only recomputes when relevant form fields actually change.
+  const sectionComplete = useMemo<Record<string, boolean>>(() => ({
     [SECTION_IDS.personal]:    !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob,
     [SECTION_IDS.contact]:     !!form.email.trim() && !!form.phone.trim(),
     [SECTION_IDS.presentAddr]: !!form.address.street.trim() && !!form.address.city.trim() && !!form.address.state.trim() && !!form.address.zip.trim(),
     [SECTION_IDS.employment]:  !!form.startDate,
-    [SECTION_IDS.immigration]: !!form.visaType && !!form.visaExpiry && !!form.i9Status && /^\d{4}$/.test(form.ssn),
+    [SECTION_IDS.immigration]: !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn),
     [SECTION_IDS.emergency]:   !!form.emergencyContact.name.trim() && !!form.emergencyContact.phone.trim(),
     [SECTION_IDS.payroll]:     (parseNumberInput(form.payRate) ?? 0) > 0,
     [SECTION_IDS.review]:      isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
     ...(isOnboarding ? {
       [SECTION_IDS.documents]:   ALL_REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
     } : {}),
-  };
+  }), [form, isEditMode, isOnboarding, uploadedDocTypes]);
 
-  const presentFilled = [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim());
-  const permFilled = form.permanentSameAsPresent
-    ? presentFilled
-    : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
-  const onboardingChecklist = [
-    // Personal
-    { id: 'photo',       label: 'Profile photo',                  section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview },
-    { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
-    // Contact
-    { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
-    { id: 'linkedin',    label: 'LinkedIn URL',                   section: SECTION_IDS.contact,       done: !!form.linkedinUrl.trim() && /^https?:\/\/.+/i.test(form.linkedinUrl.trim()) },
-    { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
-    { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
-    // Employment
-    { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation },
-    // Immigration + SSN
-    { id: 'immigration', label: 'Immigration & I-9 (incl. SSN)',  section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && !!form.i9Status && /^\d{4}$/.test(form.ssn) },
-    // Education
-    { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
-    // Emergency
-    { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
-    // Documents
-    ...ALL_REQUIRED_DOC_TYPES.map(t => ({
-      id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-      label: t,
-      section: SECTION_IDS.documents,
-      done: uploadedDocTypes.has(t),
-    })),
-    // Payroll
-    { id: 'bank',        label: 'Bank details (direct deposit)',  section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && /^\d{9}$/.test(form.bankRoutingNumber) && !!form.bankAccountNumber.trim() },
-    // Declaration
-    { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
-  ];
+  const onboardingChecklist = useMemo(() => {
+    const presentFilled = [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim());
+    const permFilled = form.permanentSameAsPresent
+      ? presentFilled
+      : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
+    return [
+      // Personal
+      { id: 'photo',       label: 'Profile photo',                  section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview },
+      { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
+      // Contact
+      { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
+      { id: 'linkedin',    label: 'LinkedIn URL',                   section: SECTION_IDS.contact,       done: !!form.linkedinUrl.trim() && /^https?:\/\/.+/i.test(form.linkedinUrl.trim()) },
+      { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
+      { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
+      // Employment
+      { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation },
+      // Immigration + SSN (I-9 status removed — HR sets that after reviewing the uploaded I-9 document)
+      { id: 'immigration', label: 'Immigration & SSN',              section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn) },
+      // Education
+      { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
+      // Emergency
+      { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
+      // Documents
+      ...ALL_REQUIRED_DOC_TYPES.map(t => ({
+        id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        label: t,
+        section: SECTION_IDS.documents,
+        done: uploadedDocTypes.has(t),
+      })),
+      // Payroll
+      { id: 'bank',        label: 'Bank details (direct deposit)',  section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && /^\d{9}$/.test(form.bankRoutingNumber) && !!form.bankAccountNumber.trim() },
+      // Declaration
+      { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
+    ];
+  }, [form, uploadedDocTypes]);
+
   const onbDone = onboardingChecklist.filter(c => c.done).length;
   const onbPct = Math.round((onbDone / onboardingChecklist.length) * 100);
-  const onbIncompleteSections = new Set(onboardingChecklist.filter(c => !c.done).map(c => c.section));
+  const onbIncompleteSections = useMemo(() => new Set(onboardingChecklist.filter(c => !c.done).map(c => c.section)), [onboardingChecklist]);
   const firstIncompleteSection = onboardingChecklist.find(c => !c.done)?.section;
 
   // ── Validation ────────────────────────────────────────────────────────────
@@ -783,8 +786,12 @@ export default function NewEmployee() {
           : 'Please fix the highlighted fields before submitting.';
       }
       setSubmitError(msg);
-      if (firstErrorSectionId) scrollToSection(firstErrorSectionId);
-      toast.error(msg, { duration: 8000 });
+      // Let React flush the error banner update, then scroll so the banner is
+      // visible when the section comes into view (rAF fires after paint).
+      requestAnimationFrame(() => {
+        if (firstErrorSectionId) scrollToSection(firstErrorSectionId);
+      });
+      toast.error(msg, { duration: 4000 });
       return;
     }
     submittingRef.current = true;
@@ -1586,16 +1593,18 @@ export default function NewEmployee() {
                 {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />
               </div>
-              <div>
-                <Label>I-9 Status {isOnboarding && <RequiredMark />}</Label>
-                <Select value={form.i9Status || ''} onValueChange={v => set('i9Status', v as FormState['i9Status'])}>
-                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
-                  <SelectContent>
-                    {I9_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <FieldError msg={errors.i9Status} />
-              </div>
+              {!isOnboarding && (
+                <div>
+                  <Label>I-9 Status</Label>
+                  <Select value={form.i9Status || ''} onValueChange={v => set('i9Status', v as FormState['i9Status'])}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {I9_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FieldError msg={errors.i9Status} />
+                </div>
+              )}
               <div>
                 <Label>SSN — Last 4 digits {isOnboarding && <RequiredMark />}</Label>
                 <Input

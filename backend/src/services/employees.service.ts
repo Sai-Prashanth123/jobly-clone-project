@@ -524,6 +524,21 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     );
   }
 
+  // 100%-completion guard: an employee must have fully completed onboarding
+  // before HR can approve them. Re-compute from live DB data.
+  if (input.status === 'active' && existing.status === 'onboarding') {
+    const { data: docs } = await supabaseAdmin
+      .from('documents').select('type').eq('entity_type', 'employee').eq('entity_id', id);
+    const docTypes = new Set<string>((docs ?? []).map((d: any) => d.type));
+    const { data: empFull } = await supabaseAdmin.from('employees').select('*').eq('id', id).single();
+    const ob = computeOnboarding(empFull ?? existing, docTypes);
+    if (!ob.complete) {
+      throw new ValidationError(
+        `Cannot approve: employee's onboarding is only ${ob.percent}% complete. Still required: ${ob.missing.join(', ')}`,
+      );
+    }
+  }
+
   const patch: Record<string, any> = {};
   if (input.email !== undefined)      patch.email           = input.email;
   if (input.phone !== undefined)      patch.phone           = input.phone;

@@ -130,6 +130,32 @@ export async function getDocumentSignedUrl(
   return data?.signedUrl ?? null;
 }
 
+export async function getDocumentPreviewUrl(
+  docId: string,
+  user: { role: string; employeeId?: string | null },
+) {
+  const { data: doc, error } = await supabaseAdmin
+    .from('documents')
+    .select('*')
+    .eq('id', docId)
+    .single();
+
+  if (error || !doc) throw new NotFoundError('Document not found');
+
+  if (user.role === 'employee') {
+    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
+    if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
+  }
+
+  const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
+  const { data } = await supabaseAdmin
+    .storage
+    .from(bucket)
+    .createSignedUrl(doc.storage_path, 3600);  // no download: true → inline rendering
+
+  return { url: data?.signedUrl ?? null, mimeType: doc.type ?? null, name: doc.name ?? 'document' };
+}
+
 export async function deleteDocument(docId: string) {
   const { data: doc, error } = await supabaseAdmin
     .from('documents')

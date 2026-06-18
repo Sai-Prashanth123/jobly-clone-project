@@ -69,7 +69,6 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
     // Immigration
     { id: 'visa_type',          label: 'Visa type',                                           done: nonEmpty(emp.visa_type) },
     { id: 'visa_expiry',        label: 'Visa / work authorization expiry',                    done: nonEmpty(emp.visa_expiry) },
-    { id: 'i9_status',          label: 'I-9 status',                                          done: nonEmpty(emp.i9_status) },
     // Reject obvious placeholder SSNs ('0000', '1234' etc.) so onboarding can't
     // be cleared with a dummy value (#17 from the edge-case audit).
     { id: 'ssn',                label: 'Social Security Number (last 4)',                     done: /^(?!0000|1234)\d{4}$/.test(String(emp.ssn ?? '')) },

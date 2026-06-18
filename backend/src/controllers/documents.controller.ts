@@ -24,6 +24,13 @@ export async function getSignedUrl(req: Request, res: Response, next: NextFuncti
   } catch (err) { next(err); }
 }
 
+export async function getPreviewUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await storageSvc.getDocumentPreviewUrl(req.params.id, req.user!);
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}
+
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     await storageSvc.deleteDocument(req.params.id);
