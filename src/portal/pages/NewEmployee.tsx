@@ -1630,7 +1630,7 @@ export default function NewEmployee() {
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description="Upload whichever of these apply. None are required — HR will flag anything still needed."
+            description="Upload your identity documents. SSN card upload here counts toward the required documents checklist."
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
