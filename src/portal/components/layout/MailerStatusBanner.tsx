@@ -4,8 +4,8 @@ import { useAuth } from '../../hooks/useAuth';
 import { useMailerStatus } from '../../hooks/useSystem';
 
 /**
- * One-line warning banner shown to admin/hr when GMAIL_USER / GMAIL_APP_PASSWORD
- * aren't set on the backend. Without this, welcome emails to new employees and
+ * One-line warning banner shown to admin/hr when AZURE_COMM_CONNECTION_STRING
+ * isn't set on the backend. Without this, welcome emails to new employees and
  * invoice emails to clients silently never send, and the only signal HR sees
  * is a toast warning *after* creating an employee.
  */
@@ -26,11 +26,9 @@ export function MailerStatusBanner() {
       <div className="flex-1 min-w-0">
         <p className="font-medium">Email is not configured on the server.</p>
         <p className="text-xs text-amber-700 mt-0.5">
-          Welcome emails to new employees and invoice emails to clients will not be delivered until the server's
-          <code className="mx-1 px-1 py-0.5 rounded bg-amber-100 font-mono text-[11px]">GMAIL_USER</code>
-          and
-          <code className="mx-1 px-1 py-0.5 rounded bg-amber-100 font-mono text-[11px]">GMAIL_APP_PASSWORD</code>
-          environment variables are set. Until then, share temporary passwords manually.
+          Welcome emails to new employees and invoice emails to clients will not be delivered until
+          <code className="mx-1 px-1 py-0.5 rounded bg-amber-100 font-mono text-[11px]">AZURE_COMM_CONNECTION_STRING</code>
+          is set in Azure App Settings. Until then, share temporary passwords manually.
         </p>
       </div>
       <button

@@ -904,7 +904,7 @@ export default function NewEmployee() {
       if (isEditMode) {
         toast.success(`Employee ${emp.displayId ?? emp.id} updated.`);
       } else if (welcomeEmailSent) {
-        toast.success(`Employee ${emp.displayId ?? emp.id} created — welcome email sent.`);
+        toast.success(`Employee ${emp.displayId ?? emp.id} created — welcome email sent. If not received in a few minutes, ask them to check their spam/junk folder.`, { duration: 10000 });
       } else {
         toast.warning(
           warning ?? `Employee ${emp.displayId ?? emp.id} created. Welcome email could not be delivered — use Resend Welcome Email on their detail page.`,
@@ -1377,7 +1377,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Nationality {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="United States" />
+                <Input value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="e.g. American, Indian, British" />
               </div>
               <div>
                 <Label>Preferred Language {isOnboarding && <RequiredMark />}</Label>
@@ -1726,11 +1726,11 @@ export default function NewEmployee() {
                     </div>
                     <div>
                       <Label className="text-[11px]">Pass Year {isOnboarding && idx === 0 && <RequiredMark />}</Label>
-                      <Input value={row.passYear ?? ''} onChange={e => updateEducation(idx, 'passYear', e.target.value)} placeholder="2024" />
+                      <Input value={row.passYear ?? ''} onChange={e => updateEducation(idx, 'passYear', e.target.value)} placeholder="e.g. 2024" />
                     </div>
                     <div>
                       <Label className="text-[11px]">GPA / Grade</Label>
-                      <Input value={row.gradeOrGPA ?? ''} onChange={e => updateEducation(idx, 'gradeOrGPA', e.target.value)} placeholder="3.8" />
+                      <Input value={row.gradeOrGPA ?? ''} onChange={e => updateEducation(idx, 'gradeOrGPA', e.target.value)} placeholder="e.g. 3.8" />
                     </div>
                     <div>
                       <Label className="text-[11px]">Mode</Label>

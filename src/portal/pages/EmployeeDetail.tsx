@@ -321,7 +321,7 @@ export default function EmployeeDetail() {
                   try {
                     const r = await resendCreds.mutateAsync(employee.id);
                     if (r.welcomeEmailSent) {
-                      toast.success(`Welcome email re-sent to ${employee.email}.`);
+                      toast.success(`Welcome email re-sent to ${[employee.email, employee.workEmail].filter(Boolean).join(' and ') || employee.email}. If not received, check spam/junk folder.`, { duration: 10000 });
                     } else if (r.tempPassword) {
                       toast.warning(
                         `${r.warning ?? 'Email could not be delivered.'} Login: ${r.loginEmail} · Temp password: ${r.tempPassword}`,

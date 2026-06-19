@@ -207,7 +207,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
     return {
       credentialsReady: true,
       emailSent: false,
-      warning: 'Login was created but the welcome email was not sent: mailer is not configured (GMAIL_USER / GMAIL_APP_PASSWORD missing on the server). Share these credentials manually.',
+      warning: 'Login was created but the welcome email was not sent: AZURE_COMM_CONNECTION_STRING is missing on the server. Share these credentials manually.',
       loginEmail: portalLoginEmail,
       tempPassword,
     };
