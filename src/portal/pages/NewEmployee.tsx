@@ -1626,8 +1626,8 @@ export default function NewEmployee() {
               / Green Card / EAD) so HR can track work-authorization expiry. */}
           <SectionCard
             id={SECTION_IDS.identity}
-            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.identity) : undefined}
-            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
+            complete={(Object.values(form.identityDocFiles ?? {}).some(Boolean) || (form.identityDocuments?.length ?? 0) > 0) || undefined}
+            attention={false}
             num="07"
             title="Identity & Documents"
             description="Upload your identity documents. SSN card upload here counts toward the required documents checklist."
