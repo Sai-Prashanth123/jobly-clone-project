@@ -235,7 +235,7 @@ function todayIso(): string {
 const defaultForm: FormState = {
   firstName: '', middleName: '', lastName: '',
   dob: '', gender: '', maritalStatus: '', bloodGroup: '',
-  nationality: 'United States', preferredLanguage: 'English', languagesKnown: '',
+  nationality: '', preferredLanguage: 'English', languagesKnown: '',
   profilePhotoFile: null, profilePhotoPreview: '',
   email: '', workEmail: '',
   phone: '', altPhone: '',
@@ -378,7 +378,7 @@ export default function NewEmployee() {
       gender: e.gender ?? '',
       maritalStatus: e.maritalStatus ?? '',
       bloodGroup: e.bloodGroup ?? '',
-      nationality: e.nationality ?? 'United States',
+      nationality: e.nationality ?? '',
       preferredLanguage: e.preferredLanguage ?? 'English',
       languagesKnown: e.languagesKnown ?? '',
       profilePhotoFile: null,
@@ -1106,7 +1106,7 @@ export default function NewEmployee() {
   );
 
   return (
-    <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-10' : 'portal-wizard pb-10'}>
+    <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-10 overflow-x-hidden w-full' : 'portal-wizard pb-10 overflow-x-hidden w-full'}>
       {/* Sticky action navbar — pinned to the top of the page so the primary
           actions stay reachable while scrolling the long form. Edge-to-edge via
           negative margins that cancel the container padding (both onboarding
@@ -1170,7 +1170,7 @@ export default function NewEmployee() {
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-3">
               <div className="h-full rounded-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all" style={{ width: `${onbPct}%` }} />
             </div>
-            <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap gap-1.5 max-w-full min-w-0">
               {onboardingChecklist.map(item => (
                 <button
                   key={item.id}

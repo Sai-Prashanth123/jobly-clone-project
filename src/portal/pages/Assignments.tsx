@@ -126,24 +126,26 @@ export default function Assignments() {
 
       {canCreate && (
         <Dialog open={showForm} onOpenChange={setShowForm}>
-          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>New Assignment</DialogTitle>
               <DialogDescription className="sr-only">Assign an employee to a client project.</DialogDescription>
             </DialogHeader>
-            <AssignmentForm
-              onSubmit={async data => {
-                try {
-                  const asgn = await createAssignment.mutateAsync(data as Partial<Assignment>);
-                  toast.success(`Assignment ${asgn.displayId ?? asgn.id} created`);
-                  setShowForm(false);
-                } catch {
-                  /* failed-request toast raised centrally (queryClient.ts) */
-                }
-              }}
-              onCancel={() => setShowForm(false)}
-              isPending={createAssignment.isPending}
-            />
+            <div className="flex-1 overflow-y-auto px-1 pb-2">
+              <AssignmentForm
+                onSubmit={async data => {
+                  try {
+                    const asgn = await createAssignment.mutateAsync(data as Partial<Assignment>);
+                    toast.success(`Assignment ${asgn.displayId ?? asgn.id} created`);
+                    setShowForm(false);
+                  } catch {
+                    /* failed-request toast raised centrally (queryClient.ts) */
+                  }
+                }}
+                onCancel={() => setShowForm(false)}
+                isPending={createAssignment.isPending}
+              />
+            </div>
           </DialogContent>
         </Dialog>
       )}

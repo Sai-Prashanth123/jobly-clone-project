@@ -1,6 +1,7 @@
-import { Router, Request, Response } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
-import { mailerConfigured } from '../lib/mailer';
+import { requireRole } from '../middleware/rbac';
+import { mailerConfigured, testEmailDelivery } from '../lib/mailer';
 
 const router = Router();
 router.use(authenticate);
@@ -20,6 +21,20 @@ router.get('/mailer-status', (_req: Request, res: Response) => {
       fromAddress: mailerConfigured ? fromAddress : null,
     },
   });
+});
+
+/**
+ * POST /api/v1/system/email-test
+ * Admin-only. Sends a test email to verify the SMTP transport end-to-end.
+ * Body: { to: string }
+ */
+router.post('/email-test', requireRole('admin'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { to } = req.body as { to?: string };
+    if (!to) { res.status(400).json({ success: false, error: 'to email required' }); return; }
+    const { ok, error } = await testEmailDelivery(to);
+    res.json({ success: true, data: { ok, error } });
+  } catch (err) { next(err); }
 });
 
 export default router;

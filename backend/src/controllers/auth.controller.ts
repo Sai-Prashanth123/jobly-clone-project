@@ -175,6 +175,30 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
   }
 }
 
+export async function refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { refreshToken } = req.body as { refreshToken?: string };
+    if (!refreshToken) {
+      res.status(400).json({ success: false, error: 'refreshToken required' });
+      return;
+    }
+    // Use the Supabase admin client to refresh the session
+    const { data, error } = await supabaseAdmin.auth.refreshSession({ refresh_token: refreshToken });
+    if (error || !data?.session) {
+      res.status(401).json({ success: false, error: 'Session expired or invalid' });
+      return;
+    }
+    res.json({
+      success: true,
+      data: {
+        token: data.session.access_token,
+        refreshToken: data.session.refresh_token,
+        expiresAt: data.session.expires_at,
+      },
+    });
+  } catch (err) { next(err); }
+}
+
 // Self-service "Forgot password?". To avoid leaking which emails exist, ALWAYS
 // returns the same generic success. If the email maps to a portal user, we reuse
 // the admin reset (fresh temp + force first-login reset + email the temp).

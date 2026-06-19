@@ -151,11 +151,12 @@ export default function PortalClients() {
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Add New Client</DialogTitle>
             <DialogDescription className="sr-only">Fill in the client details.</DialogDescription>
           </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-1 pb-2">
           <ClientForm
             onSubmit={async (data, pendingFiles) => {
               try {
@@ -193,32 +194,35 @@ export default function PortalClients() {
             onCancel={() => setShowForm(false)}
             isPending={createClient.isPending}
           />
+          </div>
         </DialogContent>
       </Dialog>
 
       <Dialog open={!!editClient} onOpenChange={(open) => { if (!open) setEditClient(null); }}>
-        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Client {editClient ? `— ${editClient.displayId ?? editClient.id.slice(0, 8)}` : ''}</DialogTitle>
             <DialogDescription className="sr-only">Update client information.</DialogDescription>
           </DialogHeader>
-          {editClient && (
-            <ClientForm
-              initial={editClient}
-              isEdit
-              onSubmit={async (data) => {
-                try {
-                  await updateClient.mutateAsync(data as Partial<Client>);
-                  toast.success('Client updated successfully');
-                  setEditClient(null);
-                } catch {
-                  /* failed-request toast raised centrally (queryClient.ts) */
-                }
-              }}
-              onCancel={() => setEditClient(null)}
-              isPending={updateClient.isPending}
-            />
-          )}
+          <div className="flex-1 overflow-y-auto px-1 pb-2">
+            {editClient && (
+              <ClientForm
+                initial={editClient}
+                isEdit
+                onSubmit={async (data) => {
+                  try {
+                    await updateClient.mutateAsync(data as Partial<Client>);
+                    toast.success('Client updated successfully');
+                    setEditClient(null);
+                  } catch {
+                    /* failed-request toast raised centrally (queryClient.ts) */
+                  }
+                }}
+                onCancel={() => setEditClient(null)}
+                isPending={updateClient.isPending}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

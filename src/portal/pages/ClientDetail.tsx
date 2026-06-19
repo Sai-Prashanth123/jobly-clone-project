@@ -179,26 +179,28 @@ export default function ClientDetail() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Client — {client.displayId ?? client.id.slice(0,8)}</DialogTitle>
             <DialogDescription className="sr-only">Update client information.</DialogDescription>
           </DialogHeader>
-          <ClientForm
-            initial={client}
-            isEdit
-            onSubmit={async (data, _pendingFiles) => {
-              try {
-                await updateClient.mutateAsync(data as any);
-                toast.success('Client updated successfully');
-                setEditOpen(false);
-              } catch {
-                /* failed-request toast raised centrally (queryClient.ts) */
-              }
-            }}
-            onCancel={() => setEditOpen(false)}
-            isPending={updateClient.isPending}
-          />
+          <div className="flex-1 overflow-y-auto px-1 pb-2">
+            <ClientForm
+              initial={client}
+              isEdit
+              onSubmit={async (data, _pendingFiles) => {
+                try {
+                  await updateClient.mutateAsync(data as any);
+                  toast.success('Client updated successfully');
+                  setEditOpen(false);
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
+                }
+              }}
+              onCancel={() => setEditOpen(false)}
+              isPending={updateClient.isPending}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -1,10 +1,8 @@
-import nodemailer from 'nodemailer';
+import { EmailClient, KnownEmailSendStatus, type EmailMessage } from '@azure/communication-email';
 import { formatDateSafe } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
 
 // HTML-escape any user-supplied string before it lands in an email body.
-// Without this a client whose company name is `<img src=x onerror=...>` (or a
-// project name containing <script>) injects executable HTML into the email.
 const HTML_ESCAPES: Record<string, string> = {
   '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
 };
@@ -13,81 +11,95 @@ function esc(value: unknown): string {
   return String(value).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
-// Provider-agnostic SMTP. Preferred: a transactional provider (Brevo / SendGrid)
-// via SMTP_* env — better deliverability to Gmail/Outlook than relaying personal
-// Gmail, and no Gmail "App Password" needed (just an SMTP key from the provider).
-//   Brevo:    SMTP_HOST=smtp-relay.brevo.com  SMTP_PORT=587  SMTP_USER=<login>  SMTP_PASS=<smtp key>
-//   SendGrid: SMTP_HOST=smtp.sendgrid.net      SMTP_PORT=587  SMTP_USER=apikey   SMTP_PASS=<api key>
-// MAIL_FROM must be a VERIFIED sender on that provider, e.g. "Jobly HR <you@gmail.com>".
-// Falls back to the old Gmail config if SMTP_* aren't set (backward compatible).
-const SMTP_HOST = process.env.SMTP_HOST?.trim();
-const SMTP_PORT = Number(process.env.SMTP_PORT ?? '587');
-const SMTP_USER = process.env.SMTP_USER?.trim();
-const SMTP_PASS = process.env.SMTP_PASS?.replace(/\s+/g, '');
-const GMAIL_USER = process.env.GMAIL_USER?.trim();
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
+// Azure Communication Services Email transport.
+// Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.
+// ACS_SENDER_ADDRESS is pre-configured to the Azure-managed domain provisioned
+// during setup; override with ACS_SENDER_ADDRESS env var if domain changes.
+const ACS_CONNECTION_STRING = process.env.AZURE_COMM_CONNECTION_STRING?.trim();
+const ACS_SENDER = (process.env.ACS_SENDER_ADDRESS?.trim())
+  || 'DoNotReply@1dab9ceb-3c53-4e33-a4b1-c00cedde4e29.azurecomm.net';
 
-const useSmtp = !!(SMTP_HOST && SMTP_USER && SMTP_PASS);
-export const mailerConfigured = useSmtp || !!(GMAIL_USER && GMAIL_APP_PASSWORD);
+export const mailerConfigured = !!ACS_CONNECTION_STRING;
 
-// Hard timeouts so a slow/hung SMTP connection fails fast instead of blocking the
-// request thread until Azure's gateway 504s (which previously rotated a password
-// without returning the new value on /reset-password).
-const POOL = { pool: true, maxConnections: 3, maxMessages: 50, rateDelta: 1000, rateLimit: 5, connectionTimeout: 15000, greetingTimeout: 15000, socketTimeout: 20000 } as const;
-const transporter = nodemailer.createTransport(
-  useSmtp
-    ? { host: SMTP_HOST, port: SMTP_PORT, secure: SMTP_PORT === 465, auth: { user: SMTP_USER, pass: SMTP_PASS }, ...POOL }
-    : { service: 'gmail', auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD }, ...POOL },
-);
-
-// Trim recipient(s) — a stray leading/trailing space makes Gmail reject the address.
-function trimRecipient(to: string | string[]): string | string[] {
-  return Array.isArray(to) ? to.map(t => t.trim()).filter(Boolean) : to.trim();
+let _acsClient: EmailClient | null = null;
+function getAcsClient(): EmailClient {
+  if (!_acsClient) {
+    if (!ACS_CONNECTION_STRING) throw new Error('AZURE_COMM_CONNECTION_STRING is not configured. Set it in Azure App Settings.');
+    _acsClient = new EmailClient(ACS_CONNECTION_STRING);
+  }
+  return _acsClient;
 }
 
-// Retry transient SMTP failures (timeouts, 4xx greylisting, Gmail throttling)
-// with exponential backoff. Hard failures (bad address, auth) throw immediately.
-async function sendWithRetry(mail: nodemailer.SendMailOptions, tries = 3): Promise<void> {
-  mail = { ...mail, to: mail.to ? trimRecipient(mail.to as string | string[]) : mail.to };
-  for (let attempt = 1; attempt <= tries; attempt++) {
-    try {
-      await transporter.sendMail(mail);
-      return;
-    } catch (err: any) {
-      const code = String(err?.code ?? err?.responseCode ?? '');
-      const transient =
-        /ETIMEDOUT|ECONNRESET|ESOCKET|ECONNECTION|EDNS/i.test(code) ||
-        /^4\d\d$/.test(code) ||
-        /timeout|try again|temporarily/i.test(String(err?.message ?? ''));
-      console.error(`[mailer] send attempt ${attempt}/${tries} to ${JSON.stringify(mail.to)} failed:`, {
-        code: err?.code, responseCode: err?.responseCode, response: err?.response, message: err?.message,
-      });
-      if (!transient || attempt === tries) throw err;
-      await new Promise(r => setTimeout(r, 2 ** (attempt - 1) * 1000));
+function toAcsRecipients(to: string | string[]): { address: string }[] {
+  return (Array.isArray(to) ? to : [to]).map(a => ({ address: a.trim() })).filter(r => r.address);
+}
+
+// Nodemailer-compatible send interface so all callers keep the same signature.
+// CID (inline) attachments are silently skipped — embed images as data URIs in HTML instead.
+interface MailOptions {
+  from?: string;
+  to: string | string[];
+  subject: string;
+  html?: string;
+  text?: string;
+  replyTo?: string;
+  attachments?: Array<{
+    filename: string;
+    content?: Buffer;
+    contentType?: string;
+    cid?: string;
+    contentDisposition?: string;
+  }>;
+}
+
+async function sendWithRetry(mail: MailOptions): Promise<void> {
+  if (!ACS_CONNECTION_STRING) {
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+  }
+  const client = getAcsClient();
+  const acsAttachments = (mail.attachments ?? [])
+    .filter(a => !a.cid && a.content)
+    .map(a => ({
+      name: a.filename,
+      contentType: a.contentType ?? 'application/octet-stream',
+      contentInBase64: a.content!.toString('base64'),
+    }));
+
+  // Build content with at least one body field (ACS requires html or plainText).
+  const rawContent = { subject: mail.subject, html: mail.html, plainText: mail.text };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const content = rawContent as any as EmailMessage['content'];
+
+  const message: EmailMessage = {
+    senderAddress: ACS_SENDER,
+    recipients: { to: toAcsRecipients(mail.to) },
+    content,
+    replyTo: mail.replyTo ? [{ address: mail.replyTo }] : undefined,
+    attachments: acsAttachments.length ? acsAttachments : undefined,
+  };
+
+  try {
+    const poller = await client.beginSend(message);
+    const result = await poller.pollUntilDone();
+    if (result.status !== KnownEmailSendStatus.Succeeded) {
+      throw new Error(`Azure email send failed: ${result.error?.message ?? result.status}`);
     }
+    console.log(`[mailer] ✓ Email sent to ${JSON.stringify(mail.to)} subject="${mail.subject}"`);
+  } catch (err: any) {
+    console.error(`[mailer] ✗ Email to ${JSON.stringify(mail.to)} failed: ${err?.message ?? err}`);
+    throw err;
   }
 }
 
-// FROM must be a verified sender on the active provider. MAIL_FROM wins; else
-// fall back to the Gmail address (legacy) or a placeholder.
-const FROM = (process.env.MAIL_FROM?.trim())
-  || (GMAIL_USER ? `Jobly HR <${GMAIL_USER}>` : 'Jobly HR <noreply@jobly.com>');
+const FROM = ACS_SENDER;
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
-const ACTIVE_TRANSPORT = useSmtp ? `SMTP ${SMTP_HOST}:${SMTP_PORT}` : 'Gmail service';
 
-// Run once at boot so operators see immediately whether SMTP works.
 export async function verifyMailer(): Promise<void> {
   if (!mailerConfigured) {
-    console.warn('[mailer] No email transport configured — set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD. Emails are disabled.');
+    console.warn('[mailer] AZURE_COMM_CONNECTION_STRING not set — email is disabled. Add it to Azure App Settings.');
     return;
   }
-  try {
-    await transporter.verify();
-    console.log(`[mailer] ✓ ${ACTIVE_TRANSPORT} authenticated; sending as "${FROM}"`);
-  } catch (err: any) {
-    console.error(`[mailer] ✗ ${ACTIVE_TRANSPORT} verification FAILED: ${err?.code ?? ''} ${err?.message ?? err}`);
-    console.error('[mailer]   → Check SMTP_USER/SMTP_PASS (provider SMTP key) and that MAIL_FROM is a VERIFIED sender on the provider.');
-  }
+  console.log(`[mailer] ✓ Azure Communication Email configured; sending as "${ACS_SENDER}"`);
 }
 
 export interface WelcomeEmailPayload {
@@ -256,7 +268,7 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
 </html>`;
 
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
   await sendWithRetry({
     from: FROM,
@@ -296,8 +308,9 @@ export interface InvoiceEmailPayload {
 
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
+  const logoDataUri = `data:image/png;base64,${getJoblyLogoBuffer().toString('base64')}`;
   const {
     to, clientName, contactName, invoiceNumber,
     issueDate, dueDate, currency, subtotal, discountType, discountValue, discountAmount,
@@ -351,7 +364,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
         <tr>
           <td style="background:#ffffff;padding:26px 40px 6px;">
-            <img src="cid:joblylogo" alt="Jobly Solutions" height="40" style="display:block;border:0;outline:none;text-decoration:none;height:40px;width:auto;">
+            <img src="${logoDataUri}" alt="Jobly Solutions" height="40" style="display:block;border:0;outline:none;text-decoration:none;height:40px;width:auto;">
           </td>
         </tr>
         <tr>
@@ -432,14 +445,8 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
 </body>
 </html>`;
 
-  // Inline logo (cid) renders the brand mark in the header; the PDF rides as a
-  // normal attachment. nodemailer treats `cid` attachments as inline.
-  const attachments: nodemailer.SendMailOptions['attachments'] = [{
-    filename: 'jobly-logo.png',
-    content: getJoblyLogoBuffer(),
-    cid: 'joblylogo',
-    contentDisposition: 'inline',
-  }];
+  // Build attachments: invoice PDF + any uploaded docs (PSL.pdf etc.)
+  const attachments: MailOptions['attachments'] = [];
   if (pdfBuffer) {
     attachments.push({
       filename: pdfFileName ?? `${invoiceNumber}.pdf`,
@@ -510,7 +517,7 @@ export interface CustomEmailPayload { to: string | string[]; subject: string; ht
 // Send a fully-rendered custom email (used by the bulk client mailer).
 export async function sendCustomEmail(payload: CustomEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
   await sendWithRetry({ from: FROM, to: payload.to, subject: payload.subject, html: payload.html });
 }
@@ -529,7 +536,7 @@ export interface ContactFormPayload {
 
 export async function sendContactEmail(p: ContactFormPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
   const row = (label: string, value: string) => `
     <tr>
@@ -575,7 +582,7 @@ export async function sendInvoiceReminderEmail(payload: {
   to: string; contactName: string; invoiceNumber: string; dueDate: string;
   balanceDue: number; currency?: string; tone: 'upcoming' | 'due' | 'overdue'; viewUrl?: string;
 }): Promise<void> {
-  if (!mailerConfigured) throw new Error('Email is not configured on the server.');
+  if (!mailerConfigured) throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: payload.currency || 'USD' }).format(n);
   const fmtDate = (s: string) => formatDateSafe(s, { long: true }) || s;
   const headline = payload.tone === 'overdue'
@@ -623,7 +630,7 @@ export interface MonthlyTimesheetEmailPayload {
 
 export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
   const {
     to, employeeName, employeeDisplayId, department, monthLabel,
@@ -743,7 +750,7 @@ export interface OnboardingCompletedEmailPayload {
 // employee stays in 'onboarding' until HR opens their profile and approves.
 export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
   const { to, employeeName, displayId, department, jobTitle, completedAt, detailUrl } = payload;
   const when = formatDateSafe(completedAt, { long: true }) || completedAt;
@@ -832,7 +839,7 @@ export async function sendOnboardingChangesRequestedEmail(
   payload: OnboardingChangesRequestedEmailPayload,
 ): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured on the server. Set SMTP_HOST/SMTP_USER/SMTP_PASS (e.g. Brevo) or GMAIL_USER/GMAIL_APP_PASSWORD.');
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
   const { to, employeeName, displayId, message, portalUrl } = payload;
   const link = portalUrl || `${PORTAL_URL}/portal/onboarding/pending`;
@@ -899,4 +906,20 @@ export async function sendOnboardingChangesRequestedEmail(
     subject: `Onboarding — changes requested for ${employeeName} (${displayId})`,
     html,
   });
+}
+
+// Diagnostic smoke-test — sends a plain-text email to the given address so an
+// admin can confirm the SMTP transport is working end-to-end from the portal.
+export async function testEmailDelivery(to: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await sendWithRetry({
+      from: FROM,
+      to,
+      subject: 'Jobly Email Test',
+      text: 'This is a test email from Jobly. If you received this, email delivery is working.',
+    });
+    return { ok: true };
+  } catch (err: any) {
+    return { ok: false, error: err?.message ?? String(err) };
+  }
 }

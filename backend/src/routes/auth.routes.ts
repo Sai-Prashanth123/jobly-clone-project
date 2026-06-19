@@ -14,5 +14,6 @@ router.get('/me', authenticate, ctrl.me);
 // password against the auth provider (#5 from the edge-case audit).
 router.post('/change-password', authLimiter, authenticate, validateBody(changePasswordSchema), ctrl.changePassword);
 router.post('/forgot-password', authLimiter, validateBody(forgotPasswordSchema), ctrl.forgotPassword);
+router.post('/refresh', ctrl.refresh);
 
 export default router;

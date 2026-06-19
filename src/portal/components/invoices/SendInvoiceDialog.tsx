@@ -121,14 +121,14 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>Send invoice {invoice.invoiceNumber}</DialogTitle>
           <DialogDescription>
             Send from your own Gmail/Outlook, or send directly through Jobly with the PDF attached.
           </DialogDescription>
         </DialogHeader>
-
+        <div className="flex-1 overflow-y-auto px-1 pb-2">
         <div className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="si-to" className="text-xs">To</Label>
@@ -212,6 +212,7 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
           <Checkbox checked={dontShow} onCheckedChange={v => persistPref(!!v)} />
           Don&apos;t show this again — always send via Jobly
         </label>
+        </div>
       </DialogContent>
     </Dialog>
   );

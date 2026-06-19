@@ -150,26 +150,28 @@ export default function AssignmentDetail() {
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Assignment — {assignment.displayId ?? assignment.id.slice(0,8)}</DialogTitle>
             <DialogDescription className="sr-only">Update assignment details.</DialogDescription>
           </DialogHeader>
-          <AssignmentForm
-            initial={assignment}
-            isEdit
-            onSubmit={async data => {
-              try {
-                await updateAssignment.mutateAsync(data as any);
-                toast.success('Assignment updated');
-                setEditOpen(false);
-              } catch {
-                /* failed-request toast raised centrally (queryClient.ts) */
-              }
-            }}
-            onCancel={() => setEditOpen(false)}
-            isPending={updateAssignment.isPending}
-          />
+          <div className="flex-1 overflow-y-auto px-1 pb-2">
+            <AssignmentForm
+              initial={assignment}
+              isEdit
+              onSubmit={async data => {
+                try {
+                  await updateAssignment.mutateAsync(data as any);
+                  toast.success('Assignment updated');
+                  setEditOpen(false);
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
+                }
+              }}
+              onCancel={() => setEditOpen(false)}
+              isPending={updateAssignment.isPending}
+            />
+          </div>
         </DialogContent>
       </Dialog>
 

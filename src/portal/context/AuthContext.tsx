@@ -44,15 +44,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data } = await apiClient.post('/auth/login', { email, password });
-      const { token, user } = data.data;
+      const { token, refreshToken, user } = data.data;
 
       // Store token for interceptor
       sessionStorage.setItem('access_token', token);
 
-      const newSession: AuthSession & { token: string } = {
+      const newSession: AuthSession & { token: string; refreshToken?: string } = {
         user,
         loginTime: new Date().toISOString(),
         token,
+        ...(refreshToken ? { refreshToken } : {}),
       };
       setSession(newSession);
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(newSession));
@@ -85,6 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const markPasswordResetComplete = () => {
     setSession(prev => {
       if (!prev) return prev;
+      // Spread prev entirely so refreshToken (and token) are preserved.
       const updated = { ...prev, user: { ...prev.user, mustResetPassword: false } };
       sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
       return updated;
@@ -110,6 +112,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!fresh) return;
       setSession(prev => {
         if (!prev) return prev;
+        // Spread prev entirely so refreshToken (and token) are preserved.
         const updated = { ...prev, user: { ...prev.user, ...fresh } };
         sessionStorage.setItem(SESSION_KEY, JSON.stringify(updated));
         return updated;
