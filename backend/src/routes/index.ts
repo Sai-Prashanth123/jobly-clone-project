@@ -22,6 +22,7 @@ import leaveBalanceRoutes from './leaveBalance.routes';
 import expenseRoutes from './expenses.routes';
 import onboardingChecklistRoutes from './onboardingChecklist.routes';
 import assetRoutes from './assets.routes';
+import reviewRoutes from './reviews.routes';
 
 export const router = Router();
 
@@ -48,3 +49,4 @@ router.use('/leave', leaveBalanceRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/onboarding-checklist', onboardingChecklistRoutes);
 router.use('/assets', assetRoutes);
+router.use('/reviews', reviewRoutes);

@@ -69,6 +69,11 @@ const People = lazy(() => import('./pages/People'));
 const Expenses = lazy(() => import('./pages/Expenses'));
 const Assets = lazy(() => import('./pages/Assets'));
 
+// Phase 3 — Performance Reviews
+const Reviews = lazy(() => import('./pages/Reviews'));
+const MyReview = lazy(() => import('./pages/MyReview'));
+const PeerFeedback = lazy(() => import('./pages/PeerFeedback'));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -302,6 +307,16 @@ export default function PortalApp() {
             <Route path="people" element={<People />} />
 
             <Route path="expenses" element={<Expenses />} />
+            <Route
+              path="reviews"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr']}>
+                  <Reviews />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="my-review" element={<MyReview />} />
+            <Route path="peer-feedback" element={<PeerFeedback />} />
             <Route
               path="assets"
               element={
