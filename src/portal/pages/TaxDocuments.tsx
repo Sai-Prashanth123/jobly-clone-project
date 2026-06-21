@@ -52,14 +52,14 @@ export default function TaxDocuments() {
 
       {/* Filters */}
       <div className="flex gap-3 flex-wrap">
-        <Select value={String(filterYear ?? '')} onValueChange={v => setFilterYear(v ? Number(v) : undefined)}>
+        <Select value={String(filterYear ?? '_all')} onValueChange={v => setFilterYear(v === '_all' ? undefined : Number(v))}>
           <SelectTrigger className="w-32"><SelectValue placeholder="All years" /></SelectTrigger>
-          <SelectContent><SelectItem value="">All years</SelectItem>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
+          <SelectContent><SelectItem value="_all">All years</SelectItem>{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
         </Select>
         {isFinance && (
-          <Select value={filterEmp} onValueChange={setFilterEmp}>
+          <Select value={filterEmp || '_all'} onValueChange={v => setFilterEmp(v === '_all' ? '' : v)}>
             <SelectTrigger className="w-52"><SelectValue placeholder="All employees" /></SelectTrigger>
-            <SelectContent><SelectItem value="">All employees</SelectItem>{employees.map(e => <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>)}</SelectContent>
+            <SelectContent><SelectItem value="_all">All employees</SelectItem>{employees.map(e => <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>)}</SelectContent>
           </Select>
         )}
       </div>

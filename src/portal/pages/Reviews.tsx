@@ -388,10 +388,10 @@ export default function Reviews() {
             </div>
             <div className="space-y-1">
               <Label>Manager (optional)</Label>
-              <Select value={newParticipantMgrId} onValueChange={setNewParticipantMgrId}>
+              <Select value={newParticipantMgrId || '_none'} onValueChange={v => setNewParticipantMgrId(v === '_none' ? '' : v)}>
                 <SelectTrigger><SelectValue placeholder="Select manager" /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">None</SelectItem>
+                  <SelectItem value="_none">None</SelectItem>
                   {activeEmployees.map(e => (
                     <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
                   ))}
