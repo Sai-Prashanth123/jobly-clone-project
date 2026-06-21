@@ -14,6 +14,7 @@ import { useAssignments } from '../../hooks/useAssignments';
 import { useTimesheets } from '../../hooks/useTimesheets';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useClients } from '../../hooks/useClients';
+import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 
 export function OperationsDashboard() {
   const { data: assignData } = useAssignments({ limit: 200 });
@@ -212,6 +213,8 @@ export function OperationsDashboard() {
             ))}
           </div>
       </Panel>
+
+      <AnnouncementsWidget />
     </div>
   );
 }

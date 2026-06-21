@@ -19,6 +19,7 @@ import { useClients } from '../../hooks/useClients';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useTimesheets } from '../../hooks/useTimesheets';
 import { useInvoices } from '../../hooks/useInvoices';
+import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -283,6 +284,8 @@ export function AdminDashboard() {
           </div>
         )}
       </Panel>
+
+      <AnnouncementsWidget />
     </div>
   );
 }

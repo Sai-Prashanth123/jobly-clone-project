@@ -51,6 +51,14 @@ export async function create(req: Request, res: Response, next: NextFunction): P
   } catch (err) { next(err); }
 }
 
+export async function directory(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { search, department } = req.query as { search?: string; department?: string };
+    const data = await svc.listDirectory(search, department);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function resendCredentials(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await svc.resendCredentials(req.params.id, req.user?.id);

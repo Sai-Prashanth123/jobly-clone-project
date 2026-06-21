@@ -450,3 +450,64 @@ export interface NavItem {
   icon: string;
   roles: UserRole[];
 }
+
+// ── Announcements ──────────────────────────────────────────────────────────────
+export type AnnouncementType = 'info' | 'urgent' | 'event' | 'policy';
+
+export interface Announcement {
+  id: string;
+  displayId?: string;
+  title: string;
+  body: string;
+  type: AnnouncementType;
+  isPinned: boolean;
+  targetRoles: UserRole[];
+  authorId?: string;
+  author?: { id: string; name: string; email: string };
+  expiresAt?: string | null;
+  deletedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Employee Directory ─────────────────────────────────────────────────────────
+export interface DirectoryEmployee {
+  id: string;
+  displayId?: string;
+  firstName: string;
+  lastName: string;
+  jobTitle?: string;
+  department?: string;
+  workEmail?: string;
+  phone?: string;
+  avatarUrl?: string;
+  workLocation?: string;
+}
+
+// ── Leave Balance ──────────────────────────────────────────────────────────────
+export type LeaveAccrualType = 'fixed' | 'accrual';
+
+export interface LeaveTypeConfig {
+  id: string;
+  displayId?: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  accrualType: LeaveAccrualType;
+  defaultDays: number;
+  accrualRate?: number | null;
+  maxCarryover: number;
+  color: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeaveBalance {
+  leaveType: LeaveTypeConfig;
+  year: number;
+  granted: number;
+  carriedOver: number;
+  used: number;
+  remaining: number;
+}

@@ -17,6 +17,8 @@ import adminRoutes from './admin.routes';
 import systemRoutes from './system.routes';
 import emailTemplateRoutes from './emailTemplates.routes';
 import invoiceTemplateRoutes from './invoiceTemplates.routes';
+import announcementRoutes from './announcements.routes';
+import leaveBalanceRoutes from './leaveBalance.routes';
 
 export const router = Router();
 
@@ -38,3 +40,5 @@ router.use('/admin', adminRoutes);
 router.use('/system', systemRoutes);
 router.use('/email-templates', emailTemplateRoutes);
 router.use('/invoice-templates', invoiceTemplateRoutes);
+router.use('/announcements', announcementRoutes);
+router.use('/leave', leaveBalanceRoutes);

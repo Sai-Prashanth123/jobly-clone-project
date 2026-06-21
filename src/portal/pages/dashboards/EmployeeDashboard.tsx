@@ -8,6 +8,8 @@ import { StatCard } from '../../components/shared/StatCard';
 import { StatusBadge } from '../../components/shared/StatusBadge';
 import { QuickActions } from '../../components/shared/QuickActions';
 import { DashboardHeader } from '../../components/shared/DashboardHeader';
+import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
+import { LeaveBalanceWidget } from '../../components/widgets/LeaveBalanceWidget';
 import { Panel } from '../../components/shared/Panel';
 import { formatDate } from '../../lib/utils';
 import { useAuth } from '../../hooks/useAuth';
@@ -222,6 +224,11 @@ export function EmployeeDashboard() {
             </div>
           )}
       </Panel>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <AnnouncementsWidget />
+        <LeaveBalanceWidget />
+      </div>
     </div>
   );
 }

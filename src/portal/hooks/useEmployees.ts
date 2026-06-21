@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 import { isValidId } from '../lib/utils';
-import type { Employee } from '../types';
+import type { Employee, DirectoryEmployee } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapEmployee(raw: any): Employee {
@@ -421,4 +421,36 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.bloodGroup !== undefined && { bloodGroup: blank(e.bloodGroup) }),
     ...(e.identityDocuments !== undefined && { identityDocuments: e.identityDocuments }),
   };
+}
+
+
+// ── Employee Directory (non-sensitive, all roles) ──────────────────────────────
+
+function mapDirectoryEmployee(raw: any): DirectoryEmployee {
+  return {
+    id:           raw.id,
+    displayId:    raw.display_id ?? undefined,
+    firstName:    raw.first_name ?? '',
+    lastName:     raw.last_name ?? '',
+    jobTitle:     raw.job_title ?? undefined,
+    department:   raw.department ?? undefined,
+    workEmail:    raw.work_email ?? undefined,
+    phone:        raw.phone ?? undefined,
+    avatarUrl:    raw.avatar_url ?? undefined,
+    workLocation: raw.work_location ?? undefined,
+  };
+}
+
+export function useEmployeeDirectory(search?: string, department?: string) {
+  return useQuery({
+    queryKey: ['employee-directory', search, department],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (search)     params.set('search',     search);
+      if (department) params.set('department', department);
+      const { data } = await apiClient.get(`/employees/directory?${params}`);
+      return (data.data as any[]).map(mapDirectoryEmployee);
+    },
+    staleTime: 2 * 60_000,
+  });
 }

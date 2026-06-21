@@ -1289,6 +1289,26 @@ export async function getEmployeeTimesheets(employeeId: string) {
   return data ?? [];
 }
 
+// ── Employee Directory (non-sensitive fields only, visible to all roles) ─────
+
+export async function listDirectory(search?: string, department?: string) {
+  let q = supabaseAdmin
+    .from('employees')
+    .select('id,display_id,first_name,last_name,job_title,department,work_email,phone,avatar_url:profile_photo_url,work_location,employment_type,status,start_date')
+    .eq('status', 'active')
+    .is('deleted_at', null)
+    .order('first_name');
+
+  if (search) {
+    q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,job_title.ilike.%${search}%,department.ilike.%${search}%`);
+  }
+  if (department) q = q.eq('department', department);
+
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
 // ── CSV export ────────────────────────────────────────────────────────────────
 
 export async function exportEmployeesCSV(query: { status?: string; department?: string; viewerRole?: string }): Promise<string> {

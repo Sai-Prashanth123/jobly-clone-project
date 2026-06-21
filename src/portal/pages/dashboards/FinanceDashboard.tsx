@@ -15,6 +15,7 @@ import { useInvoices } from '../../hooks/useInvoices';
 import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
 import { useRecurringTemplates } from '../../hooks/useRecurring';
+import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
@@ -382,6 +383,8 @@ export function FinanceDashboard() {
             </div>
           )}
       </Panel>
+
+      <AnnouncementsWidget />
     </div>
   );
 }

@@ -13,6 +13,7 @@ import { Panel } from '../../components/shared/Panel';
 import { OnboardingBar } from '../../components/employees/OnboardingProgress';
 import { formatDate } from '../../lib/utils';
 import { useEmployees } from '../../hooks/useEmployees';
+import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 import {
   isActive, isOnboarding, isInactive, isVisaExpiringSoon, isI9Issue,
 } from '../../lib/employeeSegments';
@@ -354,6 +355,8 @@ export function HRDashboard() {
             </div>
         </Panel>
       )}
+
+      <AnnouncementsWidget />
     </div>
   );
 }
