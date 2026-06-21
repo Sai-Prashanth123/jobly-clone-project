@@ -5,6 +5,7 @@ import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRe
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { computeOnboarding } from '../lib/onboarding';
 import { todayUTC } from '../lib/dateUtils';
+import { generateTasksForEmployee } from './onboardingChecklist.service';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
@@ -361,6 +362,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
   }
 
   logActivity(actorId ?? null, 'created', 'employee', emp.id, emp.display_id ?? `${input.firstName} ${input.lastName}`);
+  void generateTasksForEmployee(emp.id);
 
   // Issue credentials and send welcome email — capture status so the controller
   // can surface email failures back to the HR user instead of silently dropping them.

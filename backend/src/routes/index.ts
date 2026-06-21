@@ -19,6 +19,9 @@ import emailTemplateRoutes from './emailTemplates.routes';
 import invoiceTemplateRoutes from './invoiceTemplates.routes';
 import announcementRoutes from './announcements.routes';
 import leaveBalanceRoutes from './leaveBalance.routes';
+import expenseRoutes from './expenses.routes';
+import onboardingChecklistRoutes from './onboardingChecklist.routes';
+import assetRoutes from './assets.routes';
 
 export const router = Router();
 
@@ -42,3 +45,6 @@ router.use('/email-templates', emailTemplateRoutes);
 router.use('/invoice-templates', invoiceTemplateRoutes);
 router.use('/announcements', announcementRoutes);
 router.use('/leave', leaveBalanceRoutes);
+router.use('/expenses', expenseRoutes);
+router.use('/onboarding-checklist', onboardingChecklistRoutes);
+router.use('/assets', assetRoutes);

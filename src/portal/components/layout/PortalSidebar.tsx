@@ -15,7 +15,7 @@ import {
   LayoutDashboard, Users, Building2, ClipboardList,
   Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search, UserPlus,
   CalendarCheck, CalendarClock, CalendarDays, KeyRound, Package, FileCheck2, RotateCw, Mail,
-  Megaphone, Users2,
+  Megaphone, Users2, Receipt, Package as PackageIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -35,6 +35,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard',       path: '/portal/dashboard',       icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee'] },
   { label: 'Announcements',  path: '/portal/announcements',  icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee'] },
   { label: 'People',         path: '/portal/people',         icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'Expenses',       path: '/portal/expenses',       icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'Assets',         path: '/portal/assets',         icon: <PackageIcon className="h-4 w-4" />,     roles: ['admin','hr','operations'] },
   { label: 'Employees',      path: '/portal/employees',      icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
   { label: 'Add Employee',   path: '/portal/employees/new',  icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'] },
   { label: 'Clients',        path: '/portal/clients',        icon: <Building2 className="h-4 w-4" />,       roles: ['admin','finance'] },

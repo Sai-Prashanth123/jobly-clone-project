@@ -65,6 +65,10 @@ const LeaveRequests = lazy(() => import('./pages/LeaveRequests'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const People = lazy(() => import('./pages/People'));
 
+// Phase 2 — Expense Reports, Assets
+const Expenses = lazy(() => import('./pages/Expenses'));
+const Assets = lazy(() => import('./pages/Assets'));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -296,6 +300,16 @@ export default function PortalApp() {
 
             <Route path="announcements" element={<Announcements />} />
             <Route path="people" element={<People />} />
+
+            <Route path="expenses" element={<Expenses />} />
+            <Route
+              path="assets"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
+                  <Assets />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="leave-requests"
