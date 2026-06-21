@@ -23,6 +23,15 @@ import expenseRoutes from './expenses.routes';
 import onboardingChecklistRoutes from './onboardingChecklist.routes';
 import assetRoutes from './assets.routes';
 import reviewRoutes from './reviews.routes';
+import holidayRoutes from './holidays.routes';
+import settingsRoutes from './settings.routes';
+import offboardingRoutes from './offboarding.routes';
+import skillsRoutes from './skills.routes';
+import shiftsRoutes from './shifts.routes';
+import budgetsRoutes from './budgets.routes';
+import taxDocumentsRoutes from './taxDocuments.routes';
+import activityLogsRoutes from './activityLogs.routes';
+import analyticsReportsRoutes from './analyticsReports.routes';
 
 export const router = Router();
 
@@ -50,3 +59,12 @@ router.use('/expenses', expenseRoutes);
 router.use('/onboarding-checklist', onboardingChecklistRoutes);
 router.use('/assets', assetRoutes);
 router.use('/reviews', reviewRoutes);
+router.use('/holidays', holidayRoutes);
+router.use('/portal-settings', settingsRoutes);
+router.use('/offboarding-checklist', offboardingRoutes);
+router.use('/skills', skillsRoutes);
+router.use('/shifts', shiftsRoutes);
+router.use('/budgets', budgetsRoutes);
+router.use('/tax-documents', taxDocumentsRoutes);
+router.use('/activity-logs', activityLogsRoutes);
+router.use('/analytics', analyticsReportsRoutes);

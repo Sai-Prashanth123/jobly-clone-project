@@ -1,0 +1,39 @@
+import { supabaseAdmin } from '../config/supabase';
+import { NotFoundError } from '../lib/errors';
+import { logActivity } from '../lib/activityLogger';
+
+export async function listHolidays(year?: number) {
+  let q = supabaseAdmin.from('company_holidays').select('*').order('date', { ascending: true });
+  if (year) q = q.like('date', `${year}-%`);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function createHoliday(input: { name: string; date: string; isRecurring?: boolean; countryCode?: string }, actorId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('company_holidays')
+    .insert({ name: input.name, date: input.date, is_recurring: input.isRecurring ?? false, country_code: input.countryCode ?? 'US' })
+    .select().single();
+  if (error || !data) throw error ?? new Error('Insert failed');
+  void logActivity(actorId, 'created', 'holiday', (data as any).id, `Holiday: ${input.name}`);
+  return data as any;
+}
+
+export async function updateHoliday(id: string, input: { name?: string; date?: string; isRecurring?: boolean; countryCode?: string }, actorId: string) {
+  const patch: any = {};
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.date !== undefined) patch.date = input.date;
+  if (input.isRecurring !== undefined) patch.is_recurring = input.isRecurring;
+  if (input.countryCode !== undefined) patch.country_code = input.countryCode;
+  const { data, error } = await supabaseAdmin.from('company_holidays').update(patch).eq('id', id).select().single();
+  if (error || !data) throw new NotFoundError('Holiday not found');
+  void logActivity(actorId, 'updated', 'holiday', id, `Updated holiday`);
+  return data as any;
+}
+
+export async function deleteHoliday(id: string, actorId: string) {
+  const { error } = await supabaseAdmin.from('company_holidays').delete().eq('id', id);
+  if (error) throw error;
+  void logActivity(actorId, 'deleted', 'holiday', id, 'Deleted holiday');
+}

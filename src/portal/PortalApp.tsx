@@ -74,6 +74,29 @@ const Reviews = lazy(() => import('./pages/Reviews'));
 const MyReview = lazy(() => import('./pages/MyReview'));
 const PeerFeedback = lazy(() => import('./pages/PeerFeedback'));
 
+// Phase 4 — Admin
+const AuditLog = lazy(() => import('./pages/AuditLog'));
+
+// Phase 4 — HR
+const Milestones = lazy(() => import('./pages/Milestones'));
+const ProbationTracker = lazy(() => import('./pages/ProbationTracker'));
+const SkillsRegistry = lazy(() => import('./pages/SkillsRegistry'));
+const HeadcountReport = lazy(() => import('./pages/HeadcountReport'));
+
+// Phase 4 — Operations
+const ShiftSchedule = lazy(() => import('./pages/ShiftSchedule'));
+const WorkforceAvailability = lazy(() => import('./pages/WorkforceAvailability'));
+const CapacityReport = lazy(() => import('./pages/CapacityReport'));
+const ContractorCompliance = lazy(() => import('./pages/ContractorCompliance'));
+const ClientSLA = lazy(() => import('./pages/ClientSLA'));
+
+// Phase 4 — Finance
+const Budgets = lazy(() => import('./pages/Budgets'));
+const TaxDocuments = lazy(() => import('./pages/TaxDocuments'));
+const InvoiceAnalytics = lazy(() => import('./pages/InvoiceAnalytics'));
+const ExpenseAnalytics = lazy(() => import('./pages/ExpenseAnalytics'));
+const CashFlow = lazy(() => import('./pages/CashFlow'));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -420,6 +443,29 @@ export default function PortalApp() {
                 </ProtectedRoute>
               }
             />
+
+            {/* Phase 4 — Admin */}
+            <Route path="audit-log" element={<ProtectedRoute allowedRoles={['admin']}><AuditLog /></ProtectedRoute>} />
+
+            {/* Phase 4 — HR */}
+            <Route path="milestones" element={<ProtectedRoute allowedRoles={['admin','hr']}><Milestones /></ProtectedRoute>} />
+            <Route path="probation" element={<ProtectedRoute allowedRoles={['admin','hr']}><ProbationTracker /></ProtectedRoute>} />
+            <Route path="skills" element={<ProtectedRoute allowedRoles={['admin','hr']}><SkillsRegistry /></ProtectedRoute>} />
+            <Route path="headcount" element={<ProtectedRoute allowedRoles={['admin','hr']}><HeadcountReport /></ProtectedRoute>} />
+
+            {/* Phase 4 — Operations */}
+            <Route path="shifts" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><ShiftSchedule /></ProtectedRoute>} />
+            <Route path="workforce" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><WorkforceAvailability /></ProtectedRoute>} />
+            <Route path="capacity" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><CapacityReport /></ProtectedRoute>} />
+            <Route path="contractors" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><ContractorCompliance /></ProtectedRoute>} />
+            <Route path="client-sla" element={<ProtectedRoute allowedRoles={['admin','operations']}><ClientSLA /></ProtectedRoute>} />
+
+            {/* Phase 4 — Finance */}
+            <Route path="budgets" element={<ProtectedRoute allowedRoles={['admin','finance']}><Budgets /></ProtectedRoute>} />
+            <Route path="tax-documents" element={<ProtectedRoute allowedRoles={['admin','finance','employee']}><TaxDocuments /></ProtectedRoute>} />
+            <Route path="invoice-analytics" element={<ProtectedRoute allowedRoles={['admin','finance']}><InvoiceAnalytics /></ProtectedRoute>} />
+            <Route path="expense-analytics" element={<ProtectedRoute allowedRoles={['admin','finance']}><ExpenseAnalytics /></ProtectedRoute>} />
+            <Route path="cash-flow" element={<ProtectedRoute allowedRoles={['admin','finance']}><CashFlow /></ProtectedRoute>} />
 
             <Route path="profile" element={<MyProfile />} />
             {/* Self-edit: employees edit their own record via the same card form

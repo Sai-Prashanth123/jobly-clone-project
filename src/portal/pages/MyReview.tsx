@@ -14,7 +14,7 @@ import {
   STATUS_LABELS, type ReviewCycle,
 } from '../hooks/useReviews';
 import { useEmployees } from '../hooks/useEmployees';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 
 function StarDisplay({ value, label }: { value: number | null | undefined; label: string }) {
   return (
