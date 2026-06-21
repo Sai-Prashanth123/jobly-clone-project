@@ -109,7 +109,8 @@ function CycleCard({
 export default function MyReview() {
   const { user } = useAuth();
   const { data: cycles = [], isLoading } = useReviewCycles();
-  const { data: employees = [] } = useEmployees();
+  const { data: empResult } = useEmployees();
+  const employees = empResult?.data ?? [];
   const submitSelf = useSubmitSelfAssessment();
   const nominatePeers = useNominatePeers();
 

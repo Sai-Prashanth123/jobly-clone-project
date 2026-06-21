@@ -68,7 +68,8 @@ const EMPTY_FORM: CycleFormData = {
 
 export default function Reviews() {
   const { data: cycles = [], isLoading } = useReviewCycles();
-  const { data: employees = [] } = useEmployees();
+  const { data: empResult } = useEmployees();
+  const employees = empResult?.data ?? [];
   const createCycle = useCreateCycle();
   const updateCycle = useUpdateCycle();
   const activateCycle = useActivateCycle();
