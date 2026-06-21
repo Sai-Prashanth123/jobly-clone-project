@@ -18,7 +18,8 @@ export default function ShiftSchedule() {
   const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
 
   const { data: shifts = [], isLoading } = useShifts({ startDate, endDate });
-  const { data: employees = [] } = useEmployees();
+  const { data: empResult } = useEmployees();
+  const employees = empResult?.data ?? [];
   const createShift = useCreateShift();
   const updateShift = useUpdateShift();
   const deleteShift = useDeleteShift();

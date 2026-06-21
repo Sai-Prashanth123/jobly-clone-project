@@ -16,7 +16,8 @@ const DOC_TYPES: TaxDocType[] = ['W2','1099','other'];
 export default function TaxDocuments() {
   const { user } = useAuth();
   const isFinance = user?.role === 'admin' || user?.role === 'finance';
-  const { data: employees = [] } = useEmployees();
+  const { data: empResult } = useEmployees();
+  const employees = empResult?.data ?? [];
   const [filterYear, setFilterYear] = useState<number | undefined>(new Date().getFullYear());
   const [filterEmp, setFilterEmp] = useState('');
   const { data: docs = [], isLoading } = useTaxDocuments({ taxYear: filterYear, employeeId: filterEmp || undefined });

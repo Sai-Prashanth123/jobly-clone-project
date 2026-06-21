@@ -72,7 +72,8 @@ function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string;
 export default function SkillsRegistry() {
   const [search, setSearch] = useState('');
   const [empSearch, setEmpSearch] = useState('');
-  const { data: employees = [] } = useEmployees();
+  const { data: empResult } = useEmployees();
+  const employees = empResult?.data ?? [];
   const { data: skillResults = [], isLoading: searching } = useSkillSearch(search);
 
   const activeEmp = employees.filter(e => e.status === 'active');
