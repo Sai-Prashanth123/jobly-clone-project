@@ -31,7 +31,7 @@ export function ExpiringDocuments() {
   const columns = [
     {
       key: 'employee',
-      label: 'Employee',
+      header: 'Employee',
       render: (r: ExpiringDocEntry) => (
         <div>
           <div className="font-medium text-sm">{r.firstName} {r.lastName}</div>
@@ -42,13 +42,13 @@ export function ExpiringDocuments() {
     },
     {
       key: 'documentType',
-      label: 'Document',
+      header: 'Document',
       render: (r: ExpiringDocEntry) => docTypeBadge(r.documentType),
       getValue: (r: ExpiringDocEntry) => r.documentType,
     },
     {
       key: 'expiryDate',
-      label: 'Expiry Date',
+      header: 'Expiry Date',
       render: (r: ExpiringDocEntry) => (
         <span className="text-sm">{new Date(r.expiryDate + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
       ),
@@ -56,9 +56,9 @@ export function ExpiringDocuments() {
     },
     {
       key: 'daysRemaining',
-      label: 'Time Remaining',
+      header: 'Time Remaining',
       render: (r: ExpiringDocEntry) => urgencyBadge(r.daysRemaining),
-      getValue: (r: ExpiringDocEntry) => r.daysRemaining,
+      getValue: (r: ExpiringDocEntry) => String(r.daysRemaining),
     },
   ];
 
@@ -67,7 +67,7 @@ export function ExpiringDocuments() {
       <PageHeader
         title="Expiring Documents"
         description={`Documents expiring within the next ${days} days.`}
-        actions={
+        action={
           <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
             <SelectTrigger className="w-36">
               <SelectValue />
@@ -90,9 +90,11 @@ export function ExpiringDocuments() {
         <DataTable
           columns={columns}
           data={docs}
-          loading={isLoading}
+          getRowKey={r => `${r.employeeId}-${r.documentType}`}
           onRowClick={r => navigate(`/portal/employees/${r.employeeId}`)}
-          emptyMessage="No expiring documents found."
+          emptyTitle="No expiring documents found"
+          searchPlaceholder="Search by name, document type…"
+          searchKeys={['firstName', 'lastName', 'documentType', 'displayId'] as (keyof ExpiringDocEntry)[]}
         />
       )}
     </div>

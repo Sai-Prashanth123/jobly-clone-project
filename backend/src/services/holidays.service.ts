@@ -4,7 +4,7 @@ import { logActivity } from '../lib/activityLogger';
 
 export async function listHolidays(year?: number) {
   let q = supabaseAdmin.from('company_holidays').select('*').order('date', { ascending: true });
-  if (year) q = q.like('date', `${year}-%`);
+  if (year) q = q.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`);
   const { data, error } = await q;
   if (error) throw error;
   return data ?? [];
