@@ -227,3 +227,11 @@ export async function exportEmployees(req: Request, res: Response, next: NextFun
     res.send(csv);
   } catch (err) { next(err); }
 }
+
+export async function expiringDocuments(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const days = parseInt(req.query.days as string ?? '90', 10);
+    const data = await svc.listExpiringDocuments(isNaN(days) ? 90 : days);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}

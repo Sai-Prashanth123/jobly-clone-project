@@ -13,8 +13,9 @@ router.use(authenticate);
 
 router.get('/', requireRole('admin','hr','operations','finance','employee'), validateQuery(listEmployeesQuerySchema), ctrl.list);
 router.post('/', requireRole('admin','hr'), validateBody(createEmployeeSchema), ctrl.create);
-router.get('/export',    requireRole('admin', 'hr', 'operations'), ctrl.exportEmployees);
-router.get('/directory', requireRole('admin','hr','operations','finance','employee'), ctrl.directory);
+router.get('/export',             requireRole('admin', 'hr', 'operations'), ctrl.exportEmployees);
+router.get('/directory',          requireRole('admin','hr','operations','finance','employee'), ctrl.directory);
+router.get('/expiring-documents', requireRole('admin','hr'), ctrl.expiringDocuments);
 router.get('/:id', requireRole('admin','hr','operations','finance','employee'), ctrl.getOne);
 // 'employee' is allowed so a user can edit their own profile; the controller
 // enforces that an employee may only update their OWN record (ownership check).

@@ -1353,3 +1353,62 @@ export async function exportEmployeesCSV(query: { status?: string; department?: 
   });
   return [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
 }
+
+// ── Expiring Documents ────────────────────────────────────────────────────────
+
+export interface ExpiringDoc {
+  employeeId: string;
+  displayId: string;
+  firstName: string;
+  lastName: string;
+  documentType: string;
+  expiryDate: string;
+  daysRemaining: number;
+}
+
+export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() + days);
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const today = new Date().toISOString().split('T')[0];
+
+  const { data, error } = await supabaseAdmin
+    .from('employees')
+    .select('id,display_id,first_name,last_name,visa_type,visa_expiry,identity_documents')
+    .is('deleted_at', null)
+    .neq('status', 'terminated');
+  if (error) throw error;
+
+  const results: ExpiringDoc[] = [];
+
+  for (const emp of data ?? []) {
+    // Check visa_expiry (work authorization) field
+    if (emp.visa_expiry && emp.visa_expiry >= today && emp.visa_expiry <= cutoffStr) {
+      const diff = Math.ceil((new Date(emp.visa_expiry).getTime() - new Date(today).getTime()) / 86400000);
+      results.push({
+        employeeId: emp.id, displayId: emp.display_id ?? '',
+        firstName: emp.first_name ?? '', lastName: emp.last_name ?? '',
+        documentType: 'Visa / Work Authorization',
+        expiryDate: emp.visa_expiry, daysRemaining: diff,
+      });
+    }
+
+    // Check identity_documents JSONB array entries that have an expiry
+    const docs = (emp.identity_documents ?? []) as Array<{ type?: string; expiry?: string; label?: string }>;
+    for (const doc of docs) {
+      const expiry = doc.expiry;
+      if (!expiry || expiry < today || expiry > cutoffStr) continue;
+      const diff = Math.ceil((new Date(expiry).getTime() - new Date(today).getTime()) / 86400000);
+      const label = doc.label ?? doc.type ?? 'Document';
+      results.push({
+        employeeId: emp.id, displayId: emp.display_id ?? '',
+        firstName: emp.first_name ?? '', lastName: emp.last_name ?? '',
+        documentType: label, expiryDate: expiry, daysRemaining: diff,
+      });
+    }
+  }
+
+  // Sort by soonest expiry first
+  results.sort((a, b) => a.daysRemaining - b.daysRemaining);
+  return results;
+}

@@ -50,3 +50,10 @@ export async function triggerInvoiceReadiness(req: Request, res: Response, next:
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
+
+export async function triggerDocumentExpiry(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await svc.triggerDocumentExpiryAlerts();
+    res.json({ success: true, data: result });
+  } catch (err) { next(err); }
+}

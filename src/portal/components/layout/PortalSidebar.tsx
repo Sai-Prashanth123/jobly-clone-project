@@ -14,15 +14,16 @@ import {
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
   Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search, UserPlus,
-  CalendarCheck, CalendarClock, CalendarDays, KeyRound, Package, FileCheck2, RotateCw, Mail,
-  Megaphone, Users2, Receipt, Package as PackageIcon,
-  Star, MessageSquare,
-  Shield, Gift, Zap, Calendar, AlertTriangle, DollarSign, TrendingUp,
+  CalendarCheck, CalendarClock, CalendarDays, KeyRound, Package, RotateCw, Mail,
+  Megaphone, Users2, Receipt,
+  Star,
+  Shield, Gift, Zap, Calendar, DollarSign, TrendingUp, FileWarning,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmployee } from '../../hooks/useEmployees';
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../../hooks/useNotifications';
+import { useNavBadges } from '../../hooks/useNavBadges';
 import { ChangePasswordDialog } from '../auth/ChangePasswordDialog';
 import type { UserRole } from '../../types';
 
@@ -31,54 +32,49 @@ interface NavItem {
   path: string;
   icon: React.ReactNode;
   roles: UserRole[];
+  badgeKey?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  // ── Core / original features ──────────────────────────────────────────────
-  { label: 'Dashboard',          path: '/portal/dashboard',          icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'Announcements',      path: '/portal/announcements',      icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'People',             path: '/portal/people',             icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'Employees',          path: '/portal/employees',          icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
-  { label: 'Add Employee',       path: '/portal/employees/new',      icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'] },
-  { label: 'Clients',            path: '/portal/clients',            icon: <Building2 className="h-4 w-4" />,       roles: ['admin','finance'] },
-  { label: 'Assignments',        path: '/portal/assignments',        icon: <ClipboardList className="h-4 w-4" />,   roles: ['admin','operations','employee'] },
-  { label: 'Timesheets',         path: '/portal/timesheets',         icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'My Attendance',      path: '/portal/attendance',         icon: <CalendarCheck className="h-4 w-4" />,   roles: ['employee','admin','hr'] },
-  { label: 'Leave Requests',     path: '/portal/leave-requests',     icon: <CalendarDays className="h-4 w-4" />,    roles: ['employee','admin','hr'] },
-  { label: 'Attendance Review',  path: '/portal/attendance/review',  icon: <CalendarClock className="h-4 w-4" />,   roles: ['admin','hr','operations'] },
-  { label: 'Expenses',           path: '/portal/expenses',           icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'Assets',             path: '/portal/assets',             icon: <PackageIcon className="h-4 w-4" />,     roles: ['admin','hr','operations'] },
-  { label: 'Reviews',            path: '/portal/reviews',            icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'] },
-  { label: 'My Review',          path: '/portal/my-review',          icon: <Star className="h-4 w-4" />,            roles: ['employee'] },
-  { label: 'Peer Feedback',      path: '/portal/peer-feedback',      icon: <MessageSquare className="h-4 w-4" />,   roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'Invoices',           path: '/portal/invoices',           icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
-  { label: 'Estimates',          path: '/portal/estimates',          icon: <FileCheck2 className="h-4 w-4" />,      roles: ['admin','finance'] },
-  { label: 'Recurring',          path: '/portal/recurring',          icon: <RotateCw className="h-4 w-4" />,        roles: ['admin','finance'] },
-  { label: 'Products',           path: '/portal/products',           icon: <Package className="h-4 w-4" />,         roles: ['admin','finance'] },
-  { label: 'Templates',          path: '/portal/templates',          icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'] },
-  { label: 'Documents',          path: '/portal/documents',          icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'] },
-  { label: 'Reports',            path: '/portal/reports',            icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','hr'] },
-  { label: 'Notifications',      path: '/portal/notifications',      icon: <Bell className="h-4 w-4" />,            roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'My Profile',         path: '/portal/profile',            icon: <UserCircle className="h-4 w-4" />,      roles: ['employee'] },
-  { label: 'Admin Settings',     path: '/portal/admin',              icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
-  // ── New features ──────────────────────────────────────────────────────────
-  { label: 'Milestones',         path: '/portal/milestones',         icon: <Gift className="h-4 w-4" />,            roles: ['admin','hr'] },
-  { label: 'Probation',          path: '/portal/probation',          icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr'] },
-  { label: 'Skills Registry',    path: '/portal/skills',             icon: <Zap className="h-4 w-4" />,             roles: ['admin','hr'] },
-  { label: 'Headcount',          path: '/portal/headcount',          icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','hr'] },
-  { label: 'Shifts',             path: '/portal/shifts',             icon: <Calendar className="h-4 w-4" />,        roles: ['admin','hr','operations'] },
-  { label: 'Workforce',          path: '/portal/workforce',          icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
-  { label: 'Capacity',           path: '/portal/capacity',           icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','hr','operations'] },
-  { label: 'Contractors',        path: '/portal/contractors',        icon: <AlertTriangle className="h-4 w-4" />,   roles: ['admin','hr','operations'] },
-  { label: 'Client SLA',         path: '/portal/client-sla',         icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','operations'] },
-  { label: 'Budgets',            path: '/portal/budgets',            icon: <DollarSign className="h-4 w-4" />,      roles: ['admin','finance'] },
-  { label: 'Tax Documents',      path: '/portal/tax-documents',      icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance','employee'] },
-  { label: 'Invoice Analytics',  path: '/portal/invoice-analytics',  icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','finance'] },
-  { label: 'Expense Analytics',  path: '/portal/expense-analytics',  icon: <Receipt className="h-4 w-4" />,         roles: ['admin','finance'] },
-  { label: 'Cash Flow',          path: '/portal/cash-flow',          icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','finance'] },
-  { label: 'Audit Log',          path: '/portal/audit-log',          icon: <Shield className="h-4 w-4" />,          roles: ['admin'] },
-  { label: 'Holidays',           path: '/portal/holidays',            icon: <CalendarDays className="h-4 w-4" />,     roles: ['admin','hr'] },
-  { label: 'System Settings',    path: '/portal/system-settings',     icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
+  // ── Core features ─────────────────────────────────────────────────────────
+  { label: 'Dashboard',           path: '/portal/dashboard',           icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'People',              path: '/portal/people',              icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'Employees',           path: '/portal/employees',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
+  { label: 'Add Employee',        path: '/portal/employees/new',       icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'] },
+  { label: 'Expiring Documents',  path: '/portal/expiring-documents',  icon: <FileWarning className="h-4 w-4" />,     roles: ['admin','hr'], badgeKey: 'expiringDocs' },
+  { label: 'Clients',             path: '/portal/clients',             icon: <Building2 className="h-4 w-4" />,       roles: ['admin','finance'] },
+  { label: 'Assignments',         path: '/portal/assignments',         icon: <ClipboardList className="h-4 w-4" />,   roles: ['admin','operations','employee'] },
+  { label: 'Timesheets',          path: '/portal/timesheets',          icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr','operations','finance','employee'], badgeKey: 'timesheets' },
+  { label: 'My Attendance',       path: '/portal/attendance',          icon: <CalendarCheck className="h-4 w-4" />,   roles: ['employee','admin','hr'] },
+  { label: 'Leave Requests',      path: '/portal/leave-requests',      icon: <CalendarDays className="h-4 w-4" />,    roles: ['employee','admin','hr'], badgeKey: 'leaveRequests' },
+  { label: 'Attendance Review',   path: '/portal/attendance/review',   icon: <CalendarClock className="h-4 w-4" />,   roles: ['admin','hr','operations'], badgeKey: 'attendanceReview' },
+  { label: 'Expenses',            path: '/portal/expenses',            icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'], badgeKey: 'expenses' },
+  { label: 'Reviews',             path: '/portal/reviews',             icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'] },
+  { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
+  { label: 'Recurring',           path: '/portal/recurring',           icon: <RotateCw className="h-4 w-4" />,        roles: ['admin','finance'] },
+  { label: 'Products',            path: '/portal/products',            icon: <Package className="h-4 w-4" />,         roles: ['admin','finance'] },
+  { label: 'Templates',           path: '/portal/templates',           icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'] },
+  { label: 'Documents',           path: '/portal/documents',           icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'] },
+  { label: 'Reports',             path: '/portal/reports',             icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','hr'] },
+  { label: 'Notifications',       path: '/portal/notifications',       icon: <Bell className="h-4 w-4" />,            roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'My Profile',          path: '/portal/profile',             icon: <UserCircle className="h-4 w-4" />,      roles: ['employee'] },
+  { label: 'Admin Settings',      path: '/portal/admin',               icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
+  // ── Analytics & extended features ─────────────────────────────────────────
+  { label: 'Milestones',          path: '/portal/milestones',          icon: <Gift className="h-4 w-4" />,            roles: ['admin','hr'] },
+  { label: 'Skills Registry',     path: '/portal/skills',              icon: <Zap className="h-4 w-4" />,             roles: ['admin','hr'] },
+  { label: 'Headcount',           path: '/portal/headcount',           icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','hr'] },
+  { label: 'Shifts',              path: '/portal/shifts',              icon: <Calendar className="h-4 w-4" />,        roles: ['admin','hr','operations'] },
+  { label: 'Workforce',           path: '/portal/workforce',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
+  { label: 'Client SLA',          path: '/portal/client-sla',          icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','operations'] },
+  { label: 'Budgets',             path: '/portal/budgets',             icon: <DollarSign className="h-4 w-4" />,      roles: ['admin','finance'] },
+  { label: 'Tax Documents',       path: '/portal/tax-documents',       icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance','employee'] },
+  { label: 'Invoice Analytics',   path: '/portal/invoice-analytics',   icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','finance'] },
+  { label: 'Expense Analytics',   path: '/portal/expense-analytics',   icon: <Receipt className="h-4 w-4" />,         roles: ['admin','finance'] },
+  { label: 'Cash Flow',           path: '/portal/cash-flow',           icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','finance'] },
+  { label: 'Audit Log',           path: '/portal/audit-log',           icon: <Shield className="h-4 w-4" />,          roles: ['admin'] },
+  { label: 'Holidays',            path: '/portal/holidays',            icon: <CalendarDays className="h-4 w-4" />,    roles: ['admin','hr'] },
+  { label: 'System Settings',     path: '/portal/system-settings',     icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
 ];
 
 const ROLE_GRADIENTS: Record<string, string> = {
@@ -125,6 +121,7 @@ export function PortalSidebar() {
   const selfPhotoUrl = selfEmployee?.profilePhotoUrl;
 
   const unreadCount = notifications.filter(n => !n.read).length;
+  const navBadges = useNavBadges(user?.role ?? '');
 
   const openNotif = () => {
     if (bellRef.current) {
@@ -318,6 +315,11 @@ export function PortalSidebar() {
                     {item.path === '/portal/notifications' && unreadCount > 0 && (
                       <span className="ml-auto h-5 min-w-[20px] px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
                         {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    )}
+                    {item.badgeKey && (navBadges[item.badgeKey] ?? 0) > 0 && (
+                      <span className="ml-auto h-5 min-w-[20px] px-1.5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                        {navBadges[item.badgeKey] > 99 ? '99+' : navBadges[item.badgeKey]}
                       </span>
                     )}
                   </Link>

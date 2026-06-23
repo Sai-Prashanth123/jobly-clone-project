@@ -16,5 +16,6 @@ router.patch('/read-all',                 ctrl.markAllRead);
 router.post('/trigger/timesheet-reminders', requireRole('admin'), ctrl.triggerTimesheetReminders);
 router.post('/trigger/contract-expiry',     requireRole('admin'), ctrl.triggerContractExpiry);
 router.post('/trigger/invoice-ready',       requireRole('admin'), ctrl.triggerInvoiceReadiness);
+router.post('/trigger/document-expiry',     requireRole('admin'), ctrl.triggerDocumentExpiry);
 
 export default router;

@@ -65,14 +65,12 @@ const LeaveRequests = lazy(() => import('./pages/LeaveRequests'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const People = lazy(() => import('./pages/People'));
 
-// Phase 2 — Expense Reports, Assets
+// Phase 2 — Expense Reports
 const Expenses = lazy(() => import('./pages/Expenses'));
-const Assets = lazy(() => import('./pages/Assets'));
 
 // Phase 3 — Performance Reviews
 const Reviews = lazy(() => import('./pages/Reviews'));
 const MyReview = lazy(() => import('./pages/MyReview'));
-const PeerFeedback = lazy(() => import('./pages/PeerFeedback'));
 
 // Phase 4 — Admin
 const AuditLog = lazy(() => import('./pages/AuditLog'));
@@ -81,15 +79,13 @@ const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 
 // Phase 4 — HR
 const Milestones = lazy(() => import('./pages/Milestones'));
-const ProbationTracker = lazy(() => import('./pages/ProbationTracker'));
 const SkillsRegistry = lazy(() => import('./pages/SkillsRegistry'));
 const HeadcountReport = lazy(() => import('./pages/HeadcountReport'));
+const ExpiringDocuments = lazy(() => import('./pages/ExpiringDocuments'));
 
 // Phase 4 — Operations
 const ShiftSchedule = lazy(() => import('./pages/ShiftSchedule'));
 const WorkforceAvailability = lazy(() => import('./pages/WorkforceAvailability'));
-const CapacityReport = lazy(() => import('./pages/CapacityReport'));
-const ContractorCompliance = lazy(() => import('./pages/ContractorCompliance'));
 const ClientSLA = lazy(() => import('./pages/ClientSLA'));
 
 // Phase 4 — Finance
@@ -233,14 +229,6 @@ export default function PortalApp() {
               }
             />
             <Route
-              path="estimates"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'finance']}>
-                  <Estimates />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="recurring"
               element={
                 <ProtectedRoute allowedRoles={['admin', 'finance']}>
@@ -252,7 +240,6 @@ export default function PortalApp() {
             {/* ── Full-page finance editors (replace popup dialogs) ── */}
             <Route path="products/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><ProductEditor /></ProtectedRoute>} />
             <Route path="products/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><ProductEditor /></ProtectedRoute>} />
-            <Route path="estimates/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><InvoiceEditor /></ProtectedRoute>} />
             <Route path="recurring/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecurringEditor /></ProtectedRoute>} />
             <Route path="recurring/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecurringEditor /></ProtectedRoute>} />
             <Route path="invoices/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><InvoiceEditor /></ProtectedRoute>} />
@@ -341,15 +328,6 @@ export default function PortalApp() {
               }
             />
             <Route path="my-review" element={<MyReview />} />
-            <Route path="peer-feedback" element={<PeerFeedback />} />
-            <Route
-              path="assets"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
-                  <Assets />
-                </ProtectedRoute>
-              }
-            />
 
             <Route
               path="leave-requests"
@@ -453,15 +431,13 @@ export default function PortalApp() {
 
             {/* Phase 4 — HR */}
             <Route path="milestones" element={<ProtectedRoute allowedRoles={['admin','hr']}><Milestones /></ProtectedRoute>} />
-            <Route path="probation" element={<ProtectedRoute allowedRoles={['admin','hr']}><ProbationTracker /></ProtectedRoute>} />
             <Route path="skills" element={<ProtectedRoute allowedRoles={['admin','hr']}><SkillsRegistry /></ProtectedRoute>} />
             <Route path="headcount" element={<ProtectedRoute allowedRoles={['admin','hr']}><HeadcountReport /></ProtectedRoute>} />
+            <Route path="expiring-documents" element={<ProtectedRoute allowedRoles={['admin','hr']}><ExpiringDocuments /></ProtectedRoute>} />
 
             {/* Phase 4 — Operations */}
             <Route path="shifts" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><ShiftSchedule /></ProtectedRoute>} />
             <Route path="workforce" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><WorkforceAvailability /></ProtectedRoute>} />
-            <Route path="capacity" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><CapacityReport /></ProtectedRoute>} />
-            <Route path="contractors" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><ContractorCompliance /></ProtectedRoute>} />
             <Route path="client-sla" element={<ProtectedRoute allowedRoles={['admin','operations']}><ClientSLA /></ProtectedRoute>} />
 
             {/* Phase 4 — Finance */}

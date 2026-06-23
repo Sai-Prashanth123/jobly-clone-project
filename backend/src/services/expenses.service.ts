@@ -112,10 +112,11 @@ export async function submitExpense(id: string, actorId: string, actorEmployeeId
 
   void logActivity(actorId, 'status_changed', 'expense_report', id, `Submitted expense: ${expense.title}`);
 
-  // Notify finance + admin
+  // Notify finance + admin + hr
   const adminFinanceIds = await getUserIdsByRole('finance');
   const adminIds = await getUserIdsByRole('admin');
-  const notifyIds = [...new Set([...adminFinanceIds, ...adminIds])];
+  const hrIds = await getUserIdsByRole('hr');
+  const notifyIds = [...new Set([...adminFinanceIds, ...adminIds, ...hrIds])];
   for (const uid of notifyIds) {
     void createNotification(uid, 'New Expense Submitted', `${expense.title} submitted for review`, 'info', 'expense_report', id);
   }

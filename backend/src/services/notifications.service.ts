@@ -335,3 +335,63 @@ export async function triggerInvoiceReadinessReminders(): Promise<{ sent: number
 
   return { sent };
 }
+
+/**
+ * Document expiry alerts — notifies employees whose visa, passport, OPT card,
+ * EAD, or I-983 expires within 90 days, plus HR/admin for their records.
+ */
+export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number }> {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90));
+  const cutoffStr = cutoff.toISOString().split('T')[0];
+
+  const { data: employees } = await supabaseAdmin
+    .from('employees')
+    .select('id, display_id, first_name, last_name, visa_expiry, identity_documents')
+    .is('deleted_at', null)
+    .neq('status', 'terminated');
+
+  if (!employees || employees.length === 0) return { sent: 0 };
+
+  const adminIds = await getUserIdsByRole('admin');
+  const hrIds = await getUserIdsByRole('hr');
+  const hrAdminRecipients = [...new Set([...adminIds, ...hrIds])];
+
+  let sent = 0;
+
+  for (const emp of employees) {
+    const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
+    const expiringDocs: { type: string; expiry: string; daysLeft: number }[] = [];
+
+    if (emp.visa_expiry && emp.visa_expiry >= todayStr && emp.visa_expiry <= cutoffStr) {
+      const daysLeft = Math.ceil((new Date(emp.visa_expiry + 'T00:00:00Z').getTime() - new Date(todayStr + 'T00:00:00Z').getTime()) / 86400000);
+      expiringDocs.push({ type: 'Visa / Work Authorization', expiry: emp.visa_expiry, daysLeft });
+    }
+
+    const docs = (emp.identity_documents ?? []) as Array<{ type?: string; label?: string; expiry?: string }>;
+    for (const doc of docs) {
+      if (!doc.expiry || doc.expiry < todayStr || doc.expiry > cutoffStr) continue;
+      const daysLeft = Math.ceil((new Date(doc.expiry + 'T00:00:00Z').getTime() - new Date(todayStr + 'T00:00:00Z').getTime()) / 86400000);
+      expiringDocs.push({ type: doc.label ?? doc.type ?? 'Document', expiry: doc.expiry, daysLeft });
+    }
+
+    if (expiringDocs.length === 0) continue;
+
+    for (const doc of expiringDocs) {
+      const urgency: 'error' | 'warning' | 'info' = doc.daysLeft <= 14 ? 'error' : doc.daysLeft <= 30 ? 'warning' : 'info';
+      const hrMsg = `${fullName} (${emp.display_id}): ${doc.type} expires in ${doc.daysLeft} day${doc.daysLeft === 1 ? '' : 's'} on ${doc.expiry}.`;
+      for (const uid of hrAdminRecipients) {
+        await createNotification(uid, 'Document Expiring Soon', hrMsg, urgency, 'employee', emp.id);
+        sent++;
+      }
+      const empPortalUserId = await getPortalUserByEmployeeId(emp.id);
+      if (empPortalUserId) {
+        await createNotification(empPortalUserId, 'Your Document Is Expiring', `Your ${doc.type} expires in ${doc.daysLeft} day${doc.daysLeft === 1 ? '' : 's'} on ${doc.expiry}. Please renew it and upload the updated copy.`, urgency, 'employee', emp.id);
+        sent++;
+      }
+    }
+  }
+
+  return { sent };
+}

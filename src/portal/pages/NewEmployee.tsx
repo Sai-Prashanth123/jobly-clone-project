@@ -145,6 +145,12 @@ const IDENTITY_DOC_ROWS: Array<{
     hint: 'Green Card — also I-9 List A.', hasExpiry: true },
   { type: 'ead',            label: 'Employment Authorization Document', placeholder: 'EAC1234567890',
     hint: 'I-766 / EAD for visa holders.', hasExpiry: true },
+  { type: 'opt_card',      label: 'OPT Card',                         placeholder: 'C12345678',
+    hint: 'EAD card issued during Optional Practical Training (OPT).', hasExpiry: true },
+  { type: 'stem_opt_card', label: 'STEM OPT Card',                    placeholder: 'C12345678',
+    hint: 'EAD card for STEM OPT 24-month extension.', hasExpiry: true },
+  { type: 'i983',          label: 'I-983 Training Plan',              placeholder: '',
+    hint: 'Required for STEM OPT — signed I-983 from employer and school.', hasExpiry: true },
 ];
 
 const SECTION_IDS = {
@@ -532,34 +538,39 @@ export default function NewEmployee() {
     const permFilled = form.permanentSameAsPresent
       ? presentFilled
       : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
+    // OPT/STEM OPT holders need I-983 + OPT card uploads
+    const isOptHolder = form.visaType === 'opt' || form.visaType === 'stem_opt';
+    const optDocs = isOptHolder
+      ? [
+          { id: 'doc_opt_card', label: 'OPT Card', section: SECTION_IDS.documents, done: uploadedDocTypes.has('OPT Card') },
+          { id: 'doc_i983',     label: 'I-983 Training Plan', section: SECTION_IDS.documents, done: uploadedDocTypes.has('I-983 Form') },
+        ]
+      : [];
     return [
-      // Personal
-      { id: 'photo',       label: 'Profile photo',                  section: SECTION_IDS.personal,      done: !!form.profilePhotoFile || !!form.profilePhotoPreview },
+      // Personal — photo is optional (not required by backend)
       { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
-      // Contact
+      // Contact — LinkedIn is optional, address is required
       { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
-      { id: 'linkedin',    label: 'LinkedIn URL',                   section: SECTION_IDS.contact,       done: !!form.linkedinUrl.trim() && /^https?:\/\/.+/i.test(form.linkedinUrl.trim()) },
       { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
       { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
       // Employment
       { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation },
-      // Immigration + SSN (I-9 status removed — HR sets that after reviewing the uploaded I-9 document)
+      // Immigration + SSN
       { id: 'immigration', label: 'Immigration & SSN',              section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn) },
       // Education
       { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
-      // Emergency
-      { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
-      // Documents
+      // Emergency — address not required by backend (name + relationship + phone only)
+      { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() },
+      // Required documents (matches backend ONBOARDING_REQUIRED_DOCS)
       ...ALL_REQUIRED_DOC_TYPES.map(t => ({
         id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
         label: t,
         section: SECTION_IDS.documents,
         done: uploadedDocTypes.has(t),
       })),
-      // Payroll
-      { id: 'bank',        label: 'Bank details (direct deposit)',  section: SECTION_IDS.payroll,       done: !!form.bankName.trim() && /^\d{9}$/.test(form.bankRoutingNumber) && !!form.bankAccountNumber.trim() },
-      // Declaration
-      { id: 'declaration', label: 'Declaration & signature',        section: SECTION_IDS.review,        done: !!form.declarationAccepted && !!form.signatureName.trim() },
+      // OPT/STEM OPT holders additionally need OPT Card + I-983
+      ...optDocs,
+      // Bank details and declaration are optional (HR collects separately if needed)
     ];
   }, [form, uploadedDocTypes]);
 

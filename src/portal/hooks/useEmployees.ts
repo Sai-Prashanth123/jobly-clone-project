@@ -454,3 +454,24 @@ export function useEmployeeDirectory(search?: string, department?: string) {
     staleTime: 2 * 60_000,
   });
 }
+
+export interface ExpiringDocEntry {
+  employeeId: string;
+  displayId: string;
+  firstName: string;
+  lastName: string;
+  documentType: string;
+  expiryDate: string;
+  daysRemaining: number;
+}
+
+export function useExpiringDocuments(days = 90) {
+  return useQuery<ExpiringDocEntry[]>({
+    queryKey: ['expiring-documents', days],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/employees/expiring-documents', { params: { days } });
+      return data.data as ExpiringDocEntry[];
+    },
+    staleTime: 5 * 60_000,
+  });
+}

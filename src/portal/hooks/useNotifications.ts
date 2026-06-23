@@ -105,3 +105,14 @@ export function useTriggerInvoiceReadiness() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
   });
 }
+
+export function useTriggerDocumentExpiry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post('/notifications/trigger/document-expiry');
+      return data.data as { sent: number };
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['notifications'] }),
+  });
+}

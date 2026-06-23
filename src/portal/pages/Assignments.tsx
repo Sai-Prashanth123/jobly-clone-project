@@ -2,13 +2,13 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { AssignmentForm } from '../components/assignments/AssignmentForm';
-import { useAssignments, useCreateAssignment } from '../hooks/useAssignments';
+import { useAssignments, useCreateAssignment, useUpdateAssignment } from '../hooks/useAssignments';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
 import type { Assignment } from '../types';
@@ -19,6 +19,8 @@ export default function Assignments() {
   const { data, isLoading } = useAssignments({ limit: 100 });
   const createAssignment = useCreateAssignment();
   const [showForm, setShowForm] = useState(false);
+  const [editTarget, setEditTarget] = useState<Assignment | null>(null);
+  const updateAssignment = useUpdateAssignment(editTarget?.id ?? '');
 
   const assignments = data?.data ?? [];
 
@@ -91,6 +93,20 @@ export default function Assignments() {
         }`}>{a.createdByName}</span>
       ) : <span className="text-xs text-muted-foreground">—</span>,
     },
+    ...(canCreate ? [{
+      key: 'actions' as const,
+      header: '',
+      render: (a: Assignment) => (
+        <Button
+          variant="ghost" size="icon"
+          onClick={e => { e.stopPropagation(); setEditTarget(a); }}
+          className="h-7 w-7 text-gray-400 hover:text-gray-700"
+          title="Edit assignment"
+        >
+          <Pencil className="h-3.5 w-3.5" />
+        </Button>
+      ),
+    }] : []),
   ];
 
   return (
@@ -144,6 +160,34 @@ export default function Assignments() {
                 }}
                 onCancel={() => setShowForm(false)}
                 isPending={createAssignment.isPending}
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {canCreate && editTarget && (
+        <Dialog open={!!editTarget} onOpenChange={open => { if (!open) setEditTarget(null); }}>
+          <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col">
+            <DialogHeader>
+              <DialogTitle>Edit Assignment {editTarget.displayId ?? ''}</DialogTitle>
+              <DialogDescription className="sr-only">Update assignment details.</DialogDescription>
+            </DialogHeader>
+            <div className="flex-1 overflow-y-auto px-1 pb-2">
+              <AssignmentForm
+                initial={editTarget}
+                isEdit
+                onSubmit={async data => {
+                  try {
+                    const asgn = await updateAssignment.mutateAsync(data as Partial<Assignment>);
+                    toast.success(`Assignment ${asgn.displayId ?? asgn.id} updated`);
+                    setEditTarget(null);
+                  } catch {
+                    /* handled centrally */
+                  }
+                }}
+                onCancel={() => setEditTarget(null)}
+                isPending={updateAssignment.isPending}
               />
             </div>
           </DialogContent>
