@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabaseAnon, supabaseAdmin } from '../config/supabase';
+import { supabaseAnon, supabaseAdmin, fetchPortalUser, fetchPortalUserByEmail, patchPortalUser } from '../config/supabase';
 import { UnauthorizedError } from '../lib/errors';
 import { resetUserPassword } from '../services/admin.service';
 import type { ChangePasswordInput, ForgotPasswordInput } from '../schemas/auth.schema';
@@ -66,14 +66,11 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       throw new UnauthorizedError(error?.message ?? 'Invalid credentials');
     }
 
-    // Fetch portal user profile
-    const { data: portalUser, error: profileError } = await supabaseAdmin
-      .from('portal_users')
-      .select('*')
-      .eq('id', data.user.id)
-      .single();
+    // Fetch portal user profile via direct REST (bypasses supabase-js client
+    // header issues that can silently drop the service-role Authorization header)
+    const portalUser = await fetchPortalUser(data.user.id);
 
-    if (profileError || !portalUser) {
+    if (!portalUser) {
       throw new UnauthorizedError('User profile not found. Contact your administrator.');
     }
 
@@ -164,10 +161,7 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
     if (updErr) throw updErr;
 
-    await supabaseAdmin
-      .from('portal_users')
-      .update({ must_reset_password: false, password_changed_at: new Date().toISOString() })
-      .eq('id', userId);
+    await patchPortalUser(userId, { must_reset_password: false, password_changed_at: new Date().toISOString() });
 
     res.json({ success: true });
   } catch (err) {
@@ -207,8 +201,7 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     const { email } = req.body as ForgotPasswordInput;
     const normalized = email.trim().toLowerCase();
 
-    const { data: pu } = await supabaseAdmin
-      .from('portal_users').select('id').eq('email', normalized).maybeSingle();
+    const pu = await fetchPortalUserByEmail(normalized);
     // Log the match result server-side (never to the client — the response stays
     // generic to avoid account enumeration). A "NO MATCH" here is the usual
     // reason a user reports "I requested a reset but got no email": the address

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabaseAdmin } from '../config/supabase';
+import { supabaseAdmin, fetchPortalUser } from '../config/supabase';
 import { UnauthorizedError } from '../lib/errors';
 
 export interface AuthUser {
@@ -34,14 +34,10 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
       throw new UnauthorizedError('Invalid or expired token');
     }
 
-    // Fetch portal user profile
-    const { data: portalUser, error: profileError } = await supabaseAdmin
-      .from('portal_users')
-      .select('*')
-      .eq('id', user.id)
-      .single();
+    // Fetch portal user profile via direct REST (same reason as auth.controller)
+    const portalUser = await fetchPortalUser(user.id);
 
-    if (profileError || !portalUser) {
+    if (!portalUser) {
       throw new UnauthorizedError('User profile not found');
     }
 
