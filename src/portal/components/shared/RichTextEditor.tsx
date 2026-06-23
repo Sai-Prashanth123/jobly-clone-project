@@ -24,7 +24,7 @@ interface RichTextEditorProps {
 export function RichTextEditor({ value, onChange, placeholder, variables, minHeight = 160 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
-      StarterKit.configure({ heading: { levels: [2, 3] } }),
+      StarterKit.configure({ heading: { levels: [2, 3] }, link: false, underline: false }),
       Underline,
       Link.configure({ openOnClick: false, autolink: true }),
       TextAlign.configure({ types: ['heading', 'paragraph'] }),

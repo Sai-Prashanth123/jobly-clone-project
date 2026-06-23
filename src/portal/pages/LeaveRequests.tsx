@@ -71,7 +71,10 @@ export default function LeaveRequests() {
       toast.success('Leave request submitted — HR has been notified.');
       setApplyOpen(false);
       setForm({ leaveType: 'vacation', startDate: today(), endDate: today(), reason: '' });
-    } catch { /* surfaced globally */ }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error;
+      toast.error(msg ?? 'Failed to submit leave request. Please try again.');
+    }
   };
 
   const approve = async (r: LeaveRequest) => {
