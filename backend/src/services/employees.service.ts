@@ -1376,7 +1376,7 @@ export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
     .from('employees')
     .select('id,display_id,first_name,last_name,visa_type,visa_expiry,identity_documents')
     .is('deleted_at', null)
-    .neq('status', 'terminated');
+    .in('status', ['active', 'inactive', 'onboarding']);
   if (error) throw error;
 
   const results: ExpiringDoc[] = [];

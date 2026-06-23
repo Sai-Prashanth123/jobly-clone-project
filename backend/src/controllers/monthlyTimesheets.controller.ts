@@ -134,6 +134,13 @@ export async function deleteClientProof(req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 }
 
+export async function patchHrNotes(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.patchHrNotes(req.params.id, req.body.hrNotes ?? null, req.user!.role);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function getPdf(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const row = await svc.getMonthlyTimesheet(req.params.id);

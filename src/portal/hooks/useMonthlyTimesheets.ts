@@ -47,6 +47,8 @@ function mapMonthlyTimesheet(raw: any): MonthlyTimesheet {
     leaveReason: raw.leave_reason ?? undefined,
     clientSignedUrl: raw.client_signed_url ?? undefined,
     clientSignedFilename: raw.client_signed_filename ?? undefined,
+    hrNotes: raw.hr_notes ?? undefined,
+    employeeEmail: raw.employees?.work_email ?? undefined,
   };
 }
 
@@ -191,6 +193,19 @@ export function usePatchMonthlyStatus(id: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['monthly-timesheets'] });
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets', id] });
+    },
+  });
+}
+
+export function usePatchHrNotes(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (hrNotes: string) => {
+      const { data } = await apiClient.patch(`/monthly-timesheets/${id}/hr-notes`, { hrNotes });
+      return mapMonthlyTimesheet(data.data);
+    },
+    onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['monthly-timesheets', id] });
     },
   });

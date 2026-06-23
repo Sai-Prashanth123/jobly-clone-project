@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Download, CheckCircle2, XCircle, FileText } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, CheckCircle2, XCircle, FileText, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { PageHeader } from '../components/shared/PageHeader';
 import { StatCard } from '../components/shared/StatCard';
 import { StatusBadge } from '../components/shared/StatusBadge';
-import { useMonthlyTimesheet, usePatchMonthlyStatus } from '../hooks/useMonthlyTimesheets';
+import { useMonthlyTimesheet, usePatchMonthlyStatus, usePatchHrNotes } from '../hooks/useMonthlyTimesheets';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { formatDate } from '../lib/utils';
@@ -29,10 +29,13 @@ export default function MonthlyTimesheetDetail() {
   const { user } = useAuth();
   const { data: sheet, isLoading } = useMonthlyTimesheet(id);
   const patchStatus = usePatchMonthlyStatus(id!);
+  const patchHrNotes = usePatchHrNotes(id!);
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [hrNotes, setHrNotes] = useState<string | undefined>(undefined);
+  const hrNotesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -72,6 +75,26 @@ export default function MonthlyTimesheetDetail() {
     }
   };
 
+  const isHrAdmin = user?.role === 'admin' || user?.role === 'hr';
+
+  const handleSaveHrNotes = async () => {
+    const notes = hrNotes ?? sheet?.hrNotes ?? '';
+    try {
+      await patchHrNotes.mutateAsync(notes);
+      toast.success('Notes saved.');
+    } catch {
+      /* handled centrally */
+    }
+  };
+
+  const handleNoteChange = (val: string) => {
+    setHrNotes(val);
+    if (hrNotesSaveTimer.current) clearTimeout(hrNotesSaveTimer.current);
+    hrNotesSaveTimer.current = setTimeout(() => {
+      patchHrNotes.mutate(val);
+    }, 1500);
+  };
+
   const handleDownload = async () => {
     setDownloading(true);
     const win = window.open('about:blank', '_blank');
@@ -100,6 +123,16 @@ export default function MonthlyTimesheetDetail() {
         action={
           <div className="flex items-center gap-2">
             <StatusBadge status={sheet.status} />
+            {isHrAdmin && sheet.employeeEmail && (
+              <a
+                href={`mailto:${sheet.employeeEmail}?subject=Regarding your ${monthLabel(sheet.year, sheet.month)} timesheet&body=Hi ${sheet.employeeName ?? 'there'},%0A%0A`}
+                className="inline-flex"
+              >
+                <Button variant="outline" size="sm" className="gap-1.5">
+                  <Mail className="h-4 w-4" /> Contact
+                </Button>
+              </a>
+            )}
             <Button variant="outline" size="sm" onClick={handleDownload} loading={downloading} loadingText="Preparing…" className="gap-1.5">
               <Download className="h-4 w-4" /> PDF
             </Button>
@@ -199,6 +232,29 @@ export default function MonthlyTimesheetDetail() {
         <Card>
           <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
           <CardContent><p className="text-sm text-gray-700 whitespace-pre-wrap">{sheet.notes}</p></CardContent>
+        </Card>
+      )}
+
+      {isHrAdmin && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">HR Notes</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <textarea
+              value={hrNotes ?? sheet.hrNotes ?? ''}
+              onChange={e => handleNoteChange(e.target.value)}
+              rows={3}
+              placeholder="Internal notes visible to HR and admin only…"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#4069FF]"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Auto-saves after 1.5 s of inactivity</span>
+              <Button size="sm" variant="outline" onClick={handleSaveHrNotes} loading={patchHrNotes.isPending} loadingText="Saving…">
+                Save Notes
+              </Button>
+            </div>
+          </CardContent>
         </Card>
       )}
 

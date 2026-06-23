@@ -29,6 +29,9 @@ router.patch('/:id/submit', requireRole('admin', 'hr', 'employee'), ctrl.submit)
 // review; the service verifies the caller is the manager OR role ∈ {hr, admin}.
 router.patch('/:id/status', requireRole('admin', 'hr', 'employee'), validateBody(patchMonthlyStatusSchema), ctrl.patchStatus);
 
+// HR notes (admin/hr only — employee never sees nor edits these).
+router.patch('/:id/hr-notes', requireRole('admin', 'hr'), ctrl.patchHrNotes);
+
 // Client-signed timesheet proof — required at submit-time when total_hours > 0.
 // Employee can only upload to their own timesheet (controller enforces).
 router.post('/:id/client-proof', requireRole('admin', 'hr', 'employee'), documentUpload.single('file'), ctrl.uploadClientProof);

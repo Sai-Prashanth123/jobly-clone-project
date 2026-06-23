@@ -98,6 +98,10 @@ export interface MonthlyTimesheet {
   // Client-signed proof attachment (required at submit-time when total_hours > 0).
   clientSignedUrl?: string;
   clientSignedFilename?: string;
+  // HR-only internal notes on this timesheet.
+  hrNotes?: string;
+  // Employee contact email (joined from employees table, admin/hr view only).
+  employeeEmail?: string;
 }
 
 export interface PortalUser {

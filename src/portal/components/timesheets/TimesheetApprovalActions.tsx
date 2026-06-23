@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CheckCircle, XCircle, Send } from 'lucide-react';
 import type { Timesheet } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+
+const todayStr = () => new Date().toISOString().split('T')[0];
 
 interface TimesheetApprovalActionsProps {
   timesheet: Timesheet;
@@ -20,6 +23,9 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
   const [rejectReason, setRejectReason] = useState('');
   const [approveOpen, setApproveOpen] = useState(false);
   const [clientApproveOpen, setClientApproveOpen] = useState(false);
+  const [clientRepName, setClientRepName] = useState('');
+  const [clientApprovalDate, setClientApprovalDate] = useState(todayStr());
+  const [clientNotes, setClientNotes] = useState('');
 
   if (!user) return null;
 
@@ -113,22 +119,61 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
     return (
       <>
         <Button className="gap-2" loading={isLoading} loadingText="Approving…"
-          onClick={() => setClientApproveOpen(true)}>
+          onClick={() => { setClientApprovalDate(todayStr()); setClientApproveOpen(true); }}>
           <CheckCircle className="h-4 w-4" />
           Client Approve
         </Button>
-        <AlertDialog open={clientApproveOpen} onOpenChange={setClientApproveOpen}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>Client-Approve Timesheet?</AlertDialogTitle>
-              <AlertDialogDescription>This will mark the timesheet as client-approved and make it available for invoicing.</AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>Cancel</AlertDialogCancel>
-              <AlertDialogAction onClick={() => { setClientApproveOpen(false); onStatusChange('client_approved'); }}>Confirm</AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
+        <Dialog open={clientApproveOpen} onOpenChange={setClientApproveOpen}>
+          <DialogContent className="w-[95vw] max-w-md">
+            <DialogHeader>
+              <DialogTitle>Client Approval</DialogTitle>
+              <DialogDescription>Record the client's sign-off on this timesheet before marking it as client-approved.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-1">
+              <div className="space-y-1">
+                <Label>Client representative name <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Input
+                  placeholder="e.g. Jane Smith"
+                  value={clientRepName}
+                  onChange={e => setClientRepName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Approval date</Label>
+                <Input
+                  type="date"
+                  value={clientApprovalDate}
+                  onChange={e => setClientApprovalDate(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <Textarea
+                  placeholder="Any additional notes from the client…"
+                  value={clientNotes}
+                  onChange={e => setClientNotes(e.target.value)}
+                  rows={2}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setClientApproveOpen(false)} disabled={isLoading}>Cancel</Button>
+              <Button
+                loading={isLoading}
+                loadingText="Approving…"
+                onClick={() => {
+                  setClientApproveOpen(false);
+                  onStatusChange('client_approved');
+                  setClientRepName('');
+                  setClientNotes('');
+                }}
+              >
+                <CheckCircle className="h-4 w-4 mr-1.5" />
+                Confirm Client Approval
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </>
     );
   }

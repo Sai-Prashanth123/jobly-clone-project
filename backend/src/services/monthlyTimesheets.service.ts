@@ -64,7 +64,7 @@ async function resolveHrEmails(): Promise<string[]> {
 
 // ── Reads ───────────────────────────────────────────────────────────────────
 
-const EMP_JOIN = '*, employees(first_name, last_name, display_id, department)';
+const EMP_JOIN = '*, employees(first_name, last_name, display_id, department, work_email)';
 
 /** True when `managerEmployeeId` is the reporting manager of `employeeId`. */
 export async function isReportingManagerOf(managerEmployeeId: string | null | undefined, employeeId: string): Promise<boolean> {
@@ -530,6 +530,18 @@ export async function uploadMonthlyClientProof(
 
   logActivity(actorId ?? null, 'uploaded_client_proof', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
   return updated;
+}
+
+export async function patchHrNotes(id: string, hrNotes: string | null, actorRole: string) {
+  if (actorRole !== 'admin' && actorRole !== 'hr') {
+    throw new ForbiddenError('Only admin or HR can update notes.');
+  }
+  const { data, error } = await supabaseAdmin
+    .from('monthly_timesheets')
+    .update({ hr_notes: hrNotes ?? null })
+    .eq('id', id).select(EMP_JOIN).single();
+  if (error || !data) throw new NotFoundError('Monthly timesheet not found');
+  return data;
 }
 
 export async function deleteMonthlyClientProof(
