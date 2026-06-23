@@ -40,7 +40,7 @@ export default function WorkforceAvailability() {
             <thead>
               <tr className="bg-gray-50 border-b">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 w-44">Employee</th>
-                {weekDays.map((d, i) => <th key={d} className="px-2 py-3 text-center text-xs font-semibold text-gray-500 min-w-[70px]"><div>{WEEK_DAYS[i]}</div><div className="text-gray-400 font-normal">{format(addDays(weekStart, i), 'MMM d')}</div></th>)}
+                {weekDays.map((d, i) => <th key={d} className={`px-2 py-3 text-center text-xs font-semibold text-gray-500 min-w-[70px] ${i >= 5 ? 'bg-gray-100' : ''}`}><div>{WEEK_DAYS[i]}</div><div className="text-gray-400 font-normal">{format(addDays(weekStart, i), 'MMM d')}</div></th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -50,9 +50,9 @@ export default function WorkforceAvailability() {
                     <p className="font-medium text-gray-900 text-xs">{emp.first_name} {emp.last_name}</p>
                     <p className="text-xs text-gray-400">{emp.department}</p>
                   </td>
-                  {weekDays.map(d => {
+                  {weekDays.map((d, i) => {
                     const onLeave = isOnLeave(emp, d);
-                    return <td key={d} className="px-2 py-2 text-center"><div className={`w-6 h-6 mx-auto rounded-full ${onLeave ? 'bg-red-400' : 'bg-green-400'}`} title={onLeave ? 'On leave' : 'Available'} /></td>;
+                    return <td key={d} className={`px-2 py-2 text-center ${i >= 5 ? 'bg-gray-50' : ''}`}><div className={`w-6 h-6 mx-auto rounded-full ${onLeave ? 'bg-red-400' : 'bg-green-400'}`} title={onLeave ? 'On leave' : 'Available'} /></td>;
                   })}
                 </tr>
               ))}
