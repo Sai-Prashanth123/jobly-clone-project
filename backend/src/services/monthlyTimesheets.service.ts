@@ -145,7 +145,13 @@ export async function upsertMonthlyTimesheet(
     }
   }
 
-  const summary = computeSummary(input.entries as MonthlyEntry[]);
+  const entries = input.entries as MonthlyEntry[];
+  const overLimit = entries.find(e => e.status === 'present' && Number(e.hours) > 24);
+  if (overLimit) {
+    throw new ValidationError(`Hours cannot exceed 24 per day (entry ${overLimit.date} has ${overLimit.hours} hours).`);
+  }
+
+  const summary = computeSummary(entries);
 
   const { data: existing } = await supabaseAdmin
     .from('monthly_timesheets').select('id, status, display_id')

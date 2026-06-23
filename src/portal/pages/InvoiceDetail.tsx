@@ -62,6 +62,11 @@ export default function InvoiceDetail() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
+      {client?.status === 'inactive' && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2.5 text-sm text-amber-800 portal-no-print">
+          <strong>Warning:</strong> This client is archived. Sending or editing this invoice may fail.
+        </div>
+      )}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 portal-no-print">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/invoices')} className="gap-1 flex-shrink-0">

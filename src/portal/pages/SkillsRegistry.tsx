@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Zap, Search, Plus, Trash2, Loader2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -71,10 +71,17 @@ function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string;
 
 export default function SkillsRegistry() {
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [empSearch, setEmpSearch] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
   const { data: empResult } = useEmployees();
   const employees = empResult?.data ?? [];
-  const { data: skillResults = [], isLoading: searching } = useSkillSearch(search);
+  const { data: skillResults = [], isLoading: searching } = useSkillSearch(debouncedSearch);
 
   const activeEmp = employees.filter(e => e.status === 'active');
   const filtered = empSearch ? activeEmp.filter(e => `${e.firstName} ${e.lastName}`.toLowerCase().includes(empSearch.toLowerCase())) : activeEmp.slice(0, 10);
@@ -91,10 +98,10 @@ export default function SkillsRegistry() {
         <h2 className="text-sm font-semibold text-gray-700">Search by Skill</h2>
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-          <Input className="pl-9" placeholder="e.g. Python, React, Excel…" value={search} onChange={e => setSearch(e.target.value)} />
+          <Input className="pl-9" placeholder="Type 2+ chars to search… (e.g. Python, React)" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         {searching && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-        {search.length >= 2 && !searching && (
+        {debouncedSearch.length >= 2 && !searching && (
           <div className="space-y-1.5">
             {skillResults.length === 0 ? <p className="text-sm text-gray-400">No results</p> : skillResults.map(s => (
               <div key={s.id} className="flex items-center gap-3 p-2 rounded-lg bg-gray-50 border border-gray-100">

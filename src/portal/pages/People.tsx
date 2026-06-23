@@ -1,15 +1,10 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Search, Mail, Phone, MapPin, Users2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHeader } from '../components/shared/PageHeader';
 import { useEmployeeDirectory } from '../hooks/useEmployees';
 import type { DirectoryEmployee } from '../types';
-
-const DEPARTMENTS = [
-  'Engineering', 'Product', 'Design', 'Sales', 'Marketing',
-  'Finance', 'HR', 'Operations', 'Legal', 'Customer Success',
-];
 
 function Avatar({ emp }: { emp: DirectoryEmployee }) {
   if (emp.avatarUrl) {
@@ -39,6 +34,12 @@ function Avatar({ emp }: { emp: DirectoryEmployee }) {
 export default function People() {
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState<string>('all');
+
+  const { data: allEmployees = [] } = useEmployeeDirectory();
+  const departments = useMemo(
+    () => [...new Set(allEmployees.map(e => e.department).filter(Boolean) as string[])].sort(),
+    [allEmployees],
+  );
 
   const { data: employees = [], isLoading } = useEmployeeDirectory(
     search || undefined,
@@ -70,7 +71,7 @@ export default function People() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All departments</SelectItem>
-            {DEPARTMENTS.map(d => (
+            {departments.map(d => (
               <SelectItem key={d} value={d}>{d}</SelectItem>
             ))}
           </SelectContent>

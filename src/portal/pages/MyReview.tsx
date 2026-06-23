@@ -13,7 +13,7 @@ import {
   useSubmitSelfAssessment, useNominatePeers,
   STATUS_LABELS, type ReviewCycle,
 } from '../hooks/useReviews';
-import { useEmployees } from '../hooks/useEmployees';
+import { useEmployeeDirectory } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 
 function StarDisplay({ value, label }: { value: number | null | undefined; label: string }) {
@@ -109,8 +109,7 @@ function CycleCard({
 export default function MyReview() {
   const { user } = useAuth();
   const { data: cycles = [], isLoading } = useReviewCycles();
-  const { data: empResult } = useEmployees();
-  const employees = empResult?.data ?? [];
+  const { data: employees = [] } = useEmployeeDirectory();
   const submitSelf = useSubmitSelfAssessment();
   const nominatePeers = useNominatePeers();
 
@@ -165,7 +164,7 @@ export default function MyReview() {
     setPeerIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
   };
 
-  const activeEmployees = employees.filter(e => e.status === 'active' && e.id !== user?.employeeId);
+  const activeEmployees = employees.filter(e => e.id !== user?.employeeId && e.id !== myReview?.managerId);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">

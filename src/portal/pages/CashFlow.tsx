@@ -35,7 +35,7 @@ export default function CashFlow() {
               </div>
             </div>
           ))}
-          {forecast.length === 0 && <div className="text-center py-16 text-gray-400"><TrendingUp className="h-10 w-10 mx-auto mb-2 opacity-30" /><p>No recurring contracts found</p></div>}
+          {forecast.length === 0 && <div className="text-center py-16 text-gray-400"><TrendingUp className="h-10 w-10 mx-auto mb-2 opacity-30" /><p>No recurring invoice templates found</p></div>}
           <p className="text-xs text-gray-400 text-center">Based on active recurring invoice templates only</p>
         </div>
       )}

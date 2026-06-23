@@ -24,14 +24,18 @@ export default function ExpenseAnalytics() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {byCategory.length === 0 && (
+        <div className="text-center py-10 text-gray-400"><Receipt className="h-8 w-8 mx-auto mb-2 opacity-30" /><p className="text-sm">No approved expenses yet</p></div>
+      )}
+
+      {byCategory.length > 0 && <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* By Category */}
         <div className="bg-white rounded-xl border border-gray-200 p-4">
           <h2 className="text-sm font-semibold text-gray-700 mb-3">By Category</h2>
           <div className="space-y-2">
             {byCategory.map(([cat, amt], i) => (
               <div key={cat} className="flex items-center gap-2">
-                <span className="text-xs text-gray-600 w-28 capitalize truncate">{cat.replace(/_/g,' ')}</span>
+                <span className="text-xs text-gray-600 w-28 truncate">{cat.replace(/_/g,' ').replace(/\b\w/g, c => c.toUpperCase())}</span>
                 <div className="flex-1 h-4 bg-gray-100 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full ${CAT_COLORS[i % CAT_COLORS.length]}`} style={{ width: `${total > 0 ? Math.round((amt / total) * 100) : 0}%` }} />
                 </div>
@@ -54,7 +58,7 @@ export default function ExpenseAnalytics() {
             ))}
           </div>
         </div>
-      </div>
+      </div>}
     </div>
   );
 }

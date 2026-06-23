@@ -178,7 +178,7 @@ export default function PeerFeedback() {
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setActiveRequest(null)}>Cancel</Button>
-            <Button onClick={handleSubmit} disabled={saving || (!form.rating && !form.strengths && !form.improvements)}>
+            <Button onClick={handleSubmit} disabled={saving || !(form.strengths?.trim() || form.improvements?.trim())}>
               {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Feedback'}
             </Button>
           </DialogFooter>

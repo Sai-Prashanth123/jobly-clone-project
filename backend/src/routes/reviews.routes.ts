@@ -14,6 +14,10 @@ router.use(authenticate);
 const HR_ADMIN = requireRole('admin', 'hr');
 const ALL      = requireRole('admin', 'hr', 'operations', 'finance', 'employee');
 
+// ── Peer feedback (must be before /:id to avoid Express matching 'peer-requests' as an id) ──
+router.get ('/peer-requests/mine',        ALL,      ctrl.getMyPeerRequests);
+router.post('/peer-requests/:requestId',  ALL,      validate(submitPeerFeedbackSchema), ctrl.submitPeerFeedback);
+
 // ── Cycles ────────────────────────────────────────────────────────────────────
 router.get ('/',                           ALL,      ctrl.listCycles);
 router.post('/',                           HR_ADMIN, validate(createCycleSchema),  ctrl.createCycle);
@@ -39,7 +43,5 @@ router.post('/:id/manager-review',        HR_ADMIN, validate(managerReviewSchema
 
 // ── Peer feedback ─────────────────────────────────────────────────────────────
 router.post('/:id/nominate-peers',        ALL,      validate(nominatePeersSchema), ctrl.nominatePeers);
-router.get ('/peer-requests/mine',        ALL,      ctrl.getMyPeerRequests);
-router.post('/peer-requests/:requestId',  ALL,      validate(submitPeerFeedbackSchema), ctrl.submitPeerFeedback);
 
 export default router;

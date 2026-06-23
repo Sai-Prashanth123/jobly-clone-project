@@ -77,6 +77,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Expense Analytics',  path: '/portal/expense-analytics',  icon: <Receipt className="h-4 w-4" />,         roles: ['admin','finance'] },
   { label: 'Cash Flow',          path: '/portal/cash-flow',          icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','finance'] },
   { label: 'Audit Log',          path: '/portal/audit-log',          icon: <Shield className="h-4 w-4" />,          roles: ['admin'] },
+  { label: 'Holidays',           path: '/portal/holidays',            icon: <CalendarDays className="h-4 w-4" />,     roles: ['admin','hr'] },
+  { label: 'System Settings',    path: '/portal/system-settings',     icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
 ];
 
 const ROLE_GRADIENTS: Record<string, string> = {

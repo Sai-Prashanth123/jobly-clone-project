@@ -125,7 +125,14 @@ export default function LeaveRequests() {
     },
     {
       key: 'status', header: 'Status',
-      render: r => <LeaveStatusBadge status={r.status} />,
+      render: r => (
+        <div>
+          <LeaveStatusBadge status={r.status} />
+          {r.status === 'rejected' && r.rejectionReason && (
+            <p className="text-xs text-red-600 mt-0.5 truncate max-w-[160px]" title={r.rejectionReason}>{r.rejectionReason}</p>
+          )}
+        </div>
+      ),
       getValue: r => r.status,
     },
     {

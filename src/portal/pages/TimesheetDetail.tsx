@@ -146,7 +146,7 @@ export default function TimesheetDetail() {
     );
   }
 
-  const billableAmount = timesheet.totalHours * (assignment?.billRate ?? 0);
+  const billableAmount = (canEdit ? liveTotalHours : timesheet.totalHours) * (assignment?.billRate ?? 0);
 
   const handleStatusChange = async (status: string, rejectionReason?: string) => {
     // Submit-time requirements, checked up front so the error is obvious

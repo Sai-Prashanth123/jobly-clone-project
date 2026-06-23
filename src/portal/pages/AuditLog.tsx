@@ -12,11 +12,11 @@ const ACTION_COLORS: Record<string, string> = { created:'bg-green-100 text-green
 export default function AuditLog() {
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
-  const [action, setAction] = useState('');
+  const [action, setAction] = useState('_all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const { data, isLoading } = useAuditLog({ page, limit: 50, search: search || undefined, action: action || undefined, startDate: startDate || undefined, endDate: endDate || undefined });
+  const { data, isLoading } = useAuditLog({ page, limit: 50, search: search || undefined, action: (action && action !== '_all') ? action : undefined, startDate: startDate || undefined, endDate: endDate || undefined });
   const logs = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / 50);
@@ -37,7 +37,7 @@ export default function AuditLog() {
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
           <Input className="pl-9" placeholder="Search entity label…" value={search} onChange={e => { setSearch(e.target.value); setPage(1); }} />
         </div>
-        <Select value={action} onValueChange={v => { setAction(v === '_all' ? '' : v); setPage(1); }}>
+        <Select value={action} onValueChange={v => { setAction(v); setPage(1); }}>
           <SelectTrigger className="w-44"><SelectValue placeholder="All actions" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="_all">All actions</SelectItem>

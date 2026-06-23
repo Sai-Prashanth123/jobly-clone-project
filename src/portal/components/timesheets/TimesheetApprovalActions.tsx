@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CheckCircle, XCircle, Send } from 'lucide-react';
 import type { Timesheet } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
@@ -17,6 +18,8 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
   const { user } = useAuth();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
+  const [approveOpen, setApproveOpen] = useState(false);
+  const [clientApproveOpen, setClientApproveOpen] = useState(false);
 
   if (!user) return null;
 
@@ -51,11 +54,24 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
             Reject
           </Button>
           <Button className="gap-2" loading={isLoading} loadingText="Approving…"
-            onClick={() => onStatusChange('manager_approved')}>
+            onClick={() => setApproveOpen(true)}>
             <CheckCircle className="h-4 w-4" />
             Approve
           </Button>
         </div>
+
+        <AlertDialog open={approveOpen} onOpenChange={setApproveOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Approve Timesheet?</AlertDialogTitle>
+              <AlertDialogDescription>This will mark the timesheet as manager-approved and send it for client approval.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setApproveOpen(false); onStatusChange('manager_approved'); }}>Approve</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
           <DialogContent className="w-[95vw] max-w-lg">
@@ -95,11 +111,25 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
 
   if ((role === 'finance' || role === 'admin') && status === 'manager_approved') {
     return (
-      <Button className="gap-2" loading={isLoading} loadingText="Approving…"
-        onClick={() => onStatusChange('client_approved')}>
-        <CheckCircle className="h-4 w-4" />
-        Client Approve
-      </Button>
+      <>
+        <Button className="gap-2" loading={isLoading} loadingText="Approving…"
+          onClick={() => setClientApproveOpen(true)}>
+          <CheckCircle className="h-4 w-4" />
+          Client Approve
+        </Button>
+        <AlertDialog open={clientApproveOpen} onOpenChange={setClientApproveOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Client-Approve Timesheet?</AlertDialogTitle>
+              <AlertDialogDescription>This will mark the timesheet as client-approved and make it available for invoicing.</AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => { setClientApproveOpen(false); onStatusChange('client_approved'); }}>Confirm</AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 

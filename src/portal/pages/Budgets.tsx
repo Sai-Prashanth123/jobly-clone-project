@@ -15,12 +15,13 @@ const TYPE_COLORS: Record<BudgetType, string> = { headcount:'bg-blue-100 text-bl
 const DEPTS = ['Engineering','Product','Design','Sales','Marketing','HR','Finance','Operations','Legal','Customer Success','Other'];
 
 export default function Budgets() {
-  const year = new Date().getFullYear();
-  const { data: budgets = [], isLoading } = useBudgets(year);
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
+  const { data: budgets = [], isLoading } = useBudgets(selectedYear);
   const upsert = useUpsertBudget();
   const del = useDeleteBudget();
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState<Omit<Budget,'id'>>({ department: '', fiscalYear: year, budgetType: 'opex', budgetAmount: 0, notes: '' });
+  const [form, setForm] = useState<Omit<Budget,'id'>>({ department: '', fiscalYear: selectedYear, budgetType: 'opex', budgetAmount: 0, notes: '' });
   const [deleteTarget, setDeleteTarget] = useState<Budget | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -37,12 +38,20 @@ export default function Budgets() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><DollarSign className="h-6 w-6 text-green-600" /> Budget Tracker</h1><p className="text-sm text-gray-500">FY {year} department budgets</p></div>
-        <Button size="sm" onClick={() => { setForm({ department: '', fiscalYear: year, budgetType: 'opex', budgetAmount: 0, notes: '' }); setError(''); setOpen(true); }} className="gap-1"><Plus className="h-4 w-4" /> Add Budget</Button>
+        <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><DollarSign className="h-6 w-6 text-green-600" /> Budget Tracker</h1><p className="text-sm text-gray-500">FY {selectedYear} department budgets</p></div>
+        <div className="flex items-center gap-2">
+          <Select value={String(selectedYear)} onValueChange={v => setSelectedYear(Number(v))}>
+            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {[currentYear - 1, currentYear, currentYear + 1].map(y => <SelectItem key={y} value={String(y)}>FY {y}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          <Button size="sm" onClick={() => { setForm({ department: '', fiscalYear: selectedYear, budgetType: 'opex', budgetAmount: 0, notes: '' }); setError(''); setOpen(true); }} className="gap-1"><Plus className="h-4 w-4" /> Add Budget</Button>
+        </div>
       </div>
 
       {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : Object.keys(grouped).length === 0 ? (
-        <div className="text-center py-16 text-gray-400"><DollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" /><p>No budgets set for FY {year}</p></div>
+        <div className="text-center py-16 text-gray-400"><DollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" /><p>No budgets set for FY {selectedYear}</p></div>
       ) : (
         <div className="space-y-4">
           {Object.entries(grouped).sort().map(([dept, deptBudgets]) => (

@@ -55,6 +55,7 @@ export default function Assets() {
   const [assignOpen, setAssignOpen] = useState<Asset | null>(null);
   const [assignEmployeeId, setAssignEmployeeId] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
+  const [unassignTarget, setUnassignTarget] = useState<Asset | null>(null);
 
   const { data, isLoading } = useAssets({ status: statusFilter === 'all' ? undefined : statusFilter, category: categoryFilter === 'all' ? undefined : categoryFilter, limit: 50 });
   const assets = data?.data ?? [];
@@ -228,12 +229,7 @@ export default function Assets() {
                         variant="outline"
                         className="text-xs flex-1 text-amber-600 border-amber-200 hover:bg-amber-50"
                         loading={unassignMut.isPending}
-                        onClick={async () => {
-                          try {
-                            await unassignMut.mutateAsync(asset.id);
-                            toast.success('Asset unassigned');
-                          } catch { /* centrally handled */ }
-                        }}
+                        onClick={() => setUnassignTarget(asset)}
                       >
                         Unassign
                       </Button>
@@ -385,6 +381,24 @@ export default function Assets() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Unassign confirm */}
+      <ConfirmDialog
+        open={!!unassignTarget}
+        onOpenChange={open => { if (!open) setUnassignTarget(null); }}
+        title="Unassign asset?"
+        description={`Remove assignment of "${unassignTarget?.name}"? The asset will return to Available status.`}
+        confirmLabel="Unassign"
+        loading={unassignMut.isPending}
+        onConfirm={async () => {
+          if (!unassignTarget) return;
+          try {
+            await unassignMut.mutateAsync(unassignTarget.id);
+            toast.success('Asset unassigned');
+            setUnassignTarget(null);
+          } catch { /* centrally handled */ }
+        }}
+      />
 
       {/* Delete confirm */}
       <ConfirmDialog

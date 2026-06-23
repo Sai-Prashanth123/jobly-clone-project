@@ -139,6 +139,17 @@ export async function deleteClient(id: string) {
   const existing = await getClient(id);
   if (!existing) throw new NotFoundError('Client not found');
 
+  const [{ count: invCount }, { count: asnCount }] = await Promise.all([
+    supabaseAdmin.from('invoices').select('*', { count: 'exact', head: true }).eq('client_id', id).neq('status', 'draft'),
+    supabaseAdmin.from('assignments').select('*', { count: 'exact', head: true }).eq('client_id', id).in('status', ['active', 'pending']),
+  ]);
+  if ((invCount ?? 0) > 0) {
+    throw new ConflictError(`Cannot delete: this client has ${invCount} sent/paid invoice(s). Archive the client instead.`);
+  }
+  if ((asnCount ?? 0) > 0) {
+    throw new ConflictError(`Cannot delete: this client has ${asnCount} active assignment(s). End those assignments first.`);
+  }
+
   const { error } = await supabaseAdmin
     .from('clients')
     .update({ deleted_at: new Date().toISOString() })

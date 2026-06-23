@@ -26,6 +26,7 @@ export default function TaxDocuments() {
   const del = useDeleteTaxDocument();
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<TaxDocument | null>(null);
+  const [markSentTarget, setMarkSentTarget] = useState<TaxDocument | null>(null);
   const [form, setForm] = useState({ employeeId: '', taxYear: new Date().getFullYear(), documentType: 'W2' as TaxDocType, fileUrl: '', notes: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -41,6 +42,7 @@ export default function TaxDocuments() {
 
   const markSent = async (doc: TaxDocument) => {
     await update.mutateAsync({ id: doc.id, sentAt: new Date().toISOString() });
+    setMarkSentTarget(null);
   };
 
   return (
@@ -81,7 +83,7 @@ export default function TaxDocuments() {
               </div>
               <div className="flex items-center gap-2">
                 {doc.fileUrl && <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="outline" className="gap-1"><Download className="h-3.5 w-3.5" /> View</Button></a>}
-                {isFinance && !doc.sentAt && <Button size="sm" variant="outline" className="gap-1" onClick={() => markSent(doc)}><Send className="h-3.5 w-3.5" /> Mark Sent</Button>}
+                {isFinance && !doc.sentAt && <Button size="sm" variant="outline" className="gap-1" onClick={() => setMarkSentTarget(doc)}><Send className="h-3.5 w-3.5" /> Mark Sent</Button>}
                 {isFinance && <Button size="sm" variant="ghost" className="text-red-500" onClick={() => setDeleteTarget(doc)}><Trash2 className="h-4 w-4" /></Button>}
               </div>
             </div>
@@ -118,6 +120,16 @@ export default function TaxDocuments() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!markSentTarget} onOpenChange={v => { if (!v) setMarkSentTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Mark as Sent?</AlertDialogTitle><AlertDialogDescription>This will record that {markSentTarget?.documentType} for tax year {markSentTarget?.taxYear} has been sent to the employee. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => markSentTarget && markSent(markSentTarget)}>Confirm</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={v => { if (!v) setDeleteTarget(null); }}>
         <AlertDialogContent>

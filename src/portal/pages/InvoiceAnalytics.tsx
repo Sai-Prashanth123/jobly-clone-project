@@ -31,14 +31,18 @@ export default function InvoiceAnalytics() {
       {/* Aging */}
       <div className="bg-white rounded-xl border border-gray-200 p-4">
         <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2"><AlertTriangle className="h-4 w-4 text-amber-500" /> Overdue Invoice Aging ({data.overdueCount} invoices)</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {Object.entries(aging).map(([bucket, amount]) => (
-            <div key={bucket} className="text-center p-3 bg-gray-50 rounded-lg border">
-              <p className="text-xs text-gray-500">{bucket} days</p>
-              <p className="text-lg font-bold text-gray-900">${Number(amount).toLocaleString()}</p>
-            </div>
-          ))}
-        </div>
+        {data.overdueCount === 0 ? (
+          <p className="text-sm text-gray-400 py-4 text-center">No overdue invoices — great job!</p>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Object.entries(aging).map(([bucket, amount]) => (
+              <div key={bucket} className="text-center p-3 bg-gray-50 rounded-lg border">
+                <p className="text-xs text-gray-500">{bucket} days</p>
+                <p className="text-lg font-bold text-gray-900">${Number(amount).toLocaleString()}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-4 text-center">

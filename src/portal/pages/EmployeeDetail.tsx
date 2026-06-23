@@ -91,12 +91,8 @@ export default function EmployeeDetail() {
   }
 
   if (!employee) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-muted-foreground">Employee not found.</p>
-        <Button variant="link" onClick={() => navigate('/portal/employees')}>← Back to Employees</Button>
-      </div>
-    );
+    navigate('/portal/employees', { replace: true });
+    return null;
   }
 
   const empAssignments = assignmentsData?.data ?? [];
@@ -690,7 +686,11 @@ export default function EmployeeDetail() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title={`Delete ${employee.firstName} ${employee.lastName}?`}
-        description="This will permanently remove this employee and cannot be undone."
+        description={
+          empAssignments.length > 0 || empTimesheets.length > 0
+            ? `This employee has ${empAssignments.length} assignment(s) and ${empTimesheets.length} timesheet(s). Deleting will permanently remove this employee and all linked records.`
+            : 'This will permanently remove this employee and cannot be undone.'
+        }
         confirmLabel="Delete Employee"
         loading={deleteEmployee.isPending}
         onConfirm={async () => {
@@ -805,7 +805,7 @@ export default function EmployeeDetail() {
               className="gap-2 bg-sky-600 hover:bg-sky-700 text-white"
               loading={placeOnLeave.isPending}
               loadingText="Placing…"
-              disabled={!leaveStart || !leaveReturn || leaveReturn <= leaveStart || leaveReturn <= todayStr}
+              disabled={!leaveStart || !leaveReturn || leaveReturn <= leaveStart}
               onClick={async () => {
                 try {
                   await placeOnLeave.mutateAsync({ startDate: leaveStart, returnDate: leaveReturn, reason: leaveReason.trim() || undefined });

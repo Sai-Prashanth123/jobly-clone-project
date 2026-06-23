@@ -104,7 +104,7 @@ export async function getInvoice(id: string) {
   // through getInvoice, so they all see attachments. (listInvoices stays lean.)
   const { data: attachments } = await supabaseAdmin
     .from('documents')
-    .select('id, name, type, uploaded_at')
+    .select('id, name, type, storage_url, uploaded_at')
     .eq('entity_type', 'invoice')
     .eq('entity_id', id)
     .order('uploaded_at', { ascending: false });
@@ -476,6 +476,9 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   const discountValue = input.discountValue !== undefined ? input.discountValue : inv.discount_value;
 
   if (input.lineItems !== undefined) {
+    if (inv.status !== 'draft') {
+      throw new ForbiddenError('Line items cannot be changed on a sent, viewed, paid, or overdue invoice. Create a new invoice instead.');
+    }
     const mapped = input.lineItems.map(li => {
       const qty = Number(li.quantity) || 0;
       const price = Number(li.unitPrice) || 0;

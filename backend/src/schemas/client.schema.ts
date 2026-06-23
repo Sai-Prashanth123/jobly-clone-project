@@ -4,7 +4,7 @@ export const createClientSchema = z.object({
   companyName: z.string().min(1),
   contactName: z.string().min(1),
   contactEmail: z.string().email(),
-  contactPhone: z.string().optional().nullable().transform(v => v || null),
+  contactPhone: z.string().refine(v => !v || /^[+\d\s().\-]{7,25}$/.test(v), { message: 'Invalid phone number format' }).optional().nullable().transform(v => v || null),
   industry: z.string().optional().default(''),
   address: z.object({
     street: z.string().optional().default(''),
@@ -20,7 +20,7 @@ export const createClientSchema = z.object({
   currency: z.string().default('USD'),
   billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),
   billingContactName: z.string().optional().nullable().transform(v => v || null),
-  billingContactEmail: z.string().optional().nullable().transform(v => v || null),
+  billingContactEmail: z.string().refine(v => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), { message: 'Invalid billing email' }).optional().nullable().transform(v => v || null),
   billingContactPhone: z.string().optional().nullable().transform(v => v || null),
   billingStreet: z.string().optional().nullable().transform(v => v || null),
   billingCity: z.string().optional().nullable().transform(v => v || null),

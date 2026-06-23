@@ -184,7 +184,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     const price = parseNumberInput(l.unitPrice) ?? 0;
     return { ...l, qty, price, amount: Math.round(qty * price * 100) / 100 };
   });
-  const manualSubtotal = manualLines.reduce((s, l) => s + l.amount, 0);
+  const manualSubtotal = Math.round(manualLines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
   const dueDate = paymentTerms === 'custom'
     ? (customDueDate || '—')
     : addDays(issueDate, PAYMENT_TERMS_OPTIONS.find(o => o.value === paymentTerms)?.days ?? 30);
@@ -196,7 +196,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     const asgn = getAssignment(t.assignmentId);
     return { ...t, billRate: asgn?.billRate ?? 0, amount: t.totalHours * (asgn?.billRate ?? 0) };
   });
-  const tsSubtotal = tsPreview.reduce((s, t) => s + t.amount, 0);
+  const tsSubtotal = Math.round(tsPreview.reduce((s, t) => s + t.amount, 0) * 100) / 100;
 
   // Shared totals. Discount only ever applies in manual mode (the control isn't
   // rendered in timesheet mode, so discountMode stays 'none' there → no effect).
@@ -263,6 +263,8 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
       onGenerate?.(selected, clientId, taxRate);
       return;
     }
+    const hasNegative = manualLines.some(l => l.qty < 0 || l.price < 0);
+    if (hasNegative) { setError('Quantities and prices must be positive values'); return; }
     const valid = manualLines.filter(l => (l.itemName.trim() || l.description.trim()) && l.amount >= 0 && (l.qty > 0 || l.price > 0));
     if (valid.length === 0) { setError('Add at least one line item with a name and amount'); return; }
     if (paymentTerms === 'custom' && !customDueDate) { setError('Pick a custom due date'); return; }

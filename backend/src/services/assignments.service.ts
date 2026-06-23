@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/errors';
 import { todayUTC } from '../lib/dateUtils';
 import { createNotification, getPortalUserByEmployeeId, getUserIdsByRole } from './notifications.service';
 import type { CreateAssignmentInput, UpdateAssignmentInput, ListAssignmentsQuery } from '../schemas/assignment.schema';
@@ -80,6 +80,9 @@ export async function createAssignment(input: CreateAssignmentInput, actorId?: s
   // (Completed/Terminated are end-states an admin/ops sets later via edit; the
   // read-time overlay also shows Completed once the end date passes.) This
   // prevents the "brand-new assignment shows Completed" confusion.
+  if (input.endDate && input.endDate <= input.startDate) {
+    throw new ValidationError('End date must be after start date');
+  }
   const derivedStatus = input.startDate > todayUTC() ? 'pending' : 'active';
 
   const { data, error } = await supabaseAdmin

@@ -235,7 +235,11 @@ export async function patchTimesheetStatus(
   if (input.status === 'submitted') updateData.submitted_at = new Date().toISOString();
   if (input.status === 'manager_approved') updateData.manager_approved_at = new Date().toISOString();
   if (input.status === 'client_approved') updateData.client_approved_at = new Date().toISOString();
-  if (input.status === 'rejected') updateData.rejection_reason = input.rejectionReason ?? null;
+  if (input.status === 'rejected') {
+    updateData.rejection_reason = input.rejectionReason ?? null;
+  } else {
+    updateData.rejection_reason = null;
+  }
 
   const { data, error } = await supabaseAdmin
     .from('timesheets')

@@ -76,6 +76,8 @@ const PeerFeedback = lazy(() => import('./pages/PeerFeedback'));
 
 // Phase 4 — Admin
 const AuditLog = lazy(() => import('./pages/AuditLog'));
+const HolidaysSettings = lazy(() => import('./pages/HolidaysSettings'));
+const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 
 // Phase 4 — HR
 const Milestones = lazy(() => import('./pages/Milestones'));
@@ -446,6 +448,8 @@ export default function PortalApp() {
 
             {/* Phase 4 — Admin */}
             <Route path="audit-log" element={<ProtectedRoute allowedRoles={['admin']}><AuditLog /></ProtectedRoute>} />
+            <Route path="holidays" element={<ProtectedRoute allowedRoles={['admin','hr']}><HolidaysSettings /></ProtectedRoute>} />
+            <Route path="system-settings" element={<ProtectedRoute allowedRoles={['admin']}><SystemSettings /></ProtectedRoute>} />
 
             {/* Phase 4 — HR */}
             <Route path="milestones" element={<ProtectedRoute allowedRoles={['admin','hr']}><Milestones /></ProtectedRoute>} />

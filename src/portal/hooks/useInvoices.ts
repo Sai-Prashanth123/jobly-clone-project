@@ -44,8 +44,8 @@ function mapInvoice(raw: any): Invoice {
     viewedAt: raw.viewed_at ?? undefined,
     convertedInvoiceId: raw.converted_invoice_id ?? undefined,
     timesheetIds: (raw.invoice_timesheets ?? []).map((it: any) => it.timesheet_id as string),
-    attachments: (raw.attachments ?? []).map((a: { id: string; name: string; type: string; uploaded_at: string }) => ({
-      id: a.id, name: a.name, type: a.type, uploadedAt: a.uploaded_at,
+    attachments: (raw.attachments ?? []).map((a: { id: string; name: string; type: string; storage_url: string; uploaded_at: string }) => ({
+      id: a.id, name: a.name, type: a.type, storageUrl: a.storage_url, uploadedAt: a.uploaded_at,
     })),
     pdfUrl: raw.pdf_url ?? undefined,
     paidAt: raw.paid_at ?? undefined,
@@ -333,7 +333,9 @@ export function useSendInvoice(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['invoices', id], updated.invoice);
-      qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
+      if (updated.emailSent) {
+        qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
+      }
     },
   });
 }

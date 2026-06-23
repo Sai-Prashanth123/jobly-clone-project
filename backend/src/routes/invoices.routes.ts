@@ -20,7 +20,7 @@ router.patch('/bulk-status', requireRole('admin', 'finance'), ctrl.bulkInvoiceSt
 router.post('/bulk-send', requireRole('admin', 'finance'), ctrl.bulkSend);
 router.get('/:id', requireRole('admin','finance'), ctrl.getOne);
 router.put('/:id', requireRole('admin','finance'), validateBody(updateInvoiceSchema), ctrl.update);
-router.delete('/:id', requireRole('admin'), ctrl.remove);
+router.delete('/:id', requireRole('admin', 'finance'), ctrl.remove);
 router.get('/:id/pdf', requireRole('admin','finance'), ctrl.getPDF);
 router.post('/:id/send', requireRole('admin','finance'), ctrl.send);
 

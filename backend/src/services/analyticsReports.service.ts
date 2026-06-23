@@ -66,7 +66,8 @@ export async function getMilestones(month: string) {
     if (e.start_date) {
       const s = new Date(e.start_date);
       if (s.getMonth() + 1 === m) {
-        const years = now.getFullYear() - s.getFullYear();
+        const thisYearAnniversary = new Date(now.getFullYear(), s.getMonth(), s.getDate());
+        const years = now.getFullYear() - s.getFullYear() - (now >= thisYearAnniversary ? 0 : 1);
         anniversaries.push({ ...e, type: 'anniversary', day: s.getDate(), years });
       }
     }

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { format } from 'date-fns';
+import { toast } from 'sonner';
 import {
   Star, Plus, Trash2, Play, ChevronRight, Users, CheckCircle2, Clock,
   BarChart3, RefreshCw, Loader2, AlertCircle,
@@ -127,28 +128,33 @@ export default function Reviews() {
   };
 
   const handleActivate = async (id: string) => {
-    try { await activateCycle.mutateAsync(id); } catch (e: any) { alert(e?.response?.data?.error ?? 'Failed to activate'); }
+    try { await activateCycle.mutateAsync(id); } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed to activate'); }
   };
 
   const handleAdvance = async (id: string, toStatus: 'peer_feedback' | 'manager_review') => {
-    try { await advanceCycle.mutateAsync({ id, toStatus }); } catch (e: any) { alert(e?.response?.data?.error ?? 'Failed'); }
+    try { await advanceCycle.mutateAsync({ id, toStatus }); } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
   };
 
   const handleRelease = async (id: string) => {
-    try { await releaseResults.mutateAsync(id); } catch (e: any) { alert(e?.response?.data?.error ?? 'Failed'); }
+    try { await releaseResults.mutateAsync(id); } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
   };
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    try { await deleteCycle.mutateAsync(deleteTarget.id); setDeleteTarget(null); } catch (e: any) { alert(e?.response?.data?.error ?? 'Failed'); }
+    try { await deleteCycle.mutateAsync(deleteTarget.id); setDeleteTarget(null); } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
   };
 
   const handleAddParticipant = async () => {
     if (!selectedCycle || !newParticipantEmpId) return;
+    const managerId = (newParticipantMgrId === '_none' || !newParticipantMgrId) ? null : newParticipantMgrId;
+    if (managerId && managerId === newParticipantEmpId) {
+      toast.error('An employee cannot be their own manager');
+      return;
+    }
     try {
-      await addParticipant.mutateAsync({ cycleId: selectedCycle.id, employeeId: newParticipantEmpId, managerId: newParticipantMgrId || null });
-      setNewParticipantEmpId(''); setNewParticipantMgrId(''); setAddParticipantOpen(false);
-    } catch (e: any) { alert(e?.response?.data?.error ?? 'Failed'); }
+      await addParticipant.mutateAsync({ cycleId: selectedCycle.id, employeeId: newParticipantEmpId, managerId });
+      setNewParticipantEmpId(''); setNewParticipantMgrId('_none'); setAddParticipantOpen(false);
+    } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
   };
 
   const handleMgrReview = async () => {
@@ -164,7 +170,7 @@ export default function Reviews() {
       });
       setMgrReviewOpen(null);
       setMgrForm({ rating: '', strengths: '', improvements: '', goals: '' });
-    } catch (e: any) { alert(e?.response?.data?.error ?? 'Failed'); }
+    } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
     finally { setSaving(false); }
   };
 
@@ -392,7 +398,7 @@ export default function Reviews() {
                 <SelectTrigger><SelectValue placeholder="Select manager" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="_none">None</SelectItem>
-                  {activeEmployees.map(e => (
+                  {activeEmployees.filter(e => e.id !== newParticipantEmpId).map(e => (
                     <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
                   ))}
                 </SelectContent>

@@ -15,7 +15,7 @@ export default function CapacityReport() {
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-5">
       <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><BarChart3 className="h-6 w-6 text-blue-600" /> Capacity Utilization</h1><p className="text-sm text-gray-500">Billed hours vs. 160h/month capacity</p></div>
+        <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><BarChart3 className="h-6 w-6 text-blue-600" /> Capacity Utilization</h1><p className="text-sm text-gray-500">Billed hours vs. 160h/month capacity <span className="text-gray-400">(40h/week × 4 weeks)</span></p></div>
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => setMonthDate(d => subMonths(d, 1))}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-medium w-32 text-center">{format(monthDate, 'MMMM yyyy')}</span>

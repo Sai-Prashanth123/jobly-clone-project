@@ -17,7 +17,7 @@ import type { Client } from '../types';
 export default function PortalClients() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading } = useClients({ limit: 100 });
+  const { data, isLoading } = useClients({ limit: 500 });
   const createClient = useCreateClient();
   const [showForm, setShowForm] = useState(false);
   const [editClient, setEditClient] = useState<Client | null>(null);

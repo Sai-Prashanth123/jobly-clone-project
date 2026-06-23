@@ -22,7 +22,7 @@ export default function ProbationTracker() {
           ) : e.daysLeft !== null ? (
             <span className={`text-xs font-semibold ${e.daysLeft <= 30 ? 'text-amber-600' : 'text-gray-600'}`}>{e.daysLeft}d left</span>
           ) : null}
-          {e.probation_end_date && <p className="text-xs text-gray-400 mt-0.5">Ends {format(new Date(e.probation_end_date + 'T00:00:00'), 'MMM d, yyyy')}</p>}
+          {e.probation_end_date && <p className="text-xs text-gray-400 mt-0.5">Ends {format(new Date(e.probation_end_date + 'T00:00:00Z'), 'MMM d, yyyy')}</p>}
         </div>
       </div>
     </Link>

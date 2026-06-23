@@ -71,7 +71,7 @@ export default function HeadcountReport() {
         <div className="flex flex-wrap gap-3">
           {Object.entries(data.byEmploymentType as Record<string, number>).map(([type, count]) => (
             <div key={type} className="px-4 py-2 rounded-xl bg-gray-50 border border-gray-200">
-              <p className="text-xs text-gray-500 capitalize">{type.replace(/_/g, ' ')}</p>
+              <p className="text-xs text-gray-500">{type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</p>
               <p className="text-xl font-bold text-gray-900">{count}</p>
             </div>
           ))}

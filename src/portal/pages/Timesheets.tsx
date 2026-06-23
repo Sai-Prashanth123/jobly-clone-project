@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,7 +25,7 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
   // Include active AND pending assignments — a freshly-created assignment is
   // often still 'pending', and excluding it left the dropdown confusingly empty.
   // Only completed/terminated assignments are hidden from new timesheets.
-  const { data: assignmentsData } = useAssignments({ limit: 200 });
+  const { data: assignmentsData, isLoading: assignmentsLoading } = useAssignments({ limit: 200 });
   const { data: employeesData } = useEmployees({ limit: 200 });
   const [assignmentId, setAssignmentId] = useState('');
   const [weekStart, setWeekStart] = useState(() => {
@@ -43,13 +43,11 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
 
   const selectedAsgn = myAssignments.find(a => a.id === assignmentId);
 
-  // Week-picker lower bound only: the Monday of the selected employee's joining
-  // week. Timesheets are active from the joining date → future (future weeks are
-  // allowed), so there is no upper bound. Mirrors the backend `isWeekBeforeJoiningUTC`.
   const selectedEmp = selectedAsgn ? employees.find(e => e.id === selectedAsgn.employeeId) : undefined;
   const minWeekStr = selectedEmp?.startDate
     ? getMondayOfWeek(new Date(selectedEmp.startDate)).toISOString().split('T')[0]
     : undefined;
+  const maxWeekStr = getMondayOfWeek(new Date(Date.now() + 12 * 7 * 86400000)).toISOString().split('T')[0];
 
   const handleCreate = () => {
     if (!assignmentId || !selectedAsgn) return;
@@ -72,6 +70,20 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
       entries,
     });
   };
+
+  if (!assignmentsLoading && myAssignments.length === 0) {
+    return (
+      <div className="space-y-4">
+        <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-6 text-center">
+          <p className="text-sm font-medium text-amber-800">No active assignments found.</p>
+          <p className="text-xs text-amber-700 mt-1">Contact operations to create an assignment first.</p>
+        </div>
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onCancel}>Close</Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -100,10 +112,11 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
           className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
           value={weekStart}
           min={minWeekStr}
+          max={maxWeekStr}
           onChange={e => setWeekStart(e.target.value)}
         />
         <p className="text-xs text-muted-foreground">
-          From the joining week onward — future weeks are allowed{minWeekStr ? '; not before the employee’s joining week' : ''}.
+          From the joining week up to 12 weeks ahead{minWeekStr ? '; not before the employee joining week' : ''}.
         </p>
       </div>
       <div className="flex justify-end gap-3 pt-2">

@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useShifts, useCreateShift, useUpdateShift, useDeleteShift, SHIFT_COLORS, type ShiftType, type Shift } from '../hooks/useShifts';
 import { useEmployees } from '../hooks/useEmployees';
 
@@ -26,6 +27,7 @@ export default function ShiftSchedule() {
 
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<Shift | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Shift | null>(null);
   const [form, setForm] = useState({ employeeId: '', date: startDate, startTime: '09:00', endTime: '17:00', shiftType: 'morning' as ShiftType, notes: '' });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -99,7 +101,7 @@ export default function ShiftSchedule() {
                               <span>{s.startTime.slice(0,5)}–{s.endTime.slice(0,5)}</span>
                               <div className="flex gap-0.5">
                                 <button onClick={() => openEdit(s)} className="hover:opacity-70"><Edit2 className="h-2.5 w-2.5" /></button>
-                                <button onClick={() => deleteShift.mutate(s.id)} className="hover:opacity-70"><Trash2 className="h-2.5 w-2.5" /></button>
+                                <button onClick={() => setDeleteTarget(s)} className="hover:opacity-70"><Trash2 className="h-2.5 w-2.5" /></button>
                               </div>
                             </div>
                           ))}
@@ -144,6 +146,19 @@ export default function ShiftSchedule() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={v => { if (!v) setDeleteTarget(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Shift?</AlertDialogTitle>
+            <AlertDialogDescription>Remove this shift for {deleteTarget && employees.find(e => e.id === deleteTarget.employeeId)?.firstName}? This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => { deleteShift.mutate(deleteTarget!.id); setDeleteTarget(null); }}>Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

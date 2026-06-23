@@ -625,6 +625,19 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     for (const k of HR_ONLY) delete patch[k];
   }
 
+  // Guard: email uniqueness — check both personal and work email if either is being changed
+  const emailsToCheck: string[] = [patch.email, patch.work_email].filter(Boolean) as string[];
+  for (const email of emailsToCheck) {
+    const { data: dup } = await supabaseAdmin
+      .from('employees')
+      .select('id')
+      .or(`email.eq.${email},work_email.eq.${email}`)
+      .neq('id', id)
+      .limit(1)
+      .maybeSingle();
+    if (dup) throw new ConflictError(`Email ${email} is already in use by another employee.`);
+  }
+
   const { data: emp, error } = await supabaseAdmin
     .from('employees')
     .update(patch)
@@ -1325,13 +1338,18 @@ export async function exportEmployeesCSV(query: { status?: string; department?: 
   const { data, error } = await q;
   if (error) throw error;
 
-  const headers = ['ID','First Name','Last Name','Email','Phone','Department','Job Title','Employment Type','Start Date','Status','Visa Type','Visa Expiry','Pay Rate','Pay Type','Work Location'];
-  const rows = (data ?? []).map(e => [
-    e.display_id ?? '',
-    e.first_name ?? '', e.last_name ?? '', e.email ?? '', e.phone ?? '',
-    e.department ?? '', e.job_title ?? '', e.employment_type ?? '', e.start_date ?? '', e.status ?? '',
-    e.visa_type ?? '', e.visa_expiry ?? '',
-    canSeePay ? (e.pay_rate ?? '') : '', e.pay_type ?? '', e.work_location ?? '',
-  ]);
+  const baseHeaders = ['ID','First Name','Last Name','Email','Phone','Department','Job Title','Employment Type','Start Date','Status','Visa Type','Visa Expiry','Pay Type','Work Location'];
+  const headers = canSeePay ? [...baseHeaders.slice(0, 12), 'Pay Rate', ...baseHeaders.slice(12)] : baseHeaders;
+  const rows = (data ?? []).map(e => {
+    const base = [
+      e.display_id ?? '',
+      e.first_name ?? '', e.last_name ?? '', e.email ?? '', e.phone ?? '',
+      e.department ?? '', e.job_title ?? '', e.employment_type ?? '', e.start_date ?? '', e.status ?? '',
+      e.visa_type ?? '', e.visa_expiry ?? '',
+      e.pay_type ?? '', e.work_location ?? '',
+    ];
+    if (canSeePay) base.splice(12, 0, String(e.pay_rate ?? ''));
+    return base;
+  });
   return [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
 }

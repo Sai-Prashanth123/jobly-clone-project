@@ -30,11 +30,12 @@ export default function MonthlyTimesheets() {
   const { data, isLoading } = useMonthlyTimesheets(status === 'all' ? { limit: 200 } : { status, limit: 200 });
   const rows = data?.data ?? [];
 
-  // Split the queue: worked timesheets (hours logged) go to the Client Timesheet
-  // tab where the reviewer checks the client-signed proof; zero-hour / leave-day
-  // timesheets go to the Leave Approval tab.
+  // Split the queue: timesheets with logged hours go to Client Timesheets tab
+  // (client proof review); timesheets with ONLY leave days (no hours) go to
+  // Leave Approval tab. Mixed months (hours + leave) show under Client Timesheets
+  // so the reviewer can still check the client-signed proof.
   const workRows = rows.filter(t => Number(t.totalHours) > 0);
-  const leaveRows = rows.filter(t => Number(t.totalHours) === 0 || (t.leaveDays ?? 0) > 0);
+  const leaveRows = rows.filter(t => Number(t.totalHours) === 0 && (t.leaveDays ?? 0) > 0);
 
   const columns: Column<MonthlyTimesheet>[] = [
     {

@@ -29,6 +29,7 @@ export default function MonthlyTimesheetDetail() {
   const { user } = useAuth();
   const { data: sheet, isLoading } = useMonthlyTimesheet(id);
   const patchStatus = usePatchMonthlyStatus(id!);
+  const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [downloading, setDownloading] = useState(false);
@@ -211,11 +212,24 @@ export default function MonthlyTimesheetDetail() {
           <Button variant="outline" className="gap-1.5 text-red-600 border-red-200 hover:bg-red-50" onClick={() => setRejectOpen(true)} disabled={patchStatus.isPending}>
             <XCircle className="h-4 w-4" /> Reject
           </Button>
-          <Button className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={handleApprove} loading={patchStatus.isPending} loadingText="Approving…">
+          <Button className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => setApproveOpen(true)} disabled={patchStatus.isPending}>
             <CheckCircle2 className="h-4 w-4" /> Approve
           </Button>
         </div>
       )}
+
+      <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
+        <DialogContent className="w-[95vw] max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Approve this timesheet?</DialogTitle>
+            <DialogDescription>The employee will be notified that their attendance record has been approved.</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setApproveOpen(false)}>Cancel</Button>
+            <Button className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={async () => { setApproveOpen(false); await handleApprove(); }} loading={patchStatus.isPending} loadingText="Approving…">Approve</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={rejectOpen} onOpenChange={setRejectOpen}>
         <DialogContent className="w-[95vw] max-w-md">
