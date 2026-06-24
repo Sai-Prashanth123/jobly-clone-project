@@ -19,6 +19,7 @@ import { useAssignment } from '../hooks/useAssignments';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatDateTime, formatCurrency } from '../lib/utils';
 import type { TimesheetEntry } from '../types';
+import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
 // Human labels for the zero-hour-week leave reasons (mirror of the editable
 // Select options below) so the read-only review view shows a friendly value.
@@ -564,6 +565,8 @@ export default function TimesheetDetail() {
           </div>
         </CardContent>
       </Card>
+
+      <EntityAuditTrail entityType="timesheet" entityId={timesheet?.id} />
 
       <ConfirmDialog
         open={deleteOpen}

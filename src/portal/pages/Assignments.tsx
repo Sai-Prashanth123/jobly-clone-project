@@ -82,16 +82,21 @@ export default function Assignments() {
     },
     {
       key: 'createdBy',
-      header: 'Created By',
+      header: 'By',
       hideOnMobile: true,
-      render: a => a.createdByName ? (
-        <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-          a.createdByRole === 'admin' ? 'bg-blue-50 text-blue-700' :
-          a.createdByRole === 'hr' ? 'bg-purple-50 text-purple-700' :
-          a.createdByRole === 'operations' ? 'bg-amber-50 text-amber-700' :
-          a.createdByRole === 'finance' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-600'
-        }`}>{a.createdByName}</span>
-      ) : <span className="text-xs text-muted-foreground">—</span>,
+      render: a => {
+        const name = a.updatedByName ?? a.createdByName;
+        const role = a.updatedByName ? a.updatedByRole : a.createdByRole;
+        const label = a.updatedByName ? `Edited · ${a.updatedByName}` : (a.createdByName ?? null);
+        return name ? (
+          <span className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full ${
+            role === 'admin' ? 'bg-blue-50 text-blue-700' :
+            role === 'hr' ? 'bg-purple-50 text-purple-700' :
+            role === 'operations' ? 'bg-amber-50 text-amber-700' :
+            role === 'finance' ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-50 text-gray-600'
+          }`}>{label}</span>
+        ) : <span className="text-xs text-muted-foreground">—</span>;
+      },
     },
     ...(canCreate ? [{
       key: 'actions' as const,

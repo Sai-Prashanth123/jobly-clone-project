@@ -14,6 +14,7 @@ import { apiClient } from '../lib/apiClient';
 import { formatDate } from '../lib/utils';
 import { MONTHS, monthLabel } from '../lib/monthUtils';
 import type { MonthlyDayStatus } from '../types';
+import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
 const PILL: Record<MonthlyDayStatus, string> = {
   present: 'bg-emerald-100 text-emerald-700',
@@ -121,7 +122,7 @@ export default function MonthlyTimesheetDetail() {
         title={`${monthLabel(sheet.year, sheet.month)} — ${sheet.employeeName ?? 'Employee'}`}
         description={`${sheet.displayId ?? ''}${sheet.department ? ` · ${sheet.department}` : ''}`}
         action={
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <StatusBadge status={sheet.status} />
             {isHrAdmin && sheet.employeeEmail && (
               <a
@@ -273,6 +274,8 @@ export default function MonthlyTimesheetDetail() {
           </Button>
         </div>
       )}
+
+      <EntityAuditTrail entityType="monthly_timesheet" entityId={sheet?.id} />
 
       <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
         <DialogContent className="w-[95vw] max-w-sm">

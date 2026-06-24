@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { AssignmentForm } from '../components/assignments/AssignmentForm';
+import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 import { useAssignment, useUpdateAssignment, useDeleteAssignment } from '../hooks/useAssignments';
 import { useEmployee } from '../hooks/useEmployees';
 import { useClient } from '../hooks/useClients';
@@ -124,6 +125,20 @@ export default function AssignmentDetail() {
         </Card>
 
         <Card className="lg:col-span-3">
+          <CardHeader><CardTitle className="text-base">Metadata</CardTitle></CardHeader>
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <Field label="Created By" value={assignment.createdByName ?? '—'} />
+            <Field label="Created At" value={formatDate(assignment.createdAt)} />
+            {assignment.updatedByName && (
+              <>
+                <Field label="Last Edited By" value={assignment.updatedByName} />
+                <Field label="Last Edited At" value={formatDate(assignment.updatedAt)} />
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
           <CardHeader>
             <CardTitle className="text-base">Timesheets ({asnTimesheets.length})</CardTitle>
           </CardHeader>
@@ -148,6 +163,8 @@ export default function AssignmentDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <EntityAuditTrail entityType="assignment" entityId={assignment.id} />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="w-[95vw] max-w-2xl max-h-[90vh] flex flex-col">

@@ -13,6 +13,7 @@ import { useInvoice, useDeleteInvoice, useGetInvoicePDF, useSendInvoice, useInvo
 import { useClient } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
 import { formatCurrency, formatDate } from '../lib/utils';
+import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
 export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>();
@@ -216,6 +217,8 @@ export default function InvoiceDetail() {
           </CardContent>
         </Card>
       )}
+
+      <EntityAuditTrail entityType="invoice" entityId={invoice?.id} />
 
       <InvoicePrintView invoice={invoice} client={client} />
 

@@ -11,7 +11,7 @@ import type { CreateAssignmentInput, UpdateAssignmentInput, ListAssignmentsQuery
 // `employees!employee_id` disambiguates the embed — assignments has TWO FKs to
 // employees (employee_id + reporting_manager_id), so a bare `employees(...)`
 // embed is ambiguous and 500s. The column hint pins it to the assignee.
-const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, display_id), clients(company_name), portal_users!created_by(name, role)';
+const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, display_id), clients(company_name), created_by_user:portal_users!created_by(name, role), updated_by_user:portal_users!updated_by(name, role)';
 
 // Flatten the joined rows to snake_case fields the frontend mapper reads, and
 // overlay a read-time "completed" status: if the engagement's end date has
@@ -33,6 +33,8 @@ function decorateAssignment(row: any): any {
     client_name: cli?.company_name ?? null,
     employees: undefined,
     clients: undefined,
+    created_by_user: row.created_by_user ?? null,
+    updated_by_user: row.updated_by_user ?? null,
   };
 }
 
@@ -140,7 +142,7 @@ export async function createAssignment(input: CreateAssignmentInput, actorId?: s
   return data;
 }
 
-export async function updateAssignment(id: string, input: UpdateAssignmentInput) {
+export async function updateAssignment(id: string, input: UpdateAssignmentInput, actorId?: string) {
   const existing = await getAssignment(id);
   if (!existing) throw new NotFoundError('Assignment not found');
 
@@ -158,16 +160,17 @@ export async function updateAssignment(id: string, input: UpdateAssignmentInput)
   if (input.billingType !== undefined) updateData.billing_type = input.billingType;
   if (input.workLocation !== undefined) updateData.work_location = input.workLocation;
   if (input.reportingManagerId !== undefined) updateData.reporting_manager_id = input.reportingManagerId;
+  if (actorId) updateData.updated_by = actorId;
 
   const { data, error } = await supabaseAdmin
     .from('assignments')
     .update(updateData)
     .eq('id', id)
-    .select()
+    .select(ASSIGNMENT_SELECT)
     .single();
 
   if (error) throw error;
-  return data;
+  return decorateAssignment(data);
 }
 
 export async function deleteAssignment(id: string) {

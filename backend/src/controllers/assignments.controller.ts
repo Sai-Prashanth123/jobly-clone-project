@@ -36,7 +36,7 @@ export async function create(req: Request, res: Response, next: NextFunction): P
 
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.updateAssignment(req.params.id, req.body as UpdateAssignmentInput);
+    const data = await svc.updateAssignment(req.params.id, req.body as UpdateAssignmentInput, req.user!.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

@@ -354,6 +354,8 @@ export interface Assignment {
   clientName?: string;
   createdByName?: string;
   createdByRole?: string;
+  updatedByName?: string;
+  updatedByRole?: string;
 }
 
 export interface TimesheetEntry {

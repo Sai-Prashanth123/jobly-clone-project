@@ -94,6 +94,7 @@ export function useResetUserPassword() {
 
 export interface ActivityLogsParams {
   entityType?: string;
+  entityId?: string;
   action?: string;
   page?: number;
   limit?: number;
@@ -109,5 +110,19 @@ export function useActivityLogs(params?: ActivityLogsParams) {
         total: data.total as number,
       };
     },
+  });
+}
+
+export function useEntityAuditTrail(entityType: string, entityId: string | undefined) {
+  return useQuery({
+    queryKey: ['activity-logs', entityType, entityId],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/activity-logs', {
+        params: { entityType, entityId, limit: 20 },
+      });
+      return (data.data as any[]).map(mapLog);
+    },
+    enabled: !!entityId,
+    staleTime: 30_000,
   });
 }

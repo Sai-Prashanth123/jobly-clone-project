@@ -139,9 +139,12 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
           <div className="space-y-2">
             <Label>Bill Rate ($/hr) *</Label>
             <Input
-              type="number" min={0} step={0.01} inputMode="decimal" placeholder="0.00"
+              type="number" min={0} step={1} inputMode="decimal" placeholder="0.00"
               value={form.billRate || ''}
-              onChange={e => set('billRate', parseNumberInput(e.target.value) ?? 0)}
+              onChange={e => {
+                const raw = parseNumberInput(e.target.value);
+                set('billRate', raw != null ? Math.round(raw * 100) / 100 : 0);
+              }}
             />
             {errors.billRate && <p className="text-xs text-red-500">{errors.billRate}</p>}
           </div>
@@ -149,9 +152,12 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
           <div className="space-y-2">
             <Label>Pay Rate ($/hr) *</Label>
             <Input
-              type="number" min={0} step={0.01} inputMode="decimal" placeholder="0.00"
+              type="number" min={0} step={1} inputMode="decimal" placeholder="0.00"
               value={form.payRate || ''}
-              onChange={e => set('payRate', parseNumberInput(e.target.value) ?? 0)}
+              onChange={e => {
+                const raw = parseNumberInput(e.target.value);
+                set('payRate', raw != null ? Math.round(raw * 100) / 100 : 0);
+              }}
             />
             {errors.payRate && <p className="text-xs text-red-500">{errors.payRate}</p>}
           </div>

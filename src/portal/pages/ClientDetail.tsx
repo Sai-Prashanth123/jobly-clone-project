@@ -15,6 +15,7 @@ import { useInvoices } from '../hooks/useInvoices';
 import { useEmployees } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
+import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -177,6 +178,8 @@ export default function ClientDetail() {
           </CardContent>
         </Card>
       </div>
+
+      <EntityAuditTrail entityType="client" entityId={client?.id} />
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col">

@@ -26,6 +26,7 @@ import { OnboardingChecklist } from '../components/employees/OnboardingProgress'
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency } from '../lib/utils';
+import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -148,7 +149,7 @@ export default function EmployeeDetail() {
           <button type="button" onClick={() => setResubmittedBanner(false)} className="text-amber-700 hover:text-amber-900 text-xs font-medium flex-shrink-0">Dismiss</button>
         </div>
       )}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3 lg:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/employees')} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
@@ -196,7 +197,7 @@ export default function EmployeeDetail() {
             </div>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap lg:justify-end lg:flex-shrink-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-end sm:flex-shrink-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
           {(employee.status === 'onboarding' || isPlainInactive) && canManage && (() => {
             const onboardingComplete = isPlainInactive || (employee.onboarding?.complete === true);
             const pct = employee.onboarding?.percent ?? 0;
@@ -681,6 +682,8 @@ export default function EmployeeDetail() {
           </CardContent>
         </Card>
       )}
+
+      <EntityAuditTrail entityType="employee" entityId={employee?.id} />
 
       <ConfirmDialog
         open={deleteOpen}

@@ -48,7 +48,7 @@ function CycleBadge({ status }: { status: CycleStatus }) {
 function StarRating({ value }: { value: number | null | undefined }) {
   if (value == null) return <span className="text-gray-400 text-xs">—</span>;
   return (
-    <span className="flex items-center gap-0.5">
+    <span className="flex flex-wrap items-center gap-0.5">
       {[1,2,3,4,5].map(i => (
         <Star key={i} className={`h-3 w-3 ${i <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-gray-300'}`} />
       ))}
