@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Command } from 'cmdk';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import {
   LayoutDashboard, Users, Building2, Briefcase,
   Clock, FileText, BarChart2, Settings, Bell, User, Search,
@@ -59,6 +59,7 @@ export function CommandPalette({ open, onOpenChange }: CommandPaletteProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="p-0 gap-0 w-[95vw] max-w-lg overflow-hidden" aria-describedby={undefined}>
+        <DialogTitle className="sr-only">Command Palette</DialogTitle>
         <Command className="rounded-lg" shouldFilter={false}>
           <div className="flex items-center border-b px-3 gap-2">
             <Search className="h-4 w-4 text-gray-400 flex-shrink-0" />

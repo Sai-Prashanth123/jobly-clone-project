@@ -266,7 +266,7 @@ export default function Announcements() {
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{editing ? 'Edit Announcement' : 'New Announcement'}</DialogTitle>
           </DialogHeader>

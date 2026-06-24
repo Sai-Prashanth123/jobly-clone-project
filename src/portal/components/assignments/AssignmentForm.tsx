@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
@@ -224,6 +225,17 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="col-span-1 sm:col-span-2 space-y-2">
+            <Label>Notes</Label>
+            <Textarea
+              value={form.notes ?? ''}
+              onChange={e => set('notes', e.target.value || null)}
+              placeholder="Internal notes, context, or special instructions…"
+              rows={3}
+              className="resize-none"
+            />
           </div>
         </CardContent>
       </Card>

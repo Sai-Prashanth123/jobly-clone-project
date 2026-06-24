@@ -210,3 +210,17 @@ export function usePatchHrNotes(id: string) {
     },
   });
 }
+
+export function usePatchMonthlyTimesheetEntries(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { entries: MonthlyTimesheetEntry[]; notes?: string | null }) => {
+      const { data } = await apiClient.patch(`/monthly-timesheets/${id}/entries`, body);
+      return mapMonthlyTimesheet(data.data);
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets'] });
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets', id] });
+    },
+  });
+}

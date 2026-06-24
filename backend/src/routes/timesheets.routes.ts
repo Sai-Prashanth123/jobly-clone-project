@@ -20,6 +20,9 @@ router.put('/:id', requireRole('admin','operations','employee'), validateBody(up
 router.patch('/:id/status', requireRole('admin','hr','operations','employee','finance'), validateBody(patchTimesheetStatusSchema), ctrl.patchStatus);
 router.delete('/:id', requireRole('admin','operations','employee'), ctrl.remove);
 
+// HR notes (admin/hr only — employee never sees nor edits these).
+router.patch('/:id/hr-notes', requireRole('admin', 'hr'), ctrl.patchHrNotes);
+
 // Client-signed timesheet proof (PDF / image / DOC). Required at submit-time
 // when total_hours > 0; skipped when zero-hour (leave). Employee can only
 // upload to their own timesheet (controller enforces ownership).

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Download, Loader2, AlertCircle, FileText } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/apiClient';
@@ -59,7 +59,8 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[96vw] h-[92vh] max-w-6xl p-0 flex flex-col gap-0 overflow-hidden">
+      <DialogContent className="w-[96vw] h-[92vh] max-w-6xl p-0 flex flex-col gap-0 overflow-hidden" aria-describedby={undefined}>
+        <DialogTitle className="sr-only">Document Preview: {fileName}</DialogTitle>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-white flex-shrink-0">
           <div className="flex items-center gap-2 min-w-0">

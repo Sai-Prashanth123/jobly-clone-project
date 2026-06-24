@@ -62,6 +62,8 @@ function mapClient(raw: any): Client {
       url: d.storage_url ?? undefined,
     })),
     status: raw.status,
+    onboardingStatus: raw.onboarding_status ?? 'not_started',
+    internalNotes: raw.internal_notes ?? undefined,
     createdByName: raw.portal_users?.name ?? undefined,
     createdByRole: raw.portal_users?.role ?? undefined,
     createdAt: raw.created_at,
@@ -128,6 +130,33 @@ export function useDeleteClient() {
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/clients/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['clients'] }),
+  });
+}
+
+export function usePatchOnboardingStatus(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (status: 'not_started' | 'in_progress' | 'completed') => {
+      const { data } = await apiClient.patch(`/clients/${id}/onboarding-status`, { status });
+      return mapClient(data.data);
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(['clients', id], updated);
+      qc.invalidateQueries({ queryKey: ['clients'], refetchType: 'none' });
+    },
+  });
+}
+
+export function usePatchClientNotes(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (internalNotes: string | null) => {
+      const { data } = await apiClient.patch(`/clients/${id}/notes`, { internalNotes });
+      return mapClient(data.data);
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(['clients', id], updated);
+    },
   });
 }
 

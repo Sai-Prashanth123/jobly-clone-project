@@ -21,6 +21,8 @@ router.get('/:id', requireRole('admin','operations','finance','employee'), ctrl.
 router.put('/:id', requireRole('admin'), validateBody(updateClientSchema), ctrl.update);
 router.delete('/:id', requireRole('admin'), ctrl.remove);
 
+router.patch('/:id/onboarding-status', requireRole('admin', 'hr'), ctrl.patchOnboardingStatus);
+router.patch('/:id/notes', requireRole('admin', 'hr'), ctrl.patchClientNotes);
 router.post('/:id/documents', requireRole('admin'), upload.single('file'), ctrl.uploadDoc);
 
 export default router;

@@ -20,6 +20,7 @@ function sanitizeAssignment(body: Partial<Assignment>) {
     billingType: blank(body.billingType),
     workLocation: blank(body.workLocation),
     reportingManagerId: blank(body.reportingManagerId),
+    notes: body.notes ?? null,
   };
 }
 
@@ -45,9 +46,12 @@ function mapAssignment(raw: any): Assignment {
     updatedAt: raw.updated_at,
     // Joined from the server (employees/clients) so the list never needs a
     // per-row fetch and deleted-employee rows still render a name.
+    notes: raw.notes ?? undefined,
     employeeName: raw.employee_name ?? undefined,
     employeeDisplayId: raw.employee_display_id ?? undefined,
+    employeeEmail: raw.employee_email ?? undefined,
     clientName: raw.client_name ?? undefined,
+    reportingManagerName: raw.reporting_manager_name ?? undefined,
     createdByName: raw.created_by_user?.name ?? undefined,
     createdByRole: raw.created_by_user?.role ?? undefined,
     updatedByName: raw.updated_by_user?.name ?? undefined,

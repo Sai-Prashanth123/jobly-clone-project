@@ -16,6 +16,7 @@ export const createAssignmentSchema = z.object({
   billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),
   workLocation: z.string().optional().nullable().transform(v => v || null),
   reportingManagerId: z.string().uuid().optional().nullable(),
+  notes: z.string().optional().nullable(),
 }).refine(
   v => !v.endDate || v.endDate >= v.startDate,
   { message: 'End date must be on or after start date', path: ['endDate'] },
@@ -37,6 +38,7 @@ export const updateAssignmentSchema = z.object({
   billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),
   workLocation: z.string().optional().nullable().transform(v => v || null),
   reportingManagerId: z.string().uuid().optional().nullable(),
+  notes: z.string().optional().nullable(),
 }).refine(
   v => !(v.startDate && v.endDate) || v.endDate >= v.startDate,
   { message: 'End date must be on or after start date', path: ['endDate'] },

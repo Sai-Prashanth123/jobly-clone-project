@@ -92,7 +92,7 @@ export default function TaxDocuments() {
       )}
 
       <Dialog open={open} onOpenChange={v => { if (!v) setOpen(false); }}>
-        <DialogContent className="w-[95vw] max-w-md">
+        <DialogContent className="w-[95vw] max-w-md" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Generate Tax Document</DialogTitle></DialogHeader>
           {error && <p className="text-sm text-red-600 flex gap-1"><AlertCircle className="h-4 w-4 mt-0.5" />{error}</p>}
           <div className="space-y-3">

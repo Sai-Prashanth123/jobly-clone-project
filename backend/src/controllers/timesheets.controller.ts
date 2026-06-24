@@ -104,6 +104,13 @@ export async function exportTimesheets(req: Request, res: Response, next: NextFu
   } catch (err) { next(err); }
 }
 
+export async function patchHrNotes(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.patchHrNotes(req.params.id, req.body.hrNotes ?? null, req.user!.role);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function bulkTimesheetStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const { ids, status } = req.body as { ids: string[]; status: string };

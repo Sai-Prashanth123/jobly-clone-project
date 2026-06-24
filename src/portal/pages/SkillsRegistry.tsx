@@ -46,7 +46,7 @@ function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string;
         </div>
       )}
       <Dialog open={open} onOpenChange={v => { if (!v) setOpen(false); }}>
-        <DialogContent className="w-[95vw] max-w-sm">
+        <DialogContent className="w-[95vw] max-w-sm" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Add Skill for {employeeName}</DialogTitle></DialogHeader>
           {error && <p className="text-xs text-red-600 flex gap-1"><AlertCircle className="h-3.5 w-3.5" />{error}</p>}
           <div className="space-y-3">

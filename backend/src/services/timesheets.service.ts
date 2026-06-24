@@ -9,8 +9,10 @@ import type {
   PatchTimesheetStatusInput, ListTimesheetsQuery,
 } from '../schemas/timesheet.schema';
 
+const TS_SELECT = '*, timesheet_entries(*), employees!employee_id(first_name, last_name, work_email)';
+
 export async function listTimesheets(query: ListTimesheetsQuery, userRole?: string, userId?: string) {
-  let q = supabaseAdmin.from('timesheets').select('*, timesheet_entries(*)', { count: 'exact' });
+  let q = supabaseAdmin.from('timesheets').select(TS_SELECT, { count: 'exact' });
 
   if (userRole === 'employee' && userId) {
     const { data: portalUser } = await supabaseAdmin
@@ -52,10 +54,22 @@ export async function listTimesheets(query: ListTimesheetsQuery, userRole?: stri
 export async function getTimesheet(id: string) {
   const { data, error } = await supabaseAdmin
     .from('timesheets')
-    .select('*, timesheet_entries(*)')
+    .select(TS_SELECT)
     .eq('id', id)
     .single();
 
+  if (error || !data) throw new NotFoundError('Timesheet not found');
+  return data;
+}
+
+export async function patchHrNotes(id: string, hrNotes: string | null, actorRole: string) {
+  if (actorRole !== 'admin' && actorRole !== 'hr') {
+    throw new ForbiddenError('Only admin or HR can update notes.');
+  }
+  const { data, error } = await supabaseAdmin
+    .from('timesheets')
+    .update({ hr_notes: hrNotes ?? null })
+    .eq('id', id).select(TS_SELECT).single();
   if (error || !data) throw new NotFoundError('Timesheet not found');
   return data;
 }

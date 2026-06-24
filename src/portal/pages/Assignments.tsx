@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -16,7 +17,8 @@ import type { Assignment } from '../types';
 export default function Assignments() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading } = useAssignments({ limit: 100 });
+  const [statusFilter, setStatusFilter] = useState<string>('');
+  const { data, isLoading } = useAssignments({ status: statusFilter || undefined, limit: 100 });
   const createAssignment = useCreateAssignment();
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Assignment | null>(null);
@@ -128,6 +130,21 @@ export default function Assignments() {
           ) : undefined
         }
       />
+
+      <div className="flex items-center gap-3 mb-4">
+        <Select value={statusFilter || '__all__'} onValueChange={v => setStatusFilter(v === '__all__' ? '' : v)}>
+          <SelectTrigger className="w-40">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__all__">All Statuses</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="pending">Pending</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="terminated">Terminated</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20">

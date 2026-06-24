@@ -191,7 +191,7 @@ export default function MyReview() {
 
       {/* Self-assessment / Peer nomination dialog */}
       <Dialog open={!!activeCycle} onOpenChange={v => { if (!v) setActiveCycle(null); }}>
-        <DialogContent className="w-[95vw] max-w-xl">
+        <DialogContent className="w-[95vw] max-w-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{activeCycle?.name}</DialogTitle>
           </DialogHeader>

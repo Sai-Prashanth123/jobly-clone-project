@@ -11,7 +11,7 @@ import type { CreateAssignmentInput, UpdateAssignmentInput, ListAssignmentsQuery
 // `employees!employee_id` disambiguates the embed — assignments has TWO FKs to
 // employees (employee_id + reporting_manager_id), so a bare `employees(...)`
 // embed is ambiguous and 500s. The column hint pins it to the assignee.
-const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, display_id), clients(company_name), created_by_user:portal_users!created_by(name, role), updated_by_user:portal_users!updated_by(name, role)';
+const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, display_id, work_email), clients(company_name), created_by_user:portal_users!created_by(name, role), updated_by_user:portal_users!updated_by(name, role), reporting_manager:employees!reporting_manager_id(first_name, last_name)';
 
 // Flatten the joined rows to snake_case fields the frontend mapper reads, and
 // overlay a read-time "completed" status: if the engagement's end date has
@@ -21,6 +21,7 @@ const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, displ
 function decorateAssignment(row: any): any {
   const emp = row.employees;
   const cli = row.clients;
+  const mgr = row.reporting_manager;
   let status = row.status;
   if (row.end_date && row.end_date < todayUTC() && (status === 'active' || status === 'pending')) {
     status = 'completed';
@@ -30,9 +31,12 @@ function decorateAssignment(row: any): any {
     status,
     employee_name: emp ? `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() : null,
     employee_display_id: emp?.display_id ?? null,
+    employee_email: emp?.work_email ?? null,
     client_name: cli?.company_name ?? null,
+    reporting_manager_name: mgr ? `${mgr.first_name ?? ''} ${mgr.last_name ?? ''}`.trim() : null,
     employees: undefined,
     clients: undefined,
+    reporting_manager: undefined,
     created_by_user: row.created_by_user ?? null,
     updated_by_user: row.updated_by_user ?? null,
   };
@@ -103,6 +107,7 @@ export async function createAssignment(input: CreateAssignmentInput, actorId?: s
       billing_type: input.billingType ?? null,
       work_location: input.workLocation ?? null,
       reporting_manager_id: input.reportingManagerId ?? null,
+      notes: input.notes ?? null,
       created_by: actorId ?? null,
     })
     .select()
@@ -160,6 +165,7 @@ export async function updateAssignment(id: string, input: UpdateAssignmentInput,
   if (input.billingType !== undefined) updateData.billing_type = input.billingType;
   if (input.workLocation !== undefined) updateData.work_location = input.workLocation;
   if (input.reportingManagerId !== undefined) updateData.reporting_manager_id = input.reportingManagerId;
+  if (input.notes !== undefined) updateData.notes = input.notes;
   if (actorId) updateData.updated_by = actorId;
 
   const { data, error } = await supabaseAdmin

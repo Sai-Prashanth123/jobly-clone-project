@@ -134,6 +134,15 @@ export async function deleteClientProof(req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 }
 
+export async function patchEntries(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { entries, notes } = req.body as { entries: any[]; notes?: string | null };
+    if (!Array.isArray(entries)) { res.status(400).json({ success: false, error: 'entries must be an array' }); return; }
+    const data = await svc.patchEntriesByAdmin(req.params.id, entries, notes, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function patchHrNotes(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.patchHrNotes(req.params.id, req.body.hrNotes ?? null, req.user!.role);

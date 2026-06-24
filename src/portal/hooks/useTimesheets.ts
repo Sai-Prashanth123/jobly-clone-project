@@ -31,6 +31,8 @@ function mapTimesheet(raw: any): Timesheet {
     leaveReason: raw.leave_reason ?? undefined,
     clientSignedUrl: raw.client_signed_url ?? undefined,
     clientSignedFilename: raw.client_signed_filename ?? undefined,
+    hrNotes: raw.hr_notes ?? undefined,
+    employeeEmail: raw.employees?.work_email ?? undefined,
   };
 }
 
@@ -197,5 +199,16 @@ export function useDeleteTimesheet() {
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/timesheets/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets'] }),
+  });
+}
+
+export function usePatchTimesheetHrNotes(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (hrNotes: string) => {
+      const { data } = await apiClient.patch(`/timesheets/${id}/hr-notes`, { hrNotes });
+      return mapTimesheet(data.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['timesheets', id] }),
   });
 }

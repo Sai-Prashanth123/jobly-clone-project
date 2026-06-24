@@ -324,6 +324,8 @@ export interface Client {
   taxId?: string;
   documents: ClientDocument[];
   status: 'active' | 'inactive';
+  onboardingStatus?: 'not_started' | 'in_progress' | 'completed';
+  internalNotes?: string;
   createdByName?: string;
   createdByRole?: string;
   createdAt: string;
@@ -348,10 +350,13 @@ export interface Assignment {
   reportingManagerId?: string;
   createdAt: string;
   updatedAt: string;
+  notes?: string;
   // Joined read-only fields from the server (employee + client names).
   employeeName?: string;
   employeeDisplayId?: string;
+  employeeEmail?: string;
   clientName?: string;
+  reportingManagerName?: string;
   createdByName?: string;
   createdByRole?: string;
   updatedByName?: string;
@@ -387,6 +392,8 @@ export interface Timesheet {
   leaveReason?: string;
   clientSignedUrl?: string;
   clientSignedFilename?: string;
+  hrNotes?: string;
+  employeeEmail?: string;
 }
 
 export interface InvoiceLineItem {

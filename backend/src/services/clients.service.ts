@@ -81,6 +81,7 @@ export async function createClient(input: CreateClientInput, actorId?: string) {
       billing_country: rest.billingCountry ?? null,
       tax_id: rest.taxId ?? null,
       status: rest.status,
+      onboarding_status: 'not_started',
       created_by: actorId ?? null,
     })
     .select()
@@ -116,6 +117,8 @@ export async function updateClient(id: string, input: UpdateClientInput) {
   if (input.billingCountry !== undefined) updateData.billing_country = input.billingCountry;
   if (input.taxId !== undefined) updateData.tax_id = input.taxId;
   if (input.status !== undefined) updateData.status = input.status;
+  if (input.onboardingStatus !== undefined) updateData.onboarding_status = input.onboardingStatus;
+  if (input.internalNotes !== undefined) updateData.internal_notes = input.internalNotes;
   if (input.address) {
     updateData.address_street = input.address.street ?? '';
     updateData.address_city = input.address.city ?? '';
@@ -132,6 +135,30 @@ export async function updateClient(id: string, input: UpdateClientInput) {
     .single();
 
   if (error) throw error;
+  return data;
+}
+
+export async function patchOnboardingStatus(id: string, status: string, actorId?: string) {
+  const { data, error } = await supabaseAdmin
+    .from('clients')
+    .update({ onboarding_status: status })
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select()
+    .single();
+  if (error || !data) throw new NotFoundError('Client not found');
+  return data;
+}
+
+export async function patchClientNotes(id: string, notes: string | null, actorId?: string) {
+  const { data, error } = await supabaseAdmin
+    .from('clients')
+    .update({ internal_notes: notes ?? null })
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select()
+    .single();
+  if (error || !data) throw new NotFoundError('Client not found');
   return data;
 }
 

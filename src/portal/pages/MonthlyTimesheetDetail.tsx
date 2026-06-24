@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Download, CheckCircle2, XCircle, FileText, Mail } from 'lucide-react';
+import { ArrowLeft, Loader2, Download, CheckCircle2, XCircle, FileText, Mail, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,12 +8,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { PageHeader } from '../components/shared/PageHeader';
 import { StatCard } from '../components/shared/StatCard';
 import { StatusBadge } from '../components/shared/StatusBadge';
-import { useMonthlyTimesheet, usePatchMonthlyStatus, usePatchHrNotes } from '../hooks/useMonthlyTimesheets';
+import { useMonthlyTimesheet, usePatchMonthlyStatus, usePatchHrNotes, usePatchMonthlyTimesheetEntries } from '../hooks/useMonthlyTimesheets';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { formatDate } from '../lib/utils';
 import { MONTHS, monthLabel } from '../lib/monthUtils';
-import type { MonthlyDayStatus } from '../types';
+import type { MonthlyDayStatus, MonthlyTimesheetEntry } from '../types';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
 const PILL: Record<MonthlyDayStatus, string> = {
@@ -31,12 +31,15 @@ export default function MonthlyTimesheetDetail() {
   const { data: sheet, isLoading } = useMonthlyTimesheet(id);
   const patchStatus = usePatchMonthlyStatus(id!);
   const patchHrNotes = usePatchHrNotes(id!);
+  const patchEntries = usePatchMonthlyTimesheetEntries(id!);
   const [approveOpen, setApproveOpen] = useState(false);
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [downloading, setDownloading] = useState(false);
   const [hrNotes, setHrNotes] = useState<string | undefined>(undefined);
   const hrNotesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [editEntriesOpen, setEditEntriesOpen] = useState(false);
+  const [editEntries, setEditEntries] = useState<MonthlyTimesheetEntry[]>([]);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -133,6 +136,12 @@ export default function MonthlyTimesheetDetail() {
                   <Mail className="h-4 w-4" /> Contact
                 </Button>
               </a>
+            )}
+            {isHrAdmin && (
+              <Button variant="outline" size="sm" className="gap-1.5"
+                onClick={() => { setEditEntries([...sheet.entries]); setEditEntriesOpen(true); }}>
+                <Edit className="h-4 w-4" /> Edit Entries
+              </Button>
             )}
             <Button variant="outline" size="sm" onClick={handleDownload} loading={downloading} loadingText="Preparing…" className="gap-1.5">
               <Download className="h-4 w-4" /> PDF
@@ -276,6 +285,80 @@ export default function MonthlyTimesheetDetail() {
       )}
 
       <EntityAuditTrail entityType="monthly_timesheet" entityId={sheet?.id} />
+
+      <Dialog open={editEntriesOpen} onOpenChange={setEditEntriesOpen}>
+        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>Edit Entries — {monthLabel(sheet.year, sheet.month)}</DialogTitle>
+            <DialogDescription>Adjust daily hours and status as admin/HR. Changes bypass the status lock.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
+                    <th className="px-3 py-2 text-left w-24">Date</th>
+                    <th className="px-3 py-2 text-left w-12">Day</th>
+                    <th className="px-3 py-2 text-center w-20">Hours</th>
+                    <th className="px-3 py-2 text-center w-28">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {editEntries.map((e, i) => (
+                    <tr key={e.date} className="border-b border-gray-100">
+                      <td className="px-3 py-1 font-mono text-xs text-gray-600">{e.date}</td>
+                      <td className="px-3 py-1 text-xs text-gray-500">{e.dayOfWeek}</td>
+                      <td className="px-3 py-1 text-center">
+                        <input
+                          type="number" min={0} max={24} step={0.5}
+                          value={e.hours}
+                          disabled={e.status === 'weekend' || e.status === 'holiday'}
+                          onChange={ev => {
+                            const updated = [...editEntries];
+                            updated[i] = { ...updated[i], hours: Number(ev.target.value) || 0 };
+                            setEditEntries(updated);
+                          }}
+                          className="w-16 text-center rounded border border-gray-200 px-2 py-0.5 text-xs focus:outline-none focus:border-[#4069FF] disabled:bg-gray-50 disabled:text-gray-400"
+                        />
+                      </td>
+                      <td className="px-3 py-1 text-center">
+                        <select
+                          value={e.status}
+                          onChange={ev => {
+                            const updated = [...editEntries];
+                            updated[i] = { ...updated[i], status: ev.target.value as MonthlyDayStatus };
+                            setEditEntries(updated);
+                          }}
+                          className="rounded border border-gray-200 px-2 py-0.5 text-xs focus:outline-none focus:border-[#4069FF]"
+                        >
+                          <option value="present">Present</option>
+                          <option value="leave">Leave</option>
+                          <option value="absent">Absent</option>
+                          <option value="holiday">Holiday</option>
+                          <option value="weekend">Weekend</option>
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditEntriesOpen(false)}>Cancel</Button>
+            <Button
+              loading={patchEntries.isPending} loadingText="Saving…"
+              onClick={async () => {
+                try {
+                  await patchEntries.mutateAsync({ entries: editEntries });
+                  toast.success('Entries updated');
+                  setEditEntriesOpen(false);
+                } catch {}
+              }}
+            >Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={approveOpen} onOpenChange={setApproveOpen}>
         <DialogContent className="w-[95vw] max-w-sm">

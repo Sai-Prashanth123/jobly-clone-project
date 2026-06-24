@@ -66,7 +66,7 @@ export default function HolidaysSettings() {
       )}
 
       <Dialog open={open} onOpenChange={v => { if (!v) setOpen(false); }}>
-        <DialogContent className="w-[95vw] max-w-sm">
+        <DialogContent className="w-[95vw] max-w-sm" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>{editing ? 'Edit Holiday' : 'Add Holiday'}</DialogTitle></DialogHeader>
           {error && <p className="text-sm text-red-600 flex gap-1"><AlertCircle className="h-4 w-4 mt-0.5" />{error}</p>}
           <div className="space-y-3">

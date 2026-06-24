@@ -532,6 +532,18 @@ export async function uploadMonthlyClientProof(
   return updated;
 }
 
+export async function patchEntriesByAdmin(id: string, entries: MonthlyEntry[], notes: string | null | undefined, actorId?: string) {
+  const row = await getMonthlyTimesheet(id);
+  const summary = computeSummary(entries);
+  const { data, error } = await supabaseAdmin
+    .from('monthly_timesheets')
+    .update({ entries, notes: notes ?? row.notes ?? null, ...summary })
+    .eq('id', id).select(EMP_JOIN).single();
+  if (error || !data) throw new NotFoundError('Monthly timesheet not found');
+  logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  return data;
+}
+
 export async function patchHrNotes(id: string, hrNotes: string | null, actorRole: string) {
   if (actorRole !== 'admin' && actorRole !== 'hr') {
     throw new ForbiddenError('Only admin or HR can update notes.');

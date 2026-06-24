@@ -89,6 +89,18 @@ export default function PortalClients() {
       sortable: true,
     },
     {
+      key: 'onboardingStatus',
+      header: 'Onboarding',
+      hideOnMobile: true,
+      render: (c: Client) => {
+        const labels: Record<string, string> = { not_started: 'Not Started', in_progress: 'In Progress', completed: 'Completed' };
+        const colors: Record<string, string> = { not_started: 'bg-gray-100 text-gray-600', in_progress: 'bg-amber-100 text-amber-700', completed: 'bg-emerald-100 text-emerald-700' };
+        const s = c.onboardingStatus ?? 'not_started';
+        return <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${colors[s] ?? 'bg-gray-100 text-gray-600'}`}>{labels[s] ?? s}</span>;
+      },
+      getValue: c => c.onboardingStatus ?? 'not_started',
+    },
+    {
       key: 'createdBy',
       header: 'Created By',
       hideOnMobile: true,

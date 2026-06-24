@@ -29,6 +29,8 @@ export const createClientSchema = z.object({
   billingCountry: z.string().optional().nullable().transform(v => v || null),
   taxId: z.string().optional().nullable().transform(v => v || null),
   status: z.enum(['active','inactive']).default('active'),
+  onboardingStatus: z.enum(['not_started','in_progress','completed']).optional(),
+  internalNotes: z.string().optional().nullable(),
 });
 
 export const updateClientSchema = createClientSchema.partial();

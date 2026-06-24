@@ -32,6 +32,9 @@ router.patch('/:id/status', requireRole('admin', 'hr', 'employee'), validateBody
 // HR notes (admin/hr only — employee never sees nor edits these).
 router.patch('/:id/hr-notes', requireRole('admin', 'hr'), ctrl.patchHrNotes);
 
+// Admin/HR direct entry edit — skips status guard and closed-month guard.
+router.patch('/:id/entries', requireRole('admin', 'hr'), ctrl.patchEntries);
+
 // Client-signed timesheet proof — required at submit-time when total_hours > 0.
 // Employee can only upload to their own timesheet (controller enforces).
 router.post('/:id/client-proof', requireRole('admin', 'hr', 'employee'), documentUpload.single('file'), ctrl.uploadClientProof);

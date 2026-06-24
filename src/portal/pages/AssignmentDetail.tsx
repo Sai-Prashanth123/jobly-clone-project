@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Edit, Trash2, ArrowLeft, Loader2 } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
@@ -71,19 +71,29 @@ export default function AssignmentDetail() {
             </div>
           </div>
         </div>
-        {canEdit && (
-          <div className="flex flex-wrap gap-2 flex-shrink-0">
-            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
-              <Edit className="h-4 w-4" />
-              Edit
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
-              className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
-              <Trash2 className="h-4 w-4" />
-              Delete
-            </Button>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-2 flex-shrink-0">
+          {assignment.employeeEmail && (
+            <a href={`mailto:${assignment.employeeEmail}?subject=Re: Assignment ${assignment.displayId ?? ''}`}>
+              <Button variant="outline" size="sm" className="gap-2">
+                <Mail className="h-4 w-4" />
+                Contact Employee
+              </Button>
+            </a>
+          )}
+          {canEdit && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
+                className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
@@ -97,6 +107,9 @@ export default function AssignmentDetail() {
             <Field label="Start Date" value={formatDate(assignment.startDate)} />
             <Field label="End Date" value={assignment.endDate ? formatDate(assignment.endDate) : 'Ongoing'} />
             <Field label="Max Hours/Week" value={`${assignment.maxHoursPerWeek} hrs`} />
+            {assignment.billingType && <Field label="Billing Type" value={assignment.billingType.charAt(0).toUpperCase() + assignment.billingType.slice(1)} />}
+            {assignment.workLocation && <Field label="Work Location" value={assignment.workLocation} />}
+            {assignment.reportingManagerName && <Field label="Reporting Manager" value={assignment.reportingManagerName} />}
           </CardContent>
         </Card>
 
@@ -123,6 +136,15 @@ export default function AssignmentDetail() {
             </div>
           </CardContent>
         </Card>
+
+        {assignment.notes && (
+          <Card className="lg:col-span-3">
+            <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">{assignment.notes}</p>
+            </CardContent>
+          </Card>
+        )}
 
         <Card className="lg:col-span-3">
           <CardHeader><CardTitle className="text-base">Metadata</CardTitle></CardHeader>

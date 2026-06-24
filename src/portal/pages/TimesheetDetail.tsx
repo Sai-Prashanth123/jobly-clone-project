@@ -2,7 +2,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { ArrowLeft, Trash2, Loader2, Check, AlertCircle, Pencil, Lock, Upload, FileText } from 'lucide-react';
+import { ArrowLeft, Trash2, Loader2, Check, AlertCircle, Pencil, Lock, Upload, FileText, Mail } from 'lucide-react';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,7 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { TimesheetWeekGrid } from '../components/timesheets/TimesheetWeekGrid';
 import { TimesheetApprovalActions } from '../components/timesheets/TimesheetApprovalActions';
-import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useDeleteTimesheet, useUploadWeeklyClientProof, useDeleteWeeklyClientProof, useTimesheetLeaveCheck } from '../hooks/useTimesheets';
+import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useDeleteTimesheet, useUploadWeeklyClientProof, useDeleteWeeklyClientProof, useTimesheetLeaveCheck, usePatchTimesheetHrNotes } from '../hooks/useTimesheets';
 import { useEmployee } from '../hooks/useEmployees';
 import { useClient } from '../hooks/useClients';
 import { useAssignment } from '../hooks/useAssignments';
@@ -46,9 +46,12 @@ export default function TimesheetDetail() {
   const deleteTimesheet = useDeleteTimesheet();
   const uploadProof = useUploadWeeklyClientProof(id!);
   const deleteProof = useDeleteWeeklyClientProof(id!);
+  const patchHrNotes = usePatchTimesheetHrNotes(id!);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [notes, setNotes] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
+  const [hrNotes, setHrNotes] = useState<string | undefined>(undefined);
+  const hrNotesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [localEntries, setLocalEntries] = useState<TimesheetEntry[]>([]);
   const hasUserEdited = useRef(false);
@@ -62,6 +65,7 @@ export default function TimesheetDetail() {
 
   const isOwner = user?.employeeId === timesheet?.employeeId;
   const isAdmin = user?.role === 'admin';
+  const isHrAdmin = user?.role === 'admin' || user?.role === 'hr';
   const isOps = user?.role === 'operations';
   const editableStatus = timesheet?.status === 'draft' || timesheet?.status === 'rejected';
   // Admin can edit any status; ops + owner are bound to draft/rejected.
@@ -226,6 +230,14 @@ export default function TimesheetDetail() {
           </div>
         </div>
         <div className="flex flex-wrap gap-2 flex-shrink-0">
+          {isHrAdmin && timesheet.employeeEmail && (
+            <a href={`mailto:${timesheet.employeeEmail}?subject=Regarding your timesheet ${timesheet.displayId ?? ''}`}>
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <Mail className="h-4 w-4" />
+                Contact
+              </Button>
+            </a>
+          )}
           <TimesheetApprovalActions
             timesheet={timesheet}
             onStatusChange={handleStatusChange}
@@ -565,6 +577,37 @@ export default function TimesheetDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {isHrAdmin && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">HR Notes</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <textarea
+              value={hrNotes ?? timesheet.hrNotes ?? ''}
+              onChange={e => {
+                const val = e.target.value;
+                setHrNotes(val);
+                if (hrNotesSaveTimer.current) clearTimeout(hrNotesSaveTimer.current);
+                hrNotesSaveTimer.current = setTimeout(() => { patchHrNotes.mutate(val); }, 1500);
+              }}
+              rows={3}
+              placeholder="Internal notes visible to HR and admin only…"
+              className="w-full rounded-md border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:border-[#4069FF]"
+            />
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Auto-saves after 1.5 s of inactivity</span>
+              <Button size="sm" variant="outline" loading={patchHrNotes.isPending} loadingText="Saving…"
+                onClick={async () => {
+                  try { await patchHrNotes.mutateAsync(hrNotes ?? timesheet.hrNotes ?? ''); toast.success('Notes saved.'); } catch {}
+                }}>
+                Save Notes
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <EntityAuditTrail entityType="timesheet" entityId={timesheet?.id} />
 

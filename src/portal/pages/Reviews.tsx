@@ -354,7 +354,7 @@ export default function Reviews() {
 
       {/* Create dialog */}
       <Dialog open={createOpen} onOpenChange={v => { if (!v) setCreateOpen(false); }}>
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>New Review Cycle</DialogTitle></DialogHeader>
           <CycleForm />
           <DialogFooter>
@@ -366,7 +366,7 @@ export default function Reviews() {
 
       {/* Edit dialog */}
       <Dialog open={!!editCycle} onOpenChange={v => { if (!v) setEditCycle(null); }}>
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Edit Cycle</DialogTitle></DialogHeader>
           <CycleForm />
           <DialogFooter>
@@ -378,7 +378,7 @@ export default function Reviews() {
 
       {/* Add participant dialog */}
       <Dialog open={addParticipantOpen} onOpenChange={setAddParticipantOpen}>
-        <DialogContent className="w-[95vw] max-w-md">
+        <DialogContent className="w-[95vw] max-w-md" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Add Participant</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
@@ -416,7 +416,7 @@ export default function Reviews() {
 
       {/* Manager review dialog */}
       <Dialog open={!!mgrReviewOpen} onOpenChange={v => { if (!v) setMgrReviewOpen(null); }}>
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Manager Review</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">

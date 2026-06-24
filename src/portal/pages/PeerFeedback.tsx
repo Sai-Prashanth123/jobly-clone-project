@@ -141,7 +141,7 @@ export default function PeerFeedback() {
 
       {/* Feedback dialog */}
       <Dialog open={!!activeRequest} onOpenChange={v => { if (!v) setActiveRequest(null); }}>
-        <DialogContent className="w-[95vw] max-w-lg">
+        <DialogContent className="w-[95vw] max-w-lg" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Feedback for {activeRequest?.revieweeName ?? 'Colleague'}</DialogTitle>
           </DialogHeader>

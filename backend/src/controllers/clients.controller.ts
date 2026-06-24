@@ -38,6 +38,25 @@ export async function remove(req: Request, res: Response, next: NextFunction): P
   } catch (err) { next(err); }
 }
 
+export async function patchOnboardingStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { status } = req.body as { status: string };
+    if (!['not_started', 'in_progress', 'completed'].includes(status)) {
+      res.status(400).json({ success: false, error: 'Invalid onboarding status' });
+      return;
+    }
+    const data = await svc.patchOnboardingStatus(req.params.id, status, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function patchClientNotes(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.patchClientNotes(req.params.id, req.body.internalNotes ?? null, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function uploadDoc(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const file = req.file;
