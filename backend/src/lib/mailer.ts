@@ -11,7 +11,66 @@ function esc(value: unknown): string {
   return String(value).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
-// Azure Communication Services Email transport.
+// ── Shared premium email shell ───────────────────────────────────────────────
+// All transactional emails use this wrapper for consistent branding.
+// `body` is trusted HTML — callers must use esc() on any user data inside it.
+function emailShell(opts: {
+  previewText: string;
+  gradient: string;   // full CSS gradient string for the header
+  emoji: string;      // large emoji for the header icon (safe, not user data)
+  title: string;      // already-escaped header title
+  subtitle: string;   // already-escaped header subtitle
+  body: string;       // full body HTML (caller's responsibility to escape user data)
+}): string {
+  const { previewText, gradient, emoji, title, subtitle, body } = opts;
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light">
+</head>
+<body style="margin:0;padding:0;background:#eef2ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#eef2ff;">${esc(previewText)}&nbsp;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;</div>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#eef2ff;padding:40px 16px;">
+<tr><td align="center">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;">
+
+  <!-- Header -->
+  <tr><td style="background:${gradient};border-radius:16px 16px 0 0;padding:36px 48px 32px;">
+    <table cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+      <tr><td style="background:rgba(255,255,255,0.18);border-radius:8px;padding:5px 11px;">
+        <span style="font-size:12px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#ffffff;">JOBLY</span>
+      </td></tr>
+    </table>
+    <div style="font-size:36px;line-height:1;margin-bottom:14px;">${emoji}</div>
+    <h1 style="margin:0 0 8px;color:#ffffff;font-size:24px;font-weight:800;line-height:1.25;letter-spacing:-0.01em;">${title}</h1>
+    <p style="margin:0;color:rgba(255,255,255,0.82);font-size:14px;line-height:1.5;">${subtitle}</p>
+  </td></tr>
+
+  <!-- Body -->
+  <tr><td style="background:#ffffff;padding:36px 48px;">
+    ${body}
+  </td></tr>
+
+  <!-- Footer -->
+  <tr><td style="background:#f5f7ff;border-radius:0 0 16px 16px;padding:20px 48px;border-top:1px solid #e4eaff;">
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+      <tr>
+        <td><p style="margin:0 0 2px;font-size:13px;font-weight:700;color:#4069FF;">Jobly Solutions</p><p style="margin:0;font-size:11px;color:#9ca3af;">Workforce Management Portal</p></td>
+        <td align="right"><p style="margin:0;font-size:11px;color:#c4cdd6;">&copy; 2026 Jobly Solutions. All rights reserved.</p></td>
+      </tr>
+    </table>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>`;
+}
+
+// ── Azure Communication Services Email transport ──────────────────────────────
 // Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.
 // ACS_SENDER_ADDRESS is pre-configured to the Azure-managed domain provisioned
 // during setup; override with ACS_SENDER_ADDRESS env var if domain changes.
@@ -146,8 +205,8 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
   const tableRows = rows
     .map(([label, value]) => `
       <tr>
-        <td style="padding:8px 12px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;">${esc(label)}</td>
-        <td style="padding:8px 12px;color:#111827;font-size:13px;font-weight:500;border-bottom:1px solid #f3f4f6;">${esc(value)}</td>
+        <td style="padding:10px 16px;color:#8b9fc9;font-size:13px;border-bottom:1px solid #eef2ff;width:40%;font-weight:500;">${esc(label)}</td>
+        <td style="padding:10px 16px;color:#111827;font-size:13px;font-weight:600;border-bottom:1px solid #eef2ff;">${esc(value)}</td>
       </tr>`)
     .join('');
 
@@ -155,117 +214,59 @@ export async function sendWelcomeEmail(payload: WelcomeEmailPayload): Promise<vo
     ? 'Welcome aboard! HR has added you to the Jobly Workforce Portal. Below are your onboarding details and your temporary login credentials &mdash; please log in and change your password right away.'
     : 'Your Jobly Workforce Portal account is active. Use the button below to log in. If you ever forget your password, use &ldquo;Forgot password?&rdquo; on the login page.');
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+  const welcomeBody = `
+<p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.7;">Hi <strong style="color:#111827;">${esc(firstName)} ${esc(lastName)}</strong>,</p>
+<p style="margin:0 0 28px;color:#6b7280;font-size:14px;line-height:1.7;">${intro}</p>
 
-        <!-- Header -->
-        <tr>
-          <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Welcome to Jobly Portal</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${showCreds ? 'Your employee account is ready' : 'Account update'}</p>
-          </td>
-        </tr>
+${rows.length ? `
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;border-radius:12px;border:1px solid #e4eaff;overflow:hidden;">
+  <tr style="background:#f5f7ff;"><th colspan="2" style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;border-bottom:1px solid #e4eaff;">Your Details</th></tr>
+  ${tableRows}
+</table>` : ''}
 
-        <!-- Body -->
-        <tr>
-          <td style="padding:32px 40px;">
-            <p style="margin:0 0 24px;color:#374151;font-size:15px;">Hi <strong>${esc(firstName)} ${esc(lastName)}</strong>,</p>
-            <p style="margin:0 0 24px;color:#374151;font-size:14px;line-height:1.6;">
-              ${intro}
-            </p>
+${showCreds ? `
+<p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#9ca3af;">Your Login Credentials</p>
+<div style="background:#f0f4ff;border:2px solid #c7d5ff;border-radius:12px;padding:18px 20px;margin-bottom:12px;">
+  <p style="margin:0 0 5px;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Login Email</p>
+  <p style="margin:0;font-size:17px;font-weight:600;font-family:'Courier New',Courier,monospace;color:#111827;word-break:break-all;">${esc(loginEmail)}</p>
+</div>
+<div style="background:#fffbeb;border:2px solid #fde68a;border-radius:12px;padding:18px 20px;margin-bottom:24px;">
+  <p style="margin:0 0 5px;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#b45309;">Temporary Password</p>
+  <p style="margin:0;font-size:24px;font-weight:800;font-family:'Courier New',Courier,monospace;letter-spacing:5px;color:#d97706;">${esc(tempPassword)}</p>
+</div>
+<p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#374151;">What happens next?</p>
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;width:100%;">
+  <tr><td style="padding:5px 0;vertical-align:top;width:28px;"><div style="width:24px;height:24px;border-radius:50%;background:#4069FF;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:24px;">1</div></td><td style="padding:5px 0 5px 10px;font-size:14px;color:#374151;line-height:1.5;vertical-align:top;">Click the <strong>Log In</strong> button below</td></tr>
+  <tr><td style="padding:5px 0;vertical-align:top;"><div style="width:24px;height:24px;border-radius:50%;background:#4069FF;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:24px;">2</div></td><td style="padding:5px 0 5px 10px;font-size:14px;color:#374151;line-height:1.5;vertical-align:top;">Enter the email and temporary password above</td></tr>
+  <tr><td style="padding:5px 0;vertical-align:top;"><div style="width:24px;height:24px;border-radius:50%;background:#4069FF;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:24px;">3</div></td><td style="padding:5px 0 5px 10px;font-size:14px;color:#374151;line-height:1.5;vertical-align:top;">You'll be prompted to set your own permanent password</td></tr>
+</table>
+<div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;margin-bottom:28px;">
+  <p style="margin:0;font-size:13px;color:#92400e;line-height:1.5;">&#x26A0;&#xFE0F; &nbsp;<strong>Security notice:</strong> Keep this password private. Change it immediately on your first login. Never share it with anyone.</p>
+</div>
+` : (loginEmail ? `
+<div style="background:#f0f4ff;border:2px solid #c7d5ff;border-radius:12px;padding:18px 20px;margin-bottom:28px;">
+  <p style="margin:0 0 5px;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Your Login Email</p>
+  <p style="margin:0;font-size:17px;font-weight:600;font-family:'Courier New',Courier,monospace;color:#111827;word-break:break-all;">${esc(loginEmail)}</p>
+</div>
+` : '')}
 
-            ${rows.length ? `
-            <!-- Details table -->
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px;">
-              <thead>
-                <tr style="background:#f9fafb;">
-                  <th colspan="2" style="padding:10px 12px;text-align:left;font-size:11px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e5e7eb;">
-                    Your Details
-                  </th>
-                </tr>
-              </thead>
-              <tbody>${tableRows}</tbody>
-            </table>
-            ` : ''}
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+  <tr><td align="center">
+    <a href="${esc(PORTAL_URL)}/portal/login" style="display:inline-block;background:linear-gradient(135deg,#4069FF,#0ea5e9);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 42px;border-radius:50px;letter-spacing:0.01em;">
+      Log In to Jobly Portal &rarr;
+    </a>
+  </td></tr>
+</table>
+<p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">Questions? Reach out to your HR team for assistance.</p>`;
 
-            ${showCreds ? `
-            <!-- Login credentials -->
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:2px solid #4069FF;border-radius:8px;overflow:hidden;margin-bottom:28px;">
-              <thead>
-                <tr style="background:#4069FF;">
-                  <th colspan="2" style="padding:10px 16px;text-align:left;font-size:12px;font-weight:700;color:#ffffff;text-transform:uppercase;letter-spacing:0.05em;">
-                    🔐 Your Login Credentials
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr>
-                  <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;width:40%;">Company</td>
-                  <td style="padding:12px 16px;color:#111827;font-size:13px;font-weight:600;border-bottom:1px solid #e5e7eb;">Jobly Solutions</td>
-                </tr>
-                <tr>
-                  <td style="padding:12px 16px;color:#6b7280;font-size:13px;border-bottom:1px solid #e5e7eb;">Username / Email</td>
-                  <td style="padding:12px 16px;color:#111827;font-size:13px;font-weight:600;font-family:monospace;border-bottom:1px solid #e5e7eb;">${esc(loginEmail)}</td>
-                </tr>
-                <tr>
-                  <td style="padding:12px 16px;color:#6b7280;font-size:13px;">Temporary Password</td>
-                  <td style="padding:12px 16px;font-size:15px;font-weight:700;font-family:monospace;letter-spacing:2px;color:#4069FF;">${esc(tempPassword)}</td>
-                </tr>
-              </tbody>
-            </table>
-            <p style="margin:0 0 24px;color:#dc2626;font-size:12px;background:#fef2f2;border:1px solid #fecaca;border-radius:6px;padding:10px 14px;">
-              ⚠️ This is a one-time temporary password. You'll be asked to set your own password the first time you log in.
-            </p>
-            ` : (loginEmail ? `
-            <!-- Login email (no password) -->
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px;">
-              <tbody>
-                <tr>
-                  <td style="padding:12px 16px;color:#6b7280;font-size:13px;width:40%;">Login Email</td>
-                  <td style="padding:12px 16px;color:#111827;font-size:13px;font-weight:600;font-family:monospace;">${esc(loginEmail)}</td>
-                </tr>
-              </tbody>
-            </table>
-            ` : '')}
-
-            <!-- CTA -->
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" style="padding:8px 0 24px;">
-                  <a href="${esc(PORTAL_URL)}/portal/login"
-                     style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
-                    Log In to Jobly Portal →
-                  </a>
-                </td>
-              </tr>
-            </table>
-
-            <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">
-              If you have any questions about your onboarding, please reach out to your HR team.
-            </p>
-          </td>
-        </tr>
-
-        <!-- Footer -->
-        <tr>
-          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">
-              Jobly Solutions · Workforce Management Portal
-            </p>
-          </td>
-        </tr>
-
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  const html = emailShell({
+    previewText: showCreds ? `Welcome ${firstName}! Your Jobly Portal credentials are ready.` : `Your Jobly Portal account — ${firstName} ${lastName}`,
+    gradient: 'linear-gradient(135deg,#4069FF 0%,#0ea5e9 100%)',
+    emoji: showCreds ? '🎉' : '👋',
+    title: showCreds ? 'Welcome to Jobly Portal' : 'Your Jobly Portal Account',
+    subtitle: showCreds ? 'Your employee account is ready — log in to complete your onboarding.' : 'Account update from Jobly Solutions.',
+    body: welcomeBody,
+  });
 
   if (!mailerConfigured) {
     throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
@@ -331,10 +332,10 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
 
   const lineRows = lineItems.map(li => `
     <tr>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;">${li.itemName ? `<strong>${esc(li.itemName)}</strong><br><span style="color:#6b7280;font-size:12px;">${esc(li.description)}</span>` : esc(li.description)}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">${esc(li.quantity)}</td>
-      <td style="padding:10px 12px;font-size:13px;color:#374151;border-bottom:1px solid #f3f4f6;text-align:right;">${fmt(li.unitPrice)}${li.isHours ? '/hr' : ''}</td>
-      <td style="padding:10px 12px;font-size:13px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;text-align:right;">${fmt(li.amount)}</td>
+      <td style="padding:11px 14px;font-size:13px;color:#374151;border-bottom:1px solid #eef2ff;">${li.itemName ? `<strong style="color:#111827;">${esc(li.itemName)}</strong><br><span style="color:#9ca3af;font-size:12px;">${esc(li.description)}</span>` : esc(li.description)}</td>
+      <td style="padding:11px 14px;font-size:13px;color:#6b7280;border-bottom:1px solid #eef2ff;text-align:right;">${esc(li.quantity)}</td>
+      <td style="padding:11px 14px;font-size:13px;color:#6b7280;border-bottom:1px solid #eef2ff;text-align:right;">${fmt(li.unitPrice)}${li.isHours ? '/hr' : ''}</td>
+      <td style="padding:11px 14px;font-size:13px;font-weight:700;color:#111827;border-bottom:1px solid #eef2ff;text-align:right;">${fmt(li.amount)}</td>
     </tr>`).join('');
 
   const discountRow = discountAmount && discountAmount > 0 ? `<tr>
@@ -354,96 +355,76 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
                 <td style="padding:6px 16px;font-size:13px;font-weight:700;color:#111827;text-align:right;">${fmt(balanceDue ?? (totalAmount - amountPaid))}</td>
               </tr>` : '';
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <tr>
-          <td style="background:#ffffff;padding:26px 40px 6px;">
-            <img src="${logoDataUri}" alt="Jobly Solutions" height="40" style="display:block;border:0;outline:none;text-decoration:none;height:40px;width:auto;">
-          </td>
-        </tr>
-        <tr>
-          <td style="background:linear-gradient(135deg,#2563EB,#0F2942);padding:26px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Invoice from Jobly Solutions</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${esc(invoiceNumber)}</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:32px 40px;">
-            <p style="margin:0 0 20px;color:#374151;font-size:15px;">Dear <strong>${esc(contactName)}</strong>,</p>
-            <p style="margin:0 0 28px;color:#374151;font-size:14px;line-height:1.6;">
-              Please find your invoice <strong>attached as a PDF</strong> for services rendered to <strong>${esc(clientName)}</strong>.
-              ${billingPeriodStart && billingPeriodEnd ? `Billing period: <strong>${esc(fmtDate(billingPeriodStart))}</strong> to <strong>${esc(fmtDate(billingPeriodEnd))}</strong>.` : ''}
-            </p>
+  const invoiceBody = `
+<p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.7;">Dear <strong style="color:#111827;">${esc(contactName)}</strong>,</p>
+<p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.7;">
+  Please find your invoice <strong style="color:#374151;">attached as a PDF</strong> for professional services rendered to <strong style="color:#374151;">${esc(clientName)}</strong>.${billingPeriodStart && billingPeriodEnd ? ` Billing period: <strong style="color:#374151;">${esc(fmtDate(billingPeriodStart))}</strong> to <strong style="color:#374151;">${esc(fmtDate(billingPeriodEnd))}</strong>.` : ''}
+</p>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;">
-              <thead>
-                <tr style="background:#f9fafb;">
-                  <th style="padding:10px 12px;text-align:left;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Description</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">${qtyHeader}</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">${priceHeader}</th>
-                  <th style="padding:10px 12px;text-align:right;font-size:11px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Amount</th>
-                </tr>
-              </thead>
-              <tbody>${lineRows}</tbody>
-            </table>
+<!-- Amount due highlight -->
+<div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:12px;padding:20px 24px;margin-bottom:24px;text-align:center;">
+  <p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.65);">Total Amount Due</p>
+  <p style="margin:0 0 8px;font-size:32px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">${fmt(balanceDue ?? totalAmount)}</p>
+  <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.7);">Due by <strong style="color:#fbbf24;">${esc(fmtDate(dueDate))}</strong></p>
+</div>
 
-            <table align="right" cellpadding="0" cellspacing="0" style="margin-bottom:28px;">
-              <tr>
-                <td style="padding:6px 16px;font-size:13px;color:#6b7280;">Subtotal</td>
-                <td style="padding:6px 16px;font-size:13px;color:#111827;text-align:right;">${fmt(subtotal)}</td>
-              </tr>
-              ${discountRow}
-              ${taxRow}
-              <tr style="background:#f9fafb;">
-                <td style="padding:10px 16px;font-size:15px;font-weight:700;color:#111827;border-top:2px solid #e5e7eb;">Total</td>
-                <td style="padding:10px 16px;font-size:15px;font-weight:700;color:#2563EB;border-top:2px solid #e5e7eb;text-align:right;">${fmt(totalAmount)}</td>
-              </tr>
-              ${paidRows}
-            </table>
+<!-- Line items -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:20px;border-radius:10px;border:1px solid #e4eaff;overflow:hidden;">
+  <tr style="background:#f5f7ff;">
+    <th style="padding:10px 14px;text-align:left;font-size:11px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid #e4eaff;">Description</th>
+    <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid #e4eaff;">${qtyHeader}</th>
+    <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid #e4eaff;">${priceHeader}</th>
+    <th style="padding:10px 14px;text-align:right;font-size:11px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.07em;border-bottom:1px solid #e4eaff;">Amount</th>
+  </tr>
+  ${lineRows}
+</table>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:28px;">
-              <tr>
-                <td style="padding:10px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:40%;">Issue Date</td>
-                <td style="padding:10px 16px;font-size:13px;font-weight:500;color:#111827;border-bottom:1px solid #f3f4f6;">${esc(fmtDate(issueDate))}</td>
-              </tr>
-              <tr>
-                <td style="padding:10px 16px;font-size:13px;color:#6b7280;">Payment Due</td>
-                <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#dc2626;">${esc(fmtDate(dueDate))}</td>
-              </tr>
-            </table>
+<!-- Totals -->
+<table align="right" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;min-width:220px;">
+  <tr><td style="padding:5px 16px;font-size:13px;color:#6b7280;">Subtotal</td><td style="padding:5px 16px;font-size:13px;color:#111827;text-align:right;">${fmt(subtotal)}</td></tr>
+  ${discountRow}${taxRow}
+  <tr style="border-top:2px solid #e4eaff;">
+    <td style="padding:10px 16px;font-size:15px;font-weight:800;color:#111827;">Total</td>
+    <td style="padding:10px 16px;font-size:15px;font-weight:800;color:#4069FF;text-align:right;">${fmt(totalAmount)}</td>
+  </tr>
+  ${paidRows}
+</table>
 
-            ${notes ? `<p style="margin:0 0 16px;font-size:13px;color:#6b7280;background:#f9fafb;border-left:3px solid #2563EB;padding:12px 16px;border-radius:4px;">${esc(notes)}</p>` : ''}
-            ${terms ? `<p style="margin:0 0 24px;font-size:12px;color:#9ca3af;line-height:1.6;">${esc(terms)}</p>` : ''}
+<!-- Dates -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;border-radius:10px;border:1px solid #e4eaff;overflow:hidden;">
+  <tr>
+    <td style="padding:10px 16px;font-size:13px;color:#8b9fc9;font-weight:500;border-bottom:1px solid #eef2ff;width:42%;">Issue Date</td>
+    <td style="padding:10px 16px;font-size:13px;font-weight:600;color:#374151;border-bottom:1px solid #eef2ff;">${esc(fmtDate(issueDate))}</td>
+  </tr>
+  <tr>
+    <td style="padding:10px 16px;font-size:13px;color:#8b9fc9;font-weight:500;">Payment Due</td>
+    <td style="padding:10px 16px;font-size:13px;font-weight:700;color:#dc2626;">${esc(fmtDate(dueDate))}</td>
+  </tr>
+</table>
 
-            ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0">
-              <tr><td align="center" style="padding:8px 0 24px;">
-                <a href="${esc(pdfUrl)}" style="display:inline-block;background:#2563EB;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
-                  Download Invoice PDF →
-                </a>
-              </td></tr>
-            </table>` : ''}
+${notes ? `<div style="margin-bottom:16px;background:#f5f7ff;border-left:3px solid #4069FF;border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;color:#374151;line-height:1.6;">${esc(notes)}</div>` : ''}
+${terms ? `<p style="margin:0 0 24px;font-size:12px;color:#9ca3af;line-height:1.6;">${esc(terms)}</p>` : ''}
 
-            <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">
-              Please remit payment by the due date. For billing inquiries, contact billing@joblysolutions.com.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · Workforce Management Portal</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+  <tr><td align="center">
+    <a href="${esc(pdfUrl)}" style="display:inline-block;background:linear-gradient(135deg,#1e293b,#334155);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 36px;border-radius:50px;">
+      Download Invoice PDF &darr;
+    </a>
+  </td></tr>
+</table>` : ''}
+
+<p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">
+  Questions about this invoice? Contact us at <a href="mailto:billing@joblysolutions.com" style="color:#4069FF;text-decoration:none;">billing@joblysolutions.com</a>
+</p>`;
+
+  const html = emailShell({
+    previewText: `Invoice ${invoiceNumber} from Jobly Solutions — ${fmt(balanceDue ?? totalAmount)} due ${fmtDate(dueDate)}`,
+    gradient: 'linear-gradient(135deg,#1e293b 0%,#334155 100%)',
+    emoji: '📄',
+    title: `Invoice from Jobly Solutions`,
+    subtitle: `${esc(invoiceNumber)} · ${esc(clientName)}`,
+    body: invoiceBody,
+  });
 
   // Build attachments: invoice PDF + any uploaded docs (PSL.pdf etc.)
   const attachments: MailOptions['attachments'] = [];
@@ -538,34 +519,28 @@ export async function sendContactEmail(p: ContactFormPayload): Promise<void> {
   if (!mailerConfigured) {
     throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
   }
-  const row = (label: string, value: string) => `
-    <tr>
-      <td style="padding:8px 16px;font-size:13px;color:#6b7280;border-bottom:1px solid #f3f4f6;width:120px;white-space:nowrap;vertical-align:top;">${label}</td>
-      <td style="padding:8px 16px;font-size:13px;color:#111827;border-bottom:1px solid #f3f4f6;">${value}</td>
-    </tr>`;
-  const html = `
-<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;"><tr><td align="center">
-    <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-      <tr><td style="background:linear-gradient(135deg,#2563EB,#0F2942);padding:24px 32px;color:#ffffff;">
-        <div style="font-size:18px;font-weight:700;">New contact-form message</div>
-        <div style="font-size:13px;color:rgba(255,255,255,0.85);">joblysolutions.com — Contact Us</div>
-      </td></tr>
-      <tr><td style="padding:24px 32px;">
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:20px;">
-          ${row('Name', esc(p.name))}
-          ${row('Email', `<a href="mailto:${esc(p.email)}" style="color:#2563EB;">${esc(p.email)}</a>`)}
-          ${p.phone ? row('Phone', esc(p.phone)) : ''}
-          ${p.subject ? row('Subject', esc(p.subject)) : ''}
-        </table>
-        <div style="font-size:12px;font-weight:700;color:#6b7280;text-transform:uppercase;margin-bottom:6px;">Message</div>
-        <div style="font-size:14px;color:#111827;line-height:1.6;white-space:pre-wrap;background:#f9fafb;border-left:3px solid #2563EB;padding:12px 16px;border-radius:4px;">${esc(p.message)}</div>
-        <p style="margin:20px 0 0;color:#9ca3af;font-size:12px;">Reply directly to this email to respond to ${esc(p.name)}.</p>
-      </td></tr>
-    </table>
-  </td></tr></table>
-</body></html>`;
+  const contactBody = `
+<p style="margin:0 0 20px;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Sender Details</p>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;border-radius:10px;border:1px solid #e4eaff;overflow:hidden;">
+  <tr><td style="padding:11px 16px;font-size:13px;color:#8b9fc9;font-weight:500;border-bottom:1px solid #eef2ff;width:38%;">Name</td><td style="padding:11px 16px;font-size:13px;font-weight:700;color:#111827;border-bottom:1px solid #eef2ff;">${esc(p.name)}</td></tr>
+  <tr><td style="padding:11px 16px;font-size:13px;color:#8b9fc9;font-weight:500;border-bottom:1px solid #eef2ff;">Email</td><td style="padding:11px 16px;font-size:13px;font-weight:600;border-bottom:1px solid #eef2ff;"><a href="mailto:${esc(p.email)}" style="color:#4069FF;text-decoration:none;">${esc(p.email)}</a></td></tr>
+  ${p.phone ? `<tr><td style="padding:11px 16px;font-size:13px;color:#8b9fc9;font-weight:500;border-bottom:1px solid #eef2ff;">Phone</td><td style="padding:11px 16px;font-size:13px;color:#374151;border-bottom:1px solid #eef2ff;">${esc(p.phone)}</td></tr>` : ''}
+  ${p.subject ? `<tr><td style="padding:11px 16px;font-size:13px;color:#8b9fc9;font-weight:500;">Subject</td><td style="padding:11px 16px;font-size:13px;font-weight:600;color:#374151;">${esc(p.subject)}</td></tr>` : ''}
+</table>
+<p style="margin:0 0 10px;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Message</p>
+<div style="font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap;background:#f5f7ff;border-left:4px solid #4069FF;border-radius:0 10px 10px 0;padding:16px 18px;margin-bottom:24px;">${esc(p.message)}</div>
+<div style="background:#f0f4ff;border-radius:10px;padding:12px 16px;text-align:center;">
+  <p style="margin:0;font-size:13px;color:#6b7280;">Reply directly to this email to respond to <strong style="color:#374151;">${esc(p.name)}</strong></p>
+</div>`;
+
+  const html = emailShell({
+    previewText: `New contact message from ${p.name}${p.subject ? ` — ${p.subject}` : ''}`,
+    gradient: 'linear-gradient(135deg,#374151 0%,#1f2937 100%)',
+    emoji: '✉️',
+    title: 'New Contact Message',
+    subtitle: `From joblysolutions.com — Contact Us form`,
+    body: contactBody,
+  });
 
   await sendWithRetry({
     from: FROM,
@@ -595,15 +570,47 @@ export async function sendInvoiceReminderEmail(payload: {
     : payload.tone === 'due'
       ? `Invoice <strong>${esc(payload.invoiceNumber)}</strong> is due today, ${fmtDate(payload.dueDate)}.`
       : `Invoice <strong>${esc(payload.invoiceNumber)}</strong> is due on ${fmtDate(payload.dueDate)}.`;
-  const html = `
-    <div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:560px;margin:0 auto;color:#0b1220;">
-      <h2 style="margin:0 0 12px;">${esc(headline)}</h2>
-      <p style="margin:0 0 8px;">Hi ${esc(payload.contactName || 'there')},</p>
-      <p style="margin:0 0 12px;line-height:1.5;">${intro}</p>
-      <p style="margin:0 0 16px;font-size:18px;"><strong>Balance due: ${fmt(payload.balanceDue)}</strong></p>
-      ${payload.viewUrl ? `<p style="margin:0 0 16px;"><a href="${esc(payload.viewUrl)}" style="background:#4069FF;color:#fff;text-decoration:none;padding:10px 18px;border-radius:8px;display:inline-block;">View invoice</a></p>` : ''}
-      <p style="margin:16px 0 0;color:#64748b;font-size:13px;">Thank you — Jobly Solutions</p>
-    </div>`;
+  const reminderGradient = payload.tone === 'overdue'
+    ? 'linear-gradient(135deg,#dc2626 0%,#ef4444 100%)'
+    : payload.tone === 'due'
+      ? 'linear-gradient(135deg,#d97706 0%,#f59e0b 100%)'
+      : 'linear-gradient(135deg,#4069FF 0%,#0ea5e9 100%)';
+  const reminderEmoji = payload.tone === 'overdue' ? '🚨' : payload.tone === 'due' ? '⏰' : '🔔';
+  const reminderBgColor = payload.tone === 'overdue' ? '#fef2f2' : payload.tone === 'due' ? '#fffbeb' : '#f0f4ff';
+  const reminderBorderColor = payload.tone === 'overdue' ? '#fecaca' : payload.tone === 'due' ? '#fde68a' : '#c7d5ff';
+  const reminderAmountColor = payload.tone === 'overdue' ? '#dc2626' : payload.tone === 'due' ? '#d97706' : '#4069FF';
+
+  const reminderBody = `
+<p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.7;">Hi <strong style="color:#111827;">${esc(payload.contactName || 'there')}</strong>,</p>
+<p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.7;">${intro}</p>
+
+<div style="background:${reminderBgColor};border:2px solid ${reminderBorderColor};border-radius:14px;padding:24px;text-align:center;margin-bottom:28px;">
+  <p style="margin:0 0 6px;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#9ca3af;">Balance Due — ${esc(payload.invoiceNumber)}</p>
+  <p style="margin:0 0 8px;font-size:36px;font-weight:800;color:${reminderAmountColor};letter-spacing:-0.02em;">${fmt(payload.balanceDue)}</p>
+  <p style="margin:0;font-size:13px;color:#6b7280;">${payload.tone === 'overdue' ? `Was due on` : `Due by`} <strong style="color:#374151;">${fmtDate(payload.dueDate)}</strong></p>
+</div>
+
+${payload.viewUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+  <tr><td align="center">
+    <a href="${esc(payload.viewUrl)}" style="display:inline-block;background:linear-gradient(135deg,#4069FF,#0ea5e9);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:50px;">
+      View Invoice &amp; Pay &rarr;
+    </a>
+  </td></tr>
+</table>` : ''}
+
+<p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">
+  Questions? Contact us at <a href="mailto:billing@joblysolutions.com" style="color:#4069FF;text-decoration:none;">billing@joblysolutions.com</a>
+</p>`;
+
+  const html = emailShell({
+    previewText: `${headline} — ${fmt(payload.balanceDue)} due`,
+    gradient: reminderGradient,
+    emoji: reminderEmoji,
+    title: headline,
+    subtitle: `Invoice ${esc(payload.invoiceNumber)} · Jobly Solutions`,
+    body: reminderBody,
+  });
+
   await sendWithRetry({
     from: FROM,
     to: payload.to,
@@ -648,85 +655,80 @@ export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPa
 
   const lineRows = rows.map(r => `
     <tr>
-      <td style="padding:7px 10px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;white-space:nowrap;">${esc(r.date)}</td>
-      <td style="padding:7px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;">${esc(r.day)}</td>
-      <td style="padding:7px 10px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;">${esc(r.project || '—')}</td>
-      <td style="padding:7px 10px;font-size:12px;color:#374151;border-bottom:1px solid #f3f4f6;">${esc(r.task || '—')}</td>
-      <td style="padding:7px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;text-align:center;">${esc(r.start || '—')}</td>
-      <td style="padding:7px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #f3f4f6;text-align:center;">${esc(r.end || '—')}</td>
-      <td style="padding:7px 10px;font-size:12px;font-weight:600;color:#111827;border-bottom:1px solid #f3f4f6;text-align:center;">${r.hours > 0 ? fmtH(r.hours) : '—'}</td>
-      <td style="padding:7px 10px;font-size:11px;color:#6b7280;border-bottom:1px solid #f3f4f6;text-align:center;">${esc(cap(r.status))}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#374151;border-bottom:1px solid #eef2ff;white-space:nowrap;font-weight:500;">${esc(r.date)}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#9ca3af;border-bottom:1px solid #eef2ff;">${esc(r.day)}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#374151;border-bottom:1px solid #eef2ff;">${esc(r.project || '—')}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#374151;border-bottom:1px solid #eef2ff;">${esc(r.task || '—')}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #eef2ff;text-align:center;">${esc(r.start || '—')}</td>
+      <td style="padding:8px 10px;font-size:12px;color:#6b7280;border-bottom:1px solid #eef2ff;text-align:center;">${esc(r.end || '—')}</td>
+      <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#4069FF;border-bottom:1px solid #eef2ff;text-align:center;">${r.hours > 0 ? fmtH(r.hours) : '—'}</td>
+      <td style="padding:8px 10px;font-size:11px;color:#6b7280;border-bottom:1px solid #eef2ff;text-align:center;">${esc(cap(r.status))}</td>
     </tr>`).join('');
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
-    <tr><td align="center">
-      <table width="680" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <tr>
-          <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Monthly Timesheet — ${esc(monthLabel)}</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">${esc(employeeName)} · ${esc(employeeDisplayId)}${department ? ` · ${esc(department)}` : ''}</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:28px 40px;">
-            <p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.6;">
-              <strong>${esc(employeeName)}</strong> submitted their attendance timesheet for <strong>${esc(monthLabel)}</strong>. Summary below; the full PDF is attached via the button.
-            </p>
+  const timesheetBody = `
+<p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.7;">
+  <strong style="color:#374151;">${esc(employeeName)}</strong> submitted their attendance timesheet for <strong style="color:#374151;">${esc(monthLabel)}</strong>. Current status: <strong style="color:#4069FF;">${esc(cap(status))}</strong>.
+</p>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:24px;">
-              <tr>
-                ${summaryCell('Total Hours', fmtH(totalHours), '#4069FF')}
-                ${summaryCell('Expected', fmtH(expectedHours), '#d97706')}
-                ${summaryCell('Balance', `${balance >= 0 ? '+' : ''}${fmtH(balance)}`, balance >= 0 ? '#059669' : '#dc2626')}
-                ${summaryCell('Working Days', String(workingDays))}
-                ${summaryCell('Leave Days', String(leaveDays))}
-              </tr>
-            </table>
+<!-- Stat boxes -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;border-collapse:separate;border-spacing:8px;">
+  <tr>
+    <td style="background:#f0f4ff;border-radius:10px;padding:16px 12px;text-align:center;width:20%;">
+      <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Total Hours</p>
+      <p style="margin:0;font-size:22px;font-weight:800;color:#4069FF;">${fmtH(totalHours)}</p>
+    </td>
+    <td style="background:#fffbeb;border-radius:10px;padding:16px 12px;text-align:center;width:20%;">
+      <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#b45309;">Expected</p>
+      <p style="margin:0;font-size:22px;font-weight:800;color:#d97706;">${fmtH(expectedHours)}</p>
+    </td>
+    <td style="background:${balance >= 0 ? '#f0fdf4' : '#fef2f2'};border-radius:10px;padding:16px 12px;text-align:center;width:20%;">
+      <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:${balance >= 0 ? '#166534' : '#991b1b'};">Balance</p>
+      <p style="margin:0;font-size:22px;font-weight:800;color:${balance >= 0 ? '#16a34a' : '#dc2626'};">${balance >= 0 ? '+' : ''}${fmtH(balance)}</p>
+    </td>
+    <td style="background:#f5f7ff;border-radius:10px;padding:16px 12px;text-align:center;width:20%;">
+      <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Work Days</p>
+      <p style="margin:0;font-size:22px;font-weight:800;color:#374151;">${workingDays}</p>
+    </td>
+    <td style="background:#f5f7ff;border-radius:10px;padding:16px 12px;text-align:center;width:20%;">
+      <p style="margin:0 0 4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Leave Days</p>
+      <p style="margin:0;font-size:22px;font-weight:800;color:#374151;">${leaveDays}</p>
+    </td>
+  </tr>
+</table>
 
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:24px;">
-              <thead>
-                <tr style="background:#f9fafb;">
-                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Date</th>
-                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Day</th>
-                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Project</th>
-                  <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Task</th>
-                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Start</th>
-                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">End</th>
-                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Hours</th>
-                  <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;border-bottom:1px solid #e5e7eb;">Status</th>
-                </tr>
-              </thead>
-              <tbody>${lineRows}</tbody>
-            </table>
+<!-- Timesheet rows -->
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="border:1px solid #e4eaff;border-radius:10px;overflow:hidden;margin-bottom:24px;">
+  <tr style="background:#f5f7ff;">
+    <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">Date</th>
+    <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">Day</th>
+    <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">Project</th>
+    <th style="padding:9px 10px;text-align:left;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">Task</th>
+    <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">Start</th>
+    <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">End</th>
+    <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">Hours</th>
+    <th style="padding:9px 10px;text-align:center;font-size:10px;font-weight:700;color:#8b9fc9;text-transform:uppercase;letter-spacing:0.06em;border-bottom:1px solid #e4eaff;">Status</th>
+  </tr>
+  ${lineRows}
+</table>
 
-            ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0">
-              <tr><td align="center" style="padding:4px 0 16px;">
-                <a href="${esc(pdfUrl)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
-                  Download Timesheet PDF →
-                </a>
-              </td></tr>
-            </table>` : ''}
+${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+  <tr><td align="center">
+    <a href="${esc(pdfUrl)}" style="display:inline-block;background:linear-gradient(135deg,#4069FF,#7c3aed);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 36px;border-radius:50px;">
+      Download Timesheet PDF &darr;
+    </a>
+  </td></tr>
+</table>` : ''}
 
-            <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.6;">
-              Review this timesheet in the Jobly Portal under <strong>Attendance Review</strong>. Current status: <strong>${esc(cap(status))}</strong>.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · Workforce Management Portal</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+<p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6;text-align:center;">Review this timesheet in the Jobly Portal under <strong style="color:#6b7280;">Attendance Review</strong>.</p>`;
+
+  const html = emailShell({
+    previewText: `Timesheet submitted — ${employeeName} (${employeeDisplayId}) — ${monthLabel}`,
+    gradient: 'linear-gradient(135deg,#4069FF 0%,#7c3aed 100%)',
+    emoji: '📊',
+    title: `Monthly Timesheet — ${esc(monthLabel)}`,
+    subtitle: `${esc(employeeName)} &middot; ${esc(employeeDisplayId)}${department ? ` &middot; ${esc(department)}` : ''}`,
+    body: timesheetBody,
+  });
 
   await sendWithRetry({
     from: FROM,
@@ -763,58 +765,50 @@ export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedE
     ['Completed', when],
   ].filter(Boolean) as [string, string][];
 
-  const tableRows = rows
+  const onbTableRows = rows
     .map(([label, value]) => `
       <tr>
-        <td style="padding:8px 12px;color:#6b7280;font-size:13px;border-bottom:1px solid #f3f4f6;width:38%;">${esc(label)}</td>
-        <td style="padding:8px 12px;color:#111827;font-size:13px;font-weight:500;border-bottom:1px solid #f3f4f6;">${esc(value)}</td>
+        <td style="padding:10px 16px;color:#8b9fc9;font-size:13px;border-bottom:1px solid #eef2ff;width:38%;font-weight:500;">${esc(label)}</td>
+        <td style="padding:10px 16px;color:#111827;font-size:13px;font-weight:600;border-bottom:1px solid #eef2ff;">${esc(value)}</td>
       </tr>`)
     .join('');
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <tr>
-          <td style="background:linear-gradient(135deg,#4069FF,#32CDDC);padding:32px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Onboarding Submitted for Review</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">An employee is awaiting your review</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:32px 40px;">
-            <p style="margin:0 0 24px;color:#374151;font-size:14px;line-height:1.6;">
-              <strong>${esc(employeeName)}</strong> has submitted their onboarding paperwork and is <strong>awaiting HR review</strong>. Open their profile, review the details and documents, then click <strong>Approve Onboarding</strong> to activate their account.
-            </p>
-            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;overflow:hidden;margin-bottom:28px;">
-              <tbody>${tableRows}</tbody>
-            </table>
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" style="padding:8px 0 8px;">
-                  <a href="${esc(link)}"
-                     style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
-                    Review &amp; Approve →
-                  </a>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · Workforce Management Portal</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+  const onboardingSubmittedBody = `
+<!-- Action needed callout -->
+<div style="background:#f0fdf4;border:2px solid #bbf7d0;border-radius:12px;padding:16px 20px;margin-bottom:24px;display:flex;align-items:center;">
+  <span style="font-size:24px;margin-right:12px;">&#x1F7E2;</span>
+  <div>
+    <p style="margin:0 0 3px;font-size:14px;font-weight:700;color:#166534;">Action Required</p>
+    <p style="margin:0;font-size:13px;color:#16a34a;">Review and approve this employee's onboarding submission</p>
+  </div>
+</div>
+
+<p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.7;">
+  <strong style="color:#374151;">${esc(employeeName)}</strong> has submitted their onboarding paperwork and is <strong style="color:#374151;">awaiting HR review</strong>. Open their profile, review the details and uploaded documents, then click <strong style="color:#374151;">Approve Onboarding</strong> to activate their account.
+</p>
+
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;border-radius:12px;border:1px solid #e4eaff;overflow:hidden;">
+  <tr style="background:#f5f7ff;"><th colspan="2" style="padding:10px 16px;text-align:left;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;border-bottom:1px solid #e4eaff;">Submission Details</th></tr>
+  ${onbTableRows}
+</table>
+
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+  <tr><td align="center">
+    <a href="${esc(link)}" style="display:inline-block;background:linear-gradient(135deg,#059669,#10b981);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 42px;border-radius:50px;">
+      Review &amp; Approve &rarr;
+    </a>
+  </td></tr>
+</table>
+<p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">This employee's account will remain inactive until you approve their onboarding.</p>`;
+
+  const html = emailShell({
+    previewText: `Action required — ${employeeName} submitted onboarding for your review`,
+    gradient: 'linear-gradient(135deg,#059669 0%,#10b981 100%)',
+    emoji: '✅',
+    title: 'Onboarding Submitted for Review',
+    subtitle: `${esc(employeeName)} (${esc(displayId)}) is awaiting your approval`,
+    body: onboardingSubmittedBody,
+  });
 
   await sendWithRetry({
     from: FROM,
@@ -847,58 +841,44 @@ export async function sendOnboardingChangesRequestedEmail(
   // Render the message with paragraph breaks preserved.
   const messageHtml = esc(message).replace(/\n/g, '<br>');
 
-  const html = `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="margin:0;padding:0;background:#f9fafb;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;padding:40px 0;">
-    <tr><td align="center">
-      <table width="560" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-        <tr>
-          <td style="background:linear-gradient(135deg,#f59e0b,#fb923c);padding:32px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;">Onboarding — changes requested</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.92);font-size:14px;">Please review HR's notes and update your information</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:32px 40px;">
-            <p style="margin:0 0 16px;color:#374151;font-size:15px;">Hi <strong>${esc(employeeName)}</strong>,</p>
-            <p style="margin:0 0 20px;color:#374151;font-size:14px;line-height:1.6;">
-              HR has reviewed your onboarding submission for <strong>${esc(displayId)}</strong> and asked for a few changes before they can approve.
-              Their note is below — please log in to the portal, update your information, and resubmit.
-            </p>
+  const changesBody = `
+<p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.7;">Hi <strong style="color:#111827;">${esc(employeeName)}</strong>,</p>
+<p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.7;">
+  HR has reviewed your onboarding submission for <strong style="color:#374151;">${esc(displayId)}</strong> and requested a few changes before they can approve it.
+  Please review their note below, update your information in the portal, and resubmit.
+</p>
 
-            <div style="margin:0 0 24px;padding:16px 18px;border-radius:10px;background:#fffbeb;border:1px solid #fde68a;color:#78350f;font-size:14px;line-height:1.55;">
-              ${messageHtml}
-            </div>
+<!-- HR message -->
+<p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#9ca3af;">HR's Note</p>
+<div style="background:#fffbeb;border-left:4px solid #f59e0b;border-radius:0 10px 10px 0;padding:16px 18px;margin-bottom:28px;font-size:14px;color:#78350f;line-height:1.65;">
+  ${messageHtml}
+</div>
 
-            <table width="100%" cellpadding="0" cellspacing="0">
-              <tr>
-                <td align="center" style="padding:8px 0 8px;">
-                  <a href="${esc(link)}"
-                     style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:12px 32px;border-radius:8px;">
-                    Update my information →
-                  </a>
-                </td>
-              </tr>
-            </table>
+<!-- Steps to fix -->
+<p style="margin:0 0 12px;font-size:13px;font-weight:700;color:#374151;">How to fix this:</p>
+<table cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;width:100%;">
+  <tr><td style="padding:5px 0;vertical-align:top;width:28px;"><div style="width:24px;height:24px;border-radius:50%;background:#f59e0b;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:24px;">1</div></td><td style="padding:5px 0 5px 10px;font-size:14px;color:#374151;line-height:1.5;vertical-align:top;">Click the button below to open your onboarding form</td></tr>
+  <tr><td style="padding:5px 0;vertical-align:top;"><div style="width:24px;height:24px;border-radius:50%;background:#f59e0b;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:24px;">2</div></td><td style="padding:5px 0 5px 10px;font-size:14px;color:#374151;line-height:1.5;vertical-align:top;">Update the sections mentioned in HR's note above</td></tr>
+  <tr><td style="padding:5px 0;vertical-align:top;"><div style="width:24px;height:24px;border-radius:50%;background:#f59e0b;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:24px;">3</div></td><td style="padding:5px 0 5px 10px;font-size:14px;color:#374151;line-height:1.5;vertical-align:top;">Click <strong>Finish Onboarding</strong> to resubmit for HR review</td></tr>
+</table>
 
-            <p style="margin:18px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">
-              If you have questions about what to change, reach out to your HR team directly.
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#f9fafb;padding:20px 40px;border-top:1px solid #f3f4f6;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · Workforce Management Portal</p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+  <tr><td align="center">
+    <a href="${esc(link)}" style="display:inline-block;background:linear-gradient(135deg,#d97706,#f59e0b);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 42px;border-radius:50px;">
+      Update My Information &rarr;
+    </a>
+  </td></tr>
+</table>
+<p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">Questions about what to change? Reach out to your HR team directly.</p>`;
+
+  const html = emailShell({
+    previewText: `Onboarding update needed — HR has requested changes for ${displayId}`,
+    gradient: 'linear-gradient(135deg,#d97706 0%,#f59e0b 100%)',
+    emoji: '📝',
+    title: 'Changes Requested',
+    subtitle: `HR has reviewed your onboarding for ${esc(displayId)} and needs a few updates`,
+    body: changesBody,
+  });
 
   await sendWithRetry({
     from: FROM,
