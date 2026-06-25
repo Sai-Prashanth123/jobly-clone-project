@@ -1408,29 +1408,39 @@ export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
     }
   }
 
-  // Also check uploaded documents that have an expiry_date set
+  // Also check uploaded documents that have an expiry_date set.
+  // entity_id is polymorphic (no FK to employees), so do two queries.
   const { data: uploadedDocs } = await supabaseAdmin
     .from('documents')
-    .select('entity_id, type, expiry_date, employees!entity_id(id, display_id, first_name, last_name)')
+    .select('entity_id, type, expiry_date')
     .eq('entity_type', 'employee')
     .gte('expiry_date', today)
     .lte('expiry_date', cutoffStr);
 
-  for (const doc of uploadedDocs ?? []) {
-    const emp = (doc as any).employees;
-    if (!emp) continue;
-    const expiry = (doc as any).expiry_date as string;
-    const diff = Math.ceil((new Date(expiry).getTime() - new Date(today).getTime()) / 86400000);
-    // Avoid duplicating visa_expiry if the doc type matches what we already pushed above
-    results.push({
-      employeeId: emp.id,
-      displayId: emp.display_id ?? '',
-      firstName: emp.first_name ?? '',
-      lastName: emp.last_name ?? '',
-      documentType: (doc as any).type ?? 'Document',
-      expiryDate: expiry,
-      daysRemaining: diff,
-    });
+  if (uploadedDocs && uploadedDocs.length > 0) {
+    const empIds = [...new Set(uploadedDocs.map((d: any) => d.entity_id as string))];
+    const { data: empRows } = await supabaseAdmin
+      .from('employees')
+      .select('id, display_id, first_name, last_name')
+      .in('id', empIds);
+    const empMap: Record<string, { id: string; display_id: string | null; first_name: string | null; last_name: string | null }> = {};
+    for (const e of empRows ?? []) empMap[e.id] = e;
+
+    for (const doc of uploadedDocs) {
+      const emp = empMap[(doc as any).entity_id];
+      if (!emp) continue;
+      const expiry = (doc as any).expiry_date as string;
+      const diff = Math.ceil((new Date(expiry).getTime() - new Date(today).getTime()) / 86400000);
+      results.push({
+        employeeId: emp.id,
+        displayId: emp.display_id ?? '',
+        firstName: emp.first_name ?? '',
+        lastName: emp.last_name ?? '',
+        documentType: (doc as any).type ?? 'Document',
+        expiryDate: expiry,
+        daysRemaining: diff,
+      });
+    }
   }
 
   // Sort by soonest expiry first
