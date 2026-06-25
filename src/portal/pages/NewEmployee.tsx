@@ -518,20 +518,29 @@ export default function NewEmployee() {
   ]);
 
   // Per-section completion — drives the green check shown on each section header.
-  // Memoized so it only recomputes when relevant form fields actually change.
-  const sectionComplete = useMemo<Record<string, boolean>>(() => ({
-    [SECTION_IDS.personal]:    !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob,
-    [SECTION_IDS.contact]:     !!form.email.trim() && !!form.phone.trim(),
-    [SECTION_IDS.presentAddr]: !!form.address.street.trim() && !!form.address.city.trim() && !!form.address.state.trim() && !!form.address.zip.trim(),
-    [SECTION_IDS.employment]:  !!form.startDate,
-    [SECTION_IDS.immigration]: !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn),
-    [SECTION_IDS.emergency]:   !!form.emergencyContact.name.trim() && !!form.emergencyContact.phone.trim(),
-    [SECTION_IDS.payroll]:     (parseNumberInput(form.payRate) ?? 0) > 0,
-    [SECTION_IDS.review]:      isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
-    ...(isOnboarding ? {
-      [SECTION_IDS.documents]:   ALL_REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
-    } : {}),
-  }), [form, isEditMode, isOnboarding, uploadedDocTypes]);
+  // Conditions here match the onboardingChecklist so that the section icon and
+  // the progress chip always agree on what "done" means.
+  const sectionComplete = useMemo<Record<string, boolean>>(() => {
+    const presentFilled = !!form.address.street.trim() && !!form.address.city.trim() && !!form.address.state.trim() && !!form.address.zip.trim();
+    const permFilled = form.permanentSameAsPresent ? presentFilled
+      : (!!form.permanentAddress.street.trim() && !!form.permanentAddress.city.trim() && !!form.permanentAddress.state.trim() && !!form.permanentAddress.zip.trim());
+    const educationDone = form.education.some(e => !!(e.level ?? '').trim() && !!(e.institution ?? '').trim() && !!String(e.passYear ?? '').trim());
+    return {
+      [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality && !!form.preferredLanguage,
+      [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim(),
+      [SECTION_IDS.presentAddr]:  presentFilled,
+      [SECTION_IDS.permanentAddr]: permFilled,
+      [SECTION_IDS.employment]:   !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation,
+      [SECTION_IDS.immigration]:  !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn),
+      [SECTION_IDS.education]:    educationDone,
+      [SECTION_IDS.emergency]:    !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim(),
+      [SECTION_IDS.payroll]:      isOnboarding ? true : (parseNumberInput(form.payRate) ?? 0) > 0,
+      [SECTION_IDS.review]:       isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
+      ...(isOnboarding ? {
+        [SECTION_IDS.documents]: ALL_REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
+      } : {}),
+    };
+  }, [form, isEditMode, isOnboarding, uploadedDocTypes]);
 
   const onboardingChecklist = useMemo(() => {
     const presentFilled = [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim());
@@ -548,7 +557,7 @@ export default function NewEmployee() {
       : [];
     return [
       // Personal — photo is optional (not required by backend)
-      { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
+      { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
       // Contact — LinkedIn is optional, address is required
       { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
       { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
@@ -1117,7 +1126,7 @@ export default function NewEmployee() {
   );
 
   return (
-    <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-10 overflow-x-hidden w-full' : 'portal-wizard pb-10 overflow-x-hidden w-full'}>
+    <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-10 [overflow-x:clip] w-full' : 'portal-wizard pb-10 [overflow-x:clip] w-full'}>
       {/* Sticky action navbar — pinned to the top of the page so the primary
           actions stay reachable while scrolling the long form. Edge-to-edge via
           negative margins that cancel the container padding (both onboarding
@@ -1181,7 +1190,8 @@ export default function NewEmployee() {
             <div className="h-2 rounded-full bg-gray-100 overflow-hidden mb-3">
               <div className="h-full rounded-full bg-gradient-to-r from-[#4069FF] to-[#32CDDC] transition-all" style={{ width: `${onbPct}%` }} />
             </div>
-            <div className="flex flex-wrap gap-1.5 max-w-full min-w-0">
+            {/* Desktop: full chip list */}
+            <div className="hidden sm:flex flex-wrap gap-1.5 max-w-full min-w-0">
               {onboardingChecklist.map(item => (
                 <button
                   key={item.id}
@@ -1194,8 +1204,38 @@ export default function NewEmployee() {
                 </button>
               ))}
             </div>
+            {/* Mobile: compact counter + mini progress strip */}
+            <div className="sm:hidden">
+              <div className="flex items-center gap-3 mb-2">
+                <span className={`text-sm font-bold tabular-nums ${onbDone === onboardingChecklist.length ? 'text-emerald-600' : 'text-[#4069FF]'}`}>
+                  {onbDone}/{onboardingChecklist.length} done
+                </span>
+                {onbDone < onboardingChecklist.length && (
+                  <span className="text-xs text-red-600 font-medium">{onboardingChecklist.length - onbDone} remaining</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {onboardingChecklist.filter(c => !c.done).slice(0, 4).map(item => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => scrollToSection(item.section)}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 transition-colors"
+                  >
+                    <AlertTriangle className="h-2.5 w-2.5" />
+                    {item.label}
+                  </button>
+                ))}
+                {onboardingChecklist.filter(c => !c.done).length > 4 && (
+                  <span className="text-[11px] text-red-600 font-medium px-1 py-0.5">+{onboardingChecklist.filter(c => !c.done).length - 4} more</span>
+                )}
+              </div>
+            </div>
             {onbDone < onboardingChecklist.length && (
-              <p className="text-[11px] text-muted-foreground mt-2">Tap a red item to jump straight to that section.</p>
+              <p className="text-[11px] text-muted-foreground mt-2 hidden sm:block">Tap a red item to jump straight to that section.</p>
+            )}
+            {onbDone < onboardingChecklist.length && (
+              <p className="text-[11px] text-muted-foreground mt-2 sm:hidden">Tap an item above to go straight to that section.</p>
             )}
           </div>
         </div>
@@ -1333,7 +1373,7 @@ export default function NewEmployee() {
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <Label>First Name <RequiredMark /></Label>
-                  <Input ref={firstNameRef} value={form.firstName} onChange={e => set('firstName', e.target.value)} />
+                  <Input ref={firstNameRef} value={form.firstName} onChange={e => set('firstName', e.target.value)} onBlur={() => { if (!form.firstName.trim()) setErrors(p => ({ ...p, firstName: 'First name is required' })); }} />
                   <FieldError msg={errors.firstName} />
                 </div>
                 <div>
@@ -1342,12 +1382,12 @@ export default function NewEmployee() {
                 </div>
                 <div>
                   <Label>Last Name <RequiredMark /></Label>
-                  <Input value={form.lastName} onChange={e => set('lastName', e.target.value)} />
+                  <Input value={form.lastName} onChange={e => set('lastName', e.target.value)} onBlur={() => { if (!form.lastName.trim()) setErrors(p => ({ ...p, lastName: 'Last name is required' })); }} />
                   <FieldError msg={errors.lastName} />
                 </div>
                 <div>
                   <Label>Date of Birth {isOnboarding && <RequiredMark />}</Label>
-                  <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} />
+                  <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} onBlur={() => { if (isOnboarding && !form.dob) setErrors(p => ({ ...p, dob: 'Date of birth is required' })); }} />
                   <FieldError msg={errors.dob} />
                 </div>
                 <div>
@@ -1388,11 +1428,13 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Nationality {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="e.g. American, Indian, British" />
+                <Input value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="e.g. American, Indian, British" onBlur={() => { if (isOnboarding && !form.nationality.trim()) setErrors(p => ({ ...p, nationality: 'Nationality is required' })); }} />
+                <FieldError msg={errors.nationality} />
               </div>
               <div>
                 <Label>Preferred Language {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.preferredLanguage} onChange={e => set('preferredLanguage', e.target.value)} placeholder="English" />
+                <Input value={form.preferredLanguage} onChange={e => set('preferredLanguage', e.target.value)} placeholder="English" onBlur={() => { if (isOnboarding && !form.preferredLanguage.trim()) setErrors(p => ({ ...p, preferredLanguage: 'Preferred language is required' })); }} />
+                <FieldError msg={errors.preferredLanguage} />
               </div>
 
               <div className="sm:col-span-4">
@@ -1414,7 +1456,7 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Personal Email <RequiredMark /></Label>
-                <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="jane.doe@gmail.com" />
+                <Input type="email" value={form.email} onChange={e => set('email', e.target.value)} placeholder="jane.doe@gmail.com" onBlur={() => { if (!form.email.trim()) setErrors(p => ({ ...p, email: 'Email is required' })); }} />
                 <p className="text-[11px] text-muted-foreground mt-1">Must be unique. We'll let you know if this email is already in use.</p>
                 <FieldError msg={errors.email} />
               </div>
@@ -1429,7 +1471,7 @@ export default function NewEmployee() {
 
               <div>
                 <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
+                <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 (555) 123-4567" onBlur={() => { if (!form.phone.trim()) setErrors(p => ({ ...p, phone: 'Phone number is required' })); }} />
                 <FieldError msg={errors.phone} />
               </div>
               <div>
