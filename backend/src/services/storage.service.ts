@@ -16,6 +16,7 @@ export async function uploadDocument(
   uploadedBy: string,
   nameOverride?: string,
   docTypeOverride?: string,
+  expiryDate?: string | null,
 ) {
   const bucket = BUCKET_MAP[entityType];
   const storagePath = `${entityId}/${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
@@ -44,6 +45,7 @@ export async function uploadDocument(
       storage_path: storagePath,
       storage_url: null,
       uploaded_by: uploadedBy,
+      expiry_date: expiryDate || null,
     })
     .select()
     .single();

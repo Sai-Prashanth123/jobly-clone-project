@@ -57,13 +57,13 @@ export default function LeaveRequests() {
   const { data: holidaysNextYear = [] } = useHolidays(currentYear + 1);
   const allHolidays = [...holidaysThisYear, ...holidaysNextYear];
 
-  const holidayConflicts = allHolidays.filter(h => h.date >= form.startDate && h.date <= form.endDate);
-
   // Apply dialog
   const [applyOpen, setApplyOpen] = useState(false);
   const [form, setForm] = useState<{ leaveType: LeaveType; startDate: string; endDate: string; reason: string }>(
     { leaveType: 'vacation', startDate: today(), endDate: today(), reason: '' },
   );
+
+  const holidayConflicts = allHolidays.filter(h => h.date >= form.startDate && h.date <= form.endDate);
 
   // Reject dialog
   const [rejectTarget, setRejectTarget] = useState<LeaveRequest | null>(null);

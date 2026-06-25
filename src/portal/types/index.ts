@@ -142,6 +142,7 @@ export interface EmployeeDocument {
   type: string;
   uploadedAt: string;
   url?: string;
+  expiryDate?: string;
 }
 
 export interface OnboardingChecklistItem {

@@ -69,14 +69,32 @@ function AvatarCircle({ first, last }: { first: string; last: string }) {
   );
 }
 
+const EXPIRY_DOC_TYPES = new Set([
+  'Passport', "Driver's License", 'State-Issued ID', 'Visa / Work Authorization',
+  'I-94', 'Permanent Resident Card', 'Employment Authorization Document',
+  'OPT Card', 'STEM OPT Card', 'I-983 Form',
+]);
+
+function ExpiryBadgeLocal({ date }: { date: string }) {
+  const days = Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
+  if (days < 0) return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-red-50 text-red-700 border-red-200">Expired</span>;
+  if (days <= 14) return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-red-50 text-red-700 border-red-200">{days}d left</span>;
+  if (days <= 30) return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-700 border-amber-200">{days}d left</span>;
+  if (days <= 90) return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-blue-50 text-blue-700 border-blue-200">{days}d left</span>;
+  return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-gray-50 text-gray-600 border-gray-200">Exp {date}</span>;
+}
+
 function DocumentManager({ employee }: { employee: Employee }) {
   const upload = useUploadEmployeeDocument(employee.id);
   const remove = useDeleteEmployeeDocument(employee.id);
   const [docType, setDocType] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [expiryDate, setExpiryDate] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string } | null>(null);
+
+  const showExpiry = EXPIRY_DOC_TYPES.has(docType);
 
   const handleUpload = async () => {
     if (!docType || !file) {
@@ -87,11 +105,13 @@ function DocumentManager({ employee }: { employee: Employee }) {
     fd.append('file', file);
     fd.append('name', file.name);
     fd.append('docType', docType);
+    if (expiryDate) fd.append('expiryDate', expiryDate);
     try {
       await upload.mutateAsync(fd);
       toast.success(`${file.name} uploaded`);
       setDocType('');
       setFile(null);
+      setExpiryDate('');
       const input = document.getElementById('doc-file') as HTMLInputElement | null;
       if (input) input.value = '';
     } catch {
@@ -124,10 +144,10 @@ function DocumentManager({ employee }: { employee: Employee }) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label className="text-xs font-medium">1. Document type *</Label>
-              <Select value={docType} onValueChange={setDocType}>
+              <Select value={docType} onValueChange={v => { setDocType(v); setExpiryDate(''); }}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>
                   {DOC_TYPES.map(t => (
@@ -146,6 +166,17 @@ function DocumentManager({ employee }: { employee: Employee }) {
                 className="block w-full h-10 text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
               />
             </div>
+            <div className="space-y-1">
+              <Label className="text-xs font-medium">
+                3. Expiry date {showExpiry ? <span className="text-amber-600">(recommended)</span> : <span className="text-gray-400">(optional)</span>}
+              </Label>
+              <Input
+                type="date"
+                value={expiryDate}
+                onChange={e => setExpiryDate(e.target.value)}
+                className={showExpiry ? 'border-amber-300 focus:ring-amber-400' : ''}
+              />
+            </div>
             <div className="flex items-end">
               <Button
                 type="button"
@@ -156,7 +187,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
                 className="w-full gap-2"
               >
                 <Upload className="h-4 w-4" />
-                3. Upload
+                4. Upload
               </Button>
             </div>
           </div>
@@ -198,6 +229,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
                         <span className="text-xs text-muted-foreground">
                           Uploaded {formatDate(doc.uploadedAt)}
                         </span>
+                        {doc.expiryDate && <ExpiryBadgeLocal date={doc.expiryDate} />}
                       </div>
                     </div>
                   </div>

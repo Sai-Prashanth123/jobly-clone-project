@@ -1408,6 +1408,31 @@ export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
     }
   }
 
+  // Also check uploaded documents that have an expiry_date set
+  const { data: uploadedDocs } = await supabaseAdmin
+    .from('documents')
+    .select('entity_id, type, expiry_date, employees!entity_id(id, display_id, first_name, last_name)')
+    .eq('entity_type', 'employee')
+    .gte('expiry_date', today)
+    .lte('expiry_date', cutoffStr);
+
+  for (const doc of uploadedDocs ?? []) {
+    const emp = (doc as any).employees;
+    if (!emp) continue;
+    const expiry = (doc as any).expiry_date as string;
+    const diff = Math.ceil((new Date(expiry).getTime() - new Date(today).getTime()) / 86400000);
+    // Avoid duplicating visa_expiry if the doc type matches what we already pushed above
+    results.push({
+      employeeId: emp.id,
+      displayId: emp.display_id ?? '',
+      firstName: emp.first_name ?? '',
+      lastName: emp.last_name ?? '',
+      documentType: (doc as any).type ?? 'Document',
+      expiryDate: expiry,
+      daysRemaining: diff,
+    });
+  }
+
   // Sort by soonest expiry first
   results.sort((a, b) => a.daysRemaining - b.daysRemaining);
   return results;

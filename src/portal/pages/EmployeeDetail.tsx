@@ -590,7 +590,14 @@ export default function EmployeeDetail() {
                 <div key={doc.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
                     <p className="text-sm font-medium">{doc.name}</p>
-                    <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
+                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                      <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
+                      {doc.expiryDate && (() => {
+                        const days = Math.ceil((new Date(doc.expiryDate).getTime() - Date.now()) / 86400000);
+                        const cls = days < 0 ? 'text-red-600' : days <= 30 ? 'text-amber-600' : 'text-gray-500';
+                        return <span className={`text-xs font-medium ${cls}`}>Expires {formatDate(doc.expiryDate)}{days >= 0 && days <= 90 ? ` (${days}d)` : ''}</span>;
+                      })()}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}>

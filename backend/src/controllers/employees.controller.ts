@@ -178,8 +178,8 @@ export async function uploadDoc(req: Request, res: Response, next: NextFunction)
     if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
       throw new ForbiddenError('Employees may only manage their own documents');
     }
-    const { name, docType } = req.body as { name?: string; docType?: string };
-    const data = await storageSvc.uploadDocument('employee', req.params.id, file, req.user!.id, name, docType);
+    const { name, docType, expiryDate } = req.body as { name?: string; docType?: string; expiryDate?: string };
+    const data = await storageSvc.uploadDocument('employee', req.params.id, file, req.user!.id, name, docType, expiryDate);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 }

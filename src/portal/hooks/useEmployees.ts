@@ -50,6 +50,7 @@ function mapEmployee(raw: any): Employee {
       type: d.type,
       uploadedAt: d.uploaded_at,
       url: d.storage_url ?? undefined,
+      expiryDate: d.expiry_date ?? undefined,
     })),
 
     // Onboarding-form extension fields (migration 005). JSONB columns map 1:1.
