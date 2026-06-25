@@ -9,6 +9,16 @@
 // declaration, and the required document uploads. Payroll + bank details are
 // HR-only (collected by HR via the HR-create / HR-edit screens, not the employee wizard).
 
+export const COMPLIANCE_REQUIRED_DOC_TYPES = [
+  "Driver's License",
+  'State-Issued ID',
+  'Passport',
+  'Visa / Work Authorization',
+  'I-94',
+  'Offer Letter',
+  'Resume',
+] as const;
+
 export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
   'I-9 Form',

@@ -147,16 +147,28 @@ export async function releaseResults(id: string, actorId: string) {
     throw new ForbiddenError('Cycle must be active or in review phases before releasing results');
   }
 
-  // Compute overall_rating for each participant
+  // Compute overall_rating for each participant.
+  // Two separate queries because peer_feedback_requests has no direct FK to
+  // review_participants.id — it links via (cycle_id, reviewee_id=employee_id).
   const { data: parts } = await supabaseAdmin
     .from('review_participants')
-    .select(`id, employee_id, manager_rating, peer_feedback_requests!cycle_id(rating, status)`)
+    .select('id, employee_id, manager_rating')
     .eq('cycle_id', id);
 
+  const { data: peerRows } = await supabaseAdmin
+    .from('peer_feedback_requests')
+    .select('reviewee_id, rating, status')
+    .eq('cycle_id', id);
+
+  const peerMap: Record<string, number[]> = {};
+  for (const pr of peerRows ?? []) {
+    if (pr.status === 'submitted' && pr.rating != null) {
+      (peerMap[pr.reviewee_id] ??= []).push(pr.rating as number);
+    }
+  }
+
   for (const p of parts ?? []) {
-    const peerRatings = (p.peer_feedback_requests ?? [])
-      .filter((r: any) => r.status === 'submitted' && r.rating != null)
-      .map((r: any) => r.rating as number);
+    const peerRatings = peerMap[p.employee_id] ?? [];
     const avgPeer = peerRatings.length > 0 ? peerRatings.reduce((a: number, b: number) => a + b, 0) / peerRatings.length : null;
     const mgr = p.manager_rating ?? null;
     let overall: number | null = null;

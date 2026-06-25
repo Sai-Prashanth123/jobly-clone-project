@@ -23,6 +23,7 @@ export const DOCUMENT_TYPES: string[] = [
   'OPT Card',
   'STEM OPT Card',
   'I-983 Form',
+  'I-94',
   'ID Proof',
   'Compliance Document',
   'Other',

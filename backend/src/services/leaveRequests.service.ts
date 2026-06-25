@@ -18,6 +18,19 @@ import type {
 
 const SELECT = '*, employees!employee_id(first_name, last_name, display_id)';
 
+/** Fetch company holidays (weekday only) that fall within [start, end]. */
+async function getWeekdayHolidaysInRange(start: string, end: string): Promise<{ date: string; name: string }[]> {
+  const { data } = await supabaseAdmin
+    .from('company_holidays')
+    .select('date, name')
+    .gte('date', start)
+    .lte('date', end);
+  return ((data ?? []) as { date: string; name: string }[]).filter(h => {
+    const dow = parseDateUTC(h.date).getUTCDay();
+    return dow !== 0 && dow !== 6;
+  });
+}
+
 /** Inclusive count of weekdays (Mon–Fri) between two YYYY-MM-DD dates. */
 function businessDaysInclusive(start: string, end: string): number {
   let count = 0;
@@ -91,11 +104,19 @@ export async function createLeaveRequest(
   if (days === 0) {
     throw new ValidationError('That date range has no working days (weekends only) — pick at least one weekday.');
   }
-  // 2. Range that starts before the employee was hired.
+  // 2. Range overlaps a company holiday — employees already have those days off.
+  const weekdayHolidays = await getWeekdayHolidaysInRange(input.startDate, input.endDate);
+  if (weekdayHolidays.length > 0) {
+    const names = weekdayHolidays.map(h => h.name).join(', ');
+    throw new ValidationError(
+      `Your leave range includes ${weekdayHolidays.length} company holiday${weekdayHolidays.length > 1 ? 's' : ''} (${names}). Exclude those dates and resubmit.`,
+    );
+  }
+  // 3. Range that starts before the employee was hired.
   if (emp.start_date && input.startDate < String(emp.start_date).slice(0, 10)) {
     throw new ValidationError(`Leave can't start before the joining date (${formatDateSafe(String(emp.start_date).slice(0, 10))}).`);
   }
-  // 3. Overlaps an existing pending/approved leave request.
+  // 4. Overlaps an existing pending/approved leave request.
   const overlaps = await getOverlappingLeave(employeeId, input.startDate, input.endDate);
   if (overlaps.length > 0) {
     throw new ConflictError(leaveOverlapMessage(overlaps[0]), {
@@ -103,7 +124,7 @@ export async function createLeaveRequest(
       overlaps: overlaps.map(o => ({ displayId: o.display_id, status: o.status, startDate: o.start_date, endDate: o.end_date })),
     });
   }
-  // 4. Overlaps days already billed (submitted+ timesheet / monthly present). Admin may override.
+  // 5. Overlaps days already billed (submitted+ timesheet / monthly present). Admin may override.
   if (actorRole !== 'admin') {
     const worked = await getWorkedDays(employeeId, input.startDate, input.endDate, { committedOnly: true });
     if (worked.length > 0) {

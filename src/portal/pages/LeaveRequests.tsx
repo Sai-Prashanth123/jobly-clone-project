@@ -16,6 +16,7 @@ import {
   useLeaveRequests, useCreateLeaveRequest, useReviewLeaveRequest, useCancelLeaveRequest,
   LEAVE_TYPE_LABELS,
 } from '../hooks/useLeaveRequests';
+import { useHolidays } from '../hooks/useHolidays';
 import type { LeaveRequest, LeaveRequestStatus, LeaveType } from '../types';
 
 const STATUS_STYLES: Record<LeaveRequestStatus, string> = {
@@ -50,6 +51,13 @@ export default function LeaveRequests() {
   const createLeave = useCreateLeaveRequest();
   const reviewLeave = useReviewLeaveRequest();
   const cancelLeave = useCancelLeaveRequest();
+
+  const currentYear = new Date().getFullYear();
+  const { data: holidaysThisYear = [] } = useHolidays(currentYear);
+  const { data: holidaysNextYear = [] } = useHolidays(currentYear + 1);
+  const allHolidays = [...holidaysThisYear, ...holidaysNextYear];
+
+  const holidayConflicts = allHolidays.filter(h => h.date >= form.startDate && h.date <= form.endDate);
 
   // Apply dialog
   const [applyOpen, setApplyOpen] = useState(false);
@@ -230,6 +238,17 @@ export default function LeaveRequests() {
                   onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
               </div>
             </div>
+            {holidayConflicts.length > 0 && (
+              <div className="rounded-lg bg-amber-50 border border-amber-200 px-3 py-2 text-xs text-amber-800">
+                <p className="font-semibold mb-0.5">Company holiday{holidayConflicts.length > 1 ? 's' : ''} in this range</p>
+                <ul className="space-y-0.5">
+                  {holidayConflicts.map(h => (
+                    <li key={h.id}>• {h.name} ({h.date})</li>
+                  ))}
+                </ul>
+                <p className="mt-1 text-amber-700">Your request will be blocked — please exclude these dates.</p>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label>Reason (optional)</Label>
               <Textarea rows={3} value={form.reason} placeholder="Add any context for HR…"

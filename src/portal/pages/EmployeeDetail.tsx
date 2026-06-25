@@ -605,6 +605,46 @@ export default function EmployeeDetail() {
         </Card>
       )}
 
+      {isReviewer && (() => {
+        const uploadedDocTypes = new Set(employee.documents.map(d => d.type));
+        const complianceItems = [
+          { label: "Driver's License / State ID", satisfiedBy: ["Driver's License", "State-Issued ID"] },
+          { label: 'Passport', satisfiedBy: ['Passport'] },
+          { label: 'Visa / Work Authorization', satisfiedBy: ['Visa / Work Authorization'] },
+          { label: 'I-94', satisfiedBy: ['I-94'] },
+          { label: 'Offer Letter', satisfiedBy: ['Offer Letter'] },
+          { label: 'Resume', satisfiedBy: ['Resume'] },
+        ];
+        const statuses = complianceItems.map(item => ({
+          ...item,
+          done: item.satisfiedBy.some(t => uploadedDocTypes.has(t)),
+        }));
+        const doneCount = statuses.filter(s => s.done).length;
+        return (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <CheckSquare2 className="h-4 w-4 text-blue-500" />
+                Required Documents
+                <span className="text-xs font-normal text-muted-foreground">{doneCount}/{statuses.length} uploaded</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1.5">
+                {statuses.map(s => (
+                  <li key={s.label} className="flex items-center gap-2.5 text-sm">
+                    {s.done
+                      ? <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
+                      : <Square className="h-4 w-4 text-red-400 flex-shrink-0" />}
+                    <span className={s.done ? 'text-gray-700' : 'text-red-600 font-medium'}>{s.label}</span>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        );
+      })()}
+
       <DocumentPreviewDialog
         open={!!previewDoc}
         onOpenChange={open => { if (!open) setPreviewDoc(null); }}

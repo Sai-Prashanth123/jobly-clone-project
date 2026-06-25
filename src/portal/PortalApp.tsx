@@ -75,6 +75,7 @@ const MyReview = lazy(() => import('./pages/MyReview'));
 // Phase 4 — Admin
 const AuditLog = lazy(() => import('./pages/AuditLog'));
 const HolidaysSettings = lazy(() => import('./pages/HolidaysSettings'));
+const CompanyHolidays = lazy(() => import('./pages/CompanyHolidays'));
 const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 
 // Phase 4 — HR
@@ -427,6 +428,7 @@ export default function PortalApp() {
             {/* Phase 4 — Admin */}
             <Route path="audit-log" element={<ProtectedRoute allowedRoles={['admin']}><AuditLog /></ProtectedRoute>} />
             <Route path="holidays" element={<ProtectedRoute allowedRoles={['admin','hr']}><HolidaysSettings /></ProtectedRoute>} />
+            <Route path="company-holidays" element={<CompanyHolidays />} />
             <Route path="system-settings" element={<ProtectedRoute allowedRoles={['admin']}><SystemSettings /></ProtectedRoute>} />
 
             {/* Phase 4 — HR */}

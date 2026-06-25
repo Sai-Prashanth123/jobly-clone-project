@@ -12,7 +12,7 @@ import { DashboardHeader } from '../../components/shared/DashboardHeader';
 import { Panel } from '../../components/shared/Panel';
 import { OnboardingBar } from '../../components/employees/OnboardingProgress';
 import { formatDate } from '../../lib/utils';
-import { useEmployees } from '../../hooks/useEmployees';
+import { useEmployees, useExpiringDocuments } from '../../hooks/useEmployees';
 import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 import {
   isActive, isOnboarding, isInactive, isVisaExpiringSoon, isI9Issue,
@@ -24,6 +24,7 @@ const DEPT_COLORS = ['#4069FF', '#32CDDC', '#10b981', '#f59e0b', '#7c3aed', '#ef
 export function HRDashboard() {
   const { data } = useEmployees({ limit: 500 });
   const employees = data?.data ?? [];
+  const { data: expiringDocs = [] } = useExpiringDocuments(90);
 
   const active = employees.filter(isActive);
   const onboarding = employees.filter(isOnboarding);
@@ -271,6 +272,43 @@ export function HRDashboard() {
             </Button>
           </div>
         </div>
+      )}
+
+      {expiringDocs.length > 0 && (
+        <Panel
+          eyebrow="Next 90 days"
+          title="Document Expiry Alert"
+          icon={<AlertCircle className="text-amber-500" />}
+          action={{ label: 'View all →', to: '/portal/expiring-documents' }}
+          className="portal-animate-in"
+        >
+          <ul className="divide-y divide-gray-50">
+            {expiringDocs.slice(0, 8).map(doc => {
+              const urgency = doc.daysRemaining <= 14 ? 'red' : doc.daysRemaining <= 30 ? 'amber' : 'gray';
+              const urgencyClasses = urgency === 'red'
+                ? 'bg-red-100 text-red-700 border-red-200'
+                : urgency === 'amber'
+                ? 'bg-amber-100 text-amber-700 border-amber-200'
+                : 'bg-gray-100 text-gray-600 border-gray-200';
+              return (
+                <li key={`${doc.displayId}-${doc.documentType}`} className="flex items-center justify-between gap-3 px-1 py-2.5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">
+                      {doc.firstName[0]}{doc.lastName[0]}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-gray-900 truncate">{doc.firstName} {doc.lastName}</p>
+                      <p className="text-xs text-muted-foreground">{doc.documentType}</p>
+                    </div>
+                  </div>
+                  <span className={`flex-shrink-0 text-[11px] px-2 py-0.5 rounded-full border font-medium ${urgencyClasses}`}>
+                    {doc.daysRemaining <= 0 ? 'Expired' : `${doc.daysRemaining}d`}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </Panel>
       )}
 
       <Panel
