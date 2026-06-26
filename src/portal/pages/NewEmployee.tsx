@@ -379,6 +379,8 @@ export default function NewEmployee() {
   const [submitMissing, setSubmitMissing] = useState<{ label: string; section: string }[]>([]);
   const [prefilled, setPrefilled] = useState(false);
   const submittingRef = useRef(false);
+  const [submitStep, setSubmitStep] = useState<'idle' | 'creating' | 'uploading' | 'finishing'>('idle');
+  const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
 
   const submitMutation = isEditMode ? updateEmployee : createEmployee;
 
@@ -836,6 +838,7 @@ export default function NewEmployee() {
       return;
     }
     submittingRef.current = true;
+    setSubmitStep('creating');
 
     const payload = buildPayload();
 
@@ -888,8 +891,11 @@ export default function NewEmployee() {
       }
 
       if (tasks.length > 0) {
+        setSubmitStep('uploading');
+        setUploadProgress({ done: 0, total: tasks.length });
+        const tracked = tasks.map(t => t.then(r => { setUploadProgress(p => ({ ...p, done: p.done + 1 })); return r; }));
         try {
-          await Promise.all(tasks);
+          await Promise.all(tracked);
         } catch (uploadErr: any) {
           // Don't fail the whole create just because an upload failed —
           // HR can re-upload on the detail page.
@@ -909,6 +915,7 @@ export default function NewEmployee() {
         // checklist and stamps it "submitted" (NO auto-activate). On success we
         // move to the "awaiting HR review" screen; on incomplete it returns the
         // exact list of what's still missing.
+        setSubmitStep('finishing');
         try {
           await completeOnboarding.mutateAsync();
           markOnboardingSubmitted();
@@ -984,6 +991,7 @@ export default function NewEmployee() {
       }
     } finally {
       submittingRef.current = false;
+      setSubmitStep('idle');
     }
   };
 
@@ -1131,18 +1139,28 @@ export default function NewEmployee() {
           Save &amp; continue later
         </Button>
       )}
-      <Button
-        size="sm"
-        onClick={handleSubmit}
-        loading={submitMutation.isPending || completeOnboarding.isPending}
-        loadingText={isOnboarding ? 'Finishing…' : isEditMode ? 'Saving…' : 'Creating…'}
-        disabled={unclassifiedDocs > 0}
-        title={unclassifiedDocs > 0 ? 'Set a type for each uploaded file first.' : undefined}
-        className="gap-2"
-      >
-        <CheckCircle2 className="h-4 w-4" />
-        {isOnboarding ? 'Finish onboarding' : isEditMode ? 'Save Changes' : 'Create Employee'}
-      </Button>
+      <div className="flex flex-col items-end gap-1.5">
+        {submitStep !== 'idle' && (
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <Loader2 className="h-3.5 w-3.5 animate-spin text-[#4069FF]" />
+            {submitStep === 'creating' && 'Creating employee record…'}
+            {submitStep === 'uploading' && `Uploading files… ${uploadProgress.done}/${uploadProgress.total}`}
+            {submitStep === 'finishing' && 'Submitting for HR review…'}
+          </div>
+        )}
+        <Button
+          size="sm"
+          onClick={handleSubmit}
+          loading={submitMutation.isPending || completeOnboarding.isPending}
+          loadingText={isOnboarding ? 'Finishing…' : isEditMode ? 'Saving…' : 'Creating…'}
+          disabled={unclassifiedDocs > 0}
+          title={unclassifiedDocs > 0 ? 'Set a type for each uploaded file first.' : undefined}
+          className="gap-2"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {isOnboarding ? 'Finish onboarding' : isEditMode ? 'Save Changes' : 'Create Employee'}
+        </Button>
+      </div>
     </div>
   );
 

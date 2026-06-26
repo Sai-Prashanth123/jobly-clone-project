@@ -41,6 +41,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [session]);
 
+  // Silent keep-alive ping so the Azure container is warm before the first real API call.
+  useEffect(() => {
+    const base = (import.meta.env.VITE_API_URL as string | undefined)?.replace('/api/v1', '') ?? '';
+    if (base) fetch(`${base}/health`).catch(() => {});
+  }, []);
+
   const login = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
       const { data } = await apiClient.post('/auth/login', { email, password });
