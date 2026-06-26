@@ -257,6 +257,9 @@ ${showCreds ? `
     </a>
   </td></tr>
 </table>
+<p style="margin:8px 0 20px;color:#9ca3af;font-size:12px;text-align:center;word-break:break-all;">
+  Or copy this link: <span style="color:#4069FF;">${esc(PORTAL_URL)}/portal/login</span>
+</p>
 <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">Questions? Reach out to your HR team for assistance.</p>`;
 
   const html = emailShell({

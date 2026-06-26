@@ -151,7 +151,18 @@ const IDENTITY_DOC_ROWS: Array<{
     hint: 'EAD card for STEM OPT 24-month extension.', hasExpiry: true },
   { type: 'i983',          label: 'I-983 Training Plan',              placeholder: '',
     hint: 'Required for STEM OPT — signed I-983 from employer and school.', hasExpiry: true },
+  { type: 'i94',           label: 'I-94',                             placeholder: '12345678901',
+    hint: 'Arrival/Departure Record — download from cbp.dhs.gov.', hasExpiry: true },
+  { type: 'us_visa',       label: 'US Visa',                          placeholder: 'A12345678',
+    hint: 'Copy of the US visa stamp in your passport (H-1B, F-1, L-1, etc.).', hasExpiry: true },
 ];
+
+// Identity doc types that are mandatory uploads during onboarding.
+const REQUIRED_IDENTITY_TYPES = ['ssn', 'passport', 'i94', 'us_visa'] as const;
+
+// Labels from IDENTITY_DOC_ROWS — used to exclude these from the Documents section dropdown
+// so employees cannot accidentally upload the same file in both sections.
+const IDENTITY_OWNED_DOC_LABELS = new Set(IDENTITY_DOC_ROWS.map(r => r.label));
 
 const SECTION_IDS = {
   personal: 'sec-personal',
@@ -505,7 +516,6 @@ export default function NewEmployee() {
     'I-9 Form',
     'W-4',
     'Offer Letter',
-    'Social Security Number',
   ];
 
   const uploadedDocTypes = new Set<string>([
@@ -537,6 +547,7 @@ export default function NewEmployee() {
       [SECTION_IDS.payroll]:      isOnboarding ? true : (parseNumberInput(form.payRate) ?? 0) > 0,
       [SECTION_IDS.review]:       isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
       ...(isOnboarding ? {
+        [SECTION_IDS.identity]:  REQUIRED_IDENTITY_TYPES.every(t => !!(form.identityDocFiles?.[t])),
         [SECTION_IDS.documents]: ALL_REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
       } : {}),
     };
@@ -570,7 +581,17 @@ export default function NewEmployee() {
       { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
       // Emergency — address not required by backend (name + relationship + phone only)
       { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() },
-      // Required documents (matches backend ONBOARDING_REQUIRED_DOCS)
+      // Required identity documents (SSN, Passport, I-94, US Visa) — uploaded in Identity section
+      ...REQUIRED_IDENTITY_TYPES.map(t => {
+        const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
+        return {
+          id: `ident_${t}`,
+          label: row.label,
+          section: SECTION_IDS.identity,
+          done: !!(form.identityDocFiles?.[t] || existingEmployee?.identityDocuments?.some((d: IdentityDocumentEntry) => d.type === t)),
+        };
+      }),
+      // Required documents (Resume, I-9 Form, W-4, Offer Letter) — uploaded in Documents section
       ...ALL_REQUIRED_DOC_TYPES.map(t => ({
         id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
         label: t,
@@ -1679,11 +1700,11 @@ export default function NewEmployee() {
               / Green Card / EAD) so HR can track work-authorization expiry. */}
           <SectionCard
             id={SECTION_IDS.identity}
-            complete={(Object.values(form.identityDocFiles ?? {}).some(Boolean) || (form.identityDocuments?.length ?? 0) > 0) || undefined}
-            attention={false}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.identity) : (Object.values(form.identityDocFiles ?? {}).some(Boolean) || (form.identityDocuments?.length ?? 0) > 0) || undefined}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description="Upload your identity documents. SSN card upload here counts toward the required documents checklist."
+            description="Upload your identity documents. SSN, Passport, I-94, and US Visa are required during onboarding."
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1691,10 +1712,18 @@ export default function NewEmployee() {
                 const file = form.identityDocFiles[row.type];
                 const doc = getIdentityDoc(row.type);
                 const inputId = `id-doc-file-${row.type}`;
+                const isRequired = (REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type);
+                const isMissing = isOnboarding && isRequired && !file;
                 return (
-                  <div key={row.type} className="p-4 bg-gray-50/60 rounded-lg border border-gray-100 flex flex-col gap-3">
+                  <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
                     <div>
-                      <p className="text-sm font-semibold text-gray-800">{row.label}</p>
+                      <p className="text-sm font-semibold text-gray-800">
+                        {row.label}
+                        {isRequired && <span className="text-red-500 ml-0.5">*</span>}
+                        {isRequired && !file && isOnboarding && (
+                          <span className="ml-2 text-[10px] font-semibold text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Required</span>
+                        )}
+                      </p>
                       {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
                     </div>
                     {row.hasExpiry && (
@@ -2014,7 +2043,8 @@ export default function NewEmployee() {
           </SectionCard>
 
           {/* 12 Documents — drag-and-drop multi-file upload with inline classification.
-              During onboarding, Resume / I-9 Form / W-4 / Offer Letter / SSN are required. */}
+              During onboarding, Resume / I-9 Form / W-4 / Offer Letter are required.
+              Identity documents (SSN, Passport, I-94, US Visa, etc.) are collected above. */}
           <SectionCard
             id={SECTION_IDS.documents}
             complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.documents) : undefined}
@@ -2022,10 +2052,15 @@ export default function NewEmployee() {
             num="12"
             title="Documents"
             description={isOnboarding
-              ? 'Upload required documents: Resume, I-9 Form, W-4, Offer Letter, Social Security Number.'
+              ? 'Upload required documents: Resume, I-9 Form, W-4, Offer Letter.'
               : 'Optional. Drag files in (or click to browse), then choose a type for each.'}
             icon={<FileText className="h-4 w-4 text-[#4069FF]" />}
           >
+            {isOnboarding && (
+              <p className="text-[11px] text-blue-600 bg-blue-50 border border-blue-100 rounded-md px-3 py-2 mb-3">
+                Identity documents (Passport, SSN, I-94, US Visa, Driver&rsquo;s License, etc.) are collected in the <strong>Identity &amp; Documents</strong> section above.
+              </p>
+            )}
             {isOnboarding && (() => {
               const missing = ALL_REQUIRED_DOC_TYPES.filter(t => !uploadedDocTypes.has(t));
               return missing.length > 0 ? (
@@ -2052,7 +2087,7 @@ export default function NewEmployee() {
                   <Select value={docDraft.type} onValueChange={v => setDocDraft(d => ({ ...d, type: v }))}>
                     <SelectTrigger><SelectValue placeholder="Choose for new uploads" /></SelectTrigger>
                     <SelectContent>
-                      {DOC_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                      {DOC_TYPES.filter(t => !IDENTITY_OWNED_DOC_LABELS.has(t)).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -2100,7 +2135,7 @@ export default function NewEmployee() {
                           <Select value="" onValueChange={v => setDocumentType(d.id, v)}>
                             <SelectTrigger className="h-7 text-[11px]"><SelectValue placeholder="Set type…" /></SelectTrigger>
                             <SelectContent>
-                              {DOC_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                              {DOC_TYPES.filter(t => !IDENTITY_OWNED_DOC_LABELS.has(t)).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                             </SelectContent>
                           </Select>
                         </div>

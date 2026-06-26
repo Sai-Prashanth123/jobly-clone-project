@@ -9,7 +9,16 @@ export const createAnnouncementSchema = z.object({
   type:        z.enum(ANNOUNCEMENT_TYPES).default('info'),
   isPinned:    z.boolean().default(false),
   targetRoles: z.array(z.enum(ALL_ROLES)).default([]),
-  expiresAt:   z.string().datetime({ offset: true }).optional().nullable().transform(v => v || null),
+  expiresAt:   z
+    .string()
+    .optional()
+    .nullable()
+    .transform(v => {
+      if (!v) return null;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${v}T00:00:00.000Z`;
+      return v;
+    })
+    .pipe(z.string().datetime({ offset: true }).nullable()),
 });
 
 export const updateAnnouncementSchema = createAnnouncementSchema.partial();
