@@ -11,18 +11,17 @@ function esc(value: unknown): string {
   return String(value).replace(/[&<>"']/g, ch => HTML_ESCAPES[ch]);
 }
 
-// ── Shared premium email shell ───────────────────────────────────────────────
-// All transactional emails use this wrapper for consistent branding.
+// ── Shared email shell ───────────────────────────────────────────────────────
+// Clean, light design: real Jobly logo, brand-blue accent border, white card.
 // `body` is trusted HTML — callers must use esc() on any user data inside it.
 function emailShell(opts: {
   previewText: string;
-  gradient: string;   // full CSS gradient string for the header
-  emoji: string;      // large emoji for the header icon (safe, not user data)
-  title: string;      // already-escaped header title
-  subtitle: string;   // already-escaped header subtitle
-  body: string;       // full body HTML (caller's responsibility to escape user data)
+  title: string;
+  subtitle: string;
+  body: string;
 }): string {
-  const { previewText, gradient, emoji, title, subtitle, body } = opts;
+  const { previewText, title, subtitle, body } = opts;
+  const logoSrc = `data:image/png;base64,${getJoblyLogoBuffer().toString('base64')}`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -30,37 +29,42 @@ function emailShell(opts: {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 </head>
-<body style="margin:0;padding:0;background:#eef2ff;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
-<div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#eef2ff;">${esc(previewText)}&nbsp;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;</div>
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#eef2ff;padding:40px 16px;">
+<body style="margin:0;padding:0;background:#f0f2f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+<div style="display:none;max-height:0;overflow:hidden;font-size:1px;line-height:1px;color:#f0f2f5;">${esc(previewText)}&nbsp;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;&#8203;</div>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f0f2f5;padding:36px 16px;">
 <tr><td align="center">
-<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;">
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#ffffff;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.06);">
 
-  <!-- Header -->
-  <tr><td style="background:${gradient};border-radius:16px 16px 0 0;padding:36px 48px 32px;">
-    <table cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
-      <tr><td style="background:rgba(255,255,255,0.18);border-radius:8px;padding:5px 11px;">
-        <span style="font-size:12px;font-weight:800;letter-spacing:0.14em;text-transform:uppercase;color:#ffffff;">JOBLY</span>
-      </td></tr>
+  <!-- Logo bar -->
+  <tr><td style="background:#ffffff;border-radius:12px 12px 0 0;padding:20px 40px;border-bottom:3px solid #4069FF;">
+    <table cellpadding="0" cellspacing="0" role="presentation">
+      <tr>
+        <td style="padding-right:12px;vertical-align:middle;">
+          <img src="${logoSrc}" width="100" alt="Jobly" style="display:block;border:0;vertical-align:middle;">
+        </td>
+        <td style="vertical-align:middle;border-left:1px solid #e5e7eb;padding-left:12px;">
+          <p style="margin:0;font-size:13px;font-weight:600;color:#374151;letter-spacing:0.01em;">Jobly Solutions</p>
+          <p style="margin:2px 0 0;font-size:11px;color:#9ca3af;">Workforce Portal</p>
+        </td>
+      </tr>
     </table>
-    <div style="font-size:36px;line-height:1;margin-bottom:14px;">${emoji}</div>
-    <h1 style="margin:0 0 8px;color:#ffffff;font-size:24px;font-weight:800;line-height:1.25;letter-spacing:-0.01em;">${title}</h1>
-    <p style="margin:0;color:rgba(255,255,255,0.82);font-size:14px;line-height:1.5;">${subtitle}</p>
+  </td></tr>
+
+  <!-- Title area -->
+  <tr><td style="background:#ffffff;padding:32px 40px 20px;">
+    <h1 style="margin:0 0 6px;color:#111827;font-size:22px;font-weight:700;line-height:1.3;">${title}</h1>
+    <p style="margin:0 0 20px;color:#6b7280;font-size:13px;line-height:1.5;">${subtitle}</p>
+    <div style="border-top:1px solid #f3f4f6;"></div>
   </td></tr>
 
   <!-- Body -->
-  <tr><td style="background:#ffffff;padding:36px 48px;">
+  <tr><td style="background:#ffffff;padding:20px 40px 36px;">
     ${body}
   </td></tr>
 
   <!-- Footer -->
-  <tr><td style="background:#f5f7ff;border-radius:0 0 16px 16px;padding:20px 48px;border-top:1px solid #e4eaff;">
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
-      <tr>
-        <td><p style="margin:0 0 2px;font-size:13px;font-weight:700;color:#4069FF;">Jobly Solutions</p><p style="margin:0;font-size:11px;color:#9ca3af;">Workforce Management Portal</p></td>
-        <td align="right"><p style="margin:0;font-size:11px;color:#c4cdd6;">&copy; 2026 Jobly Solutions. All rights reserved.</p></td>
-      </tr>
-    </table>
+  <tr><td style="background:#f9fafb;border-radius:0 0 12px 12px;padding:16px 40px;border-top:1px solid #f3f4f6;">
+    <p style="margin:0;font-size:11px;color:#9ca3af;text-align:center;">&copy; 2026 Jobly Solutions &middot; Workforce Management Portal &middot; All rights reserved.</p>
   </td></tr>
 
 </table>
@@ -252,7 +256,7 @@ ${showCreds ? `
 
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
-    <a href="${esc(PORTAL_URL)}/portal/login" style="display:inline-block;background:linear-gradient(135deg,#4069FF,#0ea5e9);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 42px;border-radius:50px;letter-spacing:0.01em;">
+    <a href="${esc(PORTAL_URL)}/portal/login" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
       Log In to Jobly Portal &rarr;
     </a>
   </td></tr>
@@ -264,8 +268,6 @@ ${showCreds ? `
 
   const html = emailShell({
     previewText: showCreds ? `Welcome ${firstName}! Your Jobly Portal credentials are ready.` : `Your Jobly Portal account — ${firstName} ${lastName}`,
-    gradient: 'linear-gradient(135deg,#4069FF 0%,#0ea5e9 100%)',
-    emoji: showCreds ? '🎉' : '👋',
     title: showCreds ? 'Welcome to Jobly Portal' : 'Your Jobly Portal Account',
     subtitle: showCreds ? 'Your employee account is ready — log in to complete your onboarding.' : 'Account update from Jobly Solutions.',
     body: welcomeBody,
@@ -365,10 +367,10 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
 </p>
 
 <!-- Amount due highlight -->
-<div style="background:linear-gradient(135deg,#1e293b,#334155);border-radius:12px;padding:20px 24px;margin-bottom:24px;text-align:center;">
-  <p style="margin:0 0 4px;font-size:12px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:rgba(255,255,255,0.65);">Total Amount Due</p>
-  <p style="margin:0 0 8px;font-size:32px;font-weight:800;color:#ffffff;letter-spacing:-0.02em;">${fmt(balanceDue ?? totalAmount)}</p>
-  <p style="margin:0;font-size:13px;color:rgba(255,255,255,0.7);">Due by <strong style="color:#fbbf24;">${esc(fmtDate(dueDate))}</strong></p>
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:20px 24px;margin-bottom:24px;text-align:center;">
+  <p style="margin:0 0 4px;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;">Total Amount Due</p>
+  <p style="margin:0 0 6px;font-size:30px;font-weight:800;color:#1d4ed8;letter-spacing:-0.02em;">${fmt(balanceDue ?? totalAmount)}</p>
+  <p style="margin:0;font-size:13px;color:#374151;">Due by <strong style="color:#4069FF;">${esc(fmtDate(dueDate))}</strong></p>
 </div>
 
 <!-- Line items -->
@@ -410,7 +412,7 @@ ${terms ? `<p style="margin:0 0 24px;font-size:12px;color:#9ca3af;line-height:1.
 
 ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
-    <a href="${esc(pdfUrl)}" style="display:inline-block;background:linear-gradient(135deg,#1e293b,#334155);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 36px;border-radius:50px;">
+    <a href="${esc(pdfUrl)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
       Download Invoice PDF &darr;
     </a>
   </td></tr>
@@ -422,8 +424,6 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
 
   const html = emailShell({
     previewText: `Invoice ${invoiceNumber} from Jobly Solutions — ${fmt(balanceDue ?? totalAmount)} due ${fmtDate(dueDate)}`,
-    gradient: 'linear-gradient(135deg,#1e293b 0%,#334155 100%)',
-    emoji: '📄',
     title: `Invoice from Jobly Solutions`,
     subtitle: `${esc(invoiceNumber)} · ${esc(clientName)}`,
     body: invoiceBody,
@@ -538,8 +538,6 @@ export async function sendContactEmail(p: ContactFormPayload): Promise<void> {
 
   const html = emailShell({
     previewText: `New contact message from ${p.name}${p.subject ? ` — ${p.subject}` : ''}`,
-    gradient: 'linear-gradient(135deg,#374151 0%,#1f2937 100%)',
-    emoji: '✉️',
     title: 'New Contact Message',
     subtitle: `From joblysolutions.com — Contact Us form`,
     body: contactBody,
@@ -595,7 +593,7 @@ export async function sendInvoiceReminderEmail(payload: {
 
 ${payload.viewUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
-    <a href="${esc(payload.viewUrl)}" style="display:inline-block;background:linear-gradient(135deg,#4069FF,#0ea5e9);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 40px;border-radius:50px;">
+    <a href="${esc(payload.viewUrl)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
       View Invoice &amp; Pay &rarr;
     </a>
   </td></tr>
@@ -607,8 +605,6 @@ ${payload.viewUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="p
 
   const html = emailShell({
     previewText: `${headline} — ${fmt(payload.balanceDue)} due`,
-    gradient: reminderGradient,
-    emoji: reminderEmoji,
     title: headline,
     subtitle: `Invoice ${esc(payload.invoiceNumber)} · Jobly Solutions`,
     body: reminderBody,
@@ -716,7 +712,7 @@ export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPa
 
 ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
-    <a href="${esc(pdfUrl)}" style="display:inline-block;background:linear-gradient(135deg,#4069FF,#7c3aed);color:#ffffff;text-decoration:none;font-size:14px;font-weight:700;padding:13px 36px;border-radius:50px;">
+    <a href="${esc(pdfUrl)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
       Download Timesheet PDF &darr;
     </a>
   </td></tr>
@@ -726,8 +722,6 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
 
   const html = emailShell({
     previewText: `Timesheet submitted — ${employeeName} (${employeeDisplayId}) — ${monthLabel}`,
-    gradient: 'linear-gradient(135deg,#4069FF 0%,#7c3aed 100%)',
-    emoji: '📊',
     title: `Monthly Timesheet — ${esc(monthLabel)}`,
     subtitle: `${esc(employeeName)} &middot; ${esc(employeeDisplayId)}${department ? ` &middot; ${esc(department)}` : ''}`,
     body: timesheetBody,
@@ -797,7 +791,7 @@ export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedE
 
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
-    <a href="${esc(link)}" style="display:inline-block;background:linear-gradient(135deg,#059669,#10b981);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 42px;border-radius:50px;">
+    <a href="${esc(link)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
       Review &amp; Approve &rarr;
     </a>
   </td></tr>
@@ -806,8 +800,6 @@ export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedE
 
   const html = emailShell({
     previewText: `Action required — ${employeeName} submitted onboarding for your review`,
-    gradient: 'linear-gradient(135deg,#059669 0%,#10b981 100%)',
-    emoji: '✅',
     title: 'Onboarding Submitted for Review',
     subtitle: `${esc(employeeName)} (${esc(displayId)}) is awaiting your approval`,
     body: onboardingSubmittedBody,
@@ -867,7 +859,7 @@ export async function sendOnboardingChangesRequestedEmail(
 
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
-    <a href="${esc(link)}" style="display:inline-block;background:linear-gradient(135deg,#d97706,#f59e0b);color:#ffffff;text-decoration:none;font-size:15px;font-weight:700;padding:14px 42px;border-radius:50px;">
+    <a href="${esc(link)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
       Update My Information &rarr;
     </a>
   </td></tr>
@@ -876,8 +868,6 @@ export async function sendOnboardingChangesRequestedEmail(
 
   const html = emailShell({
     previewText: `Onboarding update needed — HR has requested changes for ${displayId}`,
-    gradient: 'linear-gradient(135deg,#d97706 0%,#f59e0b 100%)',
-    emoji: '📝',
     title: 'Changes Requested',
     subtitle: `HR has reviewed your onboarding for ${esc(displayId)} and needs a few updates`,
     body: changesBody,
