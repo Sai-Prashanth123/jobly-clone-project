@@ -534,16 +534,16 @@ export default function NewEmployee() {
     const presentFilled = !!form.address.street.trim() && !!form.address.city.trim() && !!form.address.state.trim() && !!form.address.zip.trim();
     const permFilled = form.permanentSameAsPresent ? presentFilled
       : (!!form.permanentAddress.street.trim() && !!form.permanentAddress.city.trim() && !!form.permanentAddress.state.trim() && !!form.permanentAddress.zip.trim());
-    const educationDone = form.education.some(e => !!(e.level ?? '').trim() && !!(e.institution ?? '').trim() && !!String(e.passYear ?? '').trim());
+    const educationDone = form.education.some(e => !!(e.level ?? '').trim() && !!(e.institution ?? '').trim() && !!String(e.passYear ?? '').trim() && Number(e.passYear) > 0);
     return {
-      [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality && !!form.preferredLanguage,
-      [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim(),
+      [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality.trim() && !!form.preferredLanguage.trim(),
+      [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim() && (isOnboarding ? !!form.linkedinUrl.trim() : true),
       [SECTION_IDS.presentAddr]:  presentFilled,
       [SECTION_IDS.permanentAddr]: permFilled,
-      [SECTION_IDS.employment]:   !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation,
-      [SECTION_IDS.immigration]:  !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn),
+      [SECTION_IDS.employment]:   !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim(),
+      [SECTION_IDS.immigration]:  !!form.visaType && !!form.visaExpiry && /^(?!0000|1234)\d{4}$/.test(form.ssn),
       [SECTION_IDS.education]:    educationDone,
-      [SECTION_IDS.emergency]:    !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim(),
+      [SECTION_IDS.emergency]:    !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && (isOnboarding ? !!form.emergencyContact.address.trim() : true),
       [SECTION_IDS.payroll]:      isOnboarding ? true : (parseNumberInput(form.payRate) ?? 0) > 0,
       [SECTION_IDS.review]:       isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
       ...(isOnboarding ? {
@@ -569,19 +569,20 @@ export default function NewEmployee() {
     return [
       // Personal — photo is optional (not required by backend)
       { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
-      // Contact — LinkedIn is optional, address is required
+      // Contact — all three are required during onboarding
       { id: 'email',       label: 'Personal email',                 section: SECTION_IDS.contact,       done: !!form.email.trim() },
       { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
+      { id: 'linkedin',    label: 'LinkedIn URL',                   section: SECTION_IDS.contact,       done: !!form.linkedinUrl.trim() },
       { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
       { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
       // Employment
-      { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department && !!form.jobTitle && !!form.employmentType && !!form.startDate && !!form.workLocation },
-      // Immigration + SSN
-      { id: 'immigration', label: 'Immigration & SSN',              section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn) },
-      // Education
-      { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim()) },
-      // Emergency — address not required by backend (name + relationship + phone only)
-      { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() },
+      { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim() },
+      // Immigration + SSN (placeholder values '0000'/'1234' are invalid)
+      { id: 'immigration', label: 'Immigration & SSN',              section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && /^(?!0000|1234)\d{4}$/.test(form.ssn) },
+      // Education (passYear must be > 0)
+      { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim() && Number(e.passYear) > 0) },
+      // Emergency — address is now required
+      { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
       // Required identity documents (SSN, Passport, I-94, US Visa) — uploaded in Identity section
       ...REQUIRED_IDENTITY_TYPES.map(t => {
         const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
@@ -627,8 +628,9 @@ export default function NewEmployee() {
     if (!form.email.trim())     flag('email',     'Personal email is required', SECTION_IDS.contact);
     else if (!/^\S+@\S+\.\S+$/.test(form.email)) flag('email', 'Enter a valid email', SECTION_IDS.contact);
     if (form.workEmail && !/^\S+@\S+\.\S+$/.test(form.workEmail)) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
+    if (isOnboarding && !form.linkedinUrl.trim()) flag('linkedinUrl', 'LinkedIn URL is required', SECTION_IDS.contact);
 
-    if (form.ssn && !/^\d{4}$/.test(form.ssn)) flag('ssn', 'SSN must be exactly 4 digits', SECTION_IDS.immigration);
+    if (form.ssn && !/^(?!0000|1234)\d{4}$/.test(form.ssn)) flag('ssn', 'Enter a valid SSN last 4 digits (not a placeholder like 0000 or 1234)', SECTION_IDS.immigration);
 
     // Admin/HR create needs only first/last name + email (above). The full
     // profile is the EMPLOYEE's responsibility to complete during onboarding —
@@ -1366,7 +1368,7 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4 mb-4">
               {/* Profile Photo upload tile (matches reference HTML) */}
               <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo {isOnboarding && <RequiredMark />}</p>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo</p>
                 <label
                   htmlFor="profile-photo"
                   className="block border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-[#4069FF] hover:bg-blue-50/40 transition-colors cursor-pointer text-center"
@@ -1485,7 +1487,8 @@ export default function NewEmployee() {
           {/* 02 Contact */}
           <SectionCard
             id={SECTION_IDS.contact}
-            complete={sectionComplete[SECTION_IDS.contact]}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.contact) : sectionComplete[SECTION_IDS.contact]}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.contact)}
             num="02"
             title="Contact Details"
             description="Personal email receives the login credentials. Work email becomes the portal username if provided."
@@ -1518,8 +1521,14 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>LinkedIn URL</Label>
-                <Input value={form.linkedinUrl} onChange={e => set('linkedinUrl', e.target.value)} placeholder="https://linkedin.com/in/…" />
+                <Label>LinkedIn URL {isOnboarding && <RequiredMark />}</Label>
+                <Input
+                  value={form.linkedinUrl}
+                  onChange={e => set('linkedinUrl', e.target.value)}
+                  placeholder="https://linkedin.com/in/…"
+                  onBlur={() => { if (isOnboarding && !form.linkedinUrl.trim()) setErrors(p => ({ ...p, linkedinUrl: 'LinkedIn URL is required' })); }}
+                />
+                <FieldError msg={errors.linkedinUrl} />
               </div>
               <div>
                 <Label>Skype / Teams ID</Label>
@@ -1531,7 +1540,8 @@ export default function NewEmployee() {
           {/* 03 Present Address */}
           <SectionCard
             id={SECTION_IDS.presentAddr}
-            complete={sectionComplete[SECTION_IDS.presentAddr]}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.presentAddr) : sectionComplete[SECTION_IDS.presentAddr]}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.presentAddr)}
             num="03"
             title="Present Address"
             description="Where the employee currently lives."
@@ -1573,7 +1583,7 @@ export default function NewEmployee() {
           {/* 04 Permanent Address */}
           <SectionCard
             id={SECTION_IDS.permanentAddr}
-            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.permanentAddr)}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.permanentAddr) : sectionComplete[SECTION_IDS.permanentAddr]}
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.permanentAddr)}
             num="04"
             title="Permanent Address"
@@ -1622,7 +1632,8 @@ export default function NewEmployee() {
           {/* 05 Employment */}
           <SectionCard
             id={SECTION_IDS.employment}
-            complete={sectionComplete[SECTION_IDS.employment]}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.employment) : sectionComplete[SECTION_IDS.employment]}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.employment)}
             num="05"
             title="Employment Details"
             description="Where this person fits in the company."
@@ -1631,11 +1642,23 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Department {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.department} onChange={e => set('department', e.target.value)} placeholder="Engineering" />
+                <Input
+                  value={form.department}
+                  onChange={e => set('department', e.target.value)}
+                  placeholder="Engineering"
+                  onBlur={() => { if (isOnboarding && !form.department.trim()) setErrors(p => ({ ...p, department: 'Department is required' })); }}
+                />
+                <FieldError msg={errors.department} />
               </div>
               <div>
                 <Label>Job Title {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.jobTitle} onChange={e => set('jobTitle', e.target.value)} placeholder="Senior Software Engineer" />
+                <Input
+                  value={form.jobTitle}
+                  onChange={e => set('jobTitle', e.target.value)}
+                  placeholder="Senior Software Engineer"
+                  onBlur={() => { if (isOnboarding && !form.jobTitle.trim()) setErrors(p => ({ ...p, jobTitle: 'Job title is required' })); }}
+                />
+                <FieldError msg={errors.jobTitle} />
               </div>
               <div>
                 <Label>Employment Type {isOnboarding && <RequiredMark />}</Label>
@@ -1653,7 +1676,13 @@ export default function NewEmployee() {
               </div>
               <div className="sm:col-span-2">
                 <Label>Work Location {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.workLocation} onChange={e => set('workLocation', e.target.value)} placeholder="Remote · Onsite - New York · Hybrid" />
+                <Input
+                  value={form.workLocation}
+                  onChange={e => set('workLocation', e.target.value)}
+                  placeholder="Remote · Onsite - New York · Hybrid"
+                  onBlur={() => { if (isOnboarding && !form.workLocation.trim()) setErrors(p => ({ ...p, workLocation: 'Work location is required' })); }}
+                />
+                <FieldError msg={errors.workLocation} />
               </div>
             </div>
           </SectionCard>
@@ -1661,7 +1690,8 @@ export default function NewEmployee() {
           {/* 06 Immigration */}
           <SectionCard
             id={SECTION_IDS.immigration}
-            complete={sectionComplete[SECTION_IDS.immigration]}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.immigration) : sectionComplete[SECTION_IDS.immigration]}
+            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.immigration)}
             num="06"
             title="Immigration & Work Authorization"
             description="Captured for I-9 compliance. SSN is stored as last-4 only."
@@ -1793,7 +1823,7 @@ export default function NewEmployee() {
           {/* 08 Education */}
           <SectionCard
             id={SECTION_IDS.education}
-            complete={isOnboarding && !onbIncompleteSections.has(SECTION_IDS.education)}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.education) : sectionComplete[SECTION_IDS.education]}
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.education)}
             num="08"
             title="Education"
@@ -1973,7 +2003,7 @@ export default function NewEmployee() {
                 <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', e.target.value)} />
               </div>
               <div className="sm:col-span-2">
-                <Label>Address</Label>
+                <Label>Address {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.emergencyContact.address} onChange={e => setEmergency('address', e.target.value)} />
               </div>
             </div>

@@ -56,6 +56,7 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
 
     // Contact
     { id: 'phone',              label: 'Phone number',                                        done: nonEmpty(emp.phone) },
+    { id: 'linkedin_url',       label: 'LinkedIn URL',                                        done: nonEmpty(emp.linkedin_url) },
     {
       id: 'present_address',    label: 'Present address (street, city, state, zip)',
       done: nonEmpty(emp.address_street) && nonEmpty(emp.address_city)
@@ -87,12 +88,13 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
       done: education.some(e => nonEmpty(e?.institution) && nonEmpty(e?.level) && (nonEmpty(e?.passYear) || numPositive(e?.passYear))),
     },
 
-    // Emergency contact
+    // Emergency contact (address now required)
     {
-      id: 'emergency',          label: 'Emergency contact (name, relationship, phone)',
+      id: 'emergency',          label: 'Emergency contact (name, relationship, phone, address)',
       done: nonEmpty(emp.emergency_contact_name)
         && nonEmpty(emp.emergency_contact_relationship)
-        && nonEmpty(emp.emergency_contact_phone),
+        && nonEmpty(emp.emergency_contact_phone)
+        && nonEmpty(emp.emergency_contact_address),
     },
 
     ...ONBOARDING_REQUIRED_DOCS.map(t => ({
