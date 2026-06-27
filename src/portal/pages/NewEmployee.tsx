@@ -515,8 +515,6 @@ export default function NewEmployee() {
   // uploads (identity + key forms) that must be completed before onboarding can finish.
   const ALL_REQUIRED_DOC_TYPES = [
     'Resume',
-    'I-9 Form',
-    'W-4',
     'Offer Letter',
   ];
 
@@ -572,6 +570,7 @@ export default function NewEmployee() {
       // Personal — photo is optional (not required by backend)
       { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
       // Contact — LinkedIn is optional, address is required
+      { id: 'email',       label: 'Personal email',                 section: SECTION_IDS.contact,       done: !!form.email.trim() },
       { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
       { id: 'present',     label: 'Present address',                section: SECTION_IDS.presentAddr,   done: presentFilled },
       { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
@@ -1519,7 +1518,7 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>LinkedIn URL {isOnboarding && <RequiredMark />}</Label>
+                <Label>LinkedIn URL</Label>
                 <Input value={form.linkedinUrl} onChange={e => set('linkedinUrl', e.target.value)} placeholder="https://linkedin.com/in/…" />
               </div>
               <div>
@@ -1974,7 +1973,7 @@ export default function NewEmployee() {
                 <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', e.target.value)} />
               </div>
               <div className="sm:col-span-2">
-                <Label>Address {isOnboarding && <RequiredMark />}</Label>
+                <Label>Address</Label>
                 <Input value={form.emergencyContact.address} onChange={e => setEmergency('address', e.target.value)} />
               </div>
             </div>
@@ -2036,11 +2035,11 @@ export default function NewEmployee() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Bank Details (ACH Direct Deposit)</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <Label>Bank Name {isOnboarding && <RequiredMark />}</Label>
+                <Label>Bank Name</Label>
                 <Input value={form.bankName} onChange={e => set('bankName', e.target.value)} placeholder="Chase" />
               </div>
               <div>
-                <Label>Routing Number (9 digits) {isOnboarding && <RequiredMark />}</Label>
+                <Label>Routing Number (9 digits)</Label>
                 <Input
                   value={form.bankRoutingNumber}
                   onChange={e => set('bankRoutingNumber', e.target.value.replace(/\D/g, '').slice(0, 9))}
@@ -2050,7 +2049,7 @@ export default function NewEmployee() {
                 />
               </div>
               <div>
-                <Label>Account Number {isOnboarding && <RequiredMark />}</Label>
+                <Label>Account Number</Label>
                 <Input
                   value={form.bankAccountNumber}
                   onChange={e => set('bankAccountNumber', e.target.value)}
@@ -2070,7 +2069,7 @@ export default function NewEmployee() {
             num="12"
             title="Documents"
             description={isOnboarding
-              ? 'Upload required documents: Resume, I-9 Form, W-4, Offer Letter.'
+              ? 'Upload required documents: Resume, Offer Letter. I-9 and W-4 are optional at this stage.'
               : 'Optional. Drag files in (or click to browse), then choose a type for each.'}
             icon={<FileText className="h-4 w-4 text-[#4069FF]" />}
           >

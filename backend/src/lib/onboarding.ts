@@ -21,8 +21,6 @@ export const COMPLIANCE_REQUIRED_DOC_TYPES = [
 
 export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
-  'I-9 Form',
-  'W-4',
   'Offer Letter',
   'Social Security Number',
 ] as const;

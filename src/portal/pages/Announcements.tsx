@@ -207,10 +207,10 @@ export default function Announcements() {
             const cfg = typeCfg(ann.type);
             return (
               <li key={ann.id} className={`portal-panel border-l-4 ${BORDER[ann.type]}`}>
-                <div className="portal-panel-body flex items-start gap-4">
-                  <div className="flex-1 min-w-0">
+                <div className="portal-panel-body flex flex-col sm:flex-row items-start gap-3">
+                  <div className="flex-1 min-w-0 w-full">
                     <div className="flex items-center gap-2 flex-wrap mb-1">
-                      {ann.isPinned && <Pin className="h-3.5 w-3.5 text-gray-400" />}
+                      {ann.isPinned && <Pin className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />}
                       <span className={`inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded border ${cfg.pill}`}>
                         {cfg.icon}
                         {cfg.label}
@@ -226,14 +226,14 @@ export default function Announcements() {
                         </span>
                       )}
                     </div>
-                    <h3 className="text-[14px] font-semibold text-gray-800 mb-0.5">{ann.title}</h3>
-                    <p className="text-[13px] text-gray-600 whitespace-pre-line">{ann.body}</p>
+                    <h3 className="text-[14px] font-semibold text-gray-800 mb-0.5 break-words">{ann.title}</h3>
+                    <p className="text-[13px] text-gray-600 whitespace-pre-line break-words">{ann.body}</p>
                     <p className="text-[11px] text-gray-400 mt-1.5">
                       {ann.author?.name ?? 'System'} · {formatDateShort(ann.createdAt)}
                     </p>
                   </div>
                   {canManage && (
-                    <div className="flex items-center gap-1 flex-shrink-0">
+                    <div className="flex items-center gap-1 flex-shrink-0 self-end sm:self-start">
                       <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEdit(ann)}>
                         <Pencil className="h-3.5 w-3.5" />
                       </Button>

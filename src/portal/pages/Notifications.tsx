@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, CheckCheck, Clock, AlertTriangle, FileText, Loader2 } from 'lucide-react';
+import { Bell, Check, CheckCheck, Clock, AlertTriangle, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import {
@@ -40,23 +40,33 @@ function NotificationCard({ n, onRead }: { n: Notification; onRead: (id: string)
   const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.info;
   return (
     <div
-      className={`flex items-start gap-4 p-4 rounded-lg border transition-all cursor-pointer hover:shadow-sm ${!n.read ? cfg.bg + ' border-l-4 border-l-current' : 'bg-white border-gray-100'}`}
+      className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${!n.read ? cfg.bg + ' border-l-4 border-l-current' : 'bg-white border-gray-100'}`}
       style={!n.read ? { borderLeftColor: n.type === 'error' ? '#ef4444' : n.type === 'warning' ? '#f59e0b' : n.type === 'success' ? '#22c55e' : '#3b82f6' } : undefined}
-      onClick={() => { if (!n.read) onRead(n.id); }}
     >
-      <div className={`mt-0.5 h-2.5 w-2.5 flex-shrink-0 rounded-full ${cfg.dot} ${n.read ? 'opacity-30' : ''}`} />
+      <div className={`mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${cfg.dot} ${n.read ? 'opacity-30' : ''}`} />
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <p className={`text-sm font-semibold ${n.read ? 'text-gray-500' : 'text-gray-900'}`}>{n.title}</p>
-          <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
-            n.type === 'error'   ? 'bg-red-100 text-red-700' :
-            n.type === 'warning' ? 'bg-amber-100 text-amber-700' :
-            n.type === 'success' ? 'bg-green-100 text-green-700' :
-            'bg-blue-100 text-blue-700'
-          }`}>
-            {cfg.label}
-          </span>
-          {!n.read && <span className="h-1.5 w-1.5 bg-blue-500 rounded-full flex-shrink-0" />}
+        <div className="flex items-start gap-2 mb-0.5">
+          <div className="flex-1 min-w-0">
+            <p className={`text-sm font-semibold ${n.read ? 'text-gray-500' : 'text-gray-900'}`}>{n.title}</p>
+            <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${
+              n.type === 'error'   ? 'bg-red-100 text-red-700' :
+              n.type === 'warning' ? 'bg-amber-100 text-amber-700' :
+              n.type === 'success' ? 'bg-green-100 text-green-700' :
+              'bg-blue-100 text-blue-700'
+            }`}>
+              {cfg.label}
+            </span>
+          </div>
+          {!n.read && (
+            <button
+              onClick={() => onRead(n.id)}
+              className="flex-shrink-0 flex items-center gap-1 text-[11px] text-gray-400 hover:text-blue-600 transition-colors px-1.5 py-0.5 rounded hover:bg-blue-50"
+              title="Mark as read"
+            >
+              <Check className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Mark read</span>
+            </button>
+          )}
         </div>
         <p className={`text-sm leading-relaxed ${n.read ? 'text-gray-400' : 'text-gray-600'}`}>{n.message}</p>
         <p className="text-xs text-gray-400 mt-1.5">{timeAgo(n.createdAt)}</p>

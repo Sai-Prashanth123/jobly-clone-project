@@ -17,7 +17,7 @@ import {
   CalendarCheck, CalendarClock, CalendarDays, KeyRound, Package, RotateCw, Mail,
   Megaphone, Users2, Receipt,
   Star,
-  Shield, Gift, Zap, Calendar, DollarSign, TrendingUp, FileWarning,
+  Shield, Gift, Calendar, DollarSign, TrendingUp, FileWarning,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -63,9 +63,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Admin Settings',      path: '/portal/admin',               icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
   // ── Analytics & extended features ─────────────────────────────────────────
   { label: 'Milestones',          path: '/portal/milestones',          icon: <Gift className="h-4 w-4" />,            roles: ['admin','hr'] },
-  { label: 'Skills Registry',     path: '/portal/skills',              icon: <Zap className="h-4 w-4" />,             roles: ['admin','hr'] },
   { label: 'Headcount',           path: '/portal/headcount',           icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','hr'] },
-  { label: 'Shifts',              path: '/portal/shifts',              icon: <Calendar className="h-4 w-4" />,        roles: ['admin','hr','operations'] },
   { label: 'Workforce',           path: '/portal/workforce',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
   { label: 'Client SLA',          path: '/portal/client-sla',          icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','operations'] },
   { label: 'Budgets',             path: '/portal/budgets',             icon: <DollarSign className="h-4 w-4" />,      roles: ['admin','finance'] },

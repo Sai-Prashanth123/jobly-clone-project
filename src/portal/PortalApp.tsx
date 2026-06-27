@@ -80,12 +80,10 @@ const SystemSettings = lazy(() => import('./pages/SystemSettings'));
 
 // Phase 4 — HR
 const Milestones = lazy(() => import('./pages/Milestones'));
-const SkillsRegistry = lazy(() => import('./pages/SkillsRegistry'));
 const HeadcountReport = lazy(() => import('./pages/HeadcountReport'));
 const ExpiringDocuments = lazy(() => import('./pages/ExpiringDocuments'));
 
 // Phase 4 — Operations
-const ShiftSchedule = lazy(() => import('./pages/ShiftSchedule'));
 const WorkforceAvailability = lazy(() => import('./pages/WorkforceAvailability'));
 const ClientSLA = lazy(() => import('./pages/ClientSLA'));
 
@@ -433,12 +431,10 @@ export default function PortalApp() {
 
             {/* Phase 4 — HR */}
             <Route path="milestones" element={<ProtectedRoute allowedRoles={['admin','hr']}><Milestones /></ProtectedRoute>} />
-            <Route path="skills" element={<ProtectedRoute allowedRoles={['admin','hr']}><SkillsRegistry /></ProtectedRoute>} />
             <Route path="headcount" element={<ProtectedRoute allowedRoles={['admin','hr']}><HeadcountReport /></ProtectedRoute>} />
             <Route path="expiring-documents" element={<ProtectedRoute allowedRoles={['admin','hr']}><ExpiringDocuments /></ProtectedRoute>} />
 
             {/* Phase 4 — Operations */}
-            <Route path="shifts" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><ShiftSchedule /></ProtectedRoute>} />
             <Route path="workforce" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><WorkforceAvailability /></ProtectedRoute>} />
             <Route path="client-sla" element={<ProtectedRoute allowedRoles={['admin','operations']}><ClientSLA /></ProtectedRoute>} />
 
