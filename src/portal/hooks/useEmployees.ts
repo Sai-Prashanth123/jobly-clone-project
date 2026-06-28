@@ -193,9 +193,14 @@ export function useUpdateEmployee(id: string) {
       return mapEmployee(data.data);
     },
     onSuccess: (updated) => {
-      // Instant detail update — no round-trip wait.
-      qc.setQueryData(['employees', id], updated);
-      // Mark lists stale so they refresh in the background on next focus/mount.
+      // The PUT endpoint returns the core employee row without a documents join.
+      // Preserve any documents already in the cache so uploading → updating the
+      // form fields in one submit doesn't wipe the document list and drop the
+      // onboarding checklist back to 0% mid-flow.
+      qc.setQueryData(['employees', id], (old: any) => ({
+        ...updated,
+        documents: updated.documents?.length ? updated.documents : (old?.documents ?? []),
+      }));
       qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
       qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
