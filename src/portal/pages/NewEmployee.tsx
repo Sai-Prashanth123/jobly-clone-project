@@ -1071,7 +1071,24 @@ export default function NewEmployee() {
       if (tasks.length > 0) {
         try {
           await Promise.all(tasks);
-          // Clear refs of files we just uploaded so Finish won't re-upload duplicates.
+          // Optimistically patch the cache so tiles immediately show "On file"
+          // without waiting for the background refetch to complete. The real
+          // refetch (below) will replace this with authoritative server data.
+          if (uploads.length > 0) {
+            queryClient.setQueryData(['employees', emp.id], (old: any) => {
+              if (!old) return old;
+              const newDocs = uploads.map(u => ({
+                id: `optimistic_${u.docType}`,
+                name: u.name,
+                type: u.docType,
+                uploadedAt: new Date().toISOString(),
+                url: undefined,
+                expiryDate: undefined,
+              }));
+              return { ...old, documents: [...(old.documents ?? []), ...newDocs] };
+            });
+          }
+          // Clear staged file refs so Finish onboarding won't re-upload duplicates.
           setForm(p => ({
             ...p,
             profilePhotoFile: null,
