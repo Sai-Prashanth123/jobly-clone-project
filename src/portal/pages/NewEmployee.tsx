@@ -381,6 +381,7 @@ export default function NewEmployee() {
   const submittingRef = useRef(false);
   const [submitStep, setSubmitStep] = useState<'idle' | 'creating' | 'uploading' | 'finishing'>('idle');
   const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
+  const [draftSaving, setDraftSaving] = useState(false);
 
   const submitMutation = isEditMode ? updateEmployee : createEmployee;
 
@@ -547,11 +548,17 @@ export default function NewEmployee() {
       [SECTION_IDS.payroll]:      isOnboarding ? true : (parseNumberInput(form.payRate) ?? 0) > 0,
       [SECTION_IDS.review]:       isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
       ...(isOnboarding ? {
-        [SECTION_IDS.identity]:  REQUIRED_IDENTITY_TYPES.every(t => !!(form.identityDocFiles?.[t])),
+        [SECTION_IDS.identity]: REQUIRED_IDENTITY_TYPES.every(t => {
+          const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
+          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+          const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
+          const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
+          return fileOrUploaded && (!row.hasExpiry || !!expiry);
+        }),
         [SECTION_IDS.documents]: ALL_REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
       } : {}),
     };
-  }, [form, isEditMode, isOnboarding, uploadedDocTypes]);
+  }, [form, isEditMode, isOnboarding, uploadedDocTypes, existingEmployee]);
 
   const onboardingChecklist = useMemo(() => {
     const presentFilled = [form.address.street, form.address.city, form.address.state, form.address.zip].every(v => !!v.trim());
@@ -584,14 +591,27 @@ export default function NewEmployee() {
       // Emergency — address is now required
       { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
       // Required identity documents (SSN, Passport, I-94, US Visa) — uploaded in Identity section
-      ...REQUIRED_IDENTITY_TYPES.map(t => {
+      // Also require expiry dates for docs that have hasExpiry (Passport, I-94, US Visa).
+      ...REQUIRED_IDENTITY_TYPES.flatMap(t => {
         const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
-        return {
+        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+        const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
+        const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
+        const items: { id: string; label: string; section: string; done: boolean }[] = [{
           id: `ident_${t}`,
           label: row.label,
           section: SECTION_IDS.identity,
-          done: !!(form.identityDocFiles?.[t] || existingEmployee?.identityDocuments?.some((d: IdentityDocumentEntry) => d.type === t)),
-        };
+          done: fileOrUploaded,
+        }];
+        if (row.hasExpiry) {
+          items.push({
+            id: `ident_${t}_expiry`,
+            label: `${row.label} expiry date`,
+            section: SECTION_IDS.identity,
+            done: fileOrUploaded && !!expiry,
+          });
+        }
+        return items;
       }),
       // Required documents (Resume, I-9 Form, W-4, Offer Letter) — uploaded in Documents section
       ...ALL_REQUIRED_DOC_TYPES.map(t => ({
@@ -610,6 +630,16 @@ export default function NewEmployee() {
   const onbPct = Math.round((onbDone / onboardingChecklist.length) * 100);
   const onbIncompleteSections = useMemo(() => new Set(onboardingChecklist.filter(c => !c.done).map(c => c.section)), [onboardingChecklist]);
   const firstIncompleteSection = onboardingChecklist.find(c => !c.done)?.section;
+
+  // Auto-dismiss stale validation errors once the employee fixes everything —
+  // without this, a previous failed submit leaves an error banner even after all
+  // items turn green and the "You're all set" banner also appears.
+  useEffect(() => {
+    if (isOnboarding && onbIncompleteSections.size === 0 && submitError) {
+      setSubmitError('');
+      setSubmitMissing([]);
+    }
+  }, [isOnboarding, onbIncompleteSections, submitError]);
 
   // ── Validation ────────────────────────────────────────────────────────────
   const validate = (): { ok: boolean; firstErrorSectionId?: string; missingItems?: { label: string; section: string }[] } => {
@@ -1006,6 +1036,7 @@ export default function NewEmployee() {
     if (submittingRef.current || !editId) return;
     setSubmitError('');
     submittingRef.current = true;
+    setDraftSaving(true);
     try {
       const emp = await updateEmployee.mutateAsync(buildPayload());
 
@@ -1066,6 +1097,7 @@ export default function NewEmployee() {
       toast.error(msg, { duration: 8000 });
     } finally {
       submittingRef.current = false;
+      setDraftSaving(false);
     }
   };
 
@@ -1134,8 +1166,9 @@ export default function NewEmployee() {
           variant="outline"
           size="sm"
           onClick={handleSaveDraft}
-          loading={updateEmployee.isPending}
+          loading={draftSaving}
           loadingText="Saving…"
+          disabled={submitStep !== 'idle'}
         >
           Save &amp; continue later
         </Button>
@@ -1760,14 +1793,18 @@ export default function NewEmployee() {
                 const doc = getIdentityDoc(row.type);
                 const inputId = `id-doc-file-${row.type}`;
                 const isRequired = (REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type);
-                const isMissing = isOnboarding && isRequired && !file;
+                const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+                const fileOrUploaded = !!(file || isAlreadyUploaded);
+                const expiryVal = (doc.expiry ?? '').trim();
+                const missingExpiry = isOnboarding && isRequired && row.hasExpiry && fileOrUploaded && !expiryVal;
+                const isMissing = isOnboarding && isRequired && (!fileOrUploaded || missingExpiry);
                 return (
                   <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
                     <div>
                       <p className="text-sm font-semibold text-gray-800">
                         {row.label}
                         {isRequired && <span className="text-red-500 ml-0.5">*</span>}
-                        {isRequired && !file && isOnboarding && (
+                        {isRequired && !fileOrUploaded && isOnboarding && (
                           <span className="ml-2 text-[10px] font-semibold text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Required</span>
                         )}
                       </p>
@@ -1775,13 +1812,17 @@ export default function NewEmployee() {
                     </div>
                     {row.hasExpiry && (
                       <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-gray-500">Expiry Date</Label>
+                        <Label className="text-[11px] font-medium text-gray-500">
+                          Expiry Date {isOnboarding && isRequired && <RequiredMark />}
+                        </Label>
                         <Input
                           type="date"
                           value={doc.expiry ?? ''}
                           onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
+                          className={missingExpiry ? 'border-red-300' : ''}
                         />
                         {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
+                        {missingExpiry && <p className="text-[11px] text-red-500 mt-0.5">Expiry date is required</p>}
                       </div>
                     )}
                     <div className="flex items-center gap-2 mt-auto">
@@ -1790,7 +1831,7 @@ export default function NewEmployee() {
                         className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
                       >
                         <Upload className="h-3.5 w-3.5" />
-                        {file ? 'Replace' : 'Upload'}
+                        {fileOrUploaded ? 'Replace' : 'Upload'}
                       </label>
                       <input
                         id={inputId}
@@ -1799,18 +1840,20 @@ export default function NewEmployee() {
                         className="hidden"
                         onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
                       />
-                      {file && (
+                      {fileOrUploaded && (
                         <>
                           <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
-                            Uploaded
+                            {isAlreadyUploaded && !file ? 'On file' : 'Uploaded'}
                           </span>
-                          <button
-                            type="button"
-                            onClick={() => setIdentityDocFile(row.type, null)}
-                            className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
-                          >
-                            Remove
-                          </button>
+                          {file && (
+                            <button
+                              type="button"
+                              onClick={() => setIdentityDocFile(row.type, null)}
+                              className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
+                            >
+                              Remove
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
