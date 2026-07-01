@@ -368,6 +368,7 @@ export default function Announcements() {
         confirmLabel="Delete"
         variant="destructive"
         onConfirm={handleDelete}
+        loading={remove.isPending}
       />
     </div>
   );

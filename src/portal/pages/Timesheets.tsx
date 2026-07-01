@@ -216,6 +216,23 @@ export default function Timesheets() {
       render: t => <span className="font-semibold">{t.totalHours}</span>,
       getValue: t => String(t.totalHours),
     },
+    ...(user?.role === 'admin' || user?.role === 'hr' ? [{
+      key: 'totalPay',
+      header: 'Total Pay',
+      hideOnMobile: true,
+      render: (t: Timesheet) => {
+        const emp = employees.find(e => e.id === t.employeeId);
+        if (!emp?.payRate) return <span className="text-muted-foreground text-xs">—</span>;
+        if (emp.payType === 'salary') return <span className="text-muted-foreground text-xs">Salary</span>;
+        const pay = emp.payRate * t.totalHours;
+        return <span className="font-semibold text-emerald-700">${pay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
+      },
+      getValue: (t: Timesheet) => {
+        const emp = employees.find(e => e.id === t.employeeId);
+        if (!emp?.payRate || emp.payType === 'salary') return '0';
+        return String(emp.payRate * t.totalHours);
+      },
+    }] : []),
     {
       key: 'status',
       header: 'Status',
@@ -333,6 +350,23 @@ export default function Timesheets() {
             </div>
           }
         />
+      )}
+
+      {(user?.role === 'admin' || user?.role === 'hr') && timesheets.length > 0 && !isLoading && (
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm">
+          <span className="text-muted-foreground">
+            <strong>{timesheets.reduce((s, t) => s + t.totalHours, 0).toFixed(1)}</strong> total hours
+          </span>
+          <span className="text-muted-foreground">
+            Estimated pay (hourly):{' '}
+            <strong className="text-emerald-700">
+              ${timesheets.reduce((s, t) => {
+                const emp = employees.find(e => e.id === t.employeeId);
+                return s + (emp?.payRate && emp.payType === 'hourly' ? emp.payRate * t.totalHours : 0);
+              }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </strong>
+          </span>
+        </div>
       )}
 
       <Dialog open={showForm} onOpenChange={setShowForm}>

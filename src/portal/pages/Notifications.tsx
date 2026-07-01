@@ -15,7 +15,7 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import type { Notification } from '../hooks/useNotifications';
 
-type FilterType = 'all' | 'unread' | 'info' | 'warning' | 'error' | 'success';
+type FilterType = 'all' | 'unread' | 'read' | 'info' | 'warning' | 'error' | 'success';
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
@@ -90,15 +90,19 @@ export default function Notifications() {
 
   const filtered = notifications.filter(n => {
     if (filter === 'unread') return !n.read;
+    if (filter === 'read') return n.read;
     if (filter === 'info' || filter === 'warning' || filter === 'error' || filter === 'success') return n.type === filter;
     return true;
   });
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const readCount = notifications.filter(n => n.read).length;
+
   const filters: { key: FilterType; label: string; count?: number }[] = [
     { key: 'all',     label: 'All',     count: notifications.length },
     { key: 'unread',  label: 'Unread',  count: unreadCount },
+    { key: 'read',    label: 'Read',    count: readCount },
     { key: 'info',    label: 'Info',    count: notifications.filter(n => n.type === 'info').length },
     { key: 'success', label: 'Success', count: notifications.filter(n => n.type === 'success').length },
     { key: 'warning', label: 'Warning', count: notifications.filter(n => n.type === 'warning').length },
