@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, AlertCircle, Info, Calendar, BookOpen, Pin, PinOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -16,6 +16,7 @@ import {
   useCreateAnnouncement,
   useUpdateAnnouncement,
   useDeleteAnnouncement,
+  useMarkAnnouncementsSeen,
 } from '../hooks/useAnnouncements';
 import type { Announcement, AnnouncementType, UserRole } from '../types';
 
@@ -85,6 +86,11 @@ export default function Announcements() {
   const create = useCreateAnnouncement();
   const update = useUpdateAnnouncement();
   const remove = useDeleteAnnouncement();
+  const markSeen = useMarkAnnouncementsSeen();
+
+  // Clear unread badge the moment the user opens this page
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { markSeen.mutate(); }, []);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Announcement | null>(null);

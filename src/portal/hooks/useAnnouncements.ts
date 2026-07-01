@@ -95,3 +95,14 @@ export function useDeleteAnnouncement() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['announcements'] }),
   });
 }
+
+export function useMarkAnnouncementsSeen() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiClient.post('/announcements/mark-seen'),
+    onSuccess: () => {
+      qc.setQueryData(['announcements-unread-count'], 0);
+      qc.setQueryData(['nav-badge', 'announcements'], 0);
+    },
+  });
+}

@@ -13,10 +13,12 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/',     requireRole('admin','hr','operations','finance','employee'), validateQuery(listAnnouncementsQuerySchema), ctrl.list);
-router.post('/',    requireRole('admin','hr'),                                   validateBody(createAnnouncementSchema),       ctrl.create);
-router.get('/:id',  requireRole('admin','hr','operations','finance','employee'),                                               ctrl.getOne);
-router.put('/:id',  requireRole('admin','hr'),                                   validateBody(updateAnnouncementSchema),       ctrl.update);
-router.delete('/:id', requireRole('admin','hr'),                                                                              ctrl.remove);
+router.get('/',             requireRole('admin','hr','operations','finance','employee'), validateQuery(listAnnouncementsQuerySchema), ctrl.list);
+router.post('/',            requireRole('admin','hr'),                                   validateBody(createAnnouncementSchema),       ctrl.create);
+router.get('/unread-count', requireRole('admin','hr','operations','finance','employee'),                                               ctrl.getUnreadCount);
+router.post('/mark-seen',   requireRole('admin','hr','operations','finance','employee'),                                               ctrl.markSeen);
+router.get('/:id',          requireRole('admin','hr','operations','finance','employee'),                                               ctrl.getOne);
+router.put('/:id',          requireRole('admin','hr'),                                   validateBody(updateAnnouncementSchema),       ctrl.update);
+router.delete('/:id',       requireRole('admin','hr'),                                                                                ctrl.remove);
 
 export default router;

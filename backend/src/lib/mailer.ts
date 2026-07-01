@@ -896,3 +896,56 @@ export async function testEmailDelivery(to: string): Promise<{ ok: boolean; erro
     return { ok: false, error: err?.message ?? String(err) };
   }
 }
+
+export interface AnnouncementEmailPayload {
+  to: string | string[];
+  announcementTitle: string;
+  announcementBody: string;
+  announcementType: string;
+  authorName: string;
+}
+
+export async function sendAnnouncementEmail(p: AnnouncementEmailPayload): Promise<void> {
+  if (!mailerConfigured) return;
+
+  const TYPE_STYLES: Record<string, { label: string; bg: string; color: string }> = {
+    urgent: { label: 'Urgent',  bg: '#fef2f2', color: '#dc2626' },
+    event:  { label: 'Event',   bg: '#ecfdf5', color: '#059669' },
+    policy: { label: 'Policy',  bg: '#f5f3ff', color: '#7c3aed' },
+    info:   { label: 'Info',    bg: '#eff6ff', color: '#2563eb' },
+  };
+  const style = TYPE_STYLES[p.announcementType] ?? TYPE_STYLES.info;
+
+  const announcementBody = `
+<p style="margin:0 0 20px;">
+  <span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;background:${esc(style.bg)};color:${esc(style.color)};">
+    ${esc(style.label)}
+  </span>
+</p>
+<h2 style="margin:0 0 16px;color:#111827;font-size:20px;font-weight:700;line-height:1.3;">${esc(p.announcementTitle)}</h2>
+<div style="background:#f9fafb;border-left:4px solid ${esc(style.color)};border-radius:0 8px 8px 0;padding:16px 18px;margin-bottom:28px;">
+  <p style="margin:0;font-size:14px;color:#374151;line-height:1.7;white-space:pre-wrap;">${esc(p.announcementBody)}</p>
+</div>
+<p style="margin:0 0 6px;font-size:12px;color:#9ca3af;">Posted by <strong style="color:#6b7280;">${esc(p.authorName)}</strong></p>
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:24px;">
+  <tr><td align="center">
+    <a href="${esc(PORTAL_URL)}/portal/announcements" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
+      View in Portal &rarr;
+    </a>
+  </td></tr>
+</table>`;
+
+  const html = emailShell({
+    previewText: `New announcement: ${p.announcementTitle}`,
+    title: 'New Announcement',
+    subtitle: `From Jobly Solutions &mdash; ${esc(style.label)}`,
+    body: announcementBody,
+  });
+
+  await sendWithRetry({
+    from: FROM,
+    to: p.to,
+    subject: `[Announcement] ${p.announcementTitle}`,
+    html,
+  });
+}

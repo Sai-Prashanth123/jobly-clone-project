@@ -81,6 +81,18 @@ export function useNavBadges(role: string): Record<string, number> {
     enabled: isHrAdmin,
   });
 
+  // All roles — unseen announcements since last visit
+  const { data: announcements } = useQuery<number>({
+    queryKey: ['nav-badge', 'announcements', role],
+    queryFn: async () => {
+      const res = await apiClient.get('/announcements/unread-count');
+      return res.data.count ?? 0;
+    },
+    staleTime: STALE,
+    refetchInterval: STALE,
+    enabled: !!role,
+  });
+
   // HR/admin — documents expiring within 30 days
   const { data: expiringDocs } = useQuery<number>({
     queryKey: ['nav-badge', 'expiring-docs'],
@@ -99,5 +111,6 @@ export function useNavBadges(role: string): Record<string, number> {
     expenses:         (canActOnExpenses ? expenses : myExpenses) ?? 0,
     attendanceReview: attendanceReview ?? 0,
     expiringDocs:     expiringDocs ?? 0,
+    announcements:    announcements ?? 0,
   };
 }

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { logActivity } from '../lib/activityLogger';
 import { NotFoundError } from '../lib/errors';
+import { mailerConfigured, sendAnnouncementEmail } from '../lib/mailer';
 import type { CreateAnnouncementInput, UpdateAnnouncementInput, ListAnnouncementsQuery } from '../schemas/announcements.schema';
 
 const SELECT = `
@@ -65,6 +66,30 @@ export async function createAnnouncement(input: CreateAnnouncementInput, authorI
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
   void logActivity(authorId, 'created', 'announcement', row.id, `Created announcement: ${row.title}`);
+
+  // Fire-and-forget: email all targeted users
+  void (async () => {
+    try {
+      if (!mailerConfigured) return;
+      let q = supabaseAdmin.from('portal_users').select('email');
+      if (input.targetRoles && input.targetRoles.length > 0) {
+        q = (q as any).in('role', input.targetRoles);
+      }
+      const { data: recipients } = await q;
+      const emails = ((recipients ?? []) as any[]).map((r: any) => r.email).filter(Boolean) as string[];
+      if (emails.length === 0) return;
+      for (let i = 0; i < emails.length; i += 50) {
+        await sendAnnouncementEmail({
+          to: emails.slice(i, i + 50),
+          announcementTitle: row.title,
+          announcementBody: row.body,
+          announcementType: row.type,
+          authorName: row.author?.name ?? 'HR Team',
+        });
+      }
+    } catch (e) { console.error('[announcement email]', e); }
+  })();
+
   return data;
 }
 
@@ -88,6 +113,28 @@ export async function updateAnnouncement(id: string, input: UpdateAnnouncementIn
   if (error || !data) throw error ?? new Error('Update returned no data');
   void logActivity(actorId, 'updated', 'announcement', id, `Updated announcement: ${existing.title}`);
   return data as any;
+}
+
+export async function getAnnouncementUnreadCount(userRole: string, lastViewedAt: string | null): Promise<number> {
+  const now = new Date().toISOString();
+  let q = supabaseAdmin
+    .from('announcements')
+    .select('id', { count: 'exact', head: true })
+    .is('deleted_at', null)
+    .or(`expires_at.is.null,expires_at.gt.${now}`)
+    .or(`target_roles.eq.{},target_roles.cs.{${userRole}}`);
+  if (lastViewedAt) q = q.gt('created_at', lastViewedAt);
+  const { count, error } = await q;
+  if (error) throw error;
+  return count ?? 0;
+}
+
+export async function markAnnouncementsSeen(portalUserId: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('portal_users')
+    .update({ announcements_last_viewed_at: new Date().toISOString() })
+    .eq('id', portalUserId);
+  if (error) throw error;
 }
 
 export async function deleteAnnouncement(id: string, actorId: string) {

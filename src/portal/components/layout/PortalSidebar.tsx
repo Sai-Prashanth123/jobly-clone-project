@@ -38,7 +38,7 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   // ── Core features ─────────────────────────────────────────────────────────
   { label: 'Dashboard',           path: '/portal/dashboard',           icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee'] },
-  { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee'], badgeKey: 'announcements' },
   { label: 'People',              path: '/portal/people',              icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance','employee'] },
   { label: 'Employees',           path: '/portal/employees',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
   { label: 'Add Employee',        path: '/portal/employees/new',       icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'] },
