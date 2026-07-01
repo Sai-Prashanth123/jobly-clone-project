@@ -1,11 +1,16 @@
-import { Loader2, Users, TrendingUp, TrendingDown } from 'lucide-react';
+import { Loader2, Users, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
 import { useHeadcount } from '../hooks/useAnalytics';
 
 export default function HeadcountReport() {
-  const { data, isLoading } = useHeadcount();
+  const { data, isLoading, isError } = useHeadcount();
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
-  if (!data) return null;
+  if (isError || !data) return (
+    <div className="flex flex-col items-center justify-center py-20 gap-3 text-red-500">
+      <AlertCircle className="h-8 w-8 text-red-400" />
+      <p className="text-sm">Failed to load headcount data. Please refresh.</p>
+    </div>
+  );
 
   const deptEntries = Object.entries(data.byDepartment as Record<string, number>).sort((a, b) => b[1] - a[1]);
   const monthEntries = Object.entries(data.hiresPerMonth as Record<string, number>).sort((a, b) => a[0].localeCompare(b[0])).slice(-12);

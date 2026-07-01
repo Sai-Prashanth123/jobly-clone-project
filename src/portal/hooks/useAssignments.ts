@@ -95,7 +95,7 @@ export function useCreateAssignment() {
     },
     onSuccess: (created) => {
       qc.setQueryData(['assignments', created.id], created);
-      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }
@@ -109,7 +109,7 @@ export function useUpdateAssignment(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['assignments', id], updated);
-      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }

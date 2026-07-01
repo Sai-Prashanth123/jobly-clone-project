@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Users, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { addWeeks, subWeeks, startOfWeek, addDays, format, isWithinInterval, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { useWorkforceAvailability } from '../hooks/useAnalytics';
@@ -10,7 +10,7 @@ export default function WorkforceAvailability() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const startDate = format(weekStart, 'yyyy-MM-dd');
   const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
-  const { data: employees = [], isLoading } = useWorkforceAvailability(startDate, endDate);
+  const { data: employees = [], isLoading, isError } = useWorkforceAvailability(startDate, endDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), 'yyyy-MM-dd'));
 
   const isOnLeave = (emp: any, date: string) =>
@@ -34,7 +34,14 @@ export default function WorkforceAvailability() {
         <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-red-400 inline-block" /> On Leave</span>
       </div>
 
-      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
+      {isLoading ? (
+        <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-red-500">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm">Failed to load workforce availability. Please refresh.</p>
+        </div>
+      ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto shadow-sm">
           <table className="w-full text-sm">
             <thead>
@@ -44,10 +51,10 @@ export default function WorkforceAvailability() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {employees.length === 0 ? <tr><td colSpan={8} className="text-center py-10 text-gray-400">No active employees</td></tr> : employees.map((emp: any) => (
+              {employees.length === 0 ? <tr><td colSpan={8} className="text-center py-10 text-gray-400">No active employees</td></tr> : employees.map(emp => (
                 <tr key={emp.id} className="hover:bg-gray-50">
                   <td className="px-4 py-2">
-                    <p className="font-medium text-gray-900 text-xs">{emp.first_name} {emp.last_name}</p>
+                    <p className="font-medium text-gray-900 text-xs">{emp.firstName} {emp.lastName}</p>
                     <p className="text-xs text-gray-400">{emp.department}</p>
                   </td>
                   {weekDays.map((d, i) => {

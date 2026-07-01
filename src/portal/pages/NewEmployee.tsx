@@ -499,7 +499,7 @@ export default function NewEmployee() {
       !!form.email && !!form.phone,                                                 // Contact
       !!form.address.street && !!form.address.city && !!form.address.state && !!form.address.zip, // Present Addr
       !!form.startDate,                                                             // Employment
-      !!form.visaType && !!form.visaExpiry && /^\d{4}$/.test(form.ssn), // Immigration
+      !!form.visaType && !!form.visaExpiry && /^(?!0000|1234)\d{4}$/.test(form.ssn), // Immigration
       !!form.emergencyContact.name && !!form.emergencyContact.phone,                // Emergency
       // Payroll: HR-side only. Hidden + not required in employee onboarding / self-edit.
       ...(isOnboarding || isSelfEdit ? [] : [!!form.payRate && Number(form.payRate) > 0]),

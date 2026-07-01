@@ -87,7 +87,7 @@ export function FinanceDashboard() {
     const invoiced = issued.reduce((s, inv) => s + inv.totalAmount, 0);
     const collected = invoices
       .filter(inv => inv.paidAt?.startsWith(key))
-      .reduce((s, inv) => s + inv.totalAmount, 0);
+      .reduce((s, inv) => s + (inv.amountPaid ?? inv.totalAmount), 0);
     return { month: label, Invoiced: invoiced, Collected: collected };
   });
 

@@ -66,11 +66,13 @@ export default function Expenses() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<Expense | null>(null);
   const [form, setForm] = useState<ExpenseFormData>(EMPTY_FORM);
+  const [submittingId, setSubmittingId] = useState<string | null>(null);
+  const [payingId, setPayingId] = useState<string | null>(null);
   const [reviewOpen, setReviewOpen] = useState<{ expense: Expense; action: 'approved' | 'rejected' } | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
 
-  const { data, isLoading } = useExpenses({ status: statusFilter === 'all' ? undefined : statusFilter, limit: 50 });
+  const { data, isLoading, isError } = useExpenses({ status: statusFilter === 'all' ? undefined : statusFilter, limit: 50 });
   const expenses = data?.data ?? [];
 
   const createMut = useCreateExpense();
@@ -131,7 +133,7 @@ export default function Expenses() {
           <h1 className="text-2xl font-semibold">Expense Reports</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Submit and track expense reimbursements</p>
         </div>
-        {(role === 'employee' || role === 'admin' || role === 'hr') && (
+        {(role === 'employee' || role === 'admin' || role === 'hr' || role === 'finance') && (
           <Button onClick={openCreate} className="gap-2 self-start sm:self-auto">
             <Plus className="h-4 w-4" /> New Expense
           </Button>
@@ -159,6 +161,12 @@ export default function Expenses() {
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
+      ) : isError ? (
+        <Card>
+          <CardContent className="py-16 text-center">
+            <p className="text-sm text-red-500">Failed to load expenses. Please refresh.</p>
+          </CardContent>
+        </Card>
       ) : expenses.length === 0 ? (
         <Card>
           <CardContent className="py-16 text-center">
@@ -205,12 +213,14 @@ export default function Expenses() {
                           <Button
                             size="sm"
                             className="gap-1 text-xs bg-blue-600 hover:bg-blue-700 text-white"
-                            loading={submitMut.isPending}
+                            loading={submittingId === expense.id}
                             onClick={async () => {
+                              setSubmittingId(expense.id);
                               try {
                                 await submitMut.mutateAsync(expense.id);
                                 toast.success('Expense submitted for review');
                               } catch { /* centrally handled */ }
+                              finally { setSubmittingId(null); }
                             }}
                           >
                             <Send className="h-3 w-3" /> Submit
@@ -240,12 +250,14 @@ export default function Expenses() {
                         <Button
                           size="sm"
                           className="gap-1 text-xs bg-purple-600 hover:bg-purple-700 text-white"
-                          loading={paidMut.isPending}
+                          loading={payingId === expense.id}
                           onClick={async () => {
+                            setPayingId(expense.id);
                             try {
                               await paidMut.mutateAsync(expense.id);
                               toast.success('Marked as paid');
                             } catch { /* centrally handled */ }
+                            finally { setPayingId(null); }
                           }}
                         >
                           <DollarSign className="h-3 w-3" /> Mark Paid

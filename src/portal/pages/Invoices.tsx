@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Pencil, Info, Trash2, Send } from 'lucide-react';
+import { Plus, Loader2, Pencil, Info, Trash2, Send, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
@@ -16,7 +16,7 @@ import type { Invoice } from '../types';
 export default function Invoices() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading } = useInvoices({ limit: 100 });
+  const { data, isLoading, isError } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
   const deleteInvoice = useDeleteInvoice();
   const bulkSend = useSendBulkInvoices();
@@ -193,6 +193,11 @@ export default function Invoices() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-red-500">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm">Failed to load invoices. Please refresh.</p>
         </div>
       ) : (
         <DataTable

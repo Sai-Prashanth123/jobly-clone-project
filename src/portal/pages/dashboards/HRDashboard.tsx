@@ -35,7 +35,11 @@ export function HRDashboard() {
   const today = new Date();
 
   const recentHires = [...employees]
-    .sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime())
+    .sort((a, b) => {
+      const ta = a.startDate ? new Date(a.startDate).getTime() : 0;
+      const tb = b.startDate ? new Date(b.startDate).getTime() : 0;
+      return tb - ta;
+    })
     .slice(0, 5);
 
   // Employees who SUBMITTED onboarding and are awaiting HR review/approval

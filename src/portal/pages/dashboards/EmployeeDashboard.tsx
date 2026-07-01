@@ -29,11 +29,11 @@ export function EmployeeDashboard() {
 
   const primaryAssignment = myAssignments[0] ?? null;
   const assignedClientName = primaryAssignment
-    ? (clients.find(c => c.id === primaryAssignment.clientId)?.companyName ?? 'Loading…')
+    ? (clients.find(c => c.id === primaryAssignment.clientId)?.companyName ?? 'Unknown client')
     : 'None assigned';
 
   const pendingTimesheets = timesheets.filter(
-    t => t.status === 'draft' || t.status === 'submitted' || t.status === 'manager_approved'
+    t => t.status === 'submitted' || t.status === 'manager_approved'
   ).length;
 
   const approvedHours = timesheets

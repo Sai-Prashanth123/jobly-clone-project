@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, FileCheck2, CalendarOff } from 'lucide-react';
+import { Loader2, FileCheck2, CalendarOff, AlertCircle, HelpCircle } from 'lucide-react';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -27,7 +27,7 @@ const STATUS_FILTERS = [
 export default function MonthlyTimesheets() {
   const navigate = useNavigate();
   const [status, setStatus] = useState('all');
-  const { data, isLoading } = useMonthlyTimesheets(status === 'all' ? { limit: 200 } : { status, limit: 200 });
+  const { data, isLoading, isError } = useMonthlyTimesheets(status === 'all' ? { limit: 200 } : { status, limit: 200 });
   const rows = data?.data ?? [];
 
   // Split the queue: timesheets with logged hours go to Client Timesheets tab
@@ -36,6 +36,7 @@ export default function MonthlyTimesheets() {
   // so the reviewer can still check the client-signed proof.
   const workRows = rows.filter(t => Number(t.totalHours) > 0);
   const leaveRows = rows.filter(t => Number(t.totalHours) === 0 && (t.leaveDays ?? 0) > 0);
+  const ghostRows = rows.filter(t => Number(t.totalHours) === 0 && (t.leaveDays ?? 0) === 0);
 
   const columns: Column<MonthlyTimesheet>[] = [
     {
@@ -147,11 +148,17 @@ export default function MonthlyTimesheets() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-red-500">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm">Failed to load timesheets. Please refresh.</p>
+        </div>
       ) : (
         <Tabs defaultValue="client" className="mt-2">
-          <TabsList className="mb-4 grid w-full max-w-md grid-cols-2">
+          <TabsList className="mb-4 grid w-full max-w-2xl grid-cols-3">
             <TabsTrigger value="client" className="gap-1.5"><FileCheck2 className="h-4 w-4" /> Client Timesheets ({workRows.length})</TabsTrigger>
             <TabsTrigger value="leave" className="gap-1.5"><CalendarOff className="h-4 w-4" /> Leave Approval ({leaveRows.length})</TabsTrigger>
+            <TabsTrigger value="ghost" className="gap-1.5"><HelpCircle className="h-4 w-4" /> Needs Clarification ({ghostRows.length})</TabsTrigger>
           </TabsList>
 
           <TabsContent value="client">
@@ -179,6 +186,23 @@ export default function MonthlyTimesheets() {
               emptyTitle="No leave to review"
               emptyDescription="Timesheets containing leave days appear here for approval."
               exportFilename="leave-approvals"
+            />
+          </TabsContent>
+
+          <TabsContent value="ghost">
+            <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              These timesheets have zero hours AND zero leave days — the employee hasn't filled them in. Contact each employee to correct and resubmit.
+            </div>
+            <DataTable
+              data={ghostRows}
+              columns={columns}
+              searchPlaceholder="Search by employee, ID, status…"
+              searchKeys={['displayId', 'employeeName', 'employeeDisplayId', 'status']}
+              getRowKey={t => t.id}
+              onRowClick={t => navigate(`/portal/attendance/${t.id}`)}
+              emptyTitle="No ghost timesheets"
+              emptyDescription="All submitted timesheets have hours or leave days logged."
             />
           </TabsContent>
         </Tabs>

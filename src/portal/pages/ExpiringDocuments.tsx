@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileWarning } from 'lucide-react';
+import { FileWarning, Loader2, AlertCircle } from 'lucide-react';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable } from '../components/shared/DataTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,7 +26,7 @@ function docTypeBadge(type: string) {
 export function ExpiringDocuments() {
   const navigate = useNavigate();
   const [days, setDays] = useState(90);
-  const { data: docs = [], isLoading } = useExpiringDocuments(days);
+  const { data: docs = [], isLoading, isError } = useExpiringDocuments(days);
 
   const columns = [
     {
@@ -81,7 +81,16 @@ export function ExpiringDocuments() {
         }
       />
 
-      {!isLoading && docs.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3">
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-red-500">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm">Failed to load expiring documents. Please refresh.</p>
+        </div>
+      ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
           <FileWarning className="h-10 w-10 text-gray-300" />
           <p className="text-sm">No documents expiring in the next {days} days.</p>
@@ -90,7 +99,7 @@ export function ExpiringDocuments() {
         <DataTable
           columns={columns}
           data={docs}
-          getRowKey={r => `${r.employeeId}-${r.documentType}`}
+          getRowKey={r => `${r.employeeId}-${r.documentType}-${r.expiryDate}`}
           onRowClick={r => navigate(`/portal/employees/${r.employeeId}`)}
           emptyTitle="No expiring documents found"
           searchPlaceholder="Search by name, document type…"

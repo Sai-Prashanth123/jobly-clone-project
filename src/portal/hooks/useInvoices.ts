@@ -112,9 +112,9 @@ export function useCreateInvoice() {
     },
     onSuccess: (created) => {
       qc.setQueryData(['invoices', created.id], created);
-      qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
-      qc.invalidateQueries({ queryKey: ['estimates'], refetchType: 'none' });
-      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      qc.invalidateQueries({ queryKey: ['estimates'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
     },
   });
 }
@@ -188,8 +188,8 @@ export function useUpdateInvoice(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['invoices', id], updated);
-      qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
-      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['invoices'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
     },
   });
 }
@@ -334,7 +334,7 @@ export function useSendInvoice(id: string) {
     onSuccess: (updated) => {
       qc.setQueryData(['invoices', id], updated.invoice);
       if (updated.emailSent) {
-        qc.invalidateQueries({ queryKey: ['invoices'], refetchType: 'none' });
+        qc.invalidateQueries({ queryKey: ['invoices'] });
       }
     },
   });

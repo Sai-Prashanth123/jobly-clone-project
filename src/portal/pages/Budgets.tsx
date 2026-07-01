@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { DollarSign, Plus, Trash2, Loader2, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -108,7 +109,7 @@ export default function Budgets() {
           <AlertDialogHeader><AlertDialogTitle>Delete Budget?</AlertDialogTitle><AlertDialogDescription>Remove this budget entry?</AlertDialogDescription></AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={async () => { await del.mutateAsync(deleteTarget!.id); setDeleteTarget(null); }}>Delete</AlertDialogAction>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={async () => { try { await del.mutateAsync(deleteTarget!.id); setDeleteTarget(null); } catch { toast.error('Failed to delete budget entry.'); } }}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

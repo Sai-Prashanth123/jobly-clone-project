@@ -23,7 +23,7 @@ function Avatar({ emp }: { emp: DirectoryEmployee }) {
     'from-amber-500 to-orange-400',
     'from-emerald-500 to-teal-400',
   ];
-  const color = colors[(emp.firstName.charCodeAt(0) + emp.lastName.charCodeAt(0)) % colors.length];
+  const color = colors[((emp.firstName.charCodeAt(0) || 65) + (emp.lastName.charCodeAt(0) || 65)) % colors.length];
   return (
     <div className={`h-12 w-12 rounded-full bg-gradient-to-br ${color} flex items-center justify-center flex-shrink-0`}>
       <span className="text-white text-[13px] font-semibold">{initials}</span>
@@ -35,13 +35,13 @@ export default function People() {
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState<string>('all');
 
-  const { data: allEmployees = [] } = useEmployeeDirectory();
+  const { data: allEmployees = [], isLoading: allLoading } = useEmployeeDirectory();
   const departments = useMemo(
     () => [...new Set(allEmployees.map(e => e.department).filter(Boolean) as string[])].sort(),
     [allEmployees],
   );
 
-  const { data: employees = [], isLoading } = useEmployeeDirectory(
+  const { data: employees = [], isLoading, isError } = useEmployeeDirectory(
     search || undefined,
     department !== 'all' ? department : undefined,
   );
@@ -65,9 +65,9 @@ export default function People() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
-        <Select value={department} onValueChange={setDepartment}>
+        <Select value={department} onValueChange={setDepartment} disabled={allLoading}>
           <SelectTrigger className="w-full sm:w-48">
-            <SelectValue placeholder="All departments" />
+            <SelectValue placeholder={allLoading ? 'Loading…' : 'All departments'} />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All departments</SelectItem>
@@ -88,20 +88,37 @@ export default function People() {
       </div>
 
       {/* Grid */}
-      {isLoading ? (
+      {isError ? (
+        <div className="portal-panel p-12 text-center">
+          <p className="text-sm text-red-500">Failed to load employee directory. Please refresh.</p>
+        </div>
+      ) : isLoading ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {[1, 2, 3, 4, 5, 6].map(i => (
-            <div key={i} className="portal-panel h-24 animate-pulse bg-gray-50" />
+            <div key={i} className="portal-panel">
+              <div className="portal-panel-body flex items-start gap-3">
+                <div className="h-12 w-12 rounded-full bg-gray-200 animate-pulse flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3.5 w-36 rounded bg-gray-200 animate-pulse" />
+                  <div className="h-3 w-24 rounded bg-gray-200 animate-pulse" />
+                  <div className="h-4 w-16 rounded-full bg-gray-200 animate-pulse" />
+                  <div className="mt-2 space-y-1.5">
+                    <div className="h-3 w-40 rounded bg-gray-200 animate-pulse" />
+                    <div className="h-3 w-28 rounded bg-gray-200 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
           ))}
         </div>
       ) : employees.length === 0 ? (
         <div className="portal-panel p-12 text-center">
           <Users2 className="h-10 w-10 text-gray-300 mx-auto mb-3" />
           <p className="text-sm text-gray-500">No employees found.</p>
-          {search && (
+          {(search || department !== 'all') && (
             <button
               className="mt-2 text-[12px] text-[#4069FF] hover:underline"
-              onClick={() => setSearch('')}
+              onClick={() => { setSearch(''); setDepartment('all'); }}
             >
               Clear search
             </button>

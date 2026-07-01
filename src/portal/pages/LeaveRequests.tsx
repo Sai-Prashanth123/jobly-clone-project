@@ -42,7 +42,7 @@ export default function LeaveRequests() {
   const canApply = !!user?.employeeId;
 
   const [statusFilter, setStatusFilter] = useState<string>(isReviewer ? 'pending' : 'all');
-  const { data, isLoading } = useLeaveRequests({
+  const { data, isLoading, isError } = useLeaveRequests({
     status: statusFilter !== 'all' ? statusFilter : undefined,
     limit: 200,
   });
@@ -150,7 +150,7 @@ export default function LeaveRequests() {
       key: 'actions', header: '', getValue: () => '',
       render: r => (
         <div className="flex items-center gap-1 justify-end">
-          {isReviewer && r.status === 'pending' && (
+          {isReviewer && r.status === 'pending' && r.employeeId !== user?.employeeId && (
             <>
               <Button variant="ghost" size="sm" className="h-8 gap-1 text-emerald-700 hover:bg-emerald-50"
                 onClick={() => approve(r)}>
@@ -197,15 +197,21 @@ export default function LeaveRequests() {
         </Select>
       </div>
 
-      <DataTable
-        data={requests}
-        columns={columns}
-        searchPlaceholder="Search leave requests…"
-        searchKeys={['displayId', 'employeeName', 'leaveType', 'status']}
-        getRowKey={r => r.id}
-        emptyTitle="No leave requests"
-        emptyDescription={isReviewer ? 'Nothing to review right now.' : 'Apply for leave and it will appear here.'}
-      />
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-2 text-red-500">
+          <p className="text-sm">Failed to load leave requests. Please refresh.</p>
+        </div>
+      ) : (
+        <DataTable
+          data={requests}
+          columns={columns}
+          searchPlaceholder="Search leave requests…"
+          searchKeys={['displayId', 'employeeName', 'leaveType', 'status']}
+          getRowKey={r => r.id}
+          emptyTitle="No leave requests"
+          emptyDescription={isReviewer ? 'Nothing to review right now.' : 'Apply for leave and it will appear here.'}
+        />
+      )}
 
       {/* Apply dialog */}
       <Dialog open={applyOpen} onOpenChange={setApplyOpen}>
@@ -257,7 +263,7 @@ export default function LeaveRequests() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setApplyOpen(false)}>Cancel</Button>
-            <Button onClick={submitApply} loading={createLeave.isPending} loadingText="Submitting…">Submit request</Button>
+            <Button onClick={submitApply} loading={createLeave.isPending} loadingText="Submitting…" disabled={createLeave.isPending || holidayConflicts.length > 0}>Submit request</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

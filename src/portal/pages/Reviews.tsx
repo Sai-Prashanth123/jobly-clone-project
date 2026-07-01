@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { toast } from 'sonner';
 import {
   Star, Plus, Trash2, Play, ChevronRight, Users, CheckCircle2, Clock,
@@ -60,6 +60,51 @@ function StarRating({ value }: { value: number | null | undefined }) {
 interface CycleFormData {
   name: string; description: string; reviewType: ReviewType;
   selfAssessmentDue: string; peerFeedbackDue: string; managerReviewDue: string;
+}
+
+interface CycleFormProps {
+  form: CycleFormData;
+  setForm: React.Dispatch<React.SetStateAction<CycleFormData>>;
+  error: string;
+}
+
+function CycleForm({ form, setForm, error }: CycleFormProps) {
+  return (
+    <div className="space-y-4">
+      {error && <p className="text-sm text-red-600 flex items-center gap-1"><AlertCircle className="h-4 w-4" />{error}</p>}
+      <div className="space-y-1">
+        <Label>Cycle Name *</Label>
+        <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Q2 2026 Performance Review" />
+      </div>
+      <div className="space-y-1">
+        <Label>Description</Label>
+        <Textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} />
+      </div>
+      <div className="space-y-1">
+        <Label>Review Type</Label>
+        <Select value={form.reviewType} onValueChange={v => setForm(p => ({ ...p, reviewType: v as ReviewType }))}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {Object.entries(TYPE_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="space-y-1">
+          <Label>Self-Assessment Due</Label>
+          <Input type="date" value={form.selfAssessmentDue} onChange={e => setForm(p => ({ ...p, selfAssessmentDue: e.target.value }))} />
+        </div>
+        <div className="space-y-1">
+          <Label>Peer Feedback Due</Label>
+          <Input type="date" value={form.peerFeedbackDue} onChange={e => setForm(p => ({ ...p, peerFeedbackDue: e.target.value }))} />
+        </div>
+        <div className="space-y-1">
+          <Label>Manager Review Due</Label>
+          <Input type="date" value={form.managerReviewDue} onChange={e => setForm(p => ({ ...p, managerReviewDue: e.target.value }))} />
+        </div>
+      </div>
+    </div>
+  );
 }
 
 const EMPTY_FORM: CycleFormData = {
@@ -159,6 +204,10 @@ export default function Reviews() {
 
   const handleMgrReview = async () => {
     if (!selectedCycle || !mgrReviewOpen) return;
+    if (mgrForm.rating) {
+      const r = Number(mgrForm.rating);
+      if (isNaN(r) || r < 1 || r > 5) { toast.error('Rating must be between 1 and 5.'); return; }
+    }
     setSaving(true);
     try {
       await submitMgrReview.mutateAsync({
@@ -173,43 +222,6 @@ export default function Reviews() {
     } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
     finally { setSaving(false); }
   };
-
-  const CycleForm = () => (
-    <div className="space-y-4">
-      {error && <p className="text-sm text-red-600 flex items-center gap-1"><AlertCircle className="h-4 w-4" />{error}</p>}
-      <div className="space-y-1">
-        <Label>Cycle Name *</Label>
-        <Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} placeholder="e.g. Q2 2026 Performance Review" />
-      </div>
-      <div className="space-y-1">
-        <Label>Description</Label>
-        <Textarea value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} rows={2} />
-      </div>
-      <div className="space-y-1">
-        <Label>Review Type</Label>
-        <Select value={form.reviewType} onValueChange={v => setForm(p => ({ ...p, reviewType: v as ReviewType }))}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {Object.entries(TYPE_LABELS).map(([k,v]) => <SelectItem key={k} value={k}>{v}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-        <div className="space-y-1">
-          <Label>Self-Assessment Due</Label>
-          <Input type="date" value={form.selfAssessmentDue} onChange={e => setForm(p => ({ ...p, selfAssessmentDue: e.target.value }))} />
-        </div>
-        <div className="space-y-1">
-          <Label>Peer Feedback Due</Label>
-          <Input type="date" value={form.peerFeedbackDue} onChange={e => setForm(p => ({ ...p, peerFeedbackDue: e.target.value }))} />
-        </div>
-        <div className="space-y-1">
-          <Label>Manager Review Due</Label>
-          <Input type="date" value={form.managerReviewDue} onChange={e => setForm(p => ({ ...p, managerReviewDue: e.target.value }))} />
-        </div>
-      </div>
-    </div>
-  );
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
@@ -247,9 +259,9 @@ export default function Reviews() {
                   </div>
                   {cycle.description && <p className="text-sm text-gray-500 mt-1 line-clamp-1">{cycle.description}</p>}
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-400">
-                    {cycle.selfAssessmentDue && <span>Self-assessment: {format(new Date(cycle.selfAssessmentDue), 'MMM d, yyyy')}</span>}
-                    {cycle.peerFeedbackDue && <span>Peer feedback: {format(new Date(cycle.peerFeedbackDue), 'MMM d, yyyy')}</span>}
-                    {cycle.managerReviewDue && <span>Manager review: {format(new Date(cycle.managerReviewDue), 'MMM d, yyyy')}</span>}
+                    {cycle.selfAssessmentDue && <span>Self-assessment: {format(parseISO(cycle.selfAssessmentDue), 'MMM d, yyyy')}</span>}
+                    {cycle.peerFeedbackDue && <span>Peer feedback: {format(parseISO(cycle.peerFeedbackDue), 'MMM d, yyyy')}</span>}
+                    {cycle.managerReviewDue && <span>Manager review: {format(parseISO(cycle.managerReviewDue), 'MMM d, yyyy')}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -270,7 +282,7 @@ export default function Reviews() {
                       <RefreshCw className="h-3 w-3" /> → Manager Review
                     </Button>
                   )}
-                  {['active','peer_feedback','manager_review'].includes(cycle.status) && (
+                  {cycle.status === 'manager_review' && (
                     <Button size="sm" onClick={() => handleRelease(cycle.id)} className="gap-1 bg-green-600 hover:bg-green-700">
                       <CheckCircle2 className="h-3 w-3" /> Release Results
                     </Button>
@@ -356,7 +368,7 @@ export default function Reviews() {
       <Dialog open={createOpen} onOpenChange={v => { if (!v) setCreateOpen(false); }}>
         <DialogContent className="w-[95vw] max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>New Review Cycle</DialogTitle></DialogHeader>
-          <CycleForm />
+          <CycleForm form={form} setForm={setForm} error={error} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Create Cycle'}</Button>
@@ -368,7 +380,7 @@ export default function Reviews() {
       <Dialog open={!!editCycle} onOpenChange={v => { if (!v) setEditCycle(null); }}>
         <DialogContent className="w-[95vw] max-w-lg" aria-describedby={undefined}>
           <DialogHeader><DialogTitle>Edit Cycle</DialogTitle></DialogHeader>
-          <CycleForm />
+          <CycleForm form={form} setForm={setForm} error={error} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditCycle(null)}>Cancel</Button>
             <Button onClick={handleSave} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save Changes'}</Button>

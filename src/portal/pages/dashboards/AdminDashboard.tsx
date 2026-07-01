@@ -117,7 +117,7 @@ export function AdminDashboard() {
 
       <QuickActions
         actions={[
-          { label: 'Add Employee',       to: '/portal/employees',     icon: UserPlus, tone: 'blue' },
+          { label: 'Add Employee',       to: '/portal/employees/new', icon: UserPlus, tone: 'blue' },
           { label: 'New Invoice',        to: '/portal/invoices',      icon: FileText, tone: 'green' },
           { label: 'Run Report',         to: '/portal/reports',       icon: BarChart3, tone: 'cyan' },
           { label: 'Pending Approvals',  to: '/portal/timesheets',    icon: Clock, tone: 'orange' },

@@ -130,7 +130,7 @@ export default function MyMonthlyTimesheet() {
     : false;
 
   // Submit-time gates the frontend mirrors so the button + helper text are honest.
-  const needsLeaveReason = totalHours === 0;
+  const needsLeaveReason = totalHours === 0 && !!(sheet || dirty);
   const needsClientProof = totalHours > 0;
   const hasClientProof = !!sheet?.clientSignedUrl;
   const canSubmit = !isLocked
@@ -269,6 +269,7 @@ export default function MyMonthlyTimesheet() {
   const handleClear = () => {
     setEntries(buildMonthSkeleton(loaded.year, loaded.month));
     setNotes('');
+    setLeaveReason('');
     setDirty(true);
     setClearOpen(false);
   };

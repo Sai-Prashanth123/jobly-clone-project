@@ -21,6 +21,11 @@ const ID_DOC_LABELS: Record<string, string> = {
   passport: 'Passport',
   green_card: 'Permanent Resident Card',
   ead: 'Employment Authorization Document',
+  opt_card: 'OPT Card',
+  stem_opt_card: 'STEM OPT Card',
+  i983: 'I-983 Training Plan',
+  i94: 'I-94',
+  us_visa: 'US Visa',
 };
 
 export default function MyProfile() {
@@ -53,7 +58,9 @@ export default function MyProfile() {
   );
   const ec = employee.emergencyContact;
   const hasEC = !!ec && (ec.name || ec.phone);
-  const identityDocs = (employee.identityDocuments ?? []).filter(d => (d.number ?? '').trim() !== '');
+  const identityDocs = (employee.identityDocuments ?? []).filter(
+    d => (d.number ?? '').trim() !== '' || (d.expiry ?? '').trim() !== ''
+  );
   const educationList = employee.education ?? [];
   const workList = employee.workHistory ?? [];
 

@@ -21,6 +21,7 @@ import {
 } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/utils';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { DOCUMENT_TYPES } from '../lib/documentTypes';
 import type { Employee } from '../types';
 
@@ -76,7 +77,7 @@ const EXPIRY_DOC_TYPES = new Set([
 ]);
 
 function ExpiryBadgeLocal({ date }: { date: string }) {
-  const days = Math.ceil((new Date(date).getTime() - Date.now()) / 86400000);
+  const days = differenceInCalendarDays(parseISO(date), new Date());
   if (days < 0) return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-red-50 text-red-700 border-red-200">Expired</span>;
   if (days <= 14) return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-red-50 text-red-700 border-red-200">{days}d left</span>;
   if (days <= 30) return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-amber-50 text-amber-700 border-amber-200">{days}d left</span>;

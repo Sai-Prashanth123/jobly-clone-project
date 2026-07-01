@@ -21,7 +21,7 @@ function emailShell(opts: {
   body: string;
 }): string {
   const { previewText, title, subtitle, body } = opts;
-  const logoSrc = `data:image/png;base64,${getJoblyLogoBuffer().toString('base64')}`;
+  const logoSrc = `${PORTAL_URL}/assets/img/logo/logo-3.png`;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>

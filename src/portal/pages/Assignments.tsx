@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Loader2, Pencil } from 'lucide-react';
+import { Plus, Loader2, Pencil, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
@@ -18,7 +18,7 @@ export default function Assignments() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const { data, isLoading } = useAssignments({ status: statusFilter || undefined, limit: 100 });
+  const { data, isLoading, isError } = useAssignments({ status: statusFilter || undefined, limit: 100 });
   const createAssignment = useCreateAssignment();
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Assignment | null>(null);
@@ -149,6 +149,11 @@ export default function Assignments() {
       {isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        </div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-20 gap-3 text-red-500">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm">Failed to load assignments. Please refresh.</p>
         </div>
       ) : (
         <DataTable

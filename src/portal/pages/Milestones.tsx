@@ -7,7 +7,7 @@ import { format, addMonths, subMonths } from 'date-fns';
 export default function Milestones() {
   const [monthDate, setMonthDate] = useState(new Date());
   const month = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
-  const { data, isLoading } = useMilestones(month);
+  const { data, isLoading, isError } = useMilestones(month);
 
   const birthdays = data?.birthdays ?? [];
   const anniversaries = data?.anniversaries ?? [];
@@ -23,7 +23,11 @@ export default function Milestones() {
         </div>
       </div>
 
-      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
+      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : isError ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-3 text-red-500">
+          <p className="text-sm">Failed to load milestones. Please refresh.</p>
+        </div>
+      ) : (
         <div className="space-y-6">
           {/* Birthdays */}
           <section>
@@ -34,8 +38,8 @@ export default function Milestones() {
                   <div key={e.id} className="flex items-center gap-3 p-3 rounded-xl bg-pink-50 border border-pink-100">
                     <div className="w-10 h-10 rounded-full bg-pink-200 flex items-center justify-center text-pink-700 font-bold text-sm">{e.day}</div>
                     <div>
-                      <p className="font-medium text-gray-900">{e.first_name} {e.last_name}</p>
-                      <p className="text-xs text-gray-500">{e.job_title} · {e.department}</p>
+                      <p className="font-medium text-gray-900">{e.firstName} {e.lastName}</p>
+                      <p className="text-xs text-gray-500">{e.jobTitle} · {e.department}</p>
                     </div>
                     <span className="ml-auto text-2xl">🎂</span>
                   </div>
@@ -53,8 +57,8 @@ export default function Milestones() {
                   <div key={e.id} className="flex items-center gap-3 p-3 rounded-xl bg-amber-50 border border-amber-100">
                     <div className="w-10 h-10 rounded-full bg-amber-200 flex items-center justify-center text-amber-700 font-bold text-sm">{e.day}</div>
                     <div>
-                      <p className="font-medium text-gray-900">{e.first_name} {e.last_name}</p>
-                      <p className="text-xs text-gray-500">{e.job_title} · {e.department}</p>
+                      <p className="font-medium text-gray-900">{e.firstName} {e.lastName}</p>
+                      <p className="text-xs text-gray-500">{e.jobTitle} · {e.department}</p>
                     </div>
                     <div className="ml-auto text-right">
                       <span className="text-2xl">🏆</span>

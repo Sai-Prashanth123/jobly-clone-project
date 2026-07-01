@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { UserPlus, Loader2 } from 'lucide-react';
+import { UserPlus, Loader2, AlertCircle } from 'lucide-react';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -15,7 +15,7 @@ import type { Employee } from '../types';
 export default function Employees() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading } = useEmployees({ limit: 500 });
+  const { data, isLoading, isError } = useEmployees({ limit: 500 });
   const canManage = user?.role === 'admin' || user?.role === 'hr';
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -62,7 +62,7 @@ export default function Employees() {
       getValue: e => e.department ?? '',
       sortable: true,
     },
-    { key: 'jobTitle', header: 'Job Title', hideOnMobile: true },
+    { key: 'jobTitle', header: 'Job Title', hideOnMobile: true, getValue: (e: Employee) => e.jobTitle ?? '' },
     {
       key: 'employmentType',
       header: 'Type',
@@ -107,11 +107,14 @@ export default function Employees() {
     },
   ];
 
+  const displayTotal = data?.total ?? employees.length;
+  const isTruncated = employees.length < displayTotal;
+
   return (
     <div>
       <PageHeader
         title="Employees"
-        description={isLoading ? 'Loading...' : `${employees.length} total employees`}
+        description={isLoading ? 'Loading...' : isTruncated ? `Showing ${employees.length} of ${displayTotal} employees` : `${displayTotal} employees`}
         action={canManage ? (
           <Button asChild className="gap-2">
             <Link to="/portal/employees/new">
@@ -122,22 +125,35 @@ export default function Employees() {
         ) : undefined}
       />
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load employees. Please refresh.</p>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       ) : (
-        <DataTable
-          data={employees}
-          columns={columns}
-          searchPlaceholder="Search by ID, name, email, department, title, status…"
-          searchKeys={['displayId', 'firstName', 'lastName', 'email', 'department', 'jobTitle', 'employmentType', 'status']}
-          getRowKey={e => e.id}
-          onRowClick={e => navigate(`/portal/employees/${e.id}`)}
-          emptyTitle="No employees found"
-          emptyDescription="Add your first employee to get started."
-          exportFilename="employees"
-        />
+        <>
+          {isTruncated && (
+            <div className="mb-3 flex items-center gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2">
+              <AlertCircle className="h-3.5 w-3.5 flex-shrink-0" />
+              Showing {employees.length} of {displayTotal} employees. Use search to find others not listed here.
+            </div>
+          )}
+          <DataTable
+            data={employees}
+            columns={columns}
+            searchPlaceholder="Search by ID, name, email, department, title, status…"
+            searchKeys={['displayId', 'firstName', 'lastName', 'email', 'department', 'jobTitle', 'employmentType', 'status']}
+            getRowKey={e => e.id}
+            onRowClick={e => navigate(`/portal/employees/${e.id}`)}
+            emptyTitle="No employees found"
+            emptyDescription="Add your first employee to get started."
+            exportFilename="employees"
+          />
+        </>
       )}
     </div>
   );
