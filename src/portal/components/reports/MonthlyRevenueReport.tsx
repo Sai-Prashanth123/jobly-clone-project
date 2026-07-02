@@ -19,7 +19,7 @@ export function MonthlyRevenueReport() {
   const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const [clientFilter, setClientFilter] = useState('all');
 
-  const invoices = invData?.data ?? [];
+  const invoices = useMemo(() => invData?.data ?? [], [invData]);
   const clients = clientData?.data ?? [];
 
   const yearOptions = [currentYear, currentYear - 1, currentYear - 2].map(y => String(y));
@@ -30,21 +30,22 @@ export function MonthlyRevenueReport() {
     return true;
   }), [invoices, selectedYear, clientFilter]);
 
-  const months: { key: string; label: string }[] = Array.from({ length: 12 }, (_, i) => ({
-    key: `${selectedYear}-${String(i + 1).padStart(2, '0')}`,
-    label: `${MONTH_LABELS[i]} ${selectedYear}`,
-  }));
-
-  const rows = months.map(({ key, label }) => {
-    const monthInvoices = filteredInvoices.filter(inv => inv.issueDate.startsWith(key));
-    const invoiced = monthInvoices.reduce((s, i) => s + i.totalAmount, 0);
-    const paid = monthInvoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0);
-    const outstanding = monthInvoices
-      .filter(i => i.status === 'sent' || i.status === 'overdue')
-      .reduce((s, i) => s + i.totalAmount, 0);
-    const count = monthInvoices.length;
-    return { key, label, invoiced, paid, outstanding, count };
-  });
+  const rows = useMemo(() => {
+    const months: { key: string; label: string }[] = Array.from({ length: 12 }, (_, i) => ({
+      key: `${selectedYear}-${String(i + 1).padStart(2, '0')}`,
+      label: `${MONTH_LABELS[i]} ${selectedYear}`,
+    }));
+    return months.map(({ key, label }) => {
+      const monthInvoices = filteredInvoices.filter(inv => inv.issueDate.startsWith(key));
+      const invoiced = monthInvoices.reduce((s, i) => s + i.totalAmount, 0);
+      const paid = monthInvoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0);
+      const outstanding = monthInvoices
+        .filter(i => i.status === 'sent' || i.status === 'overdue')
+        .reduce((s, i) => s + i.totalAmount, 0);
+      const count = monthInvoices.length;
+      return { key, label, invoiced, paid, outstanding, count };
+    });
+  }, [filteredInvoices, selectedYear]);
 
   const chartData = rows.map(r => ({
     month: r.label.split(' ')[0],

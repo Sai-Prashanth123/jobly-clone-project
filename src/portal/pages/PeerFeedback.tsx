@@ -26,7 +26,7 @@ function StarInput({ value, onChange }: { value: number | null; onChange: (v: nu
 }
 
 export default function PeerFeedback() {
-  const { data: requests = [], isLoading } = useMyPeerRequests();
+  const { data: requests = [], isLoading, isError, refetch } = useMyPeerRequests();
   const submitFeedback = useSubmitPeerFeedback();
 
   const [activeRequest, setActiveRequest] = useState<PeerRequest | null>(null);
@@ -67,7 +67,13 @@ export default function PeerFeedback() {
         <p className="text-sm text-gray-500 mt-0.5">Give honest, constructive feedback to your colleagues</p>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load feedback requests. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : requests.length === 0 ? (
         <div className="text-center py-20 text-gray-400">

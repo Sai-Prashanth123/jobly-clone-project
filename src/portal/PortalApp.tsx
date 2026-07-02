@@ -349,7 +349,7 @@ export default function PortalApp() {
             <Route
               path="attendance/review"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'employee']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
                   <MonthlyTimesheets />
                 </ProtectedRoute>
               }
@@ -357,7 +357,7 @@ export default function PortalApp() {
             <Route
               path="attendance/:id"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'employee']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
                   <MonthlyTimesheetDetail />
                 </ProtectedRoute>
               }

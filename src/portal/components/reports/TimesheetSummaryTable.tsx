@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTimesheets } from '../../hooks/useTimesheets';
@@ -7,10 +8,10 @@ export function TimesheetSummaryTable() {
   const { data: tsData } = useTimesheets({ limit: 500 });
   const { data: empData } = useEmployees({ limit: 200, status: 'active' });
 
-  const timesheets = tsData?.data ?? [];
-  const employees = empData?.data ?? [];
+  const timesheets = useMemo(() => tsData?.data ?? [], [tsData]);
+  const employees = useMemo(() => empData?.data ?? [], [empData]);
 
-  const summary = employees
+  const summary = useMemo(() => employees
     .map(emp => {
       const empTS = timesheets.filter(t => t.employeeId === emp.id);
       const totalHours = empTS.reduce((s, t) => s + t.totalHours, 0);
@@ -24,7 +25,7 @@ export function TimesheetSummaryTable() {
       return { emp, totalHours, byStatus, count: empTS.length };
     })
     .filter(s => s.count > 0)
-    .sort((a, b) => b.totalHours - a.totalHours);
+    .sort((a, b) => b.totalHours - a.totalHours), [employees, timesheets]);
 
   return (
     <Card>

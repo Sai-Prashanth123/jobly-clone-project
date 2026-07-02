@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useInvoices } from '../../hooks/useInvoices';
@@ -10,30 +11,31 @@ export function BillingChart() {
   const { data: invData } = useInvoices({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
 
-  const invoices = invData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const invoices = useMemo(() => invData?.data ?? [], [invData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
-  const now = new Date();
-  const months: string[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
+  const topClients = useMemo(() => clients.filter(c => c.status === 'active').slice(0, 4), [clients]);
 
-  const topClients = clients.filter(c => c.status === 'active').slice(0, 4);
-
-  const data = months.map(month => {
-    const row: Record<string, string | number> = {
-      month: MONTH_LABELS[parseInt(month.split('-')[1]) - 1],
-    };
-    topClients.forEach(client => {
-      const total = invoices
-        .filter(inv => inv.clientId === client.id && inv.issueDate.startsWith(month))
-        .reduce((s, inv) => s + inv.totalAmount, 0);
-      row[client.companyName.split(' ')[0]] = total;
+  const data = useMemo(() => {
+    const now = new Date();
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    return months.map(month => {
+      const row: Record<string, string | number> = {
+        month: MONTH_LABELS[parseInt(month.split('-')[1]) - 1],
+      };
+      topClients.forEach(client => {
+        const total = invoices
+          .filter(inv => inv.clientId === client.id && inv.issueDate.startsWith(month))
+          .reduce((s, inv) => s + inv.totalAmount, 0);
+        row[client.companyName.split(' ')[0]] = total;
+      });
+      return row;
     });
-    return row;
-  });
+  }, [invoices, topClients]);
 
   const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6'];
 

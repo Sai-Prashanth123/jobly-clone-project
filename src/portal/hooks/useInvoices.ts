@@ -190,6 +190,8 @@ export function useUpdateInvoice(id: string) {
       qc.setQueryData(['invoices', id], updated);
       qc.invalidateQueries({ queryKey: ['invoices'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
+      qc.invalidateQueries({ queryKey: ['analytics-invoices'] });
+      qc.invalidateQueries({ queryKey: ['analytics-cashflow'] });
     },
   });
 }
@@ -274,6 +276,8 @@ export function useRecordPayment(invoiceId: string) {
       qc.invalidateQueries({ queryKey: ['invoices', invoiceId] });
       qc.invalidateQueries({ queryKey: ['invoices', invoiceId, 'payments'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
+      qc.invalidateQueries({ queryKey: ['analytics-invoices'] });
+      qc.invalidateQueries({ queryKey: ['analytics-cashflow'] });
     },
   });
 }
@@ -287,6 +291,8 @@ export function useDeletePayment(invoiceId: string) {
       qc.invalidateQueries({ queryKey: ['invoices', invoiceId] });
       qc.invalidateQueries({ queryKey: ['invoices', invoiceId, 'payments'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
+      qc.invalidateQueries({ queryKey: ['analytics-invoices'] });
+      qc.invalidateQueries({ queryKey: ['analytics-cashflow'] });
     },
   });
 }
@@ -307,6 +313,8 @@ export function useSendBulkInvoices() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoices'] });
       qc.invalidateQueries({ queryKey: ['reports'] });
+      qc.invalidateQueries({ queryKey: ['analytics-invoices'] });
+      qc.invalidateQueries({ queryKey: ['analytics-cashflow'] });
     },
   });
 }

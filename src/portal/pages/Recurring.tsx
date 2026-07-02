@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, Trash2, Play, Pause, RotateCw, Pencil } from 'lucide-react';
+import { AlertCircle, Loader2, Plus, Trash2, Play, Pause, RotateCw, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -23,7 +23,7 @@ async function updateRecurringInline(id: string, body: Record<string, unknown>) 
 
 export default function Recurring() {
   const navigate = useNavigate();
-  const { data, isLoading } = useRecurringTemplates();
+  const { data, isLoading, isError, refetch } = useRecurringTemplates();
   const deleteR = useDeleteRecurring();
   const runNow = useRunRecurringNow();
   const [delTarget, setDelTarget] = useState<RecurringTemplate | null>(null);
@@ -74,7 +74,13 @@ export default function Recurring() {
         action={<Button onClick={() => navigate('/portal/recurring/new')} className="gap-2"><Plus className="h-4 w-4" /> New Schedule</Button>}
       />
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load recurring schedules. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <DataTable data={templates} columns={columns} searchPlaceholder="Search schedules…" searchKeys={['title', 'clientName', 'frequency', 'status']} getRowKey={t => t.id}

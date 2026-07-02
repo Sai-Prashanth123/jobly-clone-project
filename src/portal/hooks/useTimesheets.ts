@@ -190,6 +190,7 @@ export function usePatchTimesheetStatus(id: string) {
       qc.setQueryData(['timesheets', id], updated);
       qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
       qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
     },
   });
 }

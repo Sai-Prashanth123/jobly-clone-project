@@ -11,7 +11,7 @@ const lineItemSchema = z.object({
   unitPrice: z.number().min(0).default(0),
 });
 
-export const createRecurringSchema = z.object({
+const recurringBaseSchema = z.object({
   clientId: z.string().uuid(),
   title: z.string().max(200).optional().nullable(),
   lineItems: z.array(lineItemSchema).min(1),
@@ -24,14 +24,36 @@ export const createRecurringSchema = z.object({
   frequency: z.enum(RECURRING_FREQUENCIES),
   startDate: ymdDate,
   endMode: z.enum(['never', 'on_date', 'after_count']).default('never'),
-  endDate: ymdDate.optional().nullable(),
+  // Coerce '' to null so a blank end-date field doesn't fail the ymd regex
+  // with an opaque 400 — the refines below produce the real field errors.
+  endDate: z.preprocess(v => (v === '' ? null : v), ymdDate.optional().nullable()),
   maxOccurrences: z.number().int().positive().optional().nullable(),
   autoSend: z.boolean().default(false),
 });
 
-export const updateRecurringSchema = createRecurringSchema.partial().extend({
+// Cross-field rules for the end-of-schedule config. Without these a blank end
+// date 400s opaquely, and a blank occurrence count creates a schedule that
+// never ends (the cron's pause guard is skipped when max_occurrences is null).
+const endModeRules = <T extends z.ZodTypeAny>(schema: T) =>
+  schema
+    .refine((d: any) => d.endMode !== 'on_date' || !!d.endDate, {
+      message: 'End date is required when the schedule ends on a date',
+      path: ['endDate'],
+    })
+    .refine((d: any) => d.endMode !== 'on_date' || !d.endDate || !d.startDate || d.endDate > d.startDate, {
+      message: 'End date must be after the start date',
+      path: ['endDate'],
+    })
+    .refine((d: any) => d.endMode !== 'after_count' || (d.maxOccurrences != null && d.maxOccurrences >= 1), {
+      message: 'Number of occurrences is required when the schedule ends after N runs',
+      path: ['maxOccurrences'],
+    });
+
+export const createRecurringSchema = endModeRules(recurringBaseSchema);
+
+export const updateRecurringSchema = endModeRules(recurringBaseSchema.partial().extend({
   status: z.enum(['active', 'paused']).optional(),
-});
+}));
 
 export type CreateRecurringInput = z.infer<typeof createRecurringSchema>;
 export type UpdateRecurringInput = z.infer<typeof updateRecurringSchema>;

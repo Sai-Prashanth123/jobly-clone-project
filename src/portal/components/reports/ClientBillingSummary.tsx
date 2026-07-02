@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Building2 } from 'lucide-react';
@@ -11,10 +12,10 @@ export function ClientBillingSummary() {
   const { data: invData } = useInvoices({ limit: 1000 });
   const { data: clientData } = useClients({ limit: 200 });
 
-  const invoices = invData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const invoices = useMemo(() => invData?.data ?? [], [invData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
-  const rows = clients
+  const rows = useMemo(() => clients
     .map(client => {
       const clientInvoices = invoices.filter(i => i.clientId === client.id);
       const balanceOf = (i: typeof invoices[number]) => i.balanceDue ?? (i.totalAmount - (i.amountPaid ?? 0));
@@ -43,7 +44,7 @@ export function ClientBillingSummary() {
       };
     })
     .filter(r => r.invoiceCount > 0)
-    .sort((a, b) => b.totalInvoiced - a.totalInvoiced);
+    .sort((a, b) => b.totalInvoiced - a.totalInvoiced), [clients, invoices]);
 
   const grandTotal = rows.reduce((s, r) => s + r.totalInvoiced, 0);
   const grandPaid = rows.reduce((s, r) => s + r.totalPaid, 0);

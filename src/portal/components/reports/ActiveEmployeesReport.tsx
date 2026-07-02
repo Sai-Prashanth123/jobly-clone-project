@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Users } from 'lucide-react';
@@ -7,26 +8,26 @@ import { formatDate } from '../../lib/utils';
 
 export function ActiveEmployeesReport() {
   const { data } = useEmployees({ limit: 500 });
-  const employees = data?.data ?? [];
+  const employees = useMemo(() => data?.data ?? [], [data]);
 
-  const active = employees.filter(e => e.status === 'active');
+  const active = useMemo(() => employees.filter(e => e.status === 'active'), [employees]);
   const onboarding = employees.filter(e => e.status === 'onboarding');
   const inactive = employees.filter(e => e.status === 'inactive');
 
-  const byDepartment = active.reduce<Record<string, number>>((acc, e) => {
+  const byDepartment = useMemo(() => active.reduce<Record<string, number>>((acc, e) => {
     const dept = e.department || 'Unassigned';
     acc[dept] = (acc[dept] ?? 0) + 1;
     return acc;
-  }, {});
+  }, {}), [active]);
 
-  const byType = active.reduce<Record<string, number>>((acc, e) => {
+  const byType = useMemo(() => active.reduce<Record<string, number>>((acc, e) => {
     acc[e.employmentType] = (acc[e.employmentType] ?? 0) + 1;
     return acc;
-  }, {});
+  }, {}), [active]);
 
-  const sorted = [...active].sort((a, b) =>
+  const sorted = useMemo(() => [...active].sort((a, b) =>
     `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`)
-  );
+  ), [active]);
 
   return (
     <div className="space-y-4">

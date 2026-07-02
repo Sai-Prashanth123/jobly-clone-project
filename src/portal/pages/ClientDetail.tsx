@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Edit, Trash2, ArrowLeft, Loader2, AlertTriangle, CheckCircle2, Circle, Mail } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, AlertTriangle, AlertCircle, CheckCircle2, Circle, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
@@ -23,7 +23,7 @@ export default function ClientDetail() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const isHrAdmin = user?.role === 'admin' || user?.role === 'hr';
-  const { data: client, isLoading } = useClient(id);
+  const { data: client, isLoading, isError, refetch } = useClient(id);
   const { data: assignmentsData } = useAssignments({ clientId: id, limit: 100 });
   const { data: invoicesData } = useInvoices({ clientId: id, limit: 100 });
   const { data: employeesData } = useEmployees({ limit: 200 });
@@ -39,6 +39,16 @@ export default function ClientDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load client. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
 
   if (!client) {

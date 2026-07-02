@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useInvoices } from '../../hooks/useInvoices';
@@ -7,24 +8,25 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 
 export function FinancialChart() {
   const { data: invData } = useInvoices({ limit: 500 });
-  const invoices = invData?.data ?? [];
+  const invoices = useMemo(() => invData?.data ?? [], [invData]);
 
-  const now = new Date();
-  const months: string[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-  }
-
-  const data = months.map(month => {
-    const label = MONTH_LABELS[parseInt(month.split('-')[1]) - 1];
-    const monthInvoices = invoices.filter(i => i.issueDate.startsWith(month));
-    const invoiced = monthInvoices.reduce((s, i) => s + i.totalAmount, 0);
-    const paid = monthInvoices
-      .filter(i => i.status === 'paid')
-      .reduce((s, i) => s + i.totalAmount, 0);
-    return { month: label, Invoiced: invoiced, Paid: paid };
-  });
+  const data = useMemo(() => {
+    const now = new Date();
+    const months: string[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    }
+    return months.map(month => {
+      const label = MONTH_LABELS[parseInt(month.split('-')[1]) - 1];
+      const monthInvoices = invoices.filter(i => i.issueDate.startsWith(month));
+      const invoiced = monthInvoices.reduce((s, i) => s + i.totalAmount, 0);
+      const paid = monthInvoices
+        .filter(i => i.status === 'paid')
+        .reduce((s, i) => s + i.totalAmount, 0);
+      return { month: label, Invoiced: invoiced, Paid: paid };
+    });
+  }, [invoices]);
 
   return (
     <Card>

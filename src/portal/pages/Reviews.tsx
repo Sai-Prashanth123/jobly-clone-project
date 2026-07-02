@@ -114,8 +114,8 @@ const EMPTY_FORM: CycleFormData = {
 };
 
 export default function Reviews() {
-  const { data: cycles = [], isLoading, refetch } = useReviewCycles();
-  const { data: empResult } = useEmployees();
+  const { data: cycles = [], isLoading, isError, refetch } = useReviewCycles();
+  const { data: empResult } = useEmployees({ limit: 500 });
   const employees = empResult?.data ?? [];
   const createCycle = useCreateCycle();
   const updateCycle = useUpdateCycle();
@@ -243,7 +243,13 @@ export default function Reviews() {
       </div>
 
       {/* Cycle list */}
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load review cycles. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : cycles.length === 0 ? (
         <div className="text-center py-20 text-gray-400">
@@ -274,22 +280,22 @@ export default function Reviews() {
                   {cycle.status === 'draft' && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => openEdit(cycle)}>Edit</Button>
-                      <Button size="sm" onClick={() => handleActivate(cycle.id)} className="gap-1"><Play className="h-3 w-3" /> Activate</Button>
+                      <Button size="sm" onClick={() => handleActivate(cycle.id)} disabled={activateCycle.isPending} className="gap-1"><Play className="h-3 w-3" /> Activate</Button>
                       <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => setDeleteTarget(cycle)}><Trash2 className="h-4 w-4" /></Button>
                     </>
                   )}
                   {cycle.status === 'active' && (
-                    <Button size="sm" variant="outline" onClick={() => handleAdvance(cycle.id, 'peer_feedback')} className="gap-1">
+                    <Button size="sm" variant="outline" onClick={() => handleAdvance(cycle.id, 'peer_feedback')} disabled={advanceCycle.isPending} className="gap-1">
                       <RefreshCw className="h-3 w-3" /> → Peer Feedback
                     </Button>
                   )}
                   {cycle.status === 'peer_feedback' && (
-                    <Button size="sm" variant="outline" onClick={() => handleAdvance(cycle.id, 'manager_review')} className="gap-1">
+                    <Button size="sm" variant="outline" onClick={() => handleAdvance(cycle.id, 'manager_review')} disabled={advanceCycle.isPending} className="gap-1">
                       <RefreshCw className="h-3 w-3" /> → Manager Review
                     </Button>
                   )}
                   {cycle.status === 'manager_review' && (
-                    <Button size="sm" onClick={() => handleRelease(cycle.id)} className="gap-1 bg-green-600 hover:bg-green-700">
+                    <Button size="sm" onClick={() => handleRelease(cycle.id)} disabled={releaseResults.isPending} className="gap-1 bg-green-600 hover:bg-green-700">
                       <CheckCircle2 className="h-3 w-3" /> Release Results
                     </Button>
                   )}
@@ -339,7 +345,7 @@ export default function Reviews() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {['active','peer_feedback','manager_review','completed'].includes(cycle.status) && (
+                            {['active','peer_feedback','manager_review'].includes(cycle.status) && (
                               <Button size="sm" variant="outline" className="text-xs" onClick={() => {
                                 setMgrReviewOpen(p.employeeId);
                                 setMgrForm({
@@ -354,6 +360,7 @@ export default function Reviews() {
                             )}
                             {cycle.status === 'draft' && (
                               <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700"
+                                disabled={removeParticipant.isPending}
                                 onClick={() => removeParticipant.mutate({ cycleId: cycle.id, employeeId: p.employeeId })}>
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>

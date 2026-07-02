@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { TrendingUp, Loader2 } from 'lucide-react';
+import { TrendingUp, Loader2, AlertCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Button } from '@/components/ui/button';
 import { useCashFlowForecast } from '../hooks/useAnalytics';
 
 export default function CashFlow() {
   const [months, setMonths] = useState(3);
-  const { data: forecast = [], isLoading } = useCashFlowForecast(months);
+  const { data: forecast = [], isLoading, isError, refetch } = useCashFlowForecast(months);
   const max = Math.max(...forecast.map(f => f.projectedRevenue), 1);
 
   return (
@@ -22,7 +23,13 @@ export default function CashFlow() {
         </div>
       </div>
 
-      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load cash flow forecast. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
         <div className="space-y-4">
           {forecast.map((f, i) => (
             <div key={f.month} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">

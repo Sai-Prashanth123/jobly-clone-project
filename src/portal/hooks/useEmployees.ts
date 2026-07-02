@@ -457,7 +457,8 @@ export function useEmployeeDirectory(search?: string, department?: string) {
       const { data } = await apiClient.get(`/employees/directory?${params}`);
       return (data.data as any[]).map(mapDirectoryEmployee);
     },
-    staleTime: 2 * 60_000,
+    // Directory data changes rarely — 5 min freshness window is safe.
+    staleTime: 5 * 60_000,
   });
 }
 

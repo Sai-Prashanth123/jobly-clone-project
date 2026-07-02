@@ -18,7 +18,7 @@ const DEPTS = ['Engineering','Product','Design','Sales','Marketing','HR','Financ
 export default function Budgets() {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
-  const { data: budgets = [], isLoading } = useBudgets(selectedYear);
+  const { data: budgets = [], isLoading, isError, refetch } = useBudgets(selectedYear);
   const upsert = useUpsertBudget();
   const del = useDeleteBudget();
   const [open, setOpen] = useState(false);
@@ -51,7 +51,13 @@ export default function Budgets() {
         </div>
       </div>
 
-      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : Object.keys(grouped).length === 0 ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load budgets. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : Object.keys(grouped).length === 0 ? (
         <div className="text-center py-16 text-gray-400"><DollarSign className="h-10 w-10 mx-auto mb-2 opacity-30" /><p>No budgets set for FY {selectedYear}</p></div>
       ) : (
         <div className="space-y-4">

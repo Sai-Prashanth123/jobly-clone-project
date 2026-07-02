@@ -1,116 +1,37 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 
-const STALE = 60_000; // 60s polling interval
+// One consolidated request for all sidebar badge counts. The backend runs the
+// count queries in parallel and caches the role-shared portion, so this is
+// dramatically cheaper than the previous 7 independently-polled queries.
+const POLL = 120_000; // 2 min
+
+interface NavBadgeCounts {
+  timesheets: number;
+  leaveRequests: number;
+  expenses: number;
+  attendanceReview: number;
+  expiringDocs: number;
+  announcements: number;
+}
+
+const ZERO: NavBadgeCounts = {
+  timesheets: 0, leaveRequests: 0, expenses: 0,
+  attendanceReview: 0, expiringDocs: 0, announcements: 0,
+};
 
 export function useNavBadges(role: string): Record<string, number> {
-  const isHrAdmin = role === 'admin' || role === 'hr';
-  const canActOnTimesheets = ['admin', 'hr', 'operations', 'finance'].includes(role);
-  const canActOnExpenses   = ['admin', 'hr', 'finance'].includes(role);
-  const isEmployee = role === 'employee';
-
-  // HR/admin/operations/finance — count ALL submitted timesheets pending approval
-  const { data: timesheets } = useQuery<number>({
-    queryKey: ['nav-badge', 'timesheets', role],
+  const { data } = useQuery<NavBadgeCounts>({
+    queryKey: ['nav-badges', role],
     queryFn: async () => {
-      const res = await apiClient.get('/timesheets', { params: { status: 'submitted', limit: 1 } });
-      return res.data.total ?? 0;
+      const res = await apiClient.get('/nav-badges');
+      return res.data.data ?? ZERO;
     },
-    staleTime: STALE,
-    refetchInterval: STALE,
-    enabled: canActOnTimesheets,
-  });
-
-  // Employees — count their own submitted (pending manager approval) timesheets
-  const { data: myTimesheets } = useQuery<number>({
-    queryKey: ['nav-badge', 'my-timesheets'],
-    queryFn: async () => {
-      const res = await apiClient.get('/timesheets', { params: { status: 'submitted', limit: 1 } });
-      return res.data.total ?? 0;
-    },
-    staleTime: STALE,
-    refetchInterval: STALE,
-    enabled: isEmployee,
-  });
-
-  // HR/admin — pending leave requests
-  const { data: leaveRequests } = useQuery<number>({
-    queryKey: ['nav-badge', 'leave-requests'],
-    queryFn: async () => {
-      const res = await apiClient.get('/leave-requests', { params: { status: 'pending', limit: 1 } });
-      return res.data.total ?? 0;
-    },
-    staleTime: STALE,
-    refetchInterval: STALE,
-    enabled: isHrAdmin,
-  });
-
-  // HR/admin/finance — submitted expenses pending review
-  const { data: expenses } = useQuery<number>({
-    queryKey: ['nav-badge', 'expenses', role],
-    queryFn: async () => {
-      const res = await apiClient.get('/expenses', { params: { status: 'submitted', limit: 1 } });
-      return res.data.total ?? 0;
-    },
-    staleTime: STALE,
-    refetchInterval: STALE,
-    enabled: canActOnExpenses,
-  });
-
-  // Employee — their own submitted expenses
-  const { data: myExpenses } = useQuery<number>({
-    queryKey: ['nav-badge', 'my-expenses'],
-    queryFn: async () => {
-      const res = await apiClient.get('/expenses', { params: { status: 'submitted', limit: 1 } });
-      return res.data.total ?? 0;
-    },
-    staleTime: STALE,
-    refetchInterval: STALE,
-    enabled: isEmployee,
-  });
-
-  // HR/admin — submitted monthly timesheets (attendance review)
-  const { data: attendanceReview } = useQuery<number>({
-    queryKey: ['nav-badge', 'attendance-review'],
-    queryFn: async () => {
-      const res = await apiClient.get('/monthly-timesheets', { params: { status: 'submitted', limit: 1 } });
-      return res.data.total ?? 0;
-    },
-    staleTime: STALE,
-    refetchInterval: STALE,
-    enabled: isHrAdmin,
-  });
-
-  // All roles — unseen announcements since last visit
-  const { data: announcements } = useQuery<number>({
-    queryKey: ['nav-badge', 'announcements', role],
-    queryFn: async () => {
-      const res = await apiClient.get('/announcements/unread-count');
-      return res.data.count ?? 0;
-    },
-    staleTime: STALE,
-    refetchInterval: STALE,
+    staleTime: POLL,
+    refetchInterval: POLL,
     enabled: !!role,
+    meta: { silentError: true }, // badge counts failing shouldn't toast
   });
 
-  // HR/admin — documents expiring within 30 days
-  const { data: expiringDocs } = useQuery<number>({
-    queryKey: ['nav-badge', 'expiring-docs'],
-    queryFn: async () => {
-      const res = await apiClient.get('/employees/expiring-documents', { params: { days: 30 } });
-      return (res.data.data as unknown[])?.length ?? 0;
-    },
-    staleTime: 5 * 60_000, // 5-min cache (less volatile)
-    refetchInterval: 5 * 60_000,
-    enabled: isHrAdmin,
-  });
-
-  return {
-    timesheets:       (canActOnTimesheets ? timesheets : myTimesheets) ?? 0,
-    leaveRequests:    leaveRequests ?? 0,
-    expenses:         (canActOnExpenses ? expenses : myExpenses) ?? 0,
-    attendanceReview: attendanceReview ?? 0,
-    expiringDocs:     expiringDocs ?? 0,
-    announcements:    announcements ?? 0,
-  };
+  return { ...ZERO, ...(data ?? {}) };
 }

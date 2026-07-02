@@ -81,17 +81,19 @@ export default function AssignmentDetail() {
             </a>
           )}
           {canEdit && (
-            <>
-              <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
-                <Edit className="h-4 w-4" />
-                Edit
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
-                className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </Button>
-            </>
+            <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
+              <Edit className="h-4 w-4" />
+              Edit
+            </Button>
+          )}
+          {/* DELETE /assignments/:id is admin-only on the backend — don't show
+              operations a button that will always 403. */}
+          {user?.role === 'admin' && (
+            <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
+              className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
           )}
         </div>
       </div>

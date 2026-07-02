@@ -37,7 +37,7 @@ export default function EmployeeDetail() {
   // Poll while a reviewer is looking at the page so a parallel re-submission by
   // the employee surfaces within a few seconds (the 409 guards are the safety
   // net; this is the proactive half). 0/false disables for everyone else.
-  const { data: employee, isLoading } = useEmployee(id, { refetchInterval: isReviewer ? 15000 : false });
+  const { data: employee, isLoading } = useEmployee(id, { refetchInterval: isReviewer ? 30000 : false });
   const { data: assignmentsData } = useAssignments({ employeeId: id, limit: 100 });
   const { data: timesheetsData } = useTimesheets({ employeeId: id, limit: 100 });
   const { data: allEmployeesData } = useEmployees({ limit: 500 });

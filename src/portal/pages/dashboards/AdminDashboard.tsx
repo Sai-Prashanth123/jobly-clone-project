@@ -1,6 +1,7 @@
+import { useMemo } from 'react';
 import {
   Users, Building2, Briefcase, Clock, TrendingUp, AlertTriangle,
-  DollarSign, CheckCircle, UserPlus, FileText, BarChart3, Inbox,
+  DollarSign, CheckCircle, UserPlus, FileText, BarChart3, Inbox, AlertCircle,
 } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
@@ -24,19 +25,17 @@ import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidge
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 export function AdminDashboard() {
-  const { data: empData } = useEmployees({ limit: 500 });
+  const { data: empData, isError, refetch } = useEmployees({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
   const { data: assignData } = useAssignments({ limit: 200 });
   const { data: tsData } = useTimesheets({ limit: 500 });
   const { data: invData } = useInvoices({ limit: 500 });
 
-  const employees = empData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const employees = useMemo(() => empData?.data ?? [], [empData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
   const assignments = assignData?.data ?? [];
-  const timesheets = tsData?.data ?? [];
-  const invoices = invData?.data ?? [];
-
-  const now = new Date();
+  const timesheets = useMemo(() => tsData?.data ?? [], [tsData]);
+  const invoices = useMemo(() => invData?.data ?? [], [invData]);
 
   // KPI metrics
   const totalEmployees = employees.length;
@@ -44,49 +43,72 @@ export function AdminDashboard() {
   const activeProjects = assignments.filter(a => a.status === 'active').length;
   const pendingApprovals = timesheets.filter(t => t.status === 'submitted').length;
 
-  const currentMonthPrefix = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-  const revenueThisMonth = invoices
-    .filter(i => i.paidAt?.startsWith(currentMonthPrefix))
-    .reduce((s, i) => s + i.totalAmount, 0);
+  const revenueThisMonth = useMemo(() => {
+    const d = new Date();
+    const currentMonthPrefix = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+    return invoices
+      .filter(i => i.paidAt?.startsWith(currentMonthPrefix))
+      .reduce((s, i) => s + i.totalAmount, 0);
+  }, [invoices]);
 
   // 6-month series for revenue trend + employee growth
-  const months: { key: string; label: string }[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
-    months.push({ key, label: MONTH_LABELS[d.getUTCMonth()] });
-  }
+  const months = useMemo(() => {
+    const d0 = new Date();
+    const out: { key: string; label: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth() - i, 1));
+      const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
+      out.push({ key, label: MONTH_LABELS[d.getUTCMonth()] });
+    }
+    return out;
+  }, []);
 
-  const revenueSeries = months.map(({ key, label }) => ({
+  const revenueSeries = useMemo(() => months.map(({ key, label }) => ({
     month: label,
     revenue: invoices
       .filter(inv => inv.paidAt?.startsWith(key))
       .reduce((s, inv) => s + inv.totalAmount, 0),
-  }));
+  })), [months, invoices]);
 
-  const hireSeries = months.map(({ key, label }) => ({
+  const hireSeries = useMemo(() => months.map(({ key, label }) => ({
     month: label,
     hires: employees.filter(e => e.startDate?.startsWith(key)).length,
-  }));
+  })), [months, employees]);
 
   // Sparkline data for KPI cards
-  const revenueSpark = revenueSeries.map(r => r.revenue);
-  const hireSpark = hireSeries.map(h => h.hires);
+  const revenueSpark = useMemo(() => revenueSeries.map(r => r.revenue), [revenueSeries]);
+  const hireSpark = useMemo(() => hireSeries.map(h => h.hires), [hireSeries]);
 
   // Supporting data
-  const overdueInvoices = invoices.filter(i => i.status === 'overdue');
-  const totalOutstanding = invoices
+  const overdueInvoices = useMemo(() => invoices.filter(i => i.status === 'overdue'), [invoices]);
+  const totalOutstanding = useMemo(() => invoices
     .filter(i => i.status === 'sent' || i.status === 'overdue')
-    .reduce((s, i) => s + i.totalAmount, 0);
+    .reduce((s, i) => s + i.totalAmount, 0), [invoices]);
 
-  const in30Days = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 30));
-  const expiringContracts = clients.filter(c => {
-    if (!c.contractEndDate || c.status !== 'active') return false;
-    const end = new Date(c.contractEndDate);
-    return end >= now && end <= in30Days;
-  });
+  const expiringContracts = useMemo(() => {
+    const today = new Date();
+    const in30Days = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() + 30));
+    return clients.filter(c => {
+      if (!c.contractEndDate || c.status !== 'active') return false;
+      const end = new Date(c.contractEndDate);
+      return end >= today && end <= in30Days;
+    });
+  }, [clients]);
 
-  const pendingTimesheets = timesheets.filter(t => t.status === 'submitted').slice(0, 5);
+  const pendingTimesheets = useMemo(
+    () => timesheets.filter(t => t.status === 'submitted').slice(0, 5),
+    [timesheets],
+  );
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load dashboard data.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   const getEmpName = (id: string) => {
     const e = employees.find(emp => emp.id === id);

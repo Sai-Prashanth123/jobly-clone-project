@@ -32,6 +32,7 @@ import budgetsRoutes from './budgets.routes';
 import taxDocumentsRoutes from './taxDocuments.routes';
 import activityLogsRoutes from './activityLogs.routes';
 import analyticsReportsRoutes from './analyticsReports.routes';
+import navBadgesRoutes from './navBadges.routes';
 
 export const router = Router();
 
@@ -68,3 +69,4 @@ router.use('/budgets', budgetsRoutes);
 router.use('/tax-documents', taxDocumentsRoutes);
 router.use('/activity-logs', activityLogsRoutes);
 router.use('/analytics', analyticsReportsRoutes);
+router.use('/nav-badges', navBadgesRoutes);

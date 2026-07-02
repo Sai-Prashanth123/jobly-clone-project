@@ -19,7 +19,7 @@ export default function ShiftSchedule() {
   const startDate = format(weekStart, 'yyyy-MM-dd');
   const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
 
-  const { data: shifts = [], isLoading } = useShifts({ startDate, endDate });
+  const { data: shifts = [], isLoading, isError, refetch } = useShifts({ startDate, endDate });
   const { data: empResult } = useEmployees();
   const employees = empResult?.data ?? [];
   const createShift = useCreateShift();
@@ -71,7 +71,13 @@ export default function ShiftSchedule() {
         </div>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load shifts. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto shadow-sm">

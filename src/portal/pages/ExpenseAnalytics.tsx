@@ -1,12 +1,22 @@
-import { Loader2, Receipt } from 'lucide-react';
+import { Loader2, Receipt, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useExpenseAnalytics } from '../hooks/useAnalytics';
 
 const CAT_COLORS = ['bg-blue-500','bg-violet-500','bg-amber-500','bg-green-500','bg-red-500','bg-pink-500','bg-cyan-500'];
 
 export default function ExpenseAnalytics() {
-  const { data, isLoading } = useExpenseAnalytics();
+  const { data, isLoading, isError, refetch } = useExpenseAnalytics();
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load expense analytics. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
   if (!data) return null;
 
   const byCategory = Object.entries(data.byCategory as Record<string, number>).sort((a, b) => b[1] - a[1]);

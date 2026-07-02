@@ -108,7 +108,7 @@ function CycleCard({
 
 export default function MyReview() {
   const { user } = useAuth();
-  const { data: cycles = [], isLoading } = useReviewCycles();
+  const { data: cycles = [], isLoading, isError, refetch } = useReviewCycles();
   const { data: employees = [] } = useEmployeeDirectory();
   const submitSelf = useSubmitSelfAssessment();
   const nominatePeers = useNominatePeers();
@@ -175,7 +175,13 @@ export default function MyReview() {
         <p className="text-sm text-gray-500 mt-0.5">Complete your self-assessments and view released results</p>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load review cycles. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
       ) : myCycles.length === 0 ? (
         <div className="text-center py-20 text-gray-400">

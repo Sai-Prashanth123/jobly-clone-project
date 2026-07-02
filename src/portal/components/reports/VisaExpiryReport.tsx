@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -7,35 +8,37 @@ import { formatDate } from '../../lib/utils';
 
 export function VisaExpiryReport() {
   const { data } = useEmployees({ limit: 500 });
-  const employees = data?.data ?? [];
-
-  // UTC-safe date math — parsing a bare 'YYYY-MM-DD' with new Date() would
-  // interpret it as local midnight, shifting the computed day by up to ±1 in
-  // timezones east/west of UTC. Anchor everything to UTC midnight.
-  const now = new Date();
-  const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-  const cutoffMs = todayMs + 180 * 24 * 60 * 60 * 1000;
-
-  const parseExpiry = (s: string) => {
-    // 'YYYY-MM-DD' → UTC midnight
-    const [y, m, d] = s.split('-').map(Number);
-    return Date.UTC(y, (m ?? 1) - 1, d ?? 1);
-  };
+  const employees = useMemo(() => data?.data ?? [], [data]);
 
   // Include already-expired visas — admins need to see them, not have them
   // silently filtered out. Expired entries sort to the top (most negative
   // daysRemaining) so they're impossible to miss.
-  const expiring = employees
-    .filter(e => {
-      if (!e.visaExpiry) return false;
-      const expMs = parseExpiry(e.visaExpiry);
-      return expMs <= cutoffMs;
-    })
-    .sort((a, b) => parseExpiry(a.visaExpiry!) - parseExpiry(b.visaExpiry!))
-    .map(e => {
-      const daysRemaining = Math.round((parseExpiry(e.visaExpiry!) - todayMs) / (24 * 60 * 60 * 1000));
-      return { ...e, daysRemaining };
-    });
+  const expiring = useMemo(() => {
+    // UTC-safe date math — parsing a bare 'YYYY-MM-DD' with new Date() would
+    // interpret it as local midnight, shifting the computed day by up to ±1 in
+    // timezones east/west of UTC. Anchor everything to UTC midnight.
+    const now = new Date();
+    const todayMs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const cutoffMs = todayMs + 180 * 24 * 60 * 60 * 1000;
+
+    const parseExpiry = (s: string) => {
+      // 'YYYY-MM-DD' → UTC midnight
+      const [y, m, d] = s.split('-').map(Number);
+      return Date.UTC(y, (m ?? 1) - 1, d ?? 1);
+    };
+
+    return employees
+      .filter(e => {
+        if (!e.visaExpiry) return false;
+        const expMs = parseExpiry(e.visaExpiry);
+        return expMs <= cutoffMs;
+      })
+      .sort((a, b) => parseExpiry(a.visaExpiry!) - parseExpiry(b.visaExpiry!))
+      .map(e => {
+        const daysRemaining = Math.round((parseExpiry(e.visaExpiry!) - todayMs) / (24 * 60 * 60 * 1000));
+        return { ...e, daysRemaining };
+      });
+  }, [employees]);
 
   const dayColor = (days: number) => {
     if (days < 0) return 'text-red-700 font-semibold';

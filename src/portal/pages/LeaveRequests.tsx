@@ -153,6 +153,7 @@ export default function LeaveRequests() {
           {isReviewer && r.status === 'pending' && r.employeeId !== user?.employeeId && (
             <>
               <Button variant="ghost" size="sm" className="h-8 gap-1 text-emerald-700 hover:bg-emerald-50"
+                disabled={reviewLeave.isPending}
                 onClick={() => approve(r)}>
                 <Check className="h-3.5 w-3.5" /> Approve
               </Button>

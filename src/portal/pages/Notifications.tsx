@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Bell, Check, CheckCheck, Clock, AlertTriangle, FileText, Loader2 } from 'lucide-react';
+import { AlertCircle, Bell, Check, CheckCheck, Clock, AlertTriangle, FileText, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import {
@@ -77,7 +77,7 @@ function NotificationCard({ n, onRead }: { n: Notification; onRead: (id: string)
 
 export default function Notifications() {
   const { user } = useAuth();
-  const { data: notifications = [], isLoading, refetch } = useNotifications();
+  const { data: notifications = [], isLoading, isError, refetch } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
   const triggerReminders = useTriggerTimesheetReminders();
@@ -240,7 +240,13 @@ export default function Notifications() {
       </div>
 
       {/* Notification list */}
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load notifications. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

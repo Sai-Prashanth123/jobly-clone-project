@@ -95,9 +95,17 @@ export async function getProbationEmployees() {
 
 // ── Capacity Utilization ──────────────────────────────────────────────────────
 
+// Last day of a YYYY-MM month as YYYY-MM-DD (Date.UTC(y, m, 0) = day 0 of the
+// NEXT month = last day of month m). Hard-coding "-31" raises Postgres 22008
+// (date out of range) for 30-day months and February.
+function monthEndStr(month: string): string {
+  const [y, m] = month.split('-').map(Number);
+  return new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+}
+
 export async function getCapacityUtilization(month: string) {
   const start = `${month}-01`;
-  const end = `${month}-31`;
+  const end = monthEndStr(month);
 
   const [emps, timesheets] = await Promise.all([
     supabaseAdmin.from('employees').select('id, first_name, last_name, display_id, department').eq('status', 'active').is('deleted_at', null),
@@ -139,10 +147,13 @@ export async function getWorkforceAvailability(startDate: string, endDate: strin
 // ── Contractor Compliance ─────────────────────────────────────────────────────
 
 export async function getContractorCompliance() {
+  // Column is visa_expiry (not visa_expiry_date); employment_type values are
+  // lowercase; i9_status values are pending|complete|expired. This endpoint is
+  // visible to operations — never return the raw bank account number.
   const { data, error } = await supabaseAdmin
     .from('employees')
-    .select('id, display_id, first_name, last_name, department, job_title, employment_type, visa_type, visa_expiry_date, i9_status, bank_account_number')
-    .in('employment_type', ['1099', 'C2C', 'contract'])
+    .select('id, display_id, first_name, last_name, department, job_title, employment_type, visa_type, visa_expiry, i9_status, bank_account_number')
+    .in('employment_type', ['1099', 'c2c', 'contract'])
     .eq('status', 'active')
     .is('deleted_at', null);
   if (error) throw error;
@@ -152,11 +163,12 @@ export async function getContractorCompliance() {
 
   return (data ?? []).map(e => {
     const issues: string[] = [];
-    if (!e.visa_expiry_date) issues.push('Missing visa expiry');
-    else if (new Date(e.visa_expiry_date) < in90) issues.push(`Visa expiring: ${e.visa_expiry_date}`);
-    if (e.i9_status !== 'verified') issues.push('I-9 not verified');
+    if (!e.visa_expiry) issues.push('Missing visa expiry');
+    else if (new Date(e.visa_expiry) < in90) issues.push(`Visa expiring: ${e.visa_expiry}`);
+    if (e.i9_status !== 'complete') issues.push('I-9 not verified');
     if (!e.bank_account_number) issues.push('Missing bank info');
-    return { ...e, issues, riskLevel: issues.length === 0 ? 'ok' : issues.length === 1 ? 'warn' : 'critical' };
+    const { bank_account_number, ...safe } = e;
+    return { ...safe, hasBankInfo: !!bank_account_number, issues, riskLevel: issues.length === 0 ? 'ok' : issues.length === 1 ? 'warn' : 'critical' };
   }).sort((a, b) => (b.issues.length) - (a.issues.length));
 }
 
@@ -164,7 +176,7 @@ export async function getContractorCompliance() {
 
 export async function getClientSLA(month: string) {
   const start = `${month}-01`;
-  const end = `${month}-31`;
+  const end = monthEndStr(month);
 
   const [clients, assignments, timesheets] = await Promise.all([
     supabaseAdmin.from('clients').select('id, company_name, display_id').is('deleted_at', null),
@@ -199,10 +211,20 @@ export async function getClientSLA(month: string) {
 // ── Cash Flow Forecast ────────────────────────────────────────────────────────
 
 export async function getCashFlowForecast(months: number = 3) {
+  // Templates store line_items (JSONB {quantity, unitPrice}) + tax_rate +
+  // frequency (weekly|biweekly|monthly|quarterly|semiannual|yearly) — there is
+  // no `amount`/`billing_cycle` column, so derive the per-run total here.
   const { data: recurring } = await supabaseAdmin
     .from('recurring_invoice_templates')
-    .select('amount, billing_cycle, client_id')
+    .select('line_items, tax_rate, frequency')
     .eq('status', 'active');
+
+  const runTotal = (r: any): number => {
+    const subtotal = ((r.line_items as any[]) ?? []).reduce(
+      (s, li) => s + (Number(li?.quantity) || 1) * (Number(li?.unitPrice) || 0), 0,
+    );
+    return subtotal * (1 + (Number(r.tax_rate) || 0) / 100);
+  };
 
   const now = new Date();
   const forecast: Array<{ month: string; projectedRevenue: number }> = [];
@@ -212,9 +234,16 @@ export async function getCashFlowForecast(months: number = 3) {
     const label = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     let revenue = 0;
     for (const r of recurring ?? []) {
-      if (r.billing_cycle === 'monthly') revenue += Number(r.amount ?? 0);
-      else if (r.billing_cycle === 'quarterly' && i % 3 === 0) revenue += Number(r.amount ?? 0);
-      else if (r.billing_cycle === 'annual' && i === 0) revenue += Number(r.amount ?? 0);
+      const amt = runTotal(r);
+      switch (r.frequency) {
+        case 'weekly':     revenue += amt * (52 / 12); break; // monthly equivalent
+        case 'biweekly':   revenue += amt * (26 / 12); break;
+        case 'monthly':    revenue += amt; break;
+        case 'quarterly':  if (i % 3 === 0) revenue += amt; break;
+        case 'semiannual': if (i % 6 === 0) revenue += amt; break;
+        case 'yearly':     if (i === 0) revenue += amt; break;
+        default:           revenue += amt; break;
+      }
     }
     forecast.push({ month: label, projectedRevenue: Math.round(revenue * 100) / 100 });
   }
@@ -224,20 +253,21 @@ export async function getCashFlowForecast(months: number = 3) {
 // ── Invoice Analytics ─────────────────────────────────────────────────────────
 
 export async function getInvoiceAnalytics() {
+  // Real columns are issue_date / paid_at; invoices are hard-deleted (no deleted_at).
   const { data: invoices } = await supabaseAdmin
     .from('invoices')
-    .select('id, status, total_amount, issued_date, due_date, paid_date, client_id')
-    .is('deleted_at', null);
+    .select('id, status, total_amount, issue_date, due_date, paid_at, client_id');
 
   const all = invoices ?? [];
   const paid = all.filter(i => i.status === 'paid');
   const overdue = all.filter(i => i.status === 'overdue' || (i.status === 'sent' && i.due_date && new Date(i.due_date) < new Date()));
 
-  const avgDaysToPay = paid.length > 0
-    ? paid.filter(i => i.issued_date && i.paid_date).reduce((sum, i) => {
-        const days = Math.ceil((new Date(i.paid_date!).getTime() - new Date(i.issued_date!).getTime()) / 86400000);
+  const paidWithDates = paid.filter(i => i.issue_date && i.paid_at);
+  const avgDaysToPay = paidWithDates.length > 0
+    ? paidWithDates.reduce((sum, i) => {
+        const days = Math.ceil((new Date(i.paid_at!).getTime() - new Date(i.issue_date!).getTime()) / 86400000);
         return sum + days;
-      }, 0) / paid.length : 0;
+      }, 0) / paidWithDates.length : 0;
 
   const totalRevenue = paid.reduce((s, i) => s + Number(i.total_amount ?? 0), 0);
   const totalOutstanding = all.filter(i => ['sent','overdue'].includes(i.status)).reduce((s, i) => s + Number(i.total_amount ?? 0), 0);

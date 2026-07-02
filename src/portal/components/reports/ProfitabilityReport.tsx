@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { TrendingUp } from 'lucide-react';
@@ -11,11 +12,11 @@ export function ProfitabilityReport() {
   const { data: empData } = useEmployees({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
 
-  const assignments = assignData?.data ?? [];
-  const employees = empData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const assignments = useMemo(() => assignData?.data ?? [], [assignData]);
+  const employees = useMemo(() => empData?.data ?? [], [empData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
-  const rows = assignments
+  const rows = useMemo(() => assignments
     .filter(a => a.status === 'active' || a.status === 'completed')
     .map(a => {
       const emp = employees.find(e => e.id === a.employeeId);
@@ -24,7 +25,7 @@ export function ProfitabilityReport() {
       const marginPct = a.billRate > 0 ? (margin / a.billRate) * 100 : 0;
       return { a, emp, client, margin, marginPct };
     })
-    .sort((x, y) => y.marginPct - x.marginPct);
+    .sort((x, y) => y.marginPct - x.marginPct), [assignments, employees, clients]);
 
   const marginColor = (pct: number) => {
     if (pct >= 40) return 'text-green-600 font-semibold';

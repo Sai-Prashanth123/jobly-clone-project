@@ -13,7 +13,7 @@ const EMPTY: Omit<Holiday,'id'> = { name: '', date: '', isRecurring: false, coun
 
 export default function HolidaysSettings() {
   const year = new Date().getFullYear();
-  const { data: holidays = [], isLoading } = useHolidays(year);
+  const { data: holidays = [], isLoading, isError, refetch } = useHolidays(year);
   const create = useCreateHoliday();
   const update = useUpdateHoliday();
   const del = useDeleteHoliday();
@@ -45,7 +45,13 @@ export default function HolidaysSettings() {
         <Button size="sm" onClick={openCreate} className="gap-1"><Plus className="h-4 w-4" /> Add Holiday</Button>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load holidays. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
       ) : (
         <div className="space-y-2">

@@ -268,6 +268,10 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     if (hasNegative) { setError('Quantities and prices must be positive values'); return; }
     const valid = manualLines.filter(l => (l.itemName.trim() || l.description.trim()) && l.amount >= 0 && (l.qty > 0 || l.price > 0));
     if (valid.length === 0) { setError('Add at least one line item with a name and amount'); return; }
+    // A line with qty>0 but price=0 passes the filter above but produces a $0
+    // invoice — block those explicitly rather than letting a zero-value
+    // invoice reach the client.
+    if (total <= 0) { setError('Invoice total must be greater than zero'); return; }
     if (paymentTerms === 'custom' && !customDueDate) { setError('Pick a custom due date'); return; }
     if (discountMode !== 'none' && discountValue <= 0) { setError('Enter a discount amount, or remove the discount'); return; }
     if (discountMode === 'percentage' && discountValue > 100) { setError('A percentage discount cannot exceed 100%'); return; }

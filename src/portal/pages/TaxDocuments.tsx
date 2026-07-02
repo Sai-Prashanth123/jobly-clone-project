@@ -20,7 +20,7 @@ export default function TaxDocuments() {
   const employees = empResult?.data ?? [];
   const [filterYear, setFilterYear] = useState<number | undefined>(new Date().getFullYear());
   const [filterEmp, setFilterEmp] = useState('');
-  const { data: docs = [], isLoading } = useTaxDocuments({ taxYear: filterYear, employeeId: filterEmp || undefined });
+  const { data: docs = [], isLoading, isError, refetch } = useTaxDocuments({ taxYear: filterYear, employeeId: filterEmp || undefined });
   const create = useCreateTaxDocument();
   const update = useUpdateTaxDocument();
   const del = useDeleteTaxDocument();
@@ -66,7 +66,13 @@ export default function TaxDocuments() {
         )}
       </div>
 
-      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : docs.length === 0 ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load tax documents. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : docs.length === 0 ? (
         <div className="text-center py-16 text-gray-400"><FileText className="h-10 w-10 mx-auto mb-2 opacity-30" /><p>No tax documents found</p></div>
       ) : (
         <div className="space-y-2">

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Settings, Save, Loader2, CheckCircle2 } from 'lucide-react';
+import { AlertCircle, Settings, Save, Loader2, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -16,7 +16,7 @@ const FIELDS = [
 ];
 
 export default function SystemSettings() {
-  const { data: settings, isLoading } = useSystemSettings();
+  const { data: settings, isLoading, isError, refetch } = useSystemSettings();
   const updateSettings = useUpdateSettings();
   const [form, setForm] = useState<Record<string, string>>({});
   const [saved, setSaved] = useState(false);
@@ -30,6 +30,14 @@ export default function SystemSettings() {
   };
 
   if (isLoading) return <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  if (isError) return (
+    <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+      <AlertCircle className="h-8 w-8 text-red-400" />
+      <p className="text-sm text-red-500">Failed to load system settings. Please try again.</p>
+      <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+    </div>
+  );
 
   return (
     <div className="space-y-4">

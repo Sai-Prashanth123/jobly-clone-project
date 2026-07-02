@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Clock } from 'lucide-react';
@@ -22,14 +23,14 @@ export function MissingTimesheetsReport() {
   const { data: tsData } = useTimesheets({ limit: 200 });
   const { data: clientData } = useClients({ limit: 200 });
 
-  const employees = empData?.data ?? [];
-  const assignments = assignData?.data ?? [];
-  const timesheets = tsData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const employees = useMemo(() => empData?.data ?? [], [empData]);
+  const assignments = useMemo(() => assignData?.data ?? [], [assignData]);
+  const timesheets = useMemo(() => tsData?.data ?? [], [tsData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
   const currentWeekStart = getCurrentWeekMonday();
 
-  const missing = assignments
+  const missing = useMemo(() => assignments
     .filter(a => {
       return !timesheets.some(
         t =>
@@ -43,7 +44,7 @@ export function MissingTimesheetsReport() {
       employee: employees.find(e => e.id === a.employeeId),
       client: clients.find(c => c.id === a.clientId),
     }))
-    .filter(r => r.employee);
+    .filter(r => r.employee), [assignments, timesheets, employees, clients, currentWeekStart]);
 
   return (
     <Card>

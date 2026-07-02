@@ -1,10 +1,11 @@
-import { Loader2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
+import { AlertCircle, Loader2, AlertTriangle, CheckCircle2, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { useProbation } from '../hooks/useAnalytics';
 import { format } from 'date-fns';
 
 export default function ProbationTracker() {
-  const { data: employees = [], isLoading } = useProbation();
+  const { data: employees = [], isLoading, isError, refetch } = useProbation();
   const overdue = employees.filter(e => e.isOverdue);
   const dueSoon = employees.filter(e => !e.isOverdue && e.daysLeft !== null && e.daysLeft <= 30);
   const normal = employees.filter(e => !e.isOverdue && (e.daysLeft === null || e.daysLeft > 30));
@@ -29,6 +30,14 @@ export default function ProbationTracker() {
   );
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+
+  if (isError) return (
+    <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+      <AlertCircle className="h-8 w-8 text-red-400" />
+      <p className="text-sm text-red-500">Failed to load probation data. Please try again.</p>
+      <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+    </div>
+  );
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">

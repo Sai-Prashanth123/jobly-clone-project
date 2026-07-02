@@ -180,7 +180,10 @@ export function useSubmitMonthlyTimesheet() {
         warning: data.warning as string | undefined,
       };
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['monthly-timesheets'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['monthly-timesheets'] });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
+    },
   });
 }
 
@@ -194,6 +197,7 @@ export function usePatchMonthlyStatus(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['monthly-timesheets'] });
       qc.invalidateQueries({ queryKey: ['monthly-timesheets', id] });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
     },
   });
 }

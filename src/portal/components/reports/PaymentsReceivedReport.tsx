@@ -17,8 +17,8 @@ export function PaymentsReceivedReport() {
   const [clientFilter, setClientFilter] = useState('all');
   const [monthsBack, setMonthsBack] = useState(0);
 
-  const invoices = invData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const invoices = useMemo(() => invData?.data ?? [], [invData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
   // Build the cutoff date string for filtering
   const cutoffMonth = useMemo(() => {
@@ -44,32 +44,33 @@ export function PaymentsReceivedReport() {
   [invoices, clients, clientFilter, cutoffMonth]);
 
   // Monthly grouping
-  const now = new Date();
-  const months: string[] = [];
-  if (monthsBack === 0) {
-    const y = now.getUTCFullYear();
-    const m = now.getUTCMonth();
-    for (let i = 0; i <= m; i++) {
-      months.push(`${y}-${String(i + 1).padStart(2, '0')}`);
+  const monthlyPaid = useMemo(() => {
+    const now = new Date();
+    const months: string[] = [];
+    if (monthsBack === 0) {
+      const y = now.getUTCFullYear();
+      const m = now.getUTCMonth();
+      for (let i = 0; i <= m; i++) {
+        months.push(`${y}-${String(i + 1).padStart(2, '0')}`);
+      }
+    } else {
+      for (let i = monthsBack - 1; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+      }
     }
-  } else {
-    for (let i = monthsBack - 1; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
-    }
-  }
+    return months.map(m => ({
+      label: `${MONTH_LABELS[parseInt(m.split('-')[1]) - 1]} ${m.split('-')[0]}`,
+      amount: paid
+        .filter(i => (i.paidAt ?? i.issueDate).startsWith(m))
+        .reduce((s, i) => s + i.totalAmount, 0),
+    }));
+  }, [monthsBack, paid]);
 
-  const monthlyPaid = months.map(m => ({
-    label: `${MONTH_LABELS[parseInt(m.split('-')[1]) - 1]} ${m.split('-')[0]}`,
-    amount: paid
-      .filter(i => (i.paidAt ?? i.issueDate).startsWith(m))
-      .reduce((s, i) => s + i.totalAmount, 0),
-  }));
-
-  const totalReceived = paid.reduce((s, i) => s + i.totalAmount, 0);
+  const totalReceived = useMemo(() => paid.reduce((s, i) => s + i.totalAmount, 0), [paid]);
 
   // By client summary
-  const byClient = clients
+  const byClient = useMemo(() => clients
     .map(c => ({
       name: c.companyName,
       id: c.id,
@@ -77,7 +78,24 @@ export function PaymentsReceivedReport() {
       count: paid.filter(i => i.clientId === c.id).length,
     }))
     .filter(c => c.total > 0)
-    .sort((a, b) => b.total - a.total);
+    .sort((a, b) => b.total - a.total), [clients, paid]);
+
+  // Year-over-year client revenue — clients × invoices × 3 years, memoized.
+  const yoyYears = useMemo(() => {
+    const y = new Date().getUTCFullYear();
+    return [y - 2, y - 1, y];
+  }, []);
+  const clientRevByYear = useMemo(() => clients
+    .map(c => {
+      const byYear = yoyYears.map(yr => ({
+        year: yr,
+        total: invoices.filter(i => i.clientId === c.id && i.issueDate.startsWith(String(yr))).reduce((s, i) => s + i.totalAmount, 0),
+      }));
+      if (byYear.every(b => b.total === 0)) return null;
+      return { name: c.companyName, byYear };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b!.byYear[2].total - a!.byYear[2].total)), [clients, invoices, yoyYears]);
 
   const handleExport = () => exportToCsv('payments-received', paid.map(i => ({
     'Invoice #': i.invoiceNumber, Client: i.clientName,
@@ -184,56 +202,40 @@ export function PaymentsReceivedReport() {
       )}
 
       {/* Year-over-year client revenue comparison */}
-      {(() => {
-        const y = new Date().getUTCFullYear();
-        const years = [y-2, y-1, y];
-        const clientRevByYear = clients
-          .map(c => {
-            const byYear = years.map(yr => ({
-              year: yr,
-              total: invoices.filter(i => i.clientId === c.id && i.issueDate.startsWith(String(yr))).reduce((s, i) => s + i.totalAmount, 0),
-            }));
-            if (byYear.every(b => b.total === 0)) return null;
-            return { name: c.companyName, byYear };
-          })
-          .filter(Boolean)
-          .sort((a, b) => (b!.byYear[2].total - a!.byYear[2].total));
-        if (clientRevByYear.length === 0) return null;
-        return (
-          <Card>
-            <CardHeader><CardTitle className="text-sm">Revenue by Client — Year over Year</CardTitle></CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50">
-                      <TableHead className="font-semibold">Client</TableHead>
-                      {years.map(yr => <TableHead key={yr} className="text-right font-semibold">{yr}</TableHead>)}
-                      <TableHead className="text-right font-semibold">Trend</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {clientRevByYear.map(c => {
-                      const prev = c!.byYear[1].total;
-                      const curr = c!.byYear[2].total;
-                      const trend = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null;
-                      return (
-                        <TableRow key={c!.name}>
-                          <TableCell className="font-medium text-sm">{c!.name}</TableCell>
-                          {c!.byYear.map(b => <TableCell key={b.year} className="text-right text-sm">{b.total > 0 ? formatCurrency(b.total) : '—'}</TableCell>)}
-                          <TableCell className={`text-right text-sm font-semibold ${trend === null ? '' : trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
-                            {trend === null ? '—' : `${trend > 0 ? '+' : ''}${trend}%`}
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
-            </CardContent>
-          </Card>
-        );
-      })()}
+      {clientRevByYear.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-sm">Revenue by Client — Year over Year</CardTitle></CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50">
+                    <TableHead className="font-semibold">Client</TableHead>
+                    {yoyYears.map(yr => <TableHead key={yr} className="text-right font-semibold">{yr}</TableHead>)}
+                    <TableHead className="text-right font-semibold">Trend</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {clientRevByYear.map(c => {
+                    const prev = c!.byYear[1].total;
+                    const curr = c!.byYear[2].total;
+                    const trend = prev > 0 ? Math.round(((curr - prev) / prev) * 100) : null;
+                    return (
+                      <TableRow key={c!.name}>
+                        <TableCell className="font-medium text-sm">{c!.name}</TableCell>
+                        {c!.byYear.map(b => <TableCell key={b.year} className="text-right text-sm">{b.total > 0 ? formatCurrency(b.total) : '—'}</TableCell>)}
+                        <TableCell className={`text-right text-sm font-semibold ${trend === null ? '' : trend >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                          {trend === null ? '—' : `${trend > 0 ? '+' : ''}${trend}%`}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Paid Invoice Details */}
       <Card>

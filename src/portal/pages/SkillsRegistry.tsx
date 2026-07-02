@@ -79,7 +79,7 @@ export default function SkillsRegistry() {
     return () => clearTimeout(t);
   }, [search]);
 
-  const { data: empResult } = useEmployees();
+  const { data: empResult, isError, refetch } = useEmployees();
   const employees = empResult?.data ?? [];
   const { data: skillResults = [], isLoading: searching } = useSkillSearch(debouncedSearch);
 
@@ -115,6 +115,13 @@ export default function SkillsRegistry() {
       </div>
 
       {/* Per-employee panels */}
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load employees. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : (
       <div className="space-y-3">
         <div className="relative">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
@@ -127,6 +134,7 @@ export default function SkillsRegistry() {
           {!empSearch && activeEmp.length > 10 && <p className="text-xs text-gray-400 text-center">Search to see more employees</p>}
         </div>
       </div>
+      )}
     </div>
   );
 }

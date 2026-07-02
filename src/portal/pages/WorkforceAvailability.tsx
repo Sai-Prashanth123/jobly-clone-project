@@ -1,17 +1,30 @@
 import { useState } from 'react';
 import { Users, ChevronLeft, ChevronRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
-import { addWeeks, subWeeks, startOfWeek, addDays, format, isWithinInterval, parseISO } from 'date-fns';
+import { isWithinInterval, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { useWorkforceAvailability } from '../hooks/useAnalytics';
+import { getMondayOfWeek } from '../lib/utils';
 
 const WEEK_DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const MONTHS_SHORT = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+// UTC-safe day-offset + display helpers — local `date-fns` calls on a
+// UTC-anchored Monday can render the wrong calendar day depending on the
+// viewer's timezone offset (e.g. UTC-5 renders UTC-midnight as 7pm prior day).
+const addUtcDays = (d: Date, n: number) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + n));
+const addUtcWeeks = (d: Date, n: number) => addUtcDays(d, n * 7);
+const isoDate = (d: Date) => d.toISOString().split('T')[0];
+const shortLabel = (d: Date) => `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}`;
+const longLabel = (d: Date) => `${MONTHS_SHORT[d.getUTCMonth()]} ${d.getUTCDate()}, ${d.getUTCFullYear()}`;
 
 export default function WorkforceAvailability() {
-  const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const startDate = format(weekStart, 'yyyy-MM-dd');
-  const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
+  const [weekStart, setWeekStart] = useState(() => getMondayOfWeek(new Date()));
+  const startDate = isoDate(weekStart);
+  const weekEnd = addUtcDays(weekStart, 6);
+  const endDate = isoDate(weekEnd);
   const { data: employees = [], isLoading, isError, refetch } = useWorkforceAvailability(startDate, endDate);
-  const weekDays = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), 'yyyy-MM-dd'));
+  const weekDayDates = Array.from({ length: 7 }, (_, i) => addUtcDays(weekStart, i));
+  const weekDays = weekDayDates.map(isoDate);
 
   const isOnLeave = (emp: any, date: string) =>
     (emp.leaveRanges ?? []).some((lr: any) => {
@@ -26,9 +39,9 @@ export default function WorkforceAvailability() {
           <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
             <RefreshCw className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(d => subWeeks(d, 1))}><ChevronLeft className="h-4 w-4" /></Button>
-          <span className="text-sm font-medium">{format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}</span>
-          <Button variant="outline" size="sm" onClick={() => setWeekStart(d => addWeeks(d, 1))}><ChevronRight className="h-4 w-4" /></Button>
+          <Button variant="outline" size="sm" onClick={() => setWeekStart(d => addUtcWeeks(d, -1))}><ChevronLeft className="h-4 w-4" /></Button>
+          <span className="text-sm font-medium">{shortLabel(weekStart)} – {longLabel(weekEnd)}</span>
+          <Button variant="outline" size="sm" onClick={() => setWeekStart(d => addUtcWeeks(d, 1))}><ChevronRight className="h-4 w-4" /></Button>
         </div>
       </div>
 
@@ -50,7 +63,7 @@ export default function WorkforceAvailability() {
             <thead>
               <tr className="bg-gray-50 border-b">
                 <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 w-44">Employee</th>
-                {weekDays.map((d, i) => <th key={d} className={`px-2 py-3 text-center text-xs font-semibold text-gray-500 min-w-[70px] ${i >= 5 ? 'bg-gray-100' : ''}`}><div>{WEEK_DAYS[i]}</div><div className="text-gray-400 font-normal">{format(addDays(weekStart, i), 'MMM d')}</div></th>)}
+                {weekDays.map((d, i) => <th key={d} className={`px-2 py-3 text-center text-xs font-semibold text-gray-500 min-w-[70px] ${i >= 5 ? 'bg-gray-100' : ''}`}><div>{WEEK_DAYS[i]}</div><div className="text-gray-400 font-normal">{shortLabel(weekDayDates[i])}</div></th>)}
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

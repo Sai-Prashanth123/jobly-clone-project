@@ -297,18 +297,22 @@ async function notifyTimesheetStatusChange(
         );
       }
       // Safety-net broadcast to operations + admin, de-duped against the manager.
-      const opIds = await getUserIdsByRole('operations');
-      const adminIds = await getUserIdsByRole('admin');
+      const [opIds, adminIds] = await Promise.all([
+        getUserIdsByRole('operations'),
+        getUserIdsByRole('admin'),
+      ]);
       const broadcast = [...new Set([...opIds, ...adminIds])].filter(uid => uid !== managerPortalId);
-      for (const uid of broadcast) {
-        await createNotification(uid, 'Timesheet Submitted', `Timesheet ${ts.label} is awaiting your approval.`, 'info', 'timesheet', ts.id);
-      }
+      await Promise.all(broadcast.map(uid =>
+        createNotification(uid, 'Timesheet Submitted', `Timesheet ${ts.label} is awaiting your approval.`, 'info', 'timesheet', ts.id)
+      ));
     } else if (newStatus === 'manager_approved') {
-      const financeIds = await getUserIdsByRole('finance');
-      const adminIds = await getUserIdsByRole('admin');
-      for (const uid of [...new Set([...financeIds, ...adminIds])]) {
-        await createNotification(uid, 'Timesheet Ready for Client Approval', `Timesheet ${ts.label} has been manager-approved.`, 'info', 'timesheet', ts.id);
-      }
+      const [financeIds, adminIds] = await Promise.all([
+        getUserIdsByRole('finance'),
+        getUserIdsByRole('admin'),
+      ]);
+      await Promise.all([...new Set([...financeIds, ...adminIds])].map(uid =>
+        createNotification(uid, 'Timesheet Ready for Client Approval', `Timesheet ${ts.label} has been manager-approved.`, 'info', 'timesheet', ts.id)
+      ));
     } else if (newStatus === 'rejected') {
       const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
       if (ownerPortalId) {
@@ -323,14 +327,14 @@ async function notifyTimesheetStatusChange(
       }
       // Spec: finance users get realtime heads-up that this is ready to invoice.
       const financeIds = await getUserIdsByRole('finance');
-      for (const uid of financeIds) {
-        await createNotification(
+      await Promise.all(financeIds.map(uid =>
+        createNotification(
           uid,
           'Timesheet Ready to Invoice',
           `Timesheet ${ts.label} is fully approved and ready to be invoiced.`,
           'info', 'timesheet', ts.id,
-        );
-      }
+        )
+      ));
     }
   } catch (err) {
     // Notification failure must not affect the main state-change flow, but log
@@ -395,6 +399,19 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
     rejected: ['submitted', 'manager_approved'],
   };
   if (!allowed[status]) throw new Error(`Invalid target status: ${status}`);
+
+  // Same per-transition role rules as the single patch path — without this,
+  // operations could bulk-advance to client_approved (finance-only) and vice
+  // versa, bypassing the state machine's role gates entirely.
+  const roleFor: Record<string, string[]> = {
+    submitted: ['employee', 'admin', 'operations'],
+    manager_approved: ['admin', 'operations'],
+    client_approved: ['admin', 'finance'],
+    rejected: ['admin', 'operations', 'finance'],
+  };
+  if (!roleFor[status]?.includes(actorRole)) {
+    throw new ForbiddenError(`Role '${actorRole}' cannot set status to '${status}'`);
+  }
 
   // Fetch current rows including the fields we need for notifications
   const { data, error } = await supabaseAdmin

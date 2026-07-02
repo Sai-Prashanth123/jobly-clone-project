@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Users, UserPlus, UserCheck, AlertCircle, ShieldAlert, FolderOpen, Clock } from 'lucide-react';
 import {
   BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid,
@@ -22,57 +23,71 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 const DEPT_COLORS = ['#4069FF', '#32CDDC', '#10b981', '#f59e0b', '#7c3aed', '#ef4444', '#06b6d4', '#84cc16'];
 
 export function HRDashboard() {
-  const { data } = useEmployees({ limit: 500 });
-  const employees = data?.data ?? [];
+  const { data, isError, refetch } = useEmployees({ limit: 500 });
+  const employees = useMemo(() => data?.data ?? [], [data]);
   const { data: expiringDocs = [] } = useExpiringDocuments(90);
 
-  const active = employees.filter(isActive);
-  const onboarding = employees.filter(isOnboarding);
-  const inactive = employees.filter(isInactive);
-  const expiringVisa = employees.filter(e => isVisaExpiringSoon(e));
-  const i9NonCompliant = employees.filter(isI9Issue);
+  const active = useMemo(() => employees.filter(isActive), [employees]);
+  const onboarding = useMemo(() => employees.filter(isOnboarding), [employees]);
+  const inactive = useMemo(() => employees.filter(isInactive), [employees]);
+  const expiringVisa = useMemo(() => employees.filter(e => isVisaExpiringSoon(e)), [employees]);
+  const i9NonCompliant = useMemo(() => employees.filter(isI9Issue), [employees]);
 
-  const today = new Date();
-
-  const recentHires = [...employees]
+  const recentHires = useMemo(() => [...employees]
     .sort((a, b) => {
       const ta = a.startDate ? new Date(a.startDate).getTime() : 0;
       const tb = b.startDate ? new Date(b.startDate).getTime() : 0;
       return tb - ta;
     })
-    .slice(0, 5);
+    .slice(0, 5), [employees]);
 
   // Employees who SUBMITTED onboarding and are awaiting HR review/approval
   // (status still 'onboarding' with a submitted timestamp) — HR's action queue.
-  const pendingReview = employees
+  const pendingReview = useMemo(() => employees
     .filter(e => e.onboardingCompletedAt && e.status === 'onboarding')
     .sort((a, b) => new Date(b.onboardingCompletedAt!).getTime() - new Date(a.onboardingCompletedAt!).getTime())
-    .slice(0, 5);
+    .slice(0, 5), [employees]);
 
   // 6-month hire trend
-  const months: { key: string; label: string }[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1));
-    months.push({
-      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
-      label: MONTH_LABELS[d.getUTCMonth()],
-    });
-  }
-  const hireSeries = months.map(({ key, label }) => ({
+  const months = useMemo(() => {
+    const today = new Date();
+    const out: { key: string; label: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth() - i, 1));
+      out.push({
+        key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+        label: MONTH_LABELS[d.getUTCMonth()],
+      });
+    }
+    return out;
+  }, []);
+  const hireSeries = useMemo(() => months.map(({ key, label }) => ({
     month: label,
     hires: employees.filter(e => e.startDate?.startsWith(key)).length,
-  }));
-  const hireSpark = hireSeries.map(h => h.hires);
+  })), [months, employees]);
+  const hireSpark = useMemo(() => hireSeries.map(h => h.hires), [hireSeries]);
 
   // Department donut data
-  const deptCounts = active.reduce<Record<string, number>>((acc, e) => {
-    const d = e.department || 'Unassigned';
-    acc[d] = (acc[d] ?? 0) + 1;
-    return acc;
-  }, {});
-  const deptData = Object.entries(deptCounts)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name, value]) => ({ name, value }));
+  const deptData = useMemo(() => {
+    const deptCounts = active.reduce<Record<string, number>>((acc, e) => {
+      const d = e.department || 'Unassigned';
+      acc[d] = (acc[d] ?? 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(deptCounts)
+      .sort((a, b) => b[1] - a[1])
+      .map(([name, value]) => ({ name, value }));
+  }, [active]);
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load dashboard data.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 md:space-y-7">

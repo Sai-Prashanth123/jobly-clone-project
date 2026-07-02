@@ -1,5 +1,6 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { ArrowLeft, Loader2, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, type Column } from '../../components/shared/DataTable';
 import { useEmployees } from '../../hooks/useEmployees';
@@ -16,7 +17,7 @@ function expiryToneClass(days: number | null): string {
 
 export default function VisaExpiringEmployees() {
   const navigate = useNavigate();
-  const { data, isLoading } = useEmployees({ limit: 500 });
+  const { data, isLoading, isError, refetch } = useEmployees({ limit: 500 });
   const employees = (data?.data ?? []).filter(e => isVisaExpiringSoon(e));
 
   const columns: Column<Employee>[] = [
@@ -87,7 +88,13 @@ export default function VisaExpiringEmployees() {
             : `${employees.length} employees have a visa expiring within the next 90 days. Start renewal paperwork early.`
         }
       />
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load employees. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

@@ -33,11 +33,11 @@ export function useNotifications() {
       const { data } = await apiClient.get('/notifications');
       return (data.data as any[]).map(mapNotification);
     },
-    refetchInterval: 60_000, // poll every 60s
+    refetchInterval: 120_000, // poll every 2 minutes
     // Treat data as fresh for almost the full polling window so tab re-focus
     // or route re-mount doesn't trigger an immediate extra refetch on top of
     // the interval poll.
-    staleTime: 55_000,
+    staleTime: 115_000,
   });
 }
 
@@ -48,8 +48,8 @@ export function useUnreadNotificationCount() {
       const { data } = await apiClient.get('/notifications/unread-count');
       return data.data.count as number;
     },
-    refetchInterval: 60_000,
-    staleTime: 55_000,
+    refetchInterval: 120_000,
+    staleTime: 115_000,
   });
 }
 

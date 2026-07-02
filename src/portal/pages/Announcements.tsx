@@ -76,7 +76,7 @@ export default function Announcements() {
   const [typeFilter, setTypeFilter] = useState<AnnouncementType | 'all'>('all');
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, refetch } = useAnnouncements({
+  const { data, isLoading, isError, refetch } = useAnnouncements({
     type: typeFilter === 'all' ? undefined : typeFilter,
     page,
     limit: 20,
@@ -199,7 +199,13 @@ export default function Announcements() {
       </div>
 
       {/* List */}
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load announcements. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
             <div key={i} className="portal-panel h-20 animate-pulse bg-gray-50" />

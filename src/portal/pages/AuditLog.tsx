@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Shield, Search, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Shield, Search, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -17,7 +17,7 @@ export default function AuditLog() {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const { data, isLoading } = useAuditLog({ page, limit: 50, search: search || undefined, action: (action && action !== '_all') ? action : undefined, startDate: startDate || undefined, endDate: endDate || undefined });
+  const { data, isLoading, isError, refetch } = useAuditLog({ page, limit: 50, search: search || undefined, action: (action && action !== '_all') ? action : undefined, startDate: startDate || undefined, endDate: endDate || undefined });
   const logs = data?.data ?? [];
   const total = data?.total ?? 0;
   const totalPages = Math.ceil(total / 50);
@@ -51,7 +51,13 @@ export default function AuditLog() {
 
       {/* Table */}
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
-        {isLoading ? (
+        {isError ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+            <AlertCircle className="h-8 w-8 text-red-400" />
+            <p className="text-sm text-red-500">Failed to load audit log. Please try again.</p>
+            <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+          </div>
+        ) : isLoading ? (
           <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
         ) : logs.length === 0 ? (
           <div className="text-center py-16 text-gray-400"><Shield className="h-10 w-10 mx-auto mb-2 opacity-30" /><p>No logs found</p></div>

@@ -102,7 +102,10 @@ export function useMarkAnnouncementsSeen() {
     mutationFn: () => apiClient.post('/announcements/mark-seen'),
     onSuccess: () => {
       qc.setQueryData(['announcements-unread-count'], 0);
-      qc.setQueryData(['nav-badge', 'announcements'], 0);
+      // Zero the announcements count inside the consolidated nav-badges cache.
+      qc.setQueriesData({ queryKey: ['nav-badges'] }, (prev: unknown) =>
+        prev && typeof prev === 'object' ? { ...prev, announcements: 0 } : prev,
+      );
     },
   });
 }

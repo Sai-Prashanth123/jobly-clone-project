@@ -1,6 +1,6 @@
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, UserPlus } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2, UserPlus } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { DataTable, type Column } from '../../components/shared/DataTable';
 import { StatusBadge } from '../../components/shared/StatusBadge';
@@ -12,7 +12,7 @@ import type { Employee } from '../../types';
 
 export default function OnboardingEmployees() {
   const navigate = useNavigate();
-  const { data, isLoading } = useEmployees({ limit: 500 });
+  const { data, isLoading, isError, refetch } = useEmployees({ limit: 500 });
   const employees = (data?.data ?? []).filter(isOnboarding);
 
   const columns: Column<Employee>[] = [
@@ -88,7 +88,13 @@ export default function OnboardingEmployees() {
           </Button>
         }
       />
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load employees. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

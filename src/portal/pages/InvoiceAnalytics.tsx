@@ -1,10 +1,20 @@
-import { Loader2, TrendingUp, DollarSign, Clock, AlertTriangle } from 'lucide-react';
+import { Loader2, TrendingUp, DollarSign, Clock, AlertTriangle, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useInvoiceAnalytics } from '../hooks/useAnalytics';
 
 export default function InvoiceAnalytics() {
-  const { data, isLoading } = useInvoiceAnalytics();
+  const { data, isLoading, isError, refetch } = useInvoiceAnalytics();
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load invoice analytics. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
   if (!data) return null;
 
   const aging = data.agingBuckets as Record<string, number>;

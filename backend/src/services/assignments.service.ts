@@ -129,17 +129,19 @@ export async function createAssignment(input: CreateAssignmentInput, actorId?: s
       );
     }
     // Also notify operations/admin
-    const opsIds = await getUserIdsByRole('operations');
-    const adminIds = await getUserIdsByRole('admin');
+    const [opsIds, adminIds] = await Promise.all([
+      getUserIdsByRole('operations'),
+      getUserIdsByRole('admin'),
+    ]);
     const label = data.display_id ?? data.id.slice(0, 8);
-    for (const uid of [...new Set([...opsIds, ...adminIds])]) {
-      await createNotification(
+    await Promise.all([...new Set([...opsIds, ...adminIds])].map(uid =>
+      createNotification(
         uid,
         'Assignment Created',
         `Assignment ${label} created for "${input.projectName}" at ${client?.company_name ?? 'a client'}.`,
         'success', 'assignment', data.id,
-      );
-    }
+      )
+    ));
   } catch (err) {
     console.error('[assignments.service] notification failed for assignment', data.id, err);
   }

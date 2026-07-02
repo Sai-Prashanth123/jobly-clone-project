@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,7 @@ const PAY_METHODS = [
 export default function RecordPayment() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { data: invoice, isLoading } = useInvoice(id);
+  const { data: invoice, isLoading, isError, refetch } = useInvoice(id);
   const recordPayment = useRecordPayment(id ?? '');
   const backTo = `/portal/invoices/${id}`;
 
@@ -52,6 +52,15 @@ export default function RecordPayment() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load invoice. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
   if (!invoice) {
     return (

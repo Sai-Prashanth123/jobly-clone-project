@@ -1,21 +1,21 @@
 import { supabaseAdmin } from '../config/supabase';
 
 export async function getEmployeeUtilization() {
-  const { data: assignments } = await supabaseAdmin
-    .from('assignments')
-    .select('employee_id, max_hours_per_week')
-    .eq('status', 'active');
-
-  const { data: timesheets } = await supabaseAdmin
-    .from('timesheets')
-    .select('employee_id, total_hours, week_start_date')
-    .in('status', ['submitted', 'manager_approved', 'client_approved'])
-    .gte('week_start_date', getWeekStartOffset(-4));
-
-  const { data: employees } = await supabaseAdmin
-    .from('employees')
-    .select('id, first_name, last_name, department')
-    .eq('status', 'active');
+  const [{ data: assignments }, { data: timesheets }, { data: employees }] = await Promise.all([
+    supabaseAdmin
+      .from('assignments')
+      .select('employee_id, max_hours_per_week')
+      .eq('status', 'active'),
+    supabaseAdmin
+      .from('timesheets')
+      .select('employee_id, total_hours, week_start_date')
+      .in('status', ['submitted', 'manager_approved', 'client_approved'])
+      .gte('week_start_date', getWeekStartOffset(-4)),
+    supabaseAdmin
+      .from('employees')
+      .select('id, first_name, last_name, department')
+      .eq('status', 'active'),
+  ]);
 
   const empMap = new Map((employees ?? []).map(e => [e.id, e]));
   const hoursMap = new Map<string, number>();
@@ -70,15 +70,16 @@ export async function getVisaExpiry(daysAhead = 90) {
 }
 
 export async function getMissingTimesheets(weekStartDate: string) {
-  const { data: activeAssignments } = await supabaseAdmin
-    .from('assignments')
-    .select('employee_id, id, project_name, client_id')
-    .eq('status', 'active');
-
-  const { data: submitted } = await supabaseAdmin
-    .from('timesheets')
-    .select('employee_id, assignment_id')
-    .eq('week_start_date', weekStartDate);
+  const [{ data: activeAssignments }, { data: submitted }] = await Promise.all([
+    supabaseAdmin
+      .from('assignments')
+      .select('employee_id, id, project_name, client_id')
+      .eq('status', 'active'),
+    supabaseAdmin
+      .from('timesheets')
+      .select('employee_id, assignment_id')
+      .eq('week_start_date', weekStartDate),
+  ]);
 
   const submittedSet = new Set(
     (submitted ?? []).map(t => `${t.employee_id}:${t.assignment_id}`)
@@ -173,18 +174,18 @@ export async function getFinancialSummary() {
 }
 
 export async function getProfitability() {
-  const { data: assignments } = await supabaseAdmin
-    .from('assignments')
-    .select('id, client_id, employee_id, bill_rate, pay_rate');
-
-  const { data: timesheets } = await supabaseAdmin
-    .from('timesheets')
-    .select('assignment_id, client_id, employee_id, total_hours')
-    .eq('status', 'client_approved');
-
-  const { data: clients } = await supabaseAdmin
-    .from('clients')
-    .select('id, company_name');
+  const [{ data: assignments }, { data: timesheets }, { data: clients }] = await Promise.all([
+    supabaseAdmin
+      .from('assignments')
+      .select('id, client_id, employee_id, bill_rate, pay_rate'),
+    supabaseAdmin
+      .from('timesheets')
+      .select('assignment_id, client_id, employee_id, total_hours')
+      .eq('status', 'client_approved'),
+    supabaseAdmin
+      .from('clients')
+      .select('id, company_name'),
+  ]);
 
   const clientMap = new Map((clients ?? []).map(c => [c.id, c.company_name]));
 

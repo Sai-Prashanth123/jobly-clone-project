@@ -193,7 +193,10 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
     const asgn = assignmentMap.get(ts.assignment_id);
     const emp = employeeMap.get(ts.employee_id);
     const billRate = asgn?.bill_rate ?? 0;
-    const amount = ts.total_hours * billRate;
+    // Round to cents at every step (mirrors createInvoice) — otherwise the
+    // NUMERIC(12,2) columns round subtotal/tax/total independently and the
+    // stored total can drift a cent from subtotal + tax.
+    const amount = Math.round(ts.total_hours * billRate * 100) / 100;
     const empName = emp ? `${emp.first_name} ${emp.last_name}` : ts.employee_id;
     return {
       timesheet_id: ts.id,
@@ -205,9 +208,9 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
     };
   });
 
-  const subtotal = lineItems.reduce((sum, li) => sum + li.amount, 0);
-  const taxAmount = subtotal * (input.taxRate / 100);
-  const totalAmount = subtotal + taxAmount;
+  const subtotal = Math.round(lineItems.reduce((sum, li) => sum + li.amount, 0) * 100) / 100;
+  const taxAmount = Math.round(subtotal * (input.taxRate / 100) * 100) / 100;
+  const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100;
 
   // Derive billing period from selected timesheets
   const weekStarts = (timesheets ?? []).map(t => t.week_start_date).sort();
@@ -279,17 +282,19 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
   // persisted above). Mirrors employees.service notifyOnboardingCompleted.
   void (async () => {
     try {
-      const finIds = await getUserIdsByRole('finance');
-      const admIds = await getUserIdsByRole('admin');
+      const [finIds, admIds] = await Promise.all([
+        getUserIdsByRole('finance'),
+        getUserIdsByRole('admin'),
+      ]);
       const clientName = client?.company_name ?? 'a client';
-      for (const uid of [...new Set([...finIds, ...admIds])]) {
-        await createNotification(
+      await Promise.all([...new Set([...finIds, ...admIds])].map(uid =>
+        createNotification(
           uid,
           'Invoice Generated',
           `Invoice ${invoice.invoice_number} for ${clientName} — $${totalAmount.toFixed(2)} — is ready. Review and send to client.`,
           'success', 'invoice', invoice.id,
-        );
-      }
+        )
+      ));
     } catch (err) {
       console.error('[invoices.service] generate notification failed for invoice', invoice.id, err);
     }
@@ -780,9 +785,27 @@ export async function exportInvoicesCSV(query: { status?: string; clientId?: str
 export async function bulkUpdateInvoiceStatus(ids: string[], status: string) {
   const validStatuses = ['draft', 'sent', 'paid', 'overdue'];
   if (!validStatuses.includes(status)) throw new Error('Invalid status');
-  const updateData: Record<string, unknown> = { status };
-  if (status === 'paid') updateData.paid_at = new Date().toISOString();
-  const { error } = await supabaseAdmin.from('invoices').update(updateData).in('id', ids);
+
+  if (status === 'paid') {
+    // Marking paid must also settle the balance — the UI computes
+    // balanceDue = total_amount - amount_paid, so leaving amount_paid at 0
+    // shows a "Paid" badge with a full balance due and a live Record Payment
+    // button. amount_paid = total_amount needs per-row values.
+    const { data: rows, error: fetchErr } = await supabaseAdmin
+      .from('invoices').select('id, total_amount').in('id', ids);
+    if (fetchErr) throw fetchErr;
+    const paidAt = new Date().toISOString();
+    const results = await Promise.all((rows ?? []).map(r =>
+      supabaseAdmin.from('invoices')
+        .update({ status, paid_at: paidAt, amount_paid: r.total_amount })
+        .eq('id', r.id),
+    ));
+    const failed = results.find(r => r.error);
+    if (failed?.error) throw failed.error;
+    return { updated: (rows ?? []).length };
+  }
+
+  const { error } = await supabaseAdmin.from('invoices').update({ status }).in('id', ids);
   if (error) throw error;
   return { updated: ids.length };
 }

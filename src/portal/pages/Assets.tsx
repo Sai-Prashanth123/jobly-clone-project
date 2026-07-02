@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { UsDateInput } from '../components/shared/UsDateInput';
-import { Loader2, Plus, Package, User, X } from 'lucide-react';
+import { AlertCircle, Loader2, Plus, Package, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -58,7 +58,7 @@ export default function Assets() {
   const [deleteTarget, setDeleteTarget] = useState<Asset | null>(null);
   const [unassignTarget, setUnassignTarget] = useState<Asset | null>(null);
 
-  const { data, isLoading } = useAssets({ status: statusFilter === 'all' ? undefined : statusFilter, category: categoryFilter === 'all' ? undefined : categoryFilter, limit: 50 });
+  const { data, isLoading, isError, refetch } = useAssets({ status: statusFilter === 'all' ? undefined : statusFilter, category: categoryFilter === 'all' ? undefined : categoryFilter, limit: 50 });
   const assets = data?.data ?? [];
   const { data: employeesData } = useEmployees({ limit: 500, status: 'active' });
   const employees = employeesData?.data ?? [];
@@ -151,7 +151,13 @@ export default function Assets() {
         </Select>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load assets. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

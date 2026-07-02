@@ -1,4 +1,5 @@
-import { DollarSign, FileText, AlertTriangle, CheckCircle, TrendingUp, BarChart3, Inbox, RotateCw, FileCheck2, Clock } from 'lucide-react';
+import { useMemo } from 'react';
+import { DollarSign, FileText, AlertTriangle, CheckCircle, TrendingUp, BarChart3, Inbox, RotateCw, FileCheck2, Clock, AlertCircle } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
@@ -21,84 +22,117 @@ const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'S
 
 const OUTSTANDING_STATUSES = ['sent', 'viewed', 'partially_paid', 'overdue'];
 
+// Invoices-in-progress funnel (Wave-style) — count + $ per status.
+const STATUS_ORDER = ['draft', 'sent', 'viewed', 'partially_paid', 'overdue', 'paid'] as const;
+const STATUS_LABELS: Record<string, string> = { draft: 'Draft', sent: 'Sent', viewed: 'Viewed', partially_paid: 'Partial', overdue: 'Overdue', paid: 'Paid' };
+
 export function FinanceDashboard() {
-  const { data: invData } = useInvoices({ limit: 500 });
+  const { data: invData, isError, refetch } = useInvoices({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
   const { data: tsData } = useTimesheets({ limit: 200, status: 'client_approved' });
   const { data: recurring } = useRecurringTemplates();
 
-  const invoices = invData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const invoices = useMemo(() => invData?.data ?? [], [invData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
   const readyToInvoice = tsData?.total ?? 0;
-  const recurringTemplates = recurring ?? [];
-
-  const balanceOf = (i: typeof invoices[number]) => i.balanceDue ?? (i.totalAmount - (i.amountPaid ?? 0));
+  const recurringTemplates = useMemo(() => recurring ?? [], [recurring]);
 
   const pendingInvoices = invoices.filter(i => i.status === 'draft').length;
 
   // Outstanding = balance still owed across all unpaid-in-flight invoices.
-  const outstandingAmount = invoices
-    .filter(i => OUTSTANDING_STATUSES.includes(i.status))
-    .reduce((s, i) => s + balanceOf(i), 0);
+  const outstandingAmount = useMemo(() => {
+    const balanceOf = (i: typeof invoices[number]) => i.balanceDue ?? (i.totalAmount - (i.amountPaid ?? 0));
+    return invoices
+      .filter(i => OUTSTANDING_STATUSES.includes(i.status))
+      .reduce((s, i) => s + balanceOf(i), 0);
+  }, [invoices]);
 
-  // Invoices-in-progress funnel (Wave-style) — count + $ per status.
-  const STATUS_ORDER = ['draft', 'sent', 'viewed', 'partially_paid', 'overdue', 'paid'] as const;
-  const STATUS_LABELS: Record<string, string> = { draft: 'Draft', sent: 'Sent', viewed: 'Viewed', partially_paid: 'Partial', overdue: 'Overdue', paid: 'Paid' };
-  const funnel = STATUS_ORDER.map(st => {
+  const funnel = useMemo(() => STATUS_ORDER.map(st => {
     const rows = invoices.filter(i => i.status === st);
     return { status: st, label: STATUS_LABELS[st], count: rows.length, amount: rows.reduce((s, i) => s + i.totalAmount, 0) };
-  });
+  }), [invoices]);
 
   // Average days-to-pay across paid invoices (paid_at − issue_date).
-  const paidWithDates = invoices.filter(i => i.status === 'paid' && i.paidAt && i.issueDate);
-  const avgDaysToPay = paidWithDates.length
-    ? Math.round(paidWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.paidAt!).getTime() - new Date(i.issueDate).getTime()) / 86400000), 0) / paidWithDates.length)
-    : null;
+  const avgDaysToPay = useMemo(() => {
+    const paidWithDates = invoices.filter(i => i.status === 'paid' && i.paidAt && i.issueDate);
+    return paidWithDates.length
+      ? Math.round(paidWithDates.reduce((s, i) => s + Math.max(0, (new Date(i.paidAt!).getTime() - new Date(i.issueDate).getTime()) / 86400000), 0) / paidWithDates.length)
+      : null;
+  }, [invoices]);
 
   // Total collected = sum of recorded payments (amount_paid), so partial
   // payments count too — not just fully-paid invoices.
-  const totalCollected = invoices.reduce((s, i) => s + (i.amountPaid ?? 0), 0);
+  const totalCollected = useMemo(() => invoices.reduce((s, i) => s + (i.amountPaid ?? 0), 0), [invoices]);
 
-  const upcomingRecurring = [...recurringTemplates]
+  const upcomingRecurring = useMemo(() => [...recurringTemplates]
     .filter(t => t.status === 'active')
     .sort((a, b) => a.nextRunDate.localeCompare(b.nextRunDate))
-    .slice(0, 5);
+    .slice(0, 5), [recurringTemplates]);
 
-  const now = new Date();
-  const months: { key: string; label: string }[] = [];
-  for (let i = 5; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
-    months.push({
-      key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
-      label: MONTH_LABELS[d.getUTCMonth()],
-    });
-  }
+  const months = useMemo(() => {
+    const now = new Date();
+    const out: { key: string; label: string }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+      out.push({
+        key: `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`,
+        label: MONTH_LABELS[d.getUTCMonth()],
+      });
+    }
+    return out;
+  }, []);
 
-  const monthlyRevenue = months.map(({ key, label }) => ({
+  const monthlyRevenue = useMemo(() => months.map(({ key, label }) => ({
     month: label,
     revenue: invoices
       .filter(inv => inv.paidAt?.startsWith(key))
       .reduce((s, inv) => s + inv.totalAmount, 0),
-  }));
+  })), [months, invoices]);
 
   // Cash flow series — invoiced vs collected per month
-  const cashFlow = months.map(({ key, label }) => {
+  const cashFlow = useMemo(() => months.map(({ key, label }) => {
     const issued = invoices.filter(inv => inv.issueDate?.startsWith(key));
     const invoiced = issued.reduce((s, inv) => s + inv.totalAmount, 0);
     const collected = invoices
       .filter(inv => inv.paidAt?.startsWith(key))
       .reduce((s, inv) => s + (inv.amountPaid ?? inv.totalAmount), 0);
     return { month: label, Invoiced: invoiced, Collected: collected };
-  });
+  }), [months, invoices]);
 
-  const totalPaidAllTime = invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0);
-  const totalOverdue = invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + i.totalAmount, 0);
+  const totalPaidAllTime = useMemo(
+    () => invoices.filter(i => i.status === 'paid').reduce((s, i) => s + i.totalAmount, 0),
+    [invoices],
+  );
+  const totalOverdue = useMemo(
+    () => invoices.filter(i => i.status === 'overdue').reduce((s, i) => s + i.totalAmount, 0),
+    [invoices],
+  );
 
   const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
 
-  const recentInvoices = [...invoices]
+  const recentInvoices = useMemo(() => [...invoices]
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-    .slice(0, 8);
+    .slice(0, 8), [invoices]);
+
+  // Paid revenue per client — clients × invoices scan, memoized.
+  const revenueByClient = useMemo(() => clients
+    .map(client => ({
+      client,
+      paid: invoices
+        .filter(i => i.clientId === client.id && i.status === 'paid')
+        .reduce((s, i) => s + i.totalAmount, 0),
+    }))
+    .filter(r => r.paid > 0), [clients, invoices]);
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load dashboard data.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -358,12 +392,7 @@ export function FinanceDashboard() {
         title="Revenue by Client"
         icon={<DollarSign className="text-emerald-500" />}
       >
-          {clients.map(client => {
-            const paid = invoices
-              .filter(i => i.clientId === client.id && i.status === 'paid')
-              .reduce((s, i) => s + i.totalAmount, 0);
-            if (paid === 0) return null;
-            return (
+          {revenueByClient.map(({ client, paid }) => (
               <div key={client.id} className="flex items-center gap-3 py-2 border-b border-gray-100 last:border-0">
                 <span className="text-sm flex-1 font-medium">{client.companyName}</span>
                 <span className="text-sm font-semibold text-emerald-700 tabular-nums">{formatCurrency(paid)}</span>
@@ -374,9 +403,8 @@ export function FinanceDashboard() {
                   />
                 </div>
               </div>
-            );
-          }).filter(Boolean)}
-          {clients.every(c => !invoices.some(i => i.clientId === c.id && i.status === 'paid')) && (
+          ))}
+          {revenueByClient.length === 0 && (
             <div className="flex flex-col items-center py-6 text-center">
               <Inbox className="h-8 w-8 text-gray-300 mb-2" />
               <p className="text-sm text-muted-foreground">No paid invoices yet.</p>

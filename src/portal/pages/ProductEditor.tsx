@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,7 +25,7 @@ export default function ProductEditor() {
   const navigate = useNavigate();
   const isEdit = !!id;
 
-  const { data, isLoading } = useProducts();
+  const { data, isLoading, isError, refetch } = useProducts();
   const existing = isEdit ? data?.data.find(p => p.id === id) : undefined;
   const createP = useCreateProduct();
   const updateP = useUpdateProduct(id ?? '');
@@ -53,6 +53,16 @@ export default function ProductEditor() {
 
   if (isEdit && isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isEdit && isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load catalog item. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
 
   return (

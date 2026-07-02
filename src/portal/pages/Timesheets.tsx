@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Loader2, Pencil, Info } from 'lucide-react';
+import { AlertCircle, Plus, Loader2, Pencil, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
@@ -170,7 +170,7 @@ export default function Timesheets() {
   const [employeeFilter, setEmployeeFilter] = useState<string>('all');
   const [showForm, setShowForm] = useState(false);
 
-  const { data, isLoading } = useTimesheets({
+  const { data, isLoading, isError, refetch } = useTimesheets({
     status: statusFilter !== 'all' ? statusFilter : undefined,
     employeeId: employeeFilter !== 'all' ? employeeFilter : undefined,
     limit: 100,
@@ -337,7 +337,13 @@ export default function Timesheets() {
         </p>
       </div>
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load timesheets. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>

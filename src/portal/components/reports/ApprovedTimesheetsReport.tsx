@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { CheckCircle2 } from 'lucide-react';
@@ -13,18 +14,18 @@ export function ApprovedTimesheetsReport() {
   const { data: clientData } = useClients({ limit: 200 });
   const { data: assignData } = useAssignments({ limit: 500 });
 
-  const timesheets = tsData?.data ?? [];
-  const employees = empData?.data ?? [];
-  const clients = clientData?.data ?? [];
-  const assignments = assignData?.data ?? [];
+  const timesheets = useMemo(() => tsData?.data ?? [], [tsData]);
+  const employees = useMemo(() => empData?.data ?? [], [empData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
+  const assignments = useMemo(() => assignData?.data ?? [], [assignData]);
 
-  const totalHours = timesheets.reduce((s, t) => s + t.totalHours, 0);
-  const totalAmount = timesheets.reduce((s, t) => {
+  const totalHours = useMemo(() => timesheets.reduce((s, t) => s + t.totalHours, 0), [timesheets]);
+  const totalAmount = useMemo(() => timesheets.reduce((s, t) => {
     const asgn = assignments.find(a => a.id === t.assignmentId);
     return s + t.totalHours * (asgn?.billRate ?? 0);
-  }, 0);
+  }, 0), [timesheets, assignments]);
 
-  const rows = timesheets
+  const rows = useMemo(() => timesheets
     .map(t => {
       const emp = employees.find(e => e.id === t.employeeId);
       const client = clients.find(c => c.id === t.clientId);
@@ -38,7 +39,7 @@ export function ApprovedTimesheetsReport() {
         amount: t.totalHours * (asgn?.billRate ?? 0),
       };
     })
-    .sort((a, b) => b.weekStartDate.localeCompare(a.weekStartDate));
+    .sort((a, b) => b.weekStartDate.localeCompare(a.weekStartDate)), [timesheets, employees, clients, assignments]);
 
   return (
     <Card>

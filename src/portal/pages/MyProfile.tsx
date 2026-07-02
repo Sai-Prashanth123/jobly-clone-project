@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
+import { AlertCircle, Edit, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { ChangePasswordDialog } from '../components/auth/ChangePasswordDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -31,12 +31,22 @@ const ID_DOC_LABELS: Record<string, string> = {
 export default function MyProfile() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: employee, isLoading } = useEmployee(user?.employeeId);
+  const { data: employee, isLoading, isError, refetch } = useEmployee(user?.employeeId);
   const [changePwOpen, setChangePwOpen] = useState(false);
   const [ssnVisible, setSsnVisible] = useState(false);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load your profile. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
 
   if (!employee) {

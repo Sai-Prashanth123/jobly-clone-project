@@ -6,7 +6,7 @@ export interface Holiday { id: string; name: string; date: string; isRecurring: 
 function map(r: any): Holiday { return { id: r.id, name: r.name, date: r.date, isRecurring: r.is_recurring, countryCode: r.country_code }; }
 
 export function useHolidays(year?: number) {
-  return useQuery({ queryKey: ['holidays', year], queryFn: async () => { const { data } = await apiClient.get('/holidays', { params: { year } }); return (data.data as any[]).map(map); } });
+  return useQuery({ queryKey: ['holidays', year], queryFn: async () => { const { data } = await apiClient.get('/holidays', { params: { year } }); return (data.data as any[]).map(map); }, staleTime: 5 * 60_000 });
 }
 export function useCreateHoliday() {
   const qc = useQueryClient();

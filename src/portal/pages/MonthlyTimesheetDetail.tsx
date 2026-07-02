@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Loader2, Download, CheckCircle2, XCircle, FileText, Mail, Edit } from 'lucide-react';
+import { AlertCircle, ArrowLeft, Loader2, Download, CheckCircle2, XCircle, FileText, Mail, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,7 @@ export default function MonthlyTimesheetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: sheet, isLoading } = useMonthlyTimesheet(id);
+  const { data: sheet, isLoading, isError, refetch } = useMonthlyTimesheet(id);
   const patchStatus = usePatchMonthlyStatus(id!);
   const patchHrNotes = usePatchHrNotes(id!);
   const patchEntries = usePatchMonthlyTimesheetEntries(id!);
@@ -43,6 +43,15 @@ export default function MonthlyTimesheetDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load timesheet. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
   if (!sheet) {
     return (

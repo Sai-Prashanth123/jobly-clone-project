@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, CalendarDays, RefreshCw } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,7 +26,7 @@ function getDayName(dateStr: string): string {
 export default function CompanyHolidays() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
-  const { data: holidays = [], isLoading, refetch } = useHolidays(year);
+  const { data: holidays = [], isLoading, isError, refetch } = useHolidays(year);
 
   // Group by month
   const byMonth: Record<number, typeof holidays> = {};
@@ -64,7 +64,13 @@ export default function CompanyHolidays() {
         }
       />
 
-      {isLoading ? (
+      {isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load holidays. Please try again.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : isLoading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">Loading holidays…</div>
       ) : holidays.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">

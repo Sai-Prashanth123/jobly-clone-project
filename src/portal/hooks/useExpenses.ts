@@ -135,7 +135,11 @@ export function useSubmitExpense() {
       const { data } = await apiClient.post(`/expenses/${id}/submit`);
       return mapExpense(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
+      qc.invalidateQueries({ queryKey: ['analytics-expenses'] });
+    },
   });
 }
 
@@ -146,7 +150,11 @@ export function useReviewExpense() {
       const { data } = await apiClient.post(`/expenses/${id}/review`, { action, rejectionReason });
       return mapExpense(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['expenses'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
+      qc.invalidateQueries({ queryKey: ['analytics-expenses'] });
+    },
   });
 }
 

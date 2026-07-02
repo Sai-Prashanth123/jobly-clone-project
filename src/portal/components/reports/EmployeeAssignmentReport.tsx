@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { StatusBadge } from '../shared/StatusBadge';
@@ -11,17 +12,17 @@ export function EmployeeAssignmentReport() {
   const { data: empData } = useEmployees({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
 
-  const assignments = assignData?.data ?? [];
-  const employees = empData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const assignments = useMemo(() => assignData?.data ?? [], [assignData]);
+  const employees = useMemo(() => empData?.data ?? [], [empData]);
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
-  const rows = assignments.map(a => {
+  const rows = useMemo(() => assignments.map(a => {
     const emp = employees.find(e => e.id === a.employeeId);
     const client = clients.find(c => c.id === a.clientId);
     const empName = emp ? `${emp.firstName} ${emp.lastName}` : a.employeeId.slice(0, 8);
     const clientName = client?.companyName ?? a.clientId.slice(0, 8);
     return { ...a, empName, clientName };
-  }).sort((a, b) => a.empName.localeCompare(b.empName));
+  }).sort((a, b) => a.empName.localeCompare(b.empName)), [assignments, employees, clients]);
 
   return (
     <Card>

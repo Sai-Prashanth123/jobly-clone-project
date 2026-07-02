@@ -1,4 +1,6 @@
-import { Briefcase, Clock, CheckCircle, XCircle, PlusCircle, Inbox } from 'lucide-react';
+import { useMemo } from 'react';
+import { Briefcase, Clock, CheckCircle, XCircle, PlusCircle, Inbox, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer,
@@ -16,19 +18,29 @@ import { useEmployees } from '../../hooks/useEmployees';
 import { useClients } from '../../hooks/useClients';
 import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 
+// ISO week key for a given date — pure helper, safe at module scope.
+const weekKey = (d: Date) => {
+  const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = dt.getUTCDay() || 7;
+  dt.setUTCDate(dt.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
+  const w = Math.ceil(((dt.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return `${dt.getUTCFullYear()}-W${String(w).padStart(2, '0')}`;
+};
+
 export function OperationsDashboard() {
-  const { data: assignData } = useAssignments({ limit: 200 });
+  const { data: assignData, isError, refetch } = useAssignments({ limit: 200 });
   const { data: tsData } = useTimesheets({ limit: 500 });
   const { data: empData } = useEmployees({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
 
-  const assignments = assignData?.data ?? [];
-  const timesheets = tsData?.data ?? [];
+  const assignments = useMemo(() => assignData?.data ?? [], [assignData]);
+  const timesheets = useMemo(() => tsData?.data ?? [], [tsData]);
   const employees = empData?.data ?? [];
-  const clients = clientData?.data ?? [];
+  const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
-  const activeAssignments = assignments.filter(a => a.status === 'active');
-  const pendingTimesheets = timesheets.filter(t => t.status === 'submitted');
+  const activeAssignments = useMemo(() => assignments.filter(a => a.status === 'active'), [assignments]);
+  const pendingTimesheets = useMemo(() => timesheets.filter(t => t.status === 'submitted'), [timesheets]);
   const approvedThisWeek = timesheets.filter(t => t.status === 'manager_approved');
   const rejectedTimesheets = timesheets.filter(t => t.status === 'rejected');
 
@@ -39,39 +51,45 @@ export function OperationsDashboard() {
   const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
 
   // Approval velocity over the last 8 weeks (count of manager-approved per week)
-  const now = new Date();
-  const weekKey = (d: Date) => {
-    const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
-    const day = dt.getUTCDay() || 7;
-    dt.setUTCDate(dt.getUTCDate() + 4 - day);
-    const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1));
-    const w = Math.ceil(((dt.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
-    return `${dt.getUTCFullYear()}-W${String(w).padStart(2, '0')}`;
-  };
-  const weeks: { key: string; label: string }[] = [];
-  for (let i = 7; i >= 0; i--) {
-    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i * 7));
-    weeks.push({ key: weekKey(d), label: `W${weekKey(d).split('-W')[1]}` });
-  }
-  const velocitySeries = weeks.map(({ key, label }) => ({
-    week: label,
-    approved: timesheets.filter(t => {
-      if (t.status !== 'manager_approved' && t.status !== 'client_approved') return false;
-      if (!t.weekStartDate) return false;
-      return weekKey(new Date(t.weekStartDate)) === key;
-    }).length,
-  }));
+  const velocitySeries = useMemo(() => {
+    const now = new Date();
+    const weeks: { key: string; label: string }[] = [];
+    for (let i = 7; i >= 0; i--) {
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i * 7));
+      weeks.push({ key: weekKey(d), label: `W${weekKey(d).split('-W')[1]}` });
+    }
+    return weeks.map(({ key, label }) => ({
+      week: label,
+      approved: timesheets.filter(t => {
+        if (t.status !== 'manager_approved' && t.status !== 'client_approved') return false;
+        if (!t.weekStartDate) return false;
+        return weekKey(new Date(t.weekStartDate)) === key;
+      }).length,
+    }));
+  }, [timesheets]);
 
   // Active assignments by client (top 6)
-  const byClient = activeAssignments.reduce<Record<string, number>>((acc, a) => {
-    const name = getClientName(a.clientId);
-    acc[name] = (acc[name] ?? 0) + 1;
-    return acc;
-  }, {});
-  const clientSeries = Object.entries(byClient)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 6)
-    .map(([name, value]) => ({ client: name.length > 14 ? name.slice(0, 13) + '…' : name, count: value }));
+  const clientSeries = useMemo(() => {
+    const byClient = activeAssignments.reduce<Record<string, number>>((acc, a) => {
+      const name = clients.find(c => c.id === a.clientId)?.companyName ?? a.clientId.slice(0, 8);
+      acc[name] = (acc[name] ?? 0) + 1;
+      return acc;
+    }, {});
+    return Object.entries(byClient)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 6)
+      .map(([name, value]) => ({ client: name.length > 14 ? name.slice(0, 13) + '…' : name, count: value }));
+  }, [activeAssignments, clients]);
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load dashboard data.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

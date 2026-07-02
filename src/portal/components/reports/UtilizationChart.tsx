@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useEmployees } from '../../hooks/useEmployees';
@@ -7,26 +8,27 @@ export function UtilizationChart() {
   const { data: empData } = useEmployees({ limit: 200, status: 'active' });
   const { data: tsData } = useTimesheets({ limit: 500 });
 
-  const employees = empData?.data ?? [];
-  const timesheets = tsData?.data ?? [];
+  const employees = useMemo(() => empData?.data ?? [], [empData]);
+  const timesheets = useMemo(() => tsData?.data ?? [], [tsData]);
 
-  const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
-
-  const data = employees
-    .map(emp => {
-      const empTimesheets = timesheets.filter(
-        t => t.employeeId === emp.id && t.weekStartDate >= monthStart
-      );
-      const totalHours = empTimesheets.reduce((s, t) => s + t.totalHours, 0);
-      return {
-        name: `${emp.firstName} ${emp.lastName.slice(0, 1)}.`,
-        hours: totalHours,
-      };
-    })
-    .filter(d => d.hours > 0)
-    .sort((a, b) => b.hours - a.hours)
-    .slice(0, 10);
+  const data = useMemo(() => {
+    const now = new Date();
+    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    return employees
+      .map(emp => {
+        const empTimesheets = timesheets.filter(
+          t => t.employeeId === emp.id && t.weekStartDate >= monthStart
+        );
+        const totalHours = empTimesheets.reduce((s, t) => s + t.totalHours, 0);
+        return {
+          name: `${emp.firstName} ${emp.lastName.slice(0, 1)}.`,
+          hours: totalHours,
+        };
+      })
+      .filter(d => d.hours > 0)
+      .sort((a, b) => b.hours - a.hours)
+      .slice(0, 10);
+  }, [employees, timesheets]);
 
   return (
     <Card>

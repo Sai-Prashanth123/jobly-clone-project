@@ -37,7 +37,7 @@ export default function TimesheetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: timesheet, isLoading } = useTimesheet(id);
+  const { data: timesheet, isLoading, isError, refetch } = useTimesheet(id);
   const { data: employee } = useEmployee(timesheet?.employeeId);
   const { data: client } = useClient(timesheet?.clientId);
   const { data: assignment } = useAssignment(timesheet?.assignmentId);
@@ -140,6 +140,16 @@ export default function TimesheetDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load timesheet. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
 
   if (!timesheet) {

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  FileText, FileImage, FileSpreadsheet, FolderOpen, Loader2, Search, Trash2, Upload,
+  AlertCircle, FileText, FileImage, FileSpreadsheet, FolderOpen, Loader2, Search, Trash2, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -291,7 +291,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
 function HrDocumentsView() {
   const [query, setQuery] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const { data, isLoading } = useEmployees({ limit: 500 });
+  const { data, isLoading, isError, refetch } = useEmployees({ limit: 500 });
   const { data: selected } = useEmployee(selectedId ?? undefined);
   const employees = data?.data ?? [];
 
@@ -326,7 +326,13 @@ function HrDocumentsView() {
               className="!pl-10 pr-3 h-9 text-sm"
             />
           </div>
-          {isLoading ? (
+          {isError ? (
+            <div className="flex flex-col items-center justify-center py-8 text-center gap-2">
+              <AlertCircle className="h-8 w-8 text-red-400" />
+              <p className="text-sm text-red-500">Failed to load employees. Please try again.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
+          ) : isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
@@ -404,12 +410,21 @@ function HrDocumentsView() {
 
 function EmployeeDocumentsView() {
   const { user } = useAuth();
-  const { data: employee, isLoading } = useEmployee(user?.employeeId);
+  const { data: employee, isLoading, isError, refetch } = useEmployee(user?.employeeId);
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load documents. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
       </div>
     );
   }

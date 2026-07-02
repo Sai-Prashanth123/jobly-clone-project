@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Info, Loader2, RotateCcw, Printer, Send, CheckCircle2, Save, Calendar, Users,
-  Upload, FileText, Trash2, AlertTriangle,
+  Upload, FileText, Trash2, AlertTriangle, AlertCircle,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,7 +87,7 @@ export default function MyMonthlyTimesheet() {
 
   const [period, setPeriod] = useState(() => currentMonth());
   const [loaded, setLoaded] = useState(() => currentMonth());
-  const { data: serverSheet, isLoading: loadingMonth, isFetching } =
+  const { data: serverSheet, isLoading: loadingMonth, isFetching, isError: monthError, refetch: refetchMonth } =
     useMyMonth(loaded.year, loaded.month, targetEmployeeId || undefined, { enabled: !!targetEmployeeId });
 
   const upsert = useUpsertMonthlyTimesheet();
@@ -398,6 +398,12 @@ export default function MyMonthlyTimesheet() {
             <CardContent className="p-0">
               {loadingMonth ? (
                 <div className="flex items-center justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+              ) : monthError ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+                  <AlertCircle className="h-8 w-8 text-red-400" />
+                  <p className="text-sm text-red-500">Failed to load this month's timesheet. Please try again.</p>
+                  <Button variant="outline" size="sm" onClick={() => refetchMonth()}>Retry</Button>
+                </div>
               ) : (
                 <>
                 <div ref={entriesTableRef} className="hidden md:block overflow-x-auto scroll-mt-24 portal-scroll-x">

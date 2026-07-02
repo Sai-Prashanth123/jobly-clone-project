@@ -83,6 +83,9 @@ export function useClients(params?: ListParams) {
         total: data.total as number,
       };
     },
+    // Client roster changes rarely; mutations invalidate the cache explicitly,
+    // so a longer staleTime only suppresses redundant background refetches.
+    staleTime: 5 * 60_000,
   });
 }
 

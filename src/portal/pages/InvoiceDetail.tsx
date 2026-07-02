@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Trash2, Loader2, Download, Send, DollarSign, Paperclip } from 'lucide-react';
+import { ArrowLeft, Trash2, Loader2, Download, Send, DollarSign, Paperclip, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
@@ -19,7 +19,7 @@ export default function InvoiceDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: invoice, isLoading } = useInvoice(id);
+  const { data: invoice, isLoading, isError, refetch } = useInvoice(id);
   const { data: client } = useClient(invoice?.clientId);
   const deleteInvoice = useDeleteInvoice();
   const getInvoicePDF = useGetInvoicePDF();
@@ -46,6 +46,16 @@ export default function InvoiceDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-2">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load invoice. Please try again.</p>
+        <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
 
   if (!invoice) {

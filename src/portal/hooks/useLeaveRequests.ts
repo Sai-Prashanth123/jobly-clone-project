@@ -67,7 +67,10 @@ export function useCreateLeaveRequest() {
       const { data } = await apiClient.post('/leave-requests', body);
       return mapLeaveRequest(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leave-requests'] });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
+    },
   });
 }
 
@@ -78,7 +81,10 @@ export function useReviewLeaveRequest() {
       const { data } = await apiClient.patch(`/leave-requests/${id}/review`, { status, rejectionReason });
       return mapLeaveRequest(data.data);
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['leave-requests'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['leave-requests'] });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
+    },
   });
 }
 
