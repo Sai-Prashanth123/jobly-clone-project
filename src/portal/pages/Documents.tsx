@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -426,6 +427,8 @@ function EmployeeDocumentsView() {
 export default function Documents() {
   const { user } = useAuth();
   const isHr = user?.role === 'admin' || user?.role === 'hr';
+  const queryClient = useQueryClient();
+  const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['employees'] });
 
   return (
     <div>
@@ -436,6 +439,7 @@ export default function Documents() {
             ? 'Upload, view, or remove documents for any employee. Useful for storing resumes, offer letters, ID proofs and compliance paperwork in one place.'
             : 'Upload, view, or remove your own documents. Keep your resume, ID proof, and compliance paperwork up to date.'
         }
+        onRefresh={handleRefresh}
       />
       {isHr ? <HrDocumentsView /> : <EmployeeDocumentsView />}
     </div>

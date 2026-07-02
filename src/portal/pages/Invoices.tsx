@@ -16,7 +16,7 @@ import type { Invoice } from '../types';
 export default function Invoices() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading, isError } = useInvoices({ limit: 100 });
+  const { data, isLoading, isError, refetch } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
   const deleteInvoice = useDeleteInvoice();
   const bulkSend = useSendBulkInvoices();
@@ -149,6 +149,7 @@ export default function Invoices() {
             New Invoice
           </Button>
         }
+        onRefresh={refetch}
       />
 
       {/* Status legend — answers "what does Draft mean?" without forcing the

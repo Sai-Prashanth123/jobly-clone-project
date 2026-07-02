@@ -18,7 +18,7 @@ export default function Assignments() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [statusFilter, setStatusFilter] = useState<string>('');
-  const { data, isLoading, isError } = useAssignments({ status: statusFilter || undefined, limit: 100 });
+  const { data, isLoading, isError, refetch } = useAssignments({ status: statusFilter || undefined, limit: 100 });
   const createAssignment = useCreateAssignment();
   const [showForm, setShowForm] = useState(false);
   const [editTarget, setEditTarget] = useState<Assignment | null>(null);
@@ -129,6 +129,7 @@ export default function Assignments() {
             </Button>
           ) : undefined
         }
+        onRefresh={refetch}
       />
 
       <div className="flex items-center gap-3 mb-4">

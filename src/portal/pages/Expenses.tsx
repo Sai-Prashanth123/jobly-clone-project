@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
-import { Loader2, Plus, Receipt, Send, Check, X, DollarSign, FileText } from 'lucide-react';
+import { Loader2, Plus, Receipt, Send, Check, X, DollarSign, FileText, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import {
@@ -72,7 +72,7 @@ export default function Expenses() {
   const [rejectionReason, setRejectionReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
 
-  const { data, isLoading, isError } = useExpenses({ status: statusFilter === 'all' ? undefined : statusFilter, limit: 50 });
+  const { data, isLoading, isError, refetch } = useExpenses({ status: statusFilter === 'all' ? undefined : statusFilter, limit: 50 });
   const expenses = data?.data ?? [];
 
   const createMut = useCreateExpense();
@@ -133,11 +133,16 @@ export default function Expenses() {
           <h1 className="text-2xl font-semibold">Expense Reports</h1>
           <p className="text-sm text-muted-foreground mt-0.5">Submit and track expense reimbursements</p>
         </div>
-        {(role === 'employee' || role === 'admin' || role === 'hr' || role === 'finance') && (
-          <Button onClick={openCreate} className="gap-2 self-start sm:self-auto">
-            <Plus className="h-4 w-4" /> New Expense
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
+            <RefreshCw className="h-4 w-4" />
           </Button>
-        )}
+          {(role === 'employee' || role === 'admin' || role === 'hr' || role === 'finance') && (
+            <Button onClick={openCreate} className="gap-2">
+              <Plus className="h-4 w-4" /> New Expense
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Status tabs */}

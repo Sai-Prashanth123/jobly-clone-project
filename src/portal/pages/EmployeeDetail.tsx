@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, CheckSquare2, Square, ListChecks } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, CheckSquare2, Square, ListChecks, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -69,6 +69,8 @@ export default function EmployeeDetail() {
   const [terminateDate, setTerminateDate] = useState(todayStr);
   // Document preview
   const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string } | null>(null);
+  // SSN visibility toggle (HR/Admin view — masked by default, eye button reveals full)
+  const [ssnVisible, setSsnVisible] = useState(false);
 
   // Detect a re-submission while this reviewer has the page open: remember the
   // submission timestamp first seen, and flag when a poll brings a newer one.
@@ -472,7 +474,24 @@ export default function EmployeeDetail() {
                 </p>
               </div>
               <Field label="I-9 Status" value={employee.i9Status} />
-              <Field label="SSN (last 4)" value={employee.ssn ? `•••• ${employee.ssn}` : undefined} />
+              {employee.ssn ? (
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Social Security Number</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-sm font-mono text-gray-900">
+                      {ssnVisible
+                        ? employee.ssn
+                        : employee.ssn.replace(/^(\d{3})-(\d{2})-(\d{4})$/, '***-**-$3')
+                          || employee.ssn.replace(/^(.*)(\d{4})$/, '***-**-$2')}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-700" onClick={() => setSsnVisible(v => !v)} title={ssnVisible ? 'Hide SSN' : 'Show SSN'}>
+                      {ssnVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Field label="Social Security Number" value={undefined} />
+              )}
             </CardContent>
           </Card>
         )}

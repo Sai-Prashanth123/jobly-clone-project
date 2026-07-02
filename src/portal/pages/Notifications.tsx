@@ -77,7 +77,7 @@ function NotificationCard({ n, onRead }: { n: Notification; onRead: (id: string)
 
 export default function Notifications() {
   const { user } = useAuth();
-  const { data: notifications = [], isLoading } = useNotifications();
+  const { data: notifications = [], isLoading, refetch } = useNotifications();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
   const triggerReminders = useTriggerTimesheetReminders();
@@ -133,6 +133,7 @@ export default function Notifications() {
             )}
           </div>
         }
+        onRefresh={refetch}
       />
 
       {/* Admin trigger panel */}

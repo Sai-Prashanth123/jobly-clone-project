@@ -26,7 +26,7 @@ function docTypeBadge(type: string) {
 export function ExpiringDocuments() {
   const navigate = useNavigate();
   const [days, setDays] = useState(90);
-  const { data: docs = [], isLoading, isError } = useExpiringDocuments(days);
+  const { data: docs = [], isLoading, isError, refetch } = useExpiringDocuments(days);
 
   const columns = [
     {
@@ -79,6 +79,7 @@ export function ExpiringDocuments() {
             </SelectContent>
           </Select>
         }
+        onRefresh={refetch}
       />
 
       {isLoading ? (

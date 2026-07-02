@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Gift, Award, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { Gift, Award, ChevronLeft, ChevronRight, Loader2, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useMilestones } from '../hooks/useAnalytics';
 import { format, addMonths, subMonths } from 'date-fns';
@@ -7,7 +7,7 @@ import { format, addMonths, subMonths } from 'date-fns';
 export default function Milestones() {
   const [monthDate, setMonthDate] = useState(new Date());
   const month = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
-  const { data, isLoading, isError } = useMilestones(month);
+  const { data, isLoading, isError, refetch } = useMilestones(month);
 
   const birthdays = data?.birthdays ?? [];
   const anniversaries = data?.anniversaries ?? [];
@@ -17,6 +17,9 @@ export default function Milestones() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Gift className="h-6 w-6 text-pink-500" /> Milestones</h1>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setMonthDate(d => subMonths(d, 1))}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-medium w-32 text-center">{format(monthDate, 'MMMM yyyy')}</span>
           <Button variant="outline" size="sm" onClick={() => setMonthDate(d => addMonths(d, 1))}><ChevronRight className="h-4 w-4" /></Button>

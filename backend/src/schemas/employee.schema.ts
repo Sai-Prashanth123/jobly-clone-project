@@ -73,7 +73,7 @@ export const createEmployeeSchema = z.object({
   payRate: z.number().min(0).optional(),
   payType: z.enum(['hourly','salary']).optional(),
   workLocation: z.string().optional().nullable(),
-  ssn: z.string().regex(/^\d{4}$/, 'SSN must be exactly 4 digits').or(z.literal('')).optional().nullable(),
+  ssn: z.string().regex(/^\d{3}-\d{2}-\d{4}$/, 'SSN must be in XXX-XX-XXXX format').or(z.literal('')).optional().nullable(),
   paymentType: z.enum(['w2','1099','c2c']).optional().nullable(),
   bankName: z.string().optional().nullable(),
   bankRoutingNumber: z.string().optional().nullable(),

@@ -27,7 +27,7 @@ const STATUS_FILTERS = [
 export default function MonthlyTimesheets() {
   const navigate = useNavigate();
   const [status, setStatus] = useState('all');
-  const { data, isLoading, isError } = useMonthlyTimesheets(status === 'all' ? { limit: 200 } : { status, limit: 200 });
+  const { data, isLoading, isError, refetch } = useMonthlyTimesheets(status === 'all' ? { limit: 200 } : { status, limit: 200 });
   const rows = data?.data ?? [];
 
   // Split the queue: timesheets with logged hours go to Client Timesheets tab
@@ -144,6 +144,7 @@ export default function MonthlyTimesheets() {
             </SelectContent>
           </Select>
         }
+        onRefresh={refetch}
       />
 
       {isLoading ? (

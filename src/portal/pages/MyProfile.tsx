@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Loader2, KeyRound } from 'lucide-react';
+import { Edit, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react';
 import { ChangePasswordDialog } from '../components/auth/ChangePasswordDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -33,6 +33,7 @@ export default function MyProfile() {
   const { user } = useAuth();
   const { data: employee, isLoading } = useEmployee(user?.employeeId);
   const [changePwOpen, setChangePwOpen] = useState(false);
+  const [ssnVisible, setSsnVisible] = useState(false);
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -169,7 +170,24 @@ export default function MyProfile() {
                 </p>
               </div>
               <Field label="I-9 Status" value={employee.i9Status} />
-              <Field label="SSN (last 4)" value={employee.ssn ? `•••• ${employee.ssn}` : undefined} />
+              {employee.ssn ? (
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Social Security Number</p>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className="text-sm font-mono text-gray-900">
+                      {ssnVisible
+                        ? employee.ssn
+                        : employee.ssn.replace(/^(\d{3})-(\d{2})-(\d{4})$/, '***-**-$3')
+                          || employee.ssn.replace(/^(.*)(\d{4})$/, '***-**-$2')}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-700" onClick={() => setSsnVisible(v => !v)} title={ssnVisible ? 'Hide SSN' : 'Show SSN'}>
+                      {ssnVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <Field label="Social Security Number" value={undefined} />
+              )}
             </CardContent>
           </Card>
         )}

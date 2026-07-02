@@ -158,7 +158,7 @@ const IDENTITY_DOC_ROWS: Array<{
 ];
 
 // Identity doc types that are mandatory uploads during onboarding.
-const REQUIRED_IDENTITY_TYPES = ['ssn', 'passport', 'i94', 'us_visa'] as const;
+const REQUIRED_IDENTITY_TYPES = ['ssn', 'passport', 'i94'] as const;
 
 // Labels from IDENTITY_DOC_ROWS — used to exclude these from the Documents section dropdown
 // so employees cannot accidentally upload the same file in both sections.
@@ -186,6 +186,7 @@ interface PendingDoc {
   id: string;          // local UUID
   name: string;
   type: string;
+  customName?: string; // used when type === 'Other'
   file?: File;
 }
 
@@ -499,7 +500,7 @@ export default function NewEmployee() {
       !!form.email && !!form.phone,                                                 // Contact
       !!form.address.street && !!form.address.city && !!form.address.state && !!form.address.zip, // Present Addr
       !!form.startDate,                                                             // Employment
-      !!form.visaType && !!form.visaExpiry && /^(?!0000|1234)\d{4}$/.test(form.ssn), // Immigration
+      /^\d{3}-\d{2}-\d{4}$/.test(form.ssn), // Immigration
       !!form.emergencyContact.name && !!form.emergencyContact.phone,                // Emergency
       // Payroll: HR-side only. Hidden + not required in employee onboarding / self-edit.
       ...(isOnboarding || isSelfEdit ? [] : [!!form.payRate && Number(form.payRate) > 0]),
@@ -542,10 +543,10 @@ export default function NewEmployee() {
       [SECTION_IDS.presentAddr]:  presentFilled,
       [SECTION_IDS.permanentAddr]: permFilled,
       [SECTION_IDS.employment]:   !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim(),
-      [SECTION_IDS.immigration]:  !!form.visaType && !!form.visaExpiry && /^(?!0000|1234)\d{4}$/.test(form.ssn),
+      [SECTION_IDS.immigration]:  /^\d{3}-\d{2}-\d{4}$/.test(form.ssn),
       [SECTION_IDS.education]:    educationDone,
       [SECTION_IDS.emergency]:    !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && (isOnboarding ? !!form.emergencyContact.address.trim() : true),
-      [SECTION_IDS.payroll]:      isOnboarding ? true : (parseNumberInput(form.payRate) ?? 0) > 0,
+      [SECTION_IDS.payroll]:      isOnboarding ? (!!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim()) : (parseNumberInput(form.payRate) ?? 0) > 0,
       [SECTION_IDS.review]:       isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
       ...(isOnboarding ? {
         [SECTION_IDS.identity]: REQUIRED_IDENTITY_TYPES.every(t => {
@@ -584,8 +585,10 @@ export default function NewEmployee() {
       { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
       // Employment
       { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim() },
-      // Immigration + SSN (placeholder values '0000'/'1234' are invalid)
-      { id: 'immigration', label: 'Immigration & SSN',              section: SECTION_IDS.immigration,   done: !!form.visaType && !!form.visaExpiry && /^(?!0000|1234)\d{4}$/.test(form.ssn) },
+      // Immigration — visa is optional; SSN (full 9 digits) is required
+      { id: 'immigration', label: 'Social Security Number (SSN)',   section: SECTION_IDS.immigration,   done: /^\d{3}-\d{2}-\d{4}$/.test(form.ssn) },
+      // Bank details — required for ACH direct deposit
+      { id: 'bank',        label: 'Bank details (name, account number, routing number)', section: SECTION_IDS.payroll, done: !!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim() },
       // Education (passYear must be > 0)
       { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim() && Number(e.passYear) > 0) },
       // Emergency — address is now required
@@ -660,7 +663,7 @@ export default function NewEmployee() {
     if (form.workEmail && !/^\S+@\S+\.\S+$/.test(form.workEmail)) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
     if (isOnboarding && !form.linkedinUrl.trim()) flag('linkedinUrl', 'LinkedIn URL is required', SECTION_IDS.contact);
 
-    if (form.ssn && !/^(?!0000|1234)\d{4}$/.test(form.ssn)) flag('ssn', 'Enter a valid SSN last 4 digits (not a placeholder like 0000 or 1234)', SECTION_IDS.immigration);
+    if (form.ssn && !/^\d{3}-\d{2}-\d{4}$/.test(form.ssn)) flag('ssn', 'Enter SSN in format XXX-XX-XXXX (e.g. 123-45-6789)', SECTION_IDS.immigration);
 
     // Admin/HR create needs only first/last name + email (above). The full
     // profile is the EMPLOYEE's responsibility to complete during onboarding —
@@ -738,7 +741,7 @@ export default function NewEmployee() {
   // 20 MB matches the backend multer limit (see backend/src/middleware/upload.ts).
   // Reject larger files client-side to avoid a 413 round-trip during upload.
   const MAX_DOC_BYTES = 20 * 1024 * 1024;
-  const [docDraft, setDocDraft] = useState<{ type: string; file: File | null }>({ type: '', file: null });
+  const [docDraft, setDocDraft] = useState<{ type: string; customName: string; file: File | null }>({ type: '', customName: '', file: null });
   const [docDragOver, setDocDragOver] = useState(false);
 
   // Stage one or more files. If a type was preselected in the draft Select, all
@@ -751,7 +754,7 @@ export default function NewEmployee() {
     let dropped = 0;
     for (const f of files) {
       if (f.size > MAX_DOC_BYTES) { dropped += 1; continue; }
-      valid.push({ id: crypto.randomUUID(), name: f.name, type: docDraft.type ?? '', file: f });
+      valid.push({ id: crypto.randomUUID(), name: f.name, type: docDraft.type ?? '', customName: docDraft.type === 'Other' ? docDraft.customName : undefined, file: f });
     }
     if (dropped > 0) {
       toast.error(`${dropped} file${dropped === 1 ? '' : 's'} exceeded the 20 MB limit and ${dropped === 1 ? 'was' : 'were'} skipped.`);
@@ -762,7 +765,7 @@ export default function NewEmployee() {
   const addDocumentDraft = () => {
     if (!docDraft.file) { toast.error('Pick a file first'); return; }
     stageDocumentFiles([docDraft.file]);
-    setDocDraft(d => ({ type: d.type, file: null }));
+    setDocDraft(d => ({ type: d.type, customName: d.type === 'Other' ? d.customName : '', file: null }));
     const input = document.getElementById('new-emp-doc-file') as HTMLInputElement | null;
     if (input) input.value = '';
   };
@@ -770,11 +773,23 @@ export default function NewEmployee() {
     setForm(p => ({ ...p, documents: p.documents.filter(d => d.id !== id) }));
   };
   const setDocumentType = (id: string, type: string) => {
-    setForm(p => ({ ...p, documents: p.documents.map(d => d.id === id ? { ...d, type } : d) }));
+    setForm(p => ({ ...p, documents: p.documents.map(d => d.id === id ? { ...d, type, customName: type !== 'Other' ? undefined : d.customName } : d) }));
+  };
+  const setDocumentCustomName = (id: string, customName: string) => {
+    setForm(p => ({ ...p, documents: p.documents.map(d => d.id === id ? { ...d, customName } : d) }));
   };
   // Exposes the unclassified-row count to the submit handler so we can block the
   // wizard from completing onboarding with half-typed uploads.
-  const unclassifiedDocs = form.documents.filter(d => !d.type).length;
+  const unclassifiedDocs = form.documents.filter(d => !d.type || (d.type === 'Other' && !d.customName?.trim())).length;
+
+  // Warn the user before they accidentally navigate away with staged-but-not-yet-saved files.
+  const hasStagedFiles = form.documents.some(d => !!d.file) || Object.values(form.identityDocFiles ?? {}).some(Boolean);
+  useEffect(() => {
+    if (!hasStagedFiles) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasStagedFiles]);
 
   // ── Submit ───────────────────────────────────────────────────────────────
   // Build the employee payload from the current form state. Shared by the full
@@ -909,7 +924,7 @@ export default function NewEmployee() {
         }
       }
       for (const d of form.documents) {
-        if (d.file) uploads.push({ file: d.file, name: d.file.name, docType: d.type });
+        if (d.file) uploads.push({ file: d.file, name: d.file.name, docType: (d.type === 'Other' && d.customName?.trim()) ? d.customName.trim() : d.type });
       }
       for (const u of uploads) {
         const fd = new FormData();
@@ -1056,7 +1071,7 @@ export default function NewEmployee() {
         if (file) { uploads.push({ file, name: file.name, docType: row.label }); uploadedDocTypes.push(row.type); }
       }
       for (const d of form.documents) {
-        if (d.file) { uploads.push({ file: d.file, name: d.file.name, docType: d.type }); uploadedGenericIds.push(d.id); }
+        if (d.file) { uploads.push({ file: d.file, name: d.file.name, docType: (d.type === 'Other' && d.customName?.trim()) ? d.customName.trim() : d.type }); uploadedGenericIds.push(d.id); }
       }
       for (const u of uploads) {
         const fd = new FormData();
@@ -1477,7 +1492,7 @@ export default function NewEmployee() {
                 </div>
                 <div>
                   <Label>Date of Birth {isOnboarding && <RequiredMark />}</Label>
-                  <Input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} onBlur={() => { if (isOnboarding && !form.dob) setErrors(p => ({ ...p, dob: 'Date of birth is required' })); }} />
+                  <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={form.dob} onChange={e => set('dob', e.target.value)} onBlur={() => { if (isOnboarding && !form.dob) setErrors(p => ({ ...p, dob: 'Date of birth is required' })); }} />
                   <FieldError msg={errors.dob} />
                 </div>
                 <div>
@@ -1789,7 +1804,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Visa Type {isOnboarding && <RequiredMark />}</Label>
+                <Label>Visa Type</Label>
                 <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -1799,8 +1814,8 @@ export default function NewEmployee() {
                 <FieldError msg={errors.visaType} />
               </div>
               <div>
-                <Label>Work Authorization Expiry {isOnboarding && <RequiredMark />}</Label>
-                <Input type="date" value={form.visaExpiry} onChange={e => set('visaExpiry', e.target.value)} />
+                <Label>Work Authorization Expiry</Label>
+                <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={form.visaExpiry} onChange={e => set('visaExpiry', e.target.value)} />
                 {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />
               </div>
@@ -1817,13 +1832,19 @@ export default function NewEmployee() {
                 </div>
               )}
               <div>
-                <Label>SSN — Last 4 digits {isOnboarding && <RequiredMark />}</Label>
+                <Label>Social Security Number (SSN) {isOnboarding && <RequiredMark />}</Label>
                 <Input
+                  type="password"
                   value={form.ssn}
-                  onChange={e => set('ssn', e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  inputMode="numeric"
-                  placeholder="••••"
-                  maxLength={4}
+                  onChange={e => {
+                    const raw = e.target.value.replace(/\D/g, '').slice(0, 9);
+                    const fmt = raw.length <= 3 ? raw
+                      : raw.length <= 5 ? `${raw.slice(0, 3)}-${raw.slice(3)}`
+                      : `${raw.slice(0, 3)}-${raw.slice(3, 5)}-${raw.slice(5)}`;
+                    set('ssn', fmt);
+                  }}
+                  placeholder="XXX-XX-XXXX"
+                  maxLength={11}
                 />
                 <FieldError msg={errors.ssn} />
               </div>
@@ -1874,6 +1895,8 @@ export default function NewEmployee() {
                         </Label>
                         <Input
                           type="date"
+                          lang="en-US"
+                          placeholder="MM/DD/YYYY"
                           value={doc.expiry ?? ''}
                           onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
                           className={missingExpiry ? 'border-red-300' : ''}
@@ -2008,11 +2031,11 @@ export default function NewEmployee() {
                     </div>
                     <div>
                       <Label className="text-[11px]">From</Label>
-                      <Input type="date" value={row.fromDate ?? ''} onChange={e => updateWorkHistory(idx, 'fromDate', e.target.value)} />
+                      <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={row.fromDate ?? ''} onChange={e => updateWorkHistory(idx, 'fromDate', e.target.value)} />
                     </div>
                     <div>
                       <Label className="text-[11px]">To</Label>
-                      <Input type="date" value={row.toDate ?? ''} onChange={e => updateWorkHistory(idx, 'toDate', e.target.value)} />
+                      <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={row.toDate ?? ''} onChange={e => updateWorkHistory(idx, 'toDate', e.target.value)} />
                     </div>
                     <div className="sm:col-span-3">
                       <Label className="text-[11px]">Reason for Leaving</Label>
@@ -2165,26 +2188,31 @@ export default function NewEmployee() {
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Bank Details (ACH Direct Deposit)</p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
-                <Label>Bank Name</Label>
-                <Input value={form.bankName} onChange={e => set('bankName', e.target.value)} placeholder="Chase" />
+                <Label>Bank Name {isOnboarding && <RequiredMark />}</Label>
+                <Input value={form.bankName} onChange={e => set('bankName', e.target.value)} placeholder="Chase" className={errors.bankName ? 'border-red-400' : ''} />
+                <FieldError msg={errors.bankName} />
               </div>
               <div>
-                <Label>Routing Number (9 digits)</Label>
+                <Label>Routing Number (9 digits) {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.bankRoutingNumber}
                   onChange={e => set('bankRoutingNumber', e.target.value.replace(/\D/g, '').slice(0, 9))}
                   inputMode="numeric"
                   maxLength={9}
                   placeholder="021000021"
+                  className={errors.bankRoutingNumber ? 'border-red-400' : ''}
                 />
+                <FieldError msg={errors.bankRoutingNumber} />
               </div>
               <div>
-                <Label>Account Number</Label>
+                <Label>Account Number {isOnboarding && <RequiredMark />}</Label>
                 <Input
                   value={form.bankAccountNumber}
                   onChange={e => set('bankAccountNumber', e.target.value)}
                   inputMode="numeric"
+                  className={errors.bankAccountNumber ? 'border-red-400' : ''}
                 />
+                <FieldError msg={errors.bankAccountNumber} />
               </div>
             </div>
           </SectionCard>
@@ -2216,6 +2244,12 @@ export default function NewEmployee() {
                 </p>
               ) : null;
             })()}
+            {hasStagedFiles && (
+              <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 mb-3">
+                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
+                You have unsaved files — click <strong>Save &amp; continue later</strong> to preserve them before navigating away.
+              </div>
+            )}
             <div
               onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
               onDragLeave={() => setDocDragOver(false)}
@@ -2229,14 +2263,22 @@ export default function NewEmployee() {
               }`}
             >
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
+                <div className="space-y-1.5">
                   <Label className="text-xs">Default type (optional)</Label>
-                  <Select value={docDraft.type} onValueChange={v => setDocDraft(d => ({ ...d, type: v }))}>
+                  <Select value={docDraft.type} onValueChange={v => setDocDraft(d => ({ ...d, type: v, customName: v !== 'Other' ? '' : d.customName }))}>
                     <SelectTrigger><SelectValue placeholder="Choose for new uploads" /></SelectTrigger>
                     <SelectContent>
                       {DOC_TYPES.filter(t => !IDENTITY_OWNED_DOC_LABELS.has(t)).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                  {docDraft.type === 'Other' && (
+                    <Input
+                      value={docDraft.customName}
+                      onChange={e => setDocDraft(d => ({ ...d, customName: e.target.value }))}
+                      placeholder="Document name (e.g. Training Certificate)…"
+                      className="text-xs h-8"
+                    />
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs">Files</Label>
@@ -2273,10 +2315,26 @@ export default function NewEmployee() {
                     <div className="flex items-center gap-2 min-w-0 flex-1">
                       <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
                       <p className="text-sm truncate flex-shrink min-w-0">{d.name}</p>
-                      {d.type ? (
+                      {d.type && d.type !== 'Other' ? (
                         <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-white border border-gray-200 flex-shrink-0">
                           {d.type}
                         </span>
+                      ) : d.type === 'Other' ? (
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          {d.customName ? (
+                            <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-white border border-gray-200">
+                              {d.customName}
+                            </span>
+                          ) : (
+                            <Input
+                              value={d.customName ?? ''}
+                              onChange={e => setDocumentCustomName(d.id, e.target.value)}
+                              placeholder="Document name…"
+                              className="h-7 text-[11px] w-40"
+                              onClick={e => e.stopPropagation()}
+                            />
+                          )}
+                        </div>
                       ) : (
                         <div className="flex-shrink-0 w-44">
                           <Select value="" onValueChange={v => setDocumentType(d.id, v)}>
@@ -2339,7 +2397,7 @@ export default function NewEmployee() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Date</Label>
-                  <Input type="date" value={form.signatureDate} onChange={e => set('signatureDate', e.target.value)} />
+                  <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={form.signatureDate} onChange={e => set('signatureDate', e.target.value)} />
                 </div>
               </div>
             </div>

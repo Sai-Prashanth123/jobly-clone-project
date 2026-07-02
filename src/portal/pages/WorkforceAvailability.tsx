@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Users, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { Users, ChevronLeft, ChevronRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { addWeeks, subWeeks, startOfWeek, addDays, format, isWithinInterval, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { useWorkforceAvailability } from '../hooks/useAnalytics';
@@ -10,7 +10,7 @@ export default function WorkforceAvailability() {
   const [weekStart, setWeekStart] = useState(() => startOfWeek(new Date(), { weekStartsOn: 1 }));
   const startDate = format(weekStart, 'yyyy-MM-dd');
   const endDate = format(addDays(weekStart, 6), 'yyyy-MM-dd');
-  const { data: employees = [], isLoading, isError } = useWorkforceAvailability(startDate, endDate);
+  const { data: employees = [], isLoading, isError, refetch } = useWorkforceAvailability(startDate, endDate);
   const weekDays = Array.from({ length: 7 }, (_, i) => format(addDays(weekStart, i), 'yyyy-MM-dd'));
 
   const isOnLeave = (emp: any, date: string) =>
@@ -23,6 +23,9 @@ export default function WorkforceAvailability() {
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="h-6 w-6 text-emerald-600" /> Workforce Availability</h1><p className="text-sm text-gray-500">Weekly leave overlay</p></div>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setWeekStart(d => subWeeks(d, 1))}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-medium">{format(weekStart, 'MMM d')} – {format(addDays(weekStart, 6), 'MMM d, yyyy')}</span>
           <Button variant="outline" size="sm" onClick={() => setWeekStart(d => addWeeks(d, 1))}><ChevronRight className="h-4 w-4" /></Button>

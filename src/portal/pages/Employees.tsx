@@ -15,7 +15,7 @@ import type { Employee } from '../types';
 export default function Employees() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading, isError } = useEmployees({ limit: 500 });
+  const { data, isLoading, isError, refetch } = useEmployees({ limit: 500 });
   const canManage = user?.role === 'admin' || user?.role === 'hr';
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -123,6 +123,7 @@ export default function Employees() {
             </Link>
           </Button>
         ) : undefined}
+        onRefresh={refetch}
       />
 
       {isError ? (

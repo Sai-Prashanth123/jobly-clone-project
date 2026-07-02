@@ -70,12 +70,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // problem (cold start / timeout / 5xx). The old code showed "Invalid
       // credentials" for everything, so a server that was merely waking up
       // looked like a wrong password.
-      const e = err as { response?: { status?: number; data?: { error?: string } }; request?: unknown; code?: string };
+      const e = err as { response?: { status?: number; data?: { error?: string; message?: string } }; request?: unknown; code?: string };
       const status = e?.response?.status;
       const serverMsg = e?.response?.data?.error;
       let msg: string;
       if (status === 401) {
         msg = serverMsg ?? 'Invalid email or password. Please try again.';
+      } else if (status === 403) {
+        // 403 responses from our backend carry a human-readable `message` field
+        // (e.g. TEMP_PASSWORD_EXPIRED). Use that instead of the error code string.
+        msg = e?.response?.data?.message ?? serverMsg ?? 'Access denied.';
       } else if (!e?.response) {
         // No response = network error / timeout / DNS — usually the app is
         // cold-starting on the free tier.

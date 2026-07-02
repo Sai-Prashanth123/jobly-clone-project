@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, Loader2, AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { addMonths, subMonths, format } from 'date-fns';
 import { useClientSLA } from '../hooks/useAnalytics';
@@ -7,7 +7,7 @@ import { useClientSLA } from '../hooks/useAnalytics';
 export default function ClientSLA() {
   const [monthDate, setMonthDate] = useState(new Date());
   const month = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
-  const { data: clients = [], isLoading, isError } = useClientSLA(month);
+  const { data: clients = [], isLoading, isError, refetch } = useClientSLA(month);
 
   const color = (pct: number) => pct >= 90 ? 'bg-green-500' : pct >= 70 ? 'bg-amber-400' : 'bg-red-400';
   const badge = (pct: number) => pct >= 90 ? 'text-green-700 bg-green-100' : pct >= 70 ? 'text-amber-700 bg-amber-100' : 'text-red-700 bg-red-100';
@@ -17,6 +17,9 @@ export default function ClientSLA() {
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><BarChart3 className="h-6 w-6 text-violet-600" /> Client SLA Tracker</h1><p className="text-sm text-gray-500">Contracted vs billed hours by client</p></div>
         <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
           <Button variant="outline" size="sm" onClick={() => setMonthDate(d => subMonths(d, 1))}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-medium w-32 text-center">{format(monthDate, 'MMMM yyyy')}</span>
           <Button variant="outline" size="sm" onClick={() => setMonthDate(d => addMonths(d, 1))}><ChevronRight className="h-4 w-4" /></Button>

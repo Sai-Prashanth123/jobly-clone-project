@@ -5,9 +5,8 @@
 // Identity documents (DL, State ID, Passport, Green Card, EAD) are optional.
 // Employment documents in ONBOARDING_REQUIRED_DOCS are mandatory.
 // Strict checklist covers personal details (no photo — optional), addresses,
-// employment, immigration status + SSN-last-4, education, emergency contact,
-// declaration, and the required document uploads. Payroll + bank details are
-// HR-only (collected by HR via the HR-create / HR-edit screens, not the employee wizard).
+// employment, immigration status + full SSN, bank details, education, emergency
+// contact, declaration, and the required document uploads. US visa is optional.
 
 export const COMPLIANCE_REQUIRED_DOC_TYPES = [
   "Driver's License",
@@ -75,12 +74,15 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
     { id: 'start_date',         label: 'Start date',                                          done: nonEmpty(emp.start_date) },
     { id: 'work_location',      label: 'Work location',                                       done: nonEmpty(emp.work_location) },
 
-    // Immigration
-    { id: 'visa_type',          label: 'Visa type',                                           done: nonEmpty(emp.visa_type) },
-    { id: 'visa_expiry',        label: 'Visa / work authorization expiry',                    done: nonEmpty(emp.visa_expiry) },
-    // Reject obvious placeholder SSNs ('0000', '1234' etc.) so onboarding can't
-    // be cleared with a dummy value (#17 from the edge-case audit).
-    { id: 'ssn',                label: 'Social Security Number (last 4)',                     done: /^(?!0000|1234)\d{4}$/.test(String(emp.ssn ?? '')) },
+    // Immigration — visa fields are optional; only SSN is required
+    { id: 'ssn',                label: 'Social Security Number',                              done: /^\d{3}-\d{2}-\d{4}$/.test(String(emp.ssn ?? '')) },
+
+    // Bank details — required for ACH direct deposit setup
+    {
+      id: 'bank',
+      label: 'Bank details (name, account number, routing number)',
+      done: nonEmpty(emp.bank_name) && nonEmpty(emp.bank_account_number) && nonEmpty(emp.bank_routing_number),
+    },
 
     // Education
     {

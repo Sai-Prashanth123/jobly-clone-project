@@ -74,6 +74,21 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
       throw new UnauthorizedError('User profile not found. Contact your administrator.');
     }
 
+    // Block login when the one-time temp password was never changed AND the
+    // account is older than 7 days. data.user.created_at is already available
+    // from signInWithPassword — no extra DB query needed.
+    const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
+    const isTemp = portalUser.must_reset_password === true;
+    const neverChanged = !portalUser.password_changed_at;
+    const accountAge = Date.now() - new Date(data.user.created_at).getTime();
+    if (isTemp && neverChanged && accountAge > SEVEN_DAYS) {
+      res.status(403).json({
+        error: 'TEMP_PASSWORD_EXPIRED',
+        message: 'Your temporary password has expired. Please contact HR to issue a new one.',
+      });
+      return;
+    }
+
     // Employees are gated until HR approves their onboarding; everyone else is
     // never gated. Surfaced to the frontend gate (mirrors mustResetPassword).
     const onboardingStatus = await computeOnboardingStatus(portalUser.role, portalUser.employee_id);

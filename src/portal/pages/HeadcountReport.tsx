@@ -1,8 +1,9 @@
-import { Loader2, Users, TrendingUp, TrendingDown, AlertCircle } from 'lucide-react';
+import { Loader2, Users, TrendingUp, TrendingDown, AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useHeadcount } from '../hooks/useAnalytics';
 
 export default function HeadcountReport() {
-  const { data, isLoading, isError } = useHeadcount();
+  const { data, isLoading, isError, refetch } = useHeadcount();
 
   if (isLoading) return <div className="flex justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
   if (isError || !data) return (
@@ -18,9 +19,14 @@ export default function HeadcountReport() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="h-6 w-6 text-blue-600" /> Headcount & Turnover</h1>
-        <p className="text-sm text-gray-500">Workforce composition overview</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2"><Users className="h-6 w-6 text-blue-600" /> Headcount & Turnover</h1>
+          <p className="text-sm text-gray-500">Workforce composition overview</p>
+        </div>
+        <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
       {/* KPI cards */}

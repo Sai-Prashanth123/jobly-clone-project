@@ -113,7 +113,7 @@ const EMPTY_FORM: CycleFormData = {
 };
 
 export default function Reviews() {
-  const { data: cycles = [], isLoading } = useReviewCycles();
+  const { data: cycles = [], isLoading, refetch } = useReviewCycles();
   const { data: empResult } = useEmployees();
   const employees = empResult?.data ?? [];
   const createCycle = useCreateCycle();
@@ -233,7 +233,12 @@ export default function Reviews() {
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">Manage 360° review cycles</p>
         </div>
-        <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> New Cycle</Button>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
+            <RefreshCw className="h-4 w-4" />
+          </Button>
+          <Button onClick={openCreate} className="gap-2"><Plus className="h-4 w-4" /> New Cycle</Button>
+        </div>
       </div>
 
       {/* Cycle list */}
