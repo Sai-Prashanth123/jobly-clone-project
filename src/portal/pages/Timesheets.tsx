@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useMemo, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -44,10 +44,41 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
   const selectedAsgn = myAssignments.find(a => a.id === assignmentId);
 
   const selectedEmp = selectedAsgn ? employees.find(e => e.id === selectedAsgn.employeeId) : undefined;
-  const minWeekStr = selectedEmp?.startDate
+
+  // Earliest valid Monday: employee joining week (or 8 weeks ago if no joining date, so HR can back-fill)
+  const currentMondayStr = getMondayOfWeek(new Date()).toISOString().split('T')[0];
+  const joiningMondayStr = selectedEmp?.startDate
     ? getMondayOfWeek(new Date(selectedEmp.startDate)).toISOString().split('T')[0]
     : undefined;
+  // Allow back-filling up to 8 past weeks, but never before the joining week
+  const pastCutoff = getMondayOfWeek(new Date(Date.now() - 8 * 7 * 86400000)).toISOString().split('T')[0];
+  const minWeekStr = joiningMondayStr
+    ? joiningMondayStr > pastCutoff ? joiningMondayStr : pastCutoff
+    : pastCutoff;
   const maxWeekStr = getMondayOfWeek(new Date(Date.now() + 12 * 7 * 86400000)).toISOString().split('T')[0];
+
+  // Build the list of valid Mondays between min and max
+  const weekOptions = useMemo(() => {
+    const options: { value: string; label: string }[] = [];
+    const [ry, rm, rd] = minWeekStr.split('-').map(Number);
+    let cur = new Date(Date.UTC(ry, rm - 1, rd));
+    const [maxY, maxM, maxD] = maxWeekStr.split('-').map(Number);
+    const maxDate = new Date(Date.UTC(maxY, maxM - 1, maxD));
+    while (cur <= maxDate) {
+      const val = cur.toISOString().split('T')[0];
+      const sun = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth(), cur.getUTCDate() + 6));
+      const fmt = (d: Date) => d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+      options.push({ value: val, label: `${fmt(cur)} – ${fmt(sun)}` });
+      cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth(), cur.getUTCDate() + 7));
+    }
+    return options;
+  }, [minWeekStr, maxWeekStr]);
+
+  // When the assignment changes (and thus min changes), clamp weekStart to a valid option
+  useEffect(() => {
+    if (weekStart < minWeekStr) setWeekStart(minWeekStr > currentMondayStr ? minWeekStr : currentMondayStr);
+    else if (weekStart > maxWeekStr) setWeekStart(maxWeekStr);
+  }, [minWeekStr, maxWeekStr]);
 
   const handleCreate = () => {
     if (!assignmentId || !selectedAsgn) return;
@@ -106,17 +137,19 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
         </Select>
       </div>
       <div className="space-y-2">
-        <label className="text-sm font-medium">Week Starting (Monday)</label>
-        <input
-          type="date"
-          className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm"
-          value={weekStart}
-          min={minWeekStr}
-          max={maxWeekStr}
-          onChange={e => setWeekStart(e.target.value)}
-        />
+        <label className="text-sm font-medium">Week</label>
+        <Select value={weekStart} onValueChange={setWeekStart}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a week…" />
+          </SelectTrigger>
+          <SelectContent className="max-h-64">
+            {weekOptions.map(o => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <p className="text-xs text-muted-foreground">
-          From the joining week up to 12 weeks ahead{minWeekStr ? '; not before the employee joining week' : ''}.
+          {weekOptions.length} weeks available (up to 12 weeks ahead{joiningMondayStr ? ', from joining week' : ', back to 8 weeks'}).
         </p>
       </div>
       <div className="flex justify-end gap-3 pt-2">
