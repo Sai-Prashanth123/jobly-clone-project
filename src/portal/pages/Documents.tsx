@@ -14,6 +14,7 @@ import { EmptyState } from '../components/shared/EmptyState';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { DocumentPreviewDialog } from '../components/shared/DocumentPreviewDialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import {
   useEmployee,
   useEmployees,
@@ -90,6 +91,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
   const upload = useUploadEmployeeDocument(employee.id);
   const remove = useDeleteEmployeeDocument(employee.id);
   const [docType, setDocType] = useState('');
+  const [customName, setCustomName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [expiryDate, setExpiryDate] = useState('');
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
@@ -106,12 +108,13 @@ function DocumentManager({ employee }: { employee: Employee }) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('name', file.name);
-    fd.append('docType', docType);
+    fd.append('docType', docType === 'Other' && customName.trim() ? customName.trim() : docType);
     if (expiryDate) fd.append('expiryDate', expiryDate);
     try {
       await upload.mutateAsync(fd);
       toast.success(`${file.name} uploaded`);
       setDocType('');
+      setCustomName('');
       setFile(null);
       setExpiryDate('');
       const input = document.getElementById('doc-file') as HTMLInputElement | null;
@@ -149,7 +152,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <div className="space-y-1">
               <Label className="text-xs font-medium">1. Document type *</Label>
-              <Select value={docType} onValueChange={v => { setDocType(v); setExpiryDate(''); }}>
+              <Select value={docType} onValueChange={v => { setDocType(v); setExpiryDate(''); if (v !== 'Other') setCustomName(''); }}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>
                   {DOC_TYPES.map(t => (
@@ -157,6 +160,13 @@ function DocumentManager({ employee }: { employee: Employee }) {
                   ))}
                 </SelectContent>
               </Select>
+              {docType === 'Other' && (
+                <Input
+                  value={customName}
+                  onChange={e => setCustomName(e.target.value)}
+                  placeholder="Document name (e.g. Training Certificate)…"
+                />
+              )}
             </div>
             <div className="space-y-1">
               <Label className="text-xs font-medium">2. Pick a file *</Label>
@@ -172,10 +182,9 @@ function DocumentManager({ employee }: { employee: Employee }) {
               <Label className="text-xs font-medium">
                 3. Expiry date {showExpiry ? <span className="text-amber-600">(recommended)</span> : <span className="text-gray-400">(optional)</span>}
               </Label>
-              <Input
-                type="date"
+              <UsDateInput
                 value={expiryDate}
-                onChange={e => setExpiryDate(e.target.value)}
+                onChange={setExpiryDate}
                 className={showExpiry ? 'border-amber-300 focus:ring-amber-400' : ''}
               />
             </div>
@@ -183,7 +192,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
               <Button
                 type="button"
                 onClick={handleUpload}
-                disabled={!docType || !file}
+                disabled={!docType || !file || (docType === 'Other' && !customName.trim())}
                 loading={upload.isPending}
                 loadingText="Uploading…"
                 className="w-full gap-2"

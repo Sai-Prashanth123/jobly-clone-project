@@ -23,7 +23,7 @@ const ID_DOC_LABELS: Record<string, string> = {
   ead: 'Employment Authorization Document',
   opt_card: 'OPT Card',
   stem_opt_card: 'STEM OPT Card',
-  i983: 'I-983 Training Plan',
+  i983: 'I-983',
   i94: 'I-94',
   us_visa: 'US Visa',
 };

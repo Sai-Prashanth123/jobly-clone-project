@@ -10,6 +10,7 @@ import type { Assignment, AssignmentStatus, BillingType } from '../../types';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useClients } from '../../hooks/useClients';
 import { parseNumberInput } from '../../lib/utils';
+import { UsDateInput } from '../shared/UsDateInput';
 
 type AssignmentFormData = Omit<Assignment, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -128,13 +129,13 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
 
           <div className="space-y-2">
             <Label>Start Date *</Label>
-            <Input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
+            <UsDateInput value={form.startDate} onChange={iso => set('startDate', iso)} />
             {errors.startDate && <p className="text-xs text-red-500">{errors.startDate}</p>}
           </div>
 
           <div className="space-y-2">
             <Label>End Date</Label>
-            <Input type="date" value={form.endDate ?? ''} onChange={e => set('endDate', e.target.value)} />
+            <UsDateInput value={form.endDate ?? ''} onChange={iso => set('endDate', iso)} />
           </div>
 
           <div className="space-y-2">

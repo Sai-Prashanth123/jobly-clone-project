@@ -2,11 +2,11 @@ import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Input } from '@/components/ui/input';
 import { Loader2, Download, TrendingUp } from 'lucide-react';
 import { useProfitLoss } from '../../hooks/useReports';
 import { exportToCsv } from '../../lib/exportCsv';
 import { formatCurrency } from '../../lib/utils';
+import { UsDateInput } from '../shared/UsDateInput';
 
 function getYearRange(year: number) {
   return { start: `${year}-01-01`, end: `${year}-12-31` };
@@ -67,9 +67,9 @@ export function ProfitLossReport() {
                 </Select>
                 {yearMode === 'custom' && (
                   <>
-                    <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 text-sm w-36" />
+                    <UsDateInput value={customStart} onChange={setCustomStart} className="w-36" />
                     <span className="text-gray-400 text-sm">–</span>
-                    <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 text-sm w-36" />
+                    <UsDateInput value={customEnd} onChange={setCustomEnd} className="w-36" />
                   </>
                 )}
               </div>
@@ -190,7 +190,7 @@ export function ProfitLossReport() {
                                 <tr key={i} className="border-t border-gray-100 hover:bg-gray-50">
                                   <td className="py-2 pr-4 font-mono text-blue-600">{row.invoiceNumber}</td>
                                   <td className="py-2 pr-4">{row.clientName}</td>
-                                  <td className="py-2 pr-4 text-muted-foreground">{row.date ? new Date(row.date + 'T00:00:00').toLocaleDateString() : '—'}</td>
+                                  <td className="py-2 pr-4 text-muted-foreground">{row.date ? new Date(row.date + 'T00:00:00').toLocaleDateString('en-US') : '—'}</td>
                                   <td className="py-2 pr-4 font-medium">{formatCurrency(row.amount)}</td>
                                   <td className="py-2 pr-4">
                                     <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${row.status === 'paid' ? 'bg-emerald-100 text-emerald-700' : row.status === 'overdue' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700'}`}>

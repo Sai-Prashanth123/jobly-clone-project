@@ -118,7 +118,7 @@ export default function PeerFeedback() {
                         {r.revieweeTitle && <p className="text-sm text-gray-500">{r.revieweeTitle}</p>}
                         <p className="text-xs text-gray-400 mt-1">Cycle: {r.cycleName}</p>
                         <p className="text-xs text-green-600 mt-0.5 flex items-center gap-1">
-                          <CheckCircle2 className="h-3.5 w-3.5" /> Submitted {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString() : ''}
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Submitted {r.submittedAt ? new Date(r.submittedAt).toLocaleDateString('en-US') : ''}
                         </p>
                       </div>
                       <div className="text-right">

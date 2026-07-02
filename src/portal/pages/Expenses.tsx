@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { Loader2, Plus, Receipt, Send, Check, X, DollarSign, FileText, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
@@ -313,7 +314,7 @@ export default function Expenses() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="exp-date">Date *</Label>
-                <Input id="exp-date" type="date" value={form.expenseDate} onChange={e => setForm(p => ({ ...p, expenseDate: e.target.value }))} />
+                <UsDateInput id="exp-date" value={form.expenseDate} onChange={iso => setForm(p => ({ ...p, expenseDate: iso }))} />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">

@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { useShifts, useCreateShift, useUpdateShift, useDeleteShift, SHIFT_COLORS, type ShiftType, type Shift } from '../hooks/useShifts';
 import { useEmployees } from '../hooks/useEmployees';
 
@@ -127,7 +128,7 @@ export default function ShiftSchedule() {
                 <SelectContent>{activeEmp.map(e => <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1"><Label>Date *</Label><Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} /></div>
+            <div className="space-y-1"><Label>Date *</Label><UsDateInput value={form.date} onChange={iso => setForm(p => ({ ...p, date: iso }))} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Start Time</Label><Input type="time" value={form.startTime} onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} /></div>
               <div className="space-y-1"><Label>End Time</Label><Input type="time" value={form.endTime} onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} /></div>

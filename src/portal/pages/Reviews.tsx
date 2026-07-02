@@ -28,6 +28,7 @@ import {
   type ReviewCycle, type CycleStatus, type ReviewType,
 } from '../hooks/useReviews';
 import { useEmployees } from '../hooks/useEmployees';
+import { UsDateInput } from '../components/shared/UsDateInput';
 
 const STATUS_COLORS: Record<CycleStatus, string> = {
   draft:          'bg-gray-100 text-gray-600',
@@ -92,15 +93,15 @@ function CycleForm({ form, setForm, error }: CycleFormProps) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="space-y-1">
           <Label>Self-Assessment Due</Label>
-          <Input type="date" value={form.selfAssessmentDue} onChange={e => setForm(p => ({ ...p, selfAssessmentDue: e.target.value }))} />
+          <UsDateInput value={form.selfAssessmentDue} onChange={iso => setForm(p => ({ ...p, selfAssessmentDue: iso }))} />
         </div>
         <div className="space-y-1">
           <Label>Peer Feedback Due</Label>
-          <Input type="date" value={form.peerFeedbackDue} onChange={e => setForm(p => ({ ...p, peerFeedbackDue: e.target.value }))} />
+          <UsDateInput value={form.peerFeedbackDue} onChange={iso => setForm(p => ({ ...p, peerFeedbackDue: iso }))} />
         </div>
         <div className="space-y-1">
           <Label>Manager Review Due</Label>
-          <Input type="date" value={form.managerReviewDue} onChange={e => setForm(p => ({ ...p, managerReviewDue: e.target.value }))} />
+          <UsDateInput value={form.managerReviewDue} onChange={iso => setForm(p => ({ ...p, managerReviewDue: iso }))} />
         </div>
       </div>
     </div>

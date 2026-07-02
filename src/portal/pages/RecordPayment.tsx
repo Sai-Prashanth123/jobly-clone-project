@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormPageShell } from '../components/shared/FormPageShell';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { useInvoice, useRecordPayment } from '../hooks/useInvoices';
 import { formatCurrency, parseNumberInput } from '../lib/utils';
 
@@ -86,7 +87,7 @@ export default function RecordPayment() {
             </div>
             <div className="space-y-1.5">
               <Label>Date</Label>
-              <Input type="date" value={form.paidOn} onChange={e => setForm(f => ({ ...f, paidOn: e.target.value }))} />
+              <UsDateInput value={form.paidOn} onChange={iso => setForm(f => ({ ...f, paidOn: iso }))} />
             </div>
           </div>
           <div className="space-y-1.5">

@@ -10,6 +10,7 @@ import { Trash2, PlusCircle, Loader2 } from 'lucide-react';
 import type { Client, BillingType } from '../../types';
 import { useClient, useUploadClientDocument } from '../../hooks/useClients';
 import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
+import { UsDateInput } from '../shared/UsDateInput';
 import { formatDate, parseNumberInput } from '../../lib/utils';
 import { toast } from 'sonner';
 
@@ -260,12 +261,12 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
           <Card><CardContent className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Contract Start Date *</Label>
-              <Input type="date" value={form.contractStartDate} onChange={e => set('contractStartDate', e.target.value)} />
+              <UsDateInput value={form.contractStartDate} onChange={iso => set('contractStartDate', iso)} />
               {errors.contractStartDate && <p className="text-xs text-red-500">{errors.contractStartDate}</p>}
             </div>
             <div className="space-y-2">
               <Label>Contract End Date</Label>
-              <Input type="date" value={form.contractEndDate ?? ''} onChange={e => set('contractEndDate', e.target.value || null)} />
+              <UsDateInput value={form.contractEndDate ?? ''} onChange={iso => set('contractEndDate', iso || null)} />
             </div>
             <div className="space-y-2">
               <Label>Billing Type</Label>

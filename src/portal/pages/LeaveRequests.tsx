@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Plus, Check, X, Ban } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -10,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/utils';
 import {
@@ -236,13 +236,13 @@ export default function LeaveRequests() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>From</Label>
-                <Input type="date" min={today()} value={form.startDate}
-                  onChange={e => setForm(f => ({ ...f, startDate: e.target.value, endDate: f.endDate < e.target.value ? e.target.value : f.endDate }))} />
+                <UsDateInput min={today()} value={form.startDate}
+                  onChange={iso => setForm(f => ({ ...f, startDate: iso, endDate: f.endDate < iso ? iso : f.endDate }))} />
               </div>
               <div className="space-y-1.5">
                 <Label>To</Label>
-                <Input type="date" min={form.startDate} value={form.endDate}
-                  onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
+                <UsDateInput min={form.startDate} value={form.endDate}
+                  onChange={iso => setForm(f => ({ ...f, endDate: iso }))} />
               </div>
             </div>
             {holidayConflicts.length > 0 && (

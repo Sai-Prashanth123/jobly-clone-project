@@ -8,6 +8,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CheckCircle, XCircle, Send } from 'lucide-react';
 import type { Timesheet } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
+import { UsDateInput } from '../shared/UsDateInput';
 
 const todayStr = () => new Date().toISOString().split('T')[0];
 
@@ -140,10 +141,9 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
               </div>
               <div className="space-y-1">
                 <Label>Approval date</Label>
-                <Input
-                  type="date"
+                <UsDateInput
                   value={clientApprovalDate}
-                  onChange={e => setClientApprovalDate(e.target.value)}
+                  onChange={setClientApprovalDate}
                 />
               </div>
               <div className="space-y-1">

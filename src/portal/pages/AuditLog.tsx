@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuditLog } from '../hooks/useAnalytics';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { format } from 'date-fns';
 
 const ACTIONS = ['created','updated','deleted','status_changed','sent','uploaded_client_proof','downloaded_pdf','requested_changes','reopened'];
@@ -44,8 +45,8 @@ export default function AuditLog() {
             {ACTIONS.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
           </SelectContent>
         </Select>
-        <Input type="date" className="w-40" value={startDate} onChange={e => { setStartDate(e.target.value); setPage(1); }} />
-        <Input type="date" className="w-40" value={endDate} onChange={e => { setEndDate(e.target.value); setPage(1); }} />
+        <UsDateInput className="w-40" value={startDate} onChange={iso => { setStartDate(iso); setPage(1); }} />
+        <UsDateInput className="w-40" value={endDate} onChange={iso => { setEndDate(iso); setPage(1); }} />
       </div>
 
       {/* Table */}

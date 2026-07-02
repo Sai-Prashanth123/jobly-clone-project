@@ -19,6 +19,7 @@ import { useProducts } from '../../hooks/useProducts';
 import { useUploadInvoiceAttachment, useDeleteInvoiceAttachment, type CreateInvoiceBody } from '../../hooks/useInvoices';
 import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates';
 import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
+import { UsDateInput } from '../shared/UsDateInput';
 import type { InvoiceAttachment, InvoiceStatus } from '../../types';
 
 // Prefill shape for edit-draft mode (mapped from an existing draft invoice).
@@ -378,7 +379,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
               </div>
               <div className="space-y-1.5">
                 <Label>Issue date</Label>
-                <Input type="date" value={issueDate} onChange={e => setIssueDate(e.target.value)} />
+                <UsDateInput value={issueDate} onChange={setIssueDate} />
               </div>
               <div className="space-y-1.5">
                 <Label>Payment terms</Label>
@@ -392,7 +393,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
               <div className="space-y-1.5">
                 <Label>{paymentTerms === 'custom' ? 'Due date' : 'Due date (auto)'}</Label>
                 {paymentTerms === 'custom'
-                  ? <Input type="date" value={customDueDate} onChange={e => setCustomDueDate(e.target.value)} />
+                  ? <UsDateInput value={customDueDate} onChange={setCustomDueDate} />
                   : <Input value={dueDate} disabled />}
               </div>
               {(invoiceThemes && invoiceThemes.length > 0) && (

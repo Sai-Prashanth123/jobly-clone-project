@@ -10,9 +10,9 @@ import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { DocumentPreviewDialog } from '../components/shared/DocumentPreviewDialog';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials,
@@ -853,13 +853,13 @@ export default function EmployeeDetail() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="leave-start">Leave starts</Label>
-              <Input id="leave-start" type="date" value={leaveStart}
-                onChange={(e) => setLeaveStart(e.target.value)} disabled={placeOnLeave.isPending} />
+              <UsDateInput id="leave-start" value={leaveStart}
+                onChange={setLeaveStart} disabled={placeOnLeave.isPending} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="leave-return">Expected return</Label>
-              <Input id="leave-return" type="date" value={leaveReturn} min={leaveStart || todayStr}
-                onChange={(e) => setLeaveReturn(e.target.value)} disabled={placeOnLeave.isPending} />
+              <UsDateInput id="leave-return" value={leaveReturn} min={leaveStart || todayStr}
+                onChange={setLeaveReturn} disabled={placeOnLeave.isPending} />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="leave-reason">Reason <span className="text-muted-foreground font-normal">(optional)</span></Label>
@@ -907,8 +907,8 @@ export default function EmployeeDetail() {
           <div className="grid grid-cols-1 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="term-date">Effective date</Label>
-              <Input id="term-date" type="date" value={terminateDate}
-                onChange={(e) => setTerminateDate(e.target.value)} disabled={terminateEmployee.isPending} />
+              <UsDateInput id="term-date" value={terminateDate}
+                onChange={setTerminateDate} disabled={terminateEmployee.isPending} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="term-reason">Reason <span className="text-muted-foreground font-normal">(optional)</span></Label>

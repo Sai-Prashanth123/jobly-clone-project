@@ -53,7 +53,7 @@ export function computeHours(start: string, end: string): number {
 
 /**
  * Build one row per calendar day for the month. Weekends are auto-marked
- * 'weekend' and locked; weekdays default to 'present' 09:00–17:30.
+ * 'weekend' and locked; weekdays default to 'present' 09:00–17:00.
  */
 export function buildMonthSkeleton(year: number, month: number): MonthlyTimesheetEntry[] {
   const total = daysInMonth(year, month);
@@ -68,8 +68,8 @@ export function buildMonthSkeleton(year: number, month: number): MonthlyTimeshee
       project: '',
       task: '',
       startTime: isWeekend ? '' : '09:00',
-      endTime: isWeekend ? '' : '17:30',
-      hours: isWeekend ? 0 : computeHours('09:00', '17:30'),
+      endTime: isWeekend ? '' : '17:00',
+      hours: isWeekend ? 0 : computeHours('09:00', '17:00'),
       status: (isWeekend ? 'weekend' : 'present') as MonthlyDayStatus,
     });
   }

@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PageHeader } from '../components/shared/PageHeader';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { useAuth } from '../hooks/useAuth';
 import {
   useAnnouncements,
@@ -314,10 +315,9 @@ export default function Announcements() {
 
               <div className="space-y-1.5">
                 <Label>Expires (optional)</Label>
-                <Input
-                  type="date"
+                <UsDateInput
                   value={form.expiresAt}
-                  onChange={e => setForm(f => ({ ...f, expiresAt: e.target.value }))}
+                  onChange={iso => setForm(f => ({ ...f, expiresAt: iso }))}
                 />
               </div>
             </div>

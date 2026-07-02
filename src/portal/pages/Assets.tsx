@@ -7,6 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { Loader2, Plus, Package, User, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
@@ -312,7 +313,7 @@ export default function Assets() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label htmlFor="ast-purchase-date">Purchase Date</Label>
-                <Input id="ast-purchase-date" type="date" value={form.purchaseDate} onChange={e => setForm(p => ({ ...p, purchaseDate: e.target.value }))} />
+                <UsDateInput id="ast-purchase-date" value={form.purchaseDate} onChange={iso => setForm(p => ({ ...p, purchaseDate: iso }))} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ast-price">Purchase Price</Label>
@@ -322,7 +323,7 @@ export default function Assets() {
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ast-warranty">Warranty Expiry</Label>
-              <Input id="ast-warranty" type="date" value={form.warrantyExpiry} onChange={e => setForm(p => ({ ...p, warrantyExpiry: e.target.value }))} />
+              <UsDateInput id="ast-warranty" value={form.warrantyExpiry} onChange={iso => setForm(p => ({ ...p, warrantyExpiry: iso }))} />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ast-notes">Notes</Label>

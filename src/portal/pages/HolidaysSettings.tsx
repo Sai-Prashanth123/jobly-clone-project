@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { useHolidays, useCreateHoliday, useUpdateHoliday, useDeleteHoliday, type Holiday } from '../hooks/useHolidays';
 import { format } from 'date-fns';
 
@@ -71,7 +72,7 @@ export default function HolidaysSettings() {
           {error && <p className="text-sm text-red-600 flex gap-1"><AlertCircle className="h-4 w-4 mt-0.5" />{error}</p>}
           <div className="space-y-3">
             <div className="space-y-1"><Label>Name *</Label><Input value={form.name} onChange={e => setForm(p => ({ ...p, name: e.target.value }))} /></div>
-            <div className="space-y-1"><Label>Date *</Label><Input type="date" value={form.date} onChange={e => setForm(p => ({ ...p, date: e.target.value }))} /></div>
+            <div className="space-y-1"><Label>Date *</Label><UsDateInput value={form.date} onChange={iso => setForm(p => ({ ...p, date: iso }))} /></div>
             <label className="flex items-center gap-2 text-sm">
               <input type="checkbox" checked={form.isRecurring} onChange={e => setForm(p => ({ ...p, isRecurring: e.target.checked }))} className="h-4 w-4 rounded" />
               Recurring annually

@@ -45,16 +45,15 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
 
   const selectedEmp = selectedAsgn ? employees.find(e => e.id === selectedAsgn.employeeId) : undefined;
 
-  // Earliest valid Monday: employee joining week (or 8 weeks ago if no joining date, so HR can back-fill)
+  // Earliest valid Monday: the employee's joining week — HR can back-fill any week
+  // since the hire date (matches the backend's only floor: isWeekBeforeJoiningUTC).
+  // No joining date on record → fall back to 26 weeks back.
   const currentMondayStr = getMondayOfWeek(new Date()).toISOString().split('T')[0];
   const joiningMondayStr = selectedEmp?.startDate
     ? getMondayOfWeek(new Date(selectedEmp.startDate)).toISOString().split('T')[0]
     : undefined;
-  // Allow back-filling up to 8 past weeks, but never before the joining week
-  const pastCutoff = getMondayOfWeek(new Date(Date.now() - 8 * 7 * 86400000)).toISOString().split('T')[0];
-  const minWeekStr = joiningMondayStr
-    ? joiningMondayStr > pastCutoff ? joiningMondayStr : pastCutoff
-    : pastCutoff;
+  const fallbackCutoff = getMondayOfWeek(new Date(Date.now() - 26 * 7 * 86400000)).toISOString().split('T')[0];
+  const minWeekStr = joiningMondayStr ?? fallbackCutoff;
   const maxWeekStr = getMondayOfWeek(new Date(Date.now() + 12 * 7 * 86400000)).toISOString().split('T')[0];
 
   // Build the list of valid Mondays between min and max
@@ -71,7 +70,9 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
       options.push({ value: val, label: `${fmt(cur)} – ${fmt(sun)}` });
       cur = new Date(Date.UTC(cur.getUTCFullYear(), cur.getUTCMonth(), cur.getUTCDate() + 7));
     }
-    return options;
+    // Newest first — the joining week can be years back, and recent weeks are
+    // what users pick most often.
+    return options.reverse();
   }, [minWeekStr, maxWeekStr]);
 
   // When the assignment changes (and thus min changes), clamp weekStart to a valid option
@@ -149,7 +150,7 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">
-          {weekOptions.length} weeks available (up to 12 weeks ahead{joiningMondayStr ? ', from joining week' : ', back to 8 weeks'}).
+          {weekOptions.length} weeks available ({joiningMondayStr ? 'from the joining week' : 'up to 26 weeks back'} to 12 weeks ahead).
         </p>
       </div>
       <div className="flex justify-end gap-3 pt-2">

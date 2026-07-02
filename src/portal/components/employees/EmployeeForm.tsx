@@ -11,6 +11,7 @@ import type { Employee, EmployeeStatus, EmploymentType, PayType, VisaType, I9Sta
 import { useEmployees, useUploadEmployeeDocument } from '../../hooks/useEmployees';
 import { generateId } from '../../lib/idGenerators';
 import { formatDate, parseNumberInput } from '../../lib/utils';
+import { UsDateInput } from '../shared/UsDateInput';
 import { toast } from 'sonner';
 
 type EmployeeFormData = Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>;
@@ -212,7 +213,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
             </div>
             <div className="space-y-2">
               <Label>Date of Birth *</Label>
-              <Input type="date" value={form.dob} onChange={e => { set('dob', e.target.value); setErrors(p => ({ ...p, dob: '' })); }} />
+              <UsDateInput value={form.dob} onChange={iso => { set('dob', iso); setErrors(p => ({ ...p, dob: '' })); }} />
               {errors.dob && <p className="text-xs text-red-500">{errors.dob}</p>}
             </div>
             <div className="col-span-1 sm:col-span-2 space-y-2">
@@ -270,7 +271,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
             </div>
             <div className="space-y-2">
               <Label>Start Date *</Label>
-              <Input type="date" value={form.startDate} onChange={e => set('startDate', e.target.value)} />
+              <UsDateInput value={form.startDate} onChange={iso => set('startDate', iso)} />
               {errors.startDate && <p className="text-xs text-red-500">{errors.startDate}</p>}
             </div>
             <div className="space-y-2">
@@ -331,7 +332,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
             </div>
             <div className="space-y-2">
               <Label>Work Authorization Expiry *</Label>
-              <Input type="date" value={form.visaExpiry ?? ''} onChange={e => { set('visaExpiry', e.target.value); setErrors(p => ({ ...p, visaExpiry: '' })); }} />
+              <UsDateInput value={form.visaExpiry ?? ''} onChange={iso => { set('visaExpiry', iso); setErrors(p => ({ ...p, visaExpiry: '' })); }} />
               {errors.visaExpiry && <p className="text-xs text-red-500">{errors.visaExpiry}</p>}
             </div>
             <div className="space-y-2">

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FormPageShell } from '../components/shared/FormPageShell';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { useRecurringTemplates, useCreateRecurring, useUpdateRecurring } from '../hooks/useRecurring';
 import { useClients } from '../hooks/useClients';
 import { parseNumberInput } from '../lib/utils';
@@ -112,7 +113,7 @@ export default function RecurringEditor() {
                 <SelectContent>{FREQUENCIES.map(fr => <SelectItem key={fr} value={fr} className="capitalize">{fr}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1.5"><Label>Start date</Label><Input type="date" value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} /></div>
+            <div className="space-y-1.5"><Label>Start date</Label><UsDateInput value={form.startDate} onChange={iso => setForm(f => ({ ...f, startDate: iso }))} /></div>
             <div className="space-y-1.5">
               <Label>Payment terms</Label>
               <Select value={form.paymentTerms} onValueChange={v => setForm(f => ({ ...f, paymentTerms: v }))}>
@@ -131,7 +132,7 @@ export default function RecurringEditor() {
                 </SelectContent>
               </Select>
             </div>
-            {form.endMode === 'on_date' && <div className="space-y-1.5"><Label>End date</Label><Input type="date" value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} /></div>}
+            {form.endMode === 'on_date' && <div className="space-y-1.5"><Label>End date</Label><UsDateInput value={form.endDate} onChange={iso => setForm(f => ({ ...f, endDate: iso }))} /></div>}
             {form.endMode === 'after_count' && <div className="space-y-1.5"><Label>Number of invoices</Label><Input type="number" min={1} value={form.maxOccurrences} onChange={e => setForm(f => ({ ...f, maxOccurrences: e.target.value }))} /></div>}
             <div className="space-y-1.5"><Label>Tax %</Label><Input type="number" min={0} max={100} step="any" placeholder="0" value={form.taxRate} onChange={e => setForm(f => ({ ...f, taxRate: e.target.value }))} /></div>
           </CardContent>

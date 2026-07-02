@@ -16,6 +16,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { PageHeader } from '../components/shared/PageHeader';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
+import { UsDateInput } from '../components/shared/UsDateInput';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
@@ -149,8 +150,8 @@ const IDENTITY_DOC_ROWS: Array<{
     hint: 'EAD card issued during Optional Practical Training (OPT).', hasExpiry: true },
   { type: 'stem_opt_card', label: 'STEM OPT Card',                    placeholder: 'C12345678',
     hint: 'EAD card for STEM OPT 24-month extension.', hasExpiry: true },
-  { type: 'i983',          label: 'I-983 Training Plan',              placeholder: '',
-    hint: 'Required for STEM OPT — signed I-983 from employer and school.', hasExpiry: true },
+  { type: 'i983',          label: 'I-983',                            placeholder: '',
+    hint: 'For OPT / STEM OPT candidates — signed I-983 from employer and school.', hasExpiry: true },
   { type: 'i94',           label: 'I-94',                             placeholder: '12345678901',
     hint: 'Arrival/Departure Record — download from cbp.dhs.gov.', hasExpiry: true },
   { type: 'us_visa',       label: 'US Visa',                          placeholder: 'A12345678',
@@ -566,12 +567,12 @@ export default function NewEmployee() {
     const permFilled = form.permanentSameAsPresent
       ? presentFilled
       : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
-    // OPT/STEM OPT holders need I-983 + OPT card uploads
+    // OPT/STEM OPT holders need the OPT card upload. I-983 is OPTIONAL (shown
+    // only to OPT candidates in the Identity section, never required).
     const isOptHolder = form.visaType === 'opt' || form.visaType === 'stem_opt';
     const optDocs = isOptHolder
       ? [
           { id: 'doc_opt_card', label: 'OPT Card', section: SECTION_IDS.documents, done: uploadedDocTypes.has('OPT Card') },
-          { id: 'doc_i983',     label: 'I-983 Training Plan', section: SECTION_IDS.documents, done: uploadedDocTypes.has('I-983 Form') },
         ]
       : [];
     return [
@@ -593,8 +594,8 @@ export default function NewEmployee() {
       { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim() && Number(e.passYear) > 0) },
       // Emergency — address is now required
       { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
-      // Required identity documents (SSN, Passport, I-94, US Visa) — uploaded in Identity section
-      // Also require expiry dates for docs that have hasExpiry (Passport, I-94, US Visa).
+      // Required identity documents (SSN, Passport, I-94) — uploaded in Identity section
+      // Also require expiry dates for docs that have hasExpiry (Passport, I-94).
       ...REQUIRED_IDENTITY_TYPES.flatMap(t => {
         const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
         const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
@@ -1492,7 +1493,7 @@ export default function NewEmployee() {
                 </div>
                 <div>
                   <Label>Date of Birth {isOnboarding && <RequiredMark />}</Label>
-                  <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={form.dob} onChange={e => set('dob', e.target.value)} onBlur={() => { if (isOnboarding && !form.dob) setErrors(p => ({ ...p, dob: 'Date of birth is required' })); }} />
+                  <UsDateInput value={form.dob} onChange={iso => { set('dob', iso); if (isOnboarding && !iso) setErrors(p => ({ ...p, dob: 'Date of birth is required' })); }} />
                   <FieldError msg={errors.dob} />
                 </div>
                 <div>
@@ -1815,7 +1816,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Work Authorization Expiry</Label>
-                <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={form.visaExpiry} onChange={e => set('visaExpiry', e.target.value)} />
+                <UsDateInput value={form.visaExpiry} onChange={iso => set('visaExpiry', iso)} />
                 {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />
               </div>
@@ -1862,11 +1863,17 @@ export default function NewEmployee() {
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description="Upload your identity documents. SSN, Passport, I-94, and US Visa are required during onboarding."
+            description="Upload your identity documents. SSN, Passport, and I-94 are required during onboarding."
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {IDENTITY_DOC_ROWS.map(row => {
+              {IDENTITY_DOC_ROWS.filter(row => {
+                // OPT-specific documents only apply to OPT / STEM OPT candidates.
+                if (['i983', 'opt_card', 'stem_opt_card'].includes(row.type)) {
+                  return form.visaType === 'opt' || form.visaType === 'stem_opt';
+                }
+                return true;
+              }).map(row => {
                 const file = form.identityDocFiles[row.type];
                 const doc = getIdentityDoc(row.type);
                 const inputId = `id-doc-file-${row.type}`;
@@ -1893,12 +1900,9 @@ export default function NewEmployee() {
                         <Label className="text-[11px] font-medium text-gray-500">
                           Expiry Date {isOnboarding && isRequired && <RequiredMark />}
                         </Label>
-                        <Input
-                          type="date"
-                          lang="en-US"
-                          placeholder="MM/DD/YYYY"
+                        <UsDateInput
                           value={doc.expiry ?? ''}
-                          onChange={e => upsertIdentityDoc(row.type, { expiry: e.target.value })}
+                          onChange={iso => upsertIdentityDoc(row.type, { expiry: iso })}
                           className={missingExpiry ? 'border-red-300' : ''}
                         />
                         {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
@@ -2031,11 +2035,11 @@ export default function NewEmployee() {
                     </div>
                     <div>
                       <Label className="text-[11px]">From</Label>
-                      <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={row.fromDate ?? ''} onChange={e => updateWorkHistory(idx, 'fromDate', e.target.value)} />
+                      <UsDateInput value={row.fromDate ?? ''} onChange={iso => updateWorkHistory(idx, 'fromDate', iso)} />
                     </div>
                     <div>
                       <Label className="text-[11px]">To</Label>
-                      <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={row.toDate ?? ''} onChange={e => updateWorkHistory(idx, 'toDate', e.target.value)} />
+                      <UsDateInput value={row.toDate ?? ''} onChange={iso => updateWorkHistory(idx, 'toDate', iso)} />
                     </div>
                     <div className="sm:col-span-3">
                       <Label className="text-[11px]">Reason for Leaving</Label>
@@ -2397,7 +2401,7 @@ export default function NewEmployee() {
                 </div>
                 <div className="space-y-1.5">
                   <Label>Date</Label>
-                  <Input type="date" lang="en-US" placeholder="MM/DD/YYYY" value={form.signatureDate} onChange={e => set('signatureDate', e.target.value)} />
+                  <UsDateInput value={form.signatureDate} onChange={iso => set('signatureDate', iso)} />
                 </div>
               </div>
             </div>

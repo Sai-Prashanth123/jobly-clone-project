@@ -7,6 +7,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useState } from 'react';
+import { UsDateInput } from '../shared/UsDateInput';
 
 interface DateRangePresetPickerProps {
   label: string;
@@ -104,26 +105,24 @@ export function DateRangePresetPicker({
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="text-xs text-muted-foreground">Start</label>
-            <input
-              type="date"
+            <UsDateInput
               value={startDate}
-              onChange={e => {
+              onChange={iso => {
                 setPreset('custom');
-                onStartDateChange(e.target.value);
+                onStartDateChange(iso);
               }}
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full"
             />
           </div>
           <div>
             <label className="text-xs text-muted-foreground">End</label>
-            <input
-              type="date"
+            <UsDateInput
               value={endDate}
-              onChange={e => {
+              onChange={iso => {
                 setPreset('custom');
-                onEndDateChange(e.target.value);
+                onEndDateChange(iso);
               }}
-              className="w-full h-9 rounded-md border border-input bg-background px-3 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+              className="w-full"
             />
           </div>
         </div>

@@ -130,13 +130,14 @@ export default function MyMonthlyTimesheet() {
     : false;
 
   // Submit-time gates the frontend mirrors so the button + helper text are honest.
+  // Client-signed proof is OPTIONAL — it can be attached before or after submit.
   const needsLeaveReason = totalHours === 0 && !!(sheet || dirty);
-  const needsClientProof = totalHours > 0;
+  const showClientProofCard = totalHours > 0;
   const hasClientProof = !!sheet?.clientSignedUrl;
   const canSubmit = !isLocked
     && !periodClosed
     && !beforeJoining
-    && (needsLeaveReason ? !!leaveReason : hasClientProof);
+    && (!needsLeaveReason || !!leaveReason);
 
   // Hydrate the grid when the (employee, month) data lands.
   useEffect(() => {
@@ -193,7 +194,7 @@ export default function MyMonthlyTimesheet() {
       if ('status' in patch) {
         if (patch.status === 'present') {
           next.startTime = next.startTime || '09:00';
-          next.endTime = next.endTime || '17:30';
+          next.endTime = next.endTime || '17:00';
           next.hours = computeHours(next.startTime, next.endTime);
         } else if (patch.status === 'leave' || patch.status === 'holiday' || patch.status === 'absent') {
           next.startTime = '';
@@ -592,12 +593,12 @@ export default function MyMonthlyTimesheet() {
             </div>
           )}
 
-          {/* Client-signed timesheet upload — required at submit-time when the
-              month has any working hours. Hidden entirely on zero-hour months
+          {/* Client-signed timesheet upload — optional attachment when the month
+              has any working hours. Hidden entirely on zero-hour months
               (no work means no client signature exists). */}
-          {!isLocked && !periodClosed && needsClientProof && (
+          {!isLocked && !periodClosed && showClientProofCard && (
             <div className="rounded-lg border border-gray-200 bg-gray-50/60 px-4 py-3">
-              <Label className="text-[12px] font-medium text-gray-800">Client-signed timesheet <span className="text-red-500">*</span></Label>
+              <Label className="text-[12px] font-medium text-gray-800">Client-signed timesheet <span className="text-muted-foreground font-normal">(optional)</span></Label>
               <p className="text-[11px] text-muted-foreground mb-2">Upload a PDF / image / DOC of the client-signed copy as proof. Max 20 MB.</p>
               {hasClientProof ? (
                 <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-white border border-emerald-200">
@@ -717,7 +718,6 @@ export default function MyMonthlyTimesheet() {
                 title={
                   periodClosed ? 'Past months are closed.'
                   : needsLeaveReason && !leaveReason ? 'Add a reason for the zero-hour month first.'
-                  : needsClientProof && !hasClientProof ? 'Upload the client-signed timesheet first.'
                   : undefined
                 }
               >

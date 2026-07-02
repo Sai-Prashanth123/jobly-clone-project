@@ -184,12 +184,11 @@ export default function TimesheetDetail() {
         });
         // non-blocking — continue to the other gates.
       }
+      // Client-signed proof is optional — nudge but never block.
       if (liveTotalHours > 0 && !timesheet.clientSignedUrl) {
-        toast.error('Upload the client-signed timesheet before submitting.', {
-          description: 'A signed copy is required as proof of the days worked.',
+        toast.warning('Submitting without a client-signed timesheet.', {
+          description: 'You can attach the signed copy later if the client requires it.',
         });
-        flagSection();
-        return;
       }
       if (liveTotalHours === 0 && !leaveReason) {
         toast.error('Select a reason for the zero-hour week before submitting.');
@@ -394,8 +393,8 @@ export default function TimesheetDetail() {
               </div>
             ) : (
               <div className="space-y-1.5">
-                <Label className="text-sm">Client-signed timesheet <span className="text-red-500">*</span></Label>
-                <p className="text-xs text-muted-foreground">Upload the client-signed copy as proof of days worked (PDF / image / DOC, max 20 MB). Required to submit.</p>
+                <Label className="text-sm">Client-signed timesheet <span className="text-muted-foreground font-normal">(optional)</span></Label>
+                <p className="text-xs text-muted-foreground">Upload the client-signed copy as proof of days worked (PDF / image / DOC, max 20 MB).</p>
                 {timesheet.clientSignedUrl ? (
                   <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-white border border-emerald-200 max-w-md">
                     <div className="flex items-center gap-2 min-w-0">

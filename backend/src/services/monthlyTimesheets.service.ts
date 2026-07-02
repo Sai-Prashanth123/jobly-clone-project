@@ -258,14 +258,9 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
   }
   // Submit-time gates:
   //  - Zero-hour periods (employee on leave) require leave_reason.
-  //  - Non-zero periods require a client-signed timesheet upload as proof.
-  //    If hours = 0 (leave / medical), the upload requirement is skipped —
-  //    no work means no client signature exists.
+  //  - Client-signed proof is OPTIONAL — it can be attached before or after submit.
   if ((row.total_hours ?? 0) === 0 && !row.leave_reason) {
     throw new ValidationError('Add a reason (e.g. medical leave, sick, unpaid leave) before submitting a zero-hour timesheet.');
-  }
-  if ((row.total_hours ?? 0) > 0 && !row.client_signed_url) {
-    throw new ValidationError('Upload the client-signed timesheet before submitting.');
   }
   // Leave conflict: a day marked Present with hours can't fall on APPROVED leave.
   // (Admin may override.)

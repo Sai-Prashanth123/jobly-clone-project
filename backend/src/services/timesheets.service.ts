@@ -226,15 +226,12 @@ export async function patchTimesheetStatus(
   // Timesheets are active from the joining date → future, so there is no
   // past/future week lockout here — only the content gates below:
   //  - Zero-hour weeks require leave_reason.
-  //  - Non-zero weeks require a client-signed timesheet upload.
+  //  - Client-signed proof is OPTIONAL (can be attached before or after submit).
   //  - No hours on a day the employee is on approved leave.
   if (action === 'submitted' && userRole !== 'admin') {
     const hours = Number(ts.total_hours ?? 0);
     if (hours === 0 && !ts.leave_reason) {
       throw new ValidationError('Add a reason (e.g. medical leave, sick, unpaid leave) before submitting a zero-hour timesheet.');
-    }
-    if (hours > 0 && !ts.client_signed_url) {
-      throw new ValidationError('Upload the client-signed timesheet before submitting.');
     }
     // Leave conflict: you can't bill hours on a day you're on APPROVED leave.
     // (Admin is exempt — handled by the outer `userRole !== 'admin'` guard.)
