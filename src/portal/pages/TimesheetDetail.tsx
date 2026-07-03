@@ -17,6 +17,7 @@ import { useEmployee } from '../hooks/useEmployees';
 import { useClient } from '../hooks/useClients';
 import { useAssignment } from '../hooks/useAssignments';
 import { useAuth } from '../hooks/useAuth';
+import { useHolidaysInRange } from '../hooks/useHolidays';
 import { formatDate, formatDateTime, formatCurrency } from '../lib/utils';
 import type { TimesheetEntry } from '../types';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
@@ -62,6 +63,12 @@ export default function TimesheetDetail() {
   const [submitAttention, setSubmitAttention] = useState(false);
   // Approved/pending leave per date for this week → grid overlay + submit guard.
   const { data: leaveByDate } = useTimesheetLeaveCheck(id);
+  // Company holidays falling within this week → grid overlay (informational only).
+  const { data: weekHolidays } = useHolidaysInRange(timesheet?.weekStartDate, timesheet?.weekEndDate);
+  const holidayByDate = useMemo(
+    () => Object.fromEntries(weekHolidays.map(h => [h.date, h])),
+    [weekHolidays],
+  );
 
   const isOwner = user?.employeeId === timesheet?.employeeId;
   const isAdmin = user?.role === 'admin';
@@ -346,6 +353,7 @@ export default function TimesheetDetail() {
             onChange={canEdit ? (entries) => { hasUserEdited.current = true; setLocalEntries(entries); } : undefined}
             readonly={!canEdit}
             leaveByDate={leaveByDate}
+            holidayByDate={holidayByDate}
           />
           {canEdit && (
             <div className="mt-4 space-y-1">

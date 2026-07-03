@@ -22,6 +22,7 @@ import {
   useUploadMonthlyClientProof, useDeleteMonthlyClientProof, useMonthlyLeaveCheck,
 } from '../hooks/useMonthlyTimesheets';
 import { LEAVE_TYPE_SHORT } from '../hooks/useTimesheets';
+import { useHolidays } from '../hooks/useHolidays';
 import { apiClient } from '../lib/apiClient';
 import {
   MONTHS, buildMonthSkeleton, computeHours, computeMonthlySummary,
@@ -98,8 +99,16 @@ export default function MyMonthlyTimesheet() {
   const { data: leaveByDate } = useMonthlyLeaveCheck(targetEmployeeId || undefined, loaded.year, loaded.month);
   const entriesTableRef = useRef<HTMLDivElement>(null);
 
+  // Company holidays for the loaded month/year, so a fresh skeleton pre-marks
+  // those days 'holiday' instead of leaving them as an ordinary workday.
+  const { data: yearHolidays, isLoading: holidaysLoading } = useHolidays(loaded.year);
+  const holidayDatesInMonth = useMemo(() => {
+    const prefix = `${loaded.year}-${String(loaded.month).padStart(2, '0')}-`;
+    return new Set((yearHolidays ?? []).filter(h => h.date.startsWith(prefix)).map(h => h.date));
+  }, [yearHolidays, loaded.year, loaded.month]);
+
   const [sheet, setSheet] = useState<MonthlyTimesheet | null>(null);
-  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month));
+  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
   const [notes, setNotes] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -139,27 +148,30 @@ export default function MyMonthlyTimesheet() {
     && !beforeJoining
     && (!needsLeaveReason || !!leaveReason);
 
-  // Hydrate the grid when the (employee, month) data lands.
+  // Hydrate the grid when the (employee, month) data lands. Also wait on the
+  // holidays fetch so a fresh skeleton has holiday days pre-marked from the
+  // start, rather than building blind and never retroactively updating (the
+  // hydratedKey guard below only runs this once per employee/month).
   useEffect(() => {
     if (!targetEmployeeId) return;
     const key = `${targetEmployeeId}-${loaded.year}-${loaded.month}`;
-    if (loadingMonth) return;
+    if (loadingMonth || holidaysLoading) return;
     if (hydratedKey.current === key) return;
     hydratedKey.current = key;
     if (serverSheet) {
       setSheet(serverSheet);
-      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month));
+      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
       setNotes(serverSheet.notes ?? '');
       setLeaveReason(serverSheet.leaveReason ?? '');
     } else {
       setSheet(null);
-      setEntries(buildMonthSkeleton(loaded.year, loaded.month));
+      setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
       setNotes('');
       setLeaveReason('');
     }
     setDirty(false);
     setSaveState('idle');
-  }, [serverSheet, loadingMonth, loaded.year, loaded.month, targetEmployeeId]);
+  }, [serverSheet, loadingMonth, holidaysLoading, holidayDatesInMonth, loaded.year, loaded.month, targetEmployeeId]);
 
   // Debounced draft auto-save (only while editable + after a real edit).
   // Skips for past (closed) periods — server would 400 the upsert anyway.
@@ -268,7 +280,7 @@ export default function MyMonthlyTimesheet() {
   };
 
   const handleClear = () => {
-    setEntries(buildMonthSkeleton(loaded.year, loaded.month));
+    setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
     setNotes('');
     setLeaveReason('');
     setDirty(true);

@@ -1,6 +1,7 @@
 import { Input } from '@/components/ui/input';
 import { parseNumberInput } from '../../lib/utils';
 import { type LeaveDayInfo, LEAVE_TYPE_SHORT } from '../../hooks/useTimesheets';
+import type { Holiday } from '../../hooks/useHolidays';
 import type { TimesheetEntry } from '../../types';
 
 interface TimesheetWeekGridProps {
@@ -10,6 +11,8 @@ interface TimesheetWeekGridProps {
   // Per-date approved/pending leave for this week — flags day columns where
   // logging hours conflicts with leave.
   leaveByDate?: Record<string, LeaveDayInfo>;
+  // Company holidays falling within this week — purely informational overlay.
+  holidayByDate?: Record<string, Holiday>;
 }
 
 function LeaveBadge({ info }: { info: LeaveDayInfo }) {
@@ -24,9 +27,21 @@ function LeaveBadge({ info }: { info: LeaveDayInfo }) {
   );
 }
 
-export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveByDate }: TimesheetWeekGridProps) {
+function HolidayBadge({ holiday }: { holiday: Holiday }) {
+  return (
+    <span
+      title={`Company holiday: ${holiday.name}`}
+      className="mt-0.5 inline-block text-[9px] font-semibold px-1 py-0.5 rounded bg-violet-100 text-violet-700"
+    >
+      {holiday.name}
+    </span>
+  );
+}
+
+export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveByDate, holidayByDate }: TimesheetWeekGridProps) {
   const totalHours = entries.reduce((s, e) => s + e.hours, 0);
   const leaveOf = (date: string): LeaveDayInfo | undefined => leaveByDate?.[date];
+  const holidayOf = (date: string): Holiday | undefined => holidayByDate?.[date];
 
   const handleChange = (index: number, hours: number) => {
     if (!onChange) return;
@@ -47,6 +62,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveBy
                 <th key={entry.date} className="px-3 py-2 text-center font-medium text-gray-700 min-w-[90px]">
                   <div>{entry.dayOfWeek.slice(0, 3)}</div>
                   <div className="text-xs text-gray-500 font-normal">{entry.date.slice(5)}</div>
+                  {holidayOf(entry.date) && <HolidayBadge holiday={holidayOf(entry.date)!} />}
                   {leaveOf(entry.date) && <LeaveBadge info={leaveOf(entry.date)!} />}
                 </th>
               ))}
@@ -94,6 +110,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveBy
             <div>
               <p className="text-sm font-medium text-gray-900">{entry.dayOfWeek}</p>
               <p className="text-xs text-gray-400">{entry.date.slice(5)}</p>
+              {holidayOf(entry.date) && <HolidayBadge holiday={holidayOf(entry.date)!} />}
               {leaveOf(entry.date) && <LeaveBadge info={leaveOf(entry.date)!} />}
             </div>
             {readonly ? (

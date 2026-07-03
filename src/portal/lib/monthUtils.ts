@@ -53,24 +53,28 @@ export function computeHours(start: string, end: string): number {
 
 /**
  * Build one row per calendar day for the month. Weekends are auto-marked
- * 'weekend' and locked; weekdays default to 'present' 09:00–17:00.
+ * 'weekend' and locked; weekdays default to 'present' 09:00–17:00, unless the
+ * date is in `holidayDates` (company holiday), in which case it's pre-marked
+ * 'holiday' so it's reflected without the employee having to set it manually.
  */
-export function buildMonthSkeleton(year: number, month: number): MonthlyTimesheetEntry[] {
+export function buildMonthSkeleton(year: number, month: number, holidayDates?: Set<string>): MonthlyTimesheetEntry[] {
   const total = daysInMonth(year, month);
   const rows: MonthlyTimesheetEntry[] = [];
   for (let d = 1; d <= total; d++) {
     const dow = dayOfWeekUTC(year, month, d);
     const isWeekend = dow === 0 || dow === 6;
     const date = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const isHoliday = !isWeekend && !!holidayDates?.has(date);
+    const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : 'present';
     rows.push({
       date,
       dayOfWeek: DAYS_SHORT[dow],
       project: '',
       task: '',
-      startTime: isWeekend ? '' : '09:00',
-      endTime: isWeekend ? '' : '17:00',
-      hours: isWeekend ? 0 : computeHours('09:00', '17:00'),
-      status: (isWeekend ? 'weekend' : 'present') as MonthlyDayStatus,
+      startTime: isWeekend || isHoliday ? '' : '09:00',
+      endTime: isWeekend || isHoliday ? '' : '17:00',
+      hours: isWeekend || isHoliday ? 0 : computeHours('09:00', '17:00'),
+      status,
     });
   }
   return rows;
