@@ -51,7 +51,7 @@ export async function listTimesheets(query: ListTimesheetsQuery, userRole?: stri
   return { data: data ?? [], total: count ?? 0 };
 }
 
-export async function getTimesheet(id: string) {
+export async function getTimesheet(id: string, actorRole?: string, actorEmployeeId?: string | null) {
   const { data, error } = await supabaseAdmin
     .from('timesheets')
     .select(TS_SELECT)
@@ -59,6 +59,9 @@ export async function getTimesheet(id: string) {
     .single();
 
   if (error || !data) throw new NotFoundError('Timesheet not found');
+  if (actorRole === 'employee' && data.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only view your own timesheet.');
+  }
   return data;
 }
 
@@ -146,8 +149,12 @@ export async function createTimesheet(input: CreateTimesheetInput, actorRole?: s
   return getTimesheet(ts.id);
 }
 
-export async function updateTimesheet(id: string, input: UpdateTimesheetInput, userRole?: string) {
+export async function updateTimesheet(id: string, input: UpdateTimesheetInput, userRole?: string, actorEmployeeId?: string | null) {
   const ts = await getTimesheet(id);
+
+  if (userRole === 'employee' && ts.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only edit your own timesheet.');
+  }
 
   // Admin gets god-mode (can edit any status). Everyone else is bound by the
   // status machine — once a timesheet is submitted/approved, only admin can
@@ -194,8 +201,13 @@ export async function patchTimesheetStatus(
   input: PatchTimesheetStatusInput,
   userRole: string,
   actorId?: string,
+  actorEmployeeId?: string | null,
 ) {
   const ts = await getTimesheet(id);
+
+  if (userRole === 'employee' && input.status === 'submitted' && ts.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only submit your own timesheet.');
+  }
 
   // State machine: enforce valid transitions regardless of role
   const validTransitions: Record<string, string[]> = {
@@ -343,8 +355,12 @@ async function notifyTimesheetStatusChange(
   }
 }
 
-export async function deleteTimesheet(id: string, userRole: string, userId: string) {
+export async function deleteTimesheet(id: string, userRole: string, userId: string, actorEmployeeId?: string | null) {
   const ts = await getTimesheet(id);
+
+  if (userRole === 'employee' && ts.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only delete your own timesheet.');
+  }
 
   if (ts.status !== 'draft' && userRole !== 'admin') {
     throw new ForbiddenError('Only draft timesheets can be deleted');

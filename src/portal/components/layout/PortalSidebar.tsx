@@ -18,6 +18,7 @@ import {
   Megaphone, Users2, Receipt,
   Star,
   Shield, Gift, Calendar, DollarSign, TrendingUp, FileWarning,
+  Award, UserCheck, MessageSquare, FileSpreadsheet, Gauge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -74,6 +75,14 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Audit Log',           path: '/portal/audit-log',           icon: <Shield className="h-4 w-4" />,          roles: ['admin'] },
   { label: 'Holidays',            path: '/portal/holidays',            icon: <CalendarDays className="h-4 w-4" />,    roles: ['admin','hr'] },
   { label: 'System Settings',     path: '/portal/system-settings',     icon: <Settings className="h-4 w-4" />,        roles: ['admin'] },
+  // ── Previously-built but unrouted pages ───────────────────────────────────
+  { label: 'Assets',              path: '/portal/assets',              icon: <Package className="h-4 w-4" />,         roles: ['admin','hr','operations'] },
+  { label: 'Skills Registry',     path: '/portal/skills',              icon: <Award className="h-4 w-4" />,           roles: ['admin','hr'] },
+  { label: 'Shift Schedule',      path: '/portal/shifts',              icon: <Calendar className="h-4 w-4" />,        roles: ['admin','hr','operations'] },
+  { label: 'Probation Tracker',   path: '/portal/probation',           icon: <UserCheck className="h-4 w-4" />,       roles: ['admin','hr'] },
+  { label: 'Peer Feedback',       path: '/portal/peer-feedback',       icon: <MessageSquare className="h-4 w-4" />,   roles: ['admin','hr','operations','finance','employee'] },
+  { label: 'Capacity Report',     path: '/portal/capacity',            icon: <Gauge className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
+  { label: 'Estimates',           path: '/portal/estimates',           icon: <FileSpreadsheet className="h-4 w-4" />, roles: ['admin','finance'] },
 ];
 
 const ROLE_GRADIENTS: Record<string, string> = {

@@ -212,7 +212,10 @@ export function useDeleteEmployee() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => apiClient.delete(`/employees/${id}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['employees'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
+    },
   });
 }
 

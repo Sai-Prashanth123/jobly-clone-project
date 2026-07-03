@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
+import { validateBody } from '../middleware/validate';
+import { createTaxDocumentSchema, updateTaxDocumentSchema } from '../schemas/taxDocuments.schema';
 import * as svc from '../services/taxDocuments.service';
 
 const router = Router();
@@ -18,11 +20,11 @@ router.get('/', ALL, async (req: Request, res: Response, next: NextFunction) => 
   } catch (e) { next(e); }
 });
 
-router.post('/', FIN, async (req, res, next) => {
+router.post('/', FIN, validateBody(createTaxDocumentSchema), async (req, res, next) => {
   try { res.json({ success: true, data: await svc.createTaxDocument(req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 
-router.put('/:id', FIN, async (req, res, next) => {
+router.put('/:id', FIN, validateBody(updateTaxDocumentSchema), async (req, res, next) => {
   try { res.json({ success: true, data: await svc.updateTaxDocument(req.params.id, req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 

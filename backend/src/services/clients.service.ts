@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ConflictError } from '../lib/errors';
+import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import type { CreateClientInput, UpdateClientInput, ListClientsQuery } from '../schemas/client.schema';
 
 export async function listClients(query: ListClientsQuery) {
@@ -7,7 +8,8 @@ export async function listClients(query: ListClientsQuery) {
 
   if (query.status) q = q.eq('status', query.status);
   if (query.search) {
-    q = q.or(`company_name.ilike.%${query.search}%,contact_name.ilike.%${query.search}%,contact_email.ilike.%${query.search}%`);
+    const s = sanitizeForPostgrestFilter(query.search);
+    q = q.or(`company_name.ilike.%${s}%,contact_name.ilike.%${s}%,contact_email.ilike.%${s}%`);
   }
 
   const offset = (query.page - 1) * query.limit;

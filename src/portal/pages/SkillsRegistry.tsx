@@ -18,14 +18,33 @@ function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string;
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ skillName: '', proficiency: 'intermediate' as Proficiency, lastUsedYear: '' });
   const [error, setError] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const currentYear = new Date().getUTCFullYear();
 
   const handleAdd = async () => {
     if (!form.skillName) { setError('Skill name required'); return; }
+    if (form.lastUsedYear) {
+      const year = Number(form.lastUsedYear);
+      if (!Number.isFinite(year) || year < 1950 || year > currentYear) {
+        setError(`Last used year must be between 1950 and ${currentYear}`);
+        return;
+      }
+    }
     setError('');
     try {
       await addSkill.mutateAsync({ employeeId, skillName: form.skillName, proficiency: form.proficiency, lastUsedYear: form.lastUsedYear ? Number(form.lastUsedYear) : undefined });
       setOpen(false); setForm({ skillName: '', proficiency: 'intermediate', lastUsedYear: '' });
     } catch (e: any) { setError(e?.response?.data?.error ?? 'Failed'); }
+  };
+
+  const handleDelete = async (skillId: string) => {
+    setDeletingId(skillId);
+    try {
+      await deleteSkill.mutateAsync({ id: skillId, employeeId });
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   return (
@@ -40,7 +59,13 @@ function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string;
           {skills.map(s => (
             <span key={s.id} className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${PROF_COLORS[s.proficiency]}`}>
               {s.skillName} · {s.proficiency}
-              <button onClick={() => deleteSkill.mutate({ id: s.id, employeeId })} className="ml-1 hover:opacity-70"><Trash2 className="h-2.5 w-2.5" /></button>
+              <button
+                onClick={() => handleDelete(s.id)}
+                disabled={deletingId === s.id}
+                className="ml-1 hover:opacity-70 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingId === s.id ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <Trash2 className="h-2.5 w-2.5" />}
+              </button>
             </span>
           ))}
         </div>
@@ -57,7 +82,7 @@ function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string;
                 <SelectContent>{PROFICIENCIES.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div className="space-y-1"><Label>Last Used Year (optional)</Label><Input type="number" value={form.lastUsedYear} onChange={e => setForm(p => ({ ...p, lastUsedYear: e.target.value }))} placeholder={String(new Date().getFullYear())} /></div>
+            <div className="space-y-1"><Label>Last Used Year (optional)</Label><Input type="number" min={1950} max={currentYear} value={form.lastUsedYear} onChange={e => setForm(p => ({ ...p, lastUsedYear: e.target.value }))} placeholder={String(currentYear)} /></div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

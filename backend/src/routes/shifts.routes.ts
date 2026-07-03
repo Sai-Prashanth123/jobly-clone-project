@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
+import { validateBody } from '../middleware/validate';
+import { createShiftSchema, updateShiftSchema } from '../schemas/shifts.schema';
 import * as svc from '../services/shifts.service';
 
 const router = Router();
@@ -16,11 +18,11 @@ router.get('/', ALL, async (req: Request, res: Response, next: NextFunction) => 
   } catch (e) { next(e); }
 });
 
-router.post('/', OPS, async (req, res, next) => {
+router.post('/', OPS, validateBody(createShiftSchema), async (req, res, next) => {
   try { res.json({ success: true, data: await svc.createShift(req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 
-router.put('/:id', OPS, async (req, res, next) => {
+router.put('/:id', OPS, validateBody(updateShiftSchema), async (req, res, next) => {
   try { res.json({ success: true, data: await svc.updateShift(req.params.id, req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 

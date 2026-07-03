@@ -36,7 +36,7 @@ const TYPE_CONFIG = {
   error:   { dot: 'bg-red-500',    bg: 'bg-red-50',    label: 'Alert',   icon: '🚨' },
 };
 
-function NotificationCard({ n, onRead }: { n: Notification; onRead: (id: string) => void }) {
+function NotificationCard({ n, onRead, marking }: { n: Notification; onRead: (id: string) => void; marking: boolean }) {
   const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.info;
   return (
     <div
@@ -58,14 +58,18 @@ function NotificationCard({ n, onRead }: { n: Notification; onRead: (id: string)
             </span>
           </div>
           {!n.read && (
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => onRead(n.id)}
-              className="flex-shrink-0 flex items-center gap-1 text-[11px] text-gray-400 hover:text-blue-600 transition-colors px-1.5 py-0.5 rounded hover:bg-blue-50"
+              loading={marking}
+              disabled={marking}
+              className="flex-shrink-0 h-auto gap-1 text-[11px] text-gray-400 hover:text-blue-600 px-1.5 py-0.5"
               title="Mark as read"
             >
-              <Check className="h-3.5 w-3.5" />
+              {!marking && <Check className="h-3.5 w-3.5" />}
               <span className="hidden sm:inline">Mark read</span>
-            </button>
+            </Button>
           )}
         </div>
         <p className={`text-sm leading-relaxed ${n.read ? 'text-gray-400' : 'text-gray-600'}`}>{n.message}</p>
@@ -85,6 +89,13 @@ export default function Notifications() {
   const triggerInvoiceReadiness = useTriggerInvoiceReadiness();
 
   const [filter, setFilter] = useState<FilterType>('all');
+  const [markingId, setMarkingId] = useState<string | null>(null);
+
+  const handleMarkRead = (id: string) => {
+    if (markingId) return; // guard against double-submit while a mark-read is in flight
+    setMarkingId(id);
+    markRead.mutate(id, { onSettled: () => setMarkingId(null) });
+  };
 
   const isAdmin = user?.role === 'admin';
 
@@ -264,7 +275,8 @@ export default function Notifications() {
             <NotificationCard
               key={n.id}
               n={n}
-              onRead={id => markRead.mutate(id)}
+              onRead={handleMarkRead}
+              marking={markingId === n.id}
             />
           ))}
         </div>

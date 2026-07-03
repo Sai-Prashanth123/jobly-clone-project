@@ -36,7 +36,7 @@ export async function listExpenses(query: ListExpensesQuery, viewerRole: string,
   return { data: data ?? [], total: count ?? 0 };
 }
 
-export async function getExpense(id: string): Promise<any> {
+export async function getExpense(id: string, actorRole?: string, actorEmployeeId?: string | null): Promise<any> {
   const { data, error } = await supabaseAdmin
     .from('expense_reports')
     .select(SELECT)
@@ -44,6 +44,9 @@ export async function getExpense(id: string): Promise<any> {
     .is('deleted_at', null)
     .single();
   if (error || !data) throw new NotFoundError('Expense not found');
+  if (actorRole === 'employee' && (data as any).employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only view your own expenses');
+  }
   return data as any;
 }
 

@@ -19,7 +19,10 @@ export async function uploadDocument(
   expiryDate?: string | null,
 ) {
   const bucket = BUCKET_MAP[entityType];
-  const storagePath = `${entityId}/${Date.now()}-${file.originalname.replace(/\s+/g, '_')}`;
+  // Strip everything but alphanumerics/dot/dash/underscore (incl. slashes and
+  // "..") so a crafted originalname can't inject extra path segments into the
+  // storage key.
+  const storagePath = `${entityId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
   const { error: uploadError } = await supabaseAdmin
     .storage

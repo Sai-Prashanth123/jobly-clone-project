@@ -4,6 +4,11 @@ import { todayUTC, daysBetween } from '../lib/dateUtils';
 import { sendInvoiceReminderEmail, mailerConfigured } from '../lib/mailer';
 import { processDueRecurring } from '../services/recurring.service';
 import { reactivateReturnedEmployees } from '../services/employees.service';
+import {
+  triggerTimesheetReminders,
+  triggerContractExpiryAlerts,
+  triggerDocumentExpiryAlerts,
+} from '../services/notifications.service';
 
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
 
@@ -77,6 +82,27 @@ export async function runDailyTick(): Promise<{ recurring: number; reactivated: 
   await processReminders();
   // Auto-reactivate employees whose extended-leave return date has arrived.
   const reactivated = await reactivateReturnedEmployees();
+
+  // Notification sweeps that were previously admin-manual-trigger-only. Each is
+  // isolated in its own try/catch so one failing job doesn't prevent the others
+  // from running (same error-isolation intent as the per-invoice try/catch in
+  // processReminders above).
+  try {
+    await triggerTimesheetReminders();
+  } catch (err) {
+    console.error('[scheduler] triggerTimesheetReminders failed', err);
+  }
+  try {
+    await triggerContractExpiryAlerts();
+  } catch (err) {
+    console.error('[scheduler] triggerContractExpiryAlerts failed', err);
+  }
+  try {
+    await triggerDocumentExpiryAlerts();
+  } catch (err) {
+    console.error('[scheduler] triggerDocumentExpiryAlerts failed', err);
+  }
+
   return { recurring, reactivated };
 }
 

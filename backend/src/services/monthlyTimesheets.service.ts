@@ -218,8 +218,11 @@ export async function upsertMonthlyTimesheet(
   }
 }
 
-export async function updateMonthlyTimesheet(id: string, input: UpdateMonthlyTimesheetInput, actorRole: string, actorId?: string) {
+export async function updateMonthlyTimesheet(id: string, input: UpdateMonthlyTimesheetInput, actorRole: string, actorId?: string, actorEmployeeId?: string | null) {
   const row = await getMonthlyTimesheet(id);
+  if (actorRole === 'employee' && row.employee_id !== actorEmployeeId) {
+    throw new ForbiddenError('You can only edit your own timesheet.');
+  }
   if (actorRole !== 'admin' && !['draft', 'rejected'].includes(row.status)) {
     throw new ForbiddenError('Only draft or rejected timesheets can be edited.');
   }

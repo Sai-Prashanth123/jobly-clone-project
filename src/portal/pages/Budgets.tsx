@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { useBudgets, useUpsertBudget, useDeleteBudget, type BudgetType, type Budget } from '../hooks/useBudgets';
 
 const BUDGET_TYPES: BudgetType[] = ['headcount','opex','capex'];
@@ -110,15 +110,22 @@ export default function Budgets() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={v => { if (!v) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete Budget?</AlertDialogTitle><AlertDialogDescription>Remove this budget entry?</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={async () => { try { await del.mutateAsync(deleteTarget!.id); setDeleteTarget(null); } catch { toast.error('Failed to delete budget entry.'); } }}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={v => { if (!v) setDeleteTarget(null); }}
+        title="Delete Budget?"
+        description="Remove this budget entry?"
+        confirmLabel="Delete"
+        loading={del.isPending}
+        onConfirm={async () => {
+          try {
+            await del.mutateAsync(deleteTarget!.id);
+            setDeleteTarget(null);
+          } catch {
+            toast.error('Failed to delete budget entry.');
+          }
+        }}
+      />
     </div>
   );
 }

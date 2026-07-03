@@ -20,7 +20,7 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
 
 export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.getTimesheet(req.params.id);
+    const data = await svc.getTimesheet(req.params.id, req.user?.role, req.user?.employeeId);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
@@ -67,7 +67,7 @@ export async function deleteClientProof(req: Request, res: Response, next: NextF
 
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.updateTimesheet(req.params.id, req.body as UpdateTimesheetInput, req.user?.role);
+    const data = await svc.updateTimesheet(req.params.id, req.body as UpdateTimesheetInput, req.user?.role, req.user?.employeeId);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
@@ -79,6 +79,7 @@ export async function patchStatus(req: Request, res: Response, next: NextFunctio
       req.body as PatchTimesheetStatusInput,
       req.user!.role,
       req.user?.id,
+      req.user?.employeeId,
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }
@@ -86,7 +87,7 @@ export async function patchStatus(req: Request, res: Response, next: NextFunctio
 
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await svc.deleteTimesheet(req.params.id, req.user!.role, req.user!.id);
+    await svc.deleteTimesheet(req.params.id, req.user!.role, req.user!.id, req.user?.employeeId);
     res.json({ success: true });
   } catch (err) { next(err); }
 }

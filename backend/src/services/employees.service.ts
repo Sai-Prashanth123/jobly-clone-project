@@ -6,6 +6,7 @@ import { createNotification, getUserIdsByRole } from './notifications.service';
 import { computeOnboarding } from '../lib/onboarding';
 import { todayUTC } from '../lib/dateUtils';
 import { generateTasksForEmployee } from './onboardingChecklist.service';
+import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
@@ -48,7 +49,7 @@ export async function listEmployees(query: ListEmployeesQuery, opts?: { restrict
   if (query.status)     q = q.eq('status', query.status);
   if (query.department) q = q.eq('department', query.department);
   if (query.search) {
-    const s = `%${query.search}%`;
+    const s = `%${sanitizeForPostgrestFilter(query.search)}%`;
     q = q.or(`first_name.ilike.${s},last_name.ilike.${s},email.ilike.${s}`);
   }
 
@@ -162,6 +163,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
         employee_id: empId,
         avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
         must_reset_password: true,   // the temp password is first-login-only
+        temp_password_issued_at: new Date().toISOString(),
       }, { onConflict: 'id' });
       if (upsertErr) throw upsertErr;
 
@@ -184,6 +186,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
           employee_id: empId,
           avatar_initials: `${input.firstName[0]}${input.lastName[0]}`.toUpperCase(),
           must_reset_password: true,   // the temp password is first-login-only
+          temp_password_issued_at: new Date().toISOString(),
         });
         if (insertErr) throw insertErr;
         credentialsReady = true;
@@ -628,10 +631,11 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   // Guard: email uniqueness — check both personal and work email if either is being changed
   const emailsToCheck: string[] = [patch.email, patch.work_email].filter(Boolean) as string[];
   for (const email of emailsToCheck) {
+    const safeEmail = sanitizeForPostgrestFilter(email);
     const { data: dup } = await supabaseAdmin
       .from('employees')
       .select('id')
-      .or(`email.eq.${email},work_email.eq.${email}`)
+      .or(`email.eq.${safeEmail},work_email.eq.${safeEmail}`)
       .neq('id', id)
       .limit(1)
       .maybeSingle();
@@ -1315,7 +1319,8 @@ export async function listDirectory(search?: string, department?: string) {
     .order('first_name');
 
   if (search) {
-    q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,job_title.ilike.%${search}%,department.ilike.%${search}%`);
+    const s = sanitizeForPostgrestFilter(search);
+    q = q.or(`first_name.ilike.%${s}%,last_name.ilike.%${s}%,job_title.ilike.%${s}%,department.ilike.%${s}%`);
   }
   if (department) q = q.eq('department', department);
 
@@ -1367,10 +1372,12 @@ export interface ExpiringDoc {
 }
 
 export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() + days);
+  // UTC-safe date range — avoids server-timezone drift on setDate() calls
+  // (mirrors notifications.service.ts's triggerDocumentExpiryAlerts).
+  const now = new Date();
+  const today = now.toISOString().split('T')[0];
+  const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days));
   const cutoffStr = cutoff.toISOString().split('T')[0];
-  const today = new Date().toISOString().split('T')[0];
 
   const { data, error } = await supabaseAdmin
     .from('employees')

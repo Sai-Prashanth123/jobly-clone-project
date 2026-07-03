@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
+import { validateBody } from '../middleware/validate';
+import { createHolidaySchema, updateHolidaySchema } from '../schemas/holidays.schema';
 import * as svc from '../services/holidays.service';
 
 const router = Router();
@@ -16,11 +18,11 @@ router.get('/', ALL, async (req: Request, res: Response, next: NextFunction) => 
   } catch (e) { next(e); }
 });
 
-router.post('/', ADMIN, async (req: Request, res: Response, next: NextFunction) => {
+router.post('/', ADMIN, validateBody(createHolidaySchema), async (req: Request, res: Response, next: NextFunction) => {
   try { res.json({ success: true, data: await svc.createHoliday(req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 
-router.put('/:id', ADMIN, async (req: Request, res: Response, next: NextFunction) => {
+router.put('/:id', ADMIN, validateBody(updateHolidaySchema), async (req: Request, res: Response, next: NextFunction) => {
   try { res.json({ success: true, data: await svc.updateHoliday(req.params.id, req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 

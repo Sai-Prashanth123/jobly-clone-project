@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/recurring.service';
 import { runDailyTick } from '../jobs/scheduler';
+import { ValidationError } from '../lib/errors';
 import type { CreateRecurringInput, UpdateRecurringInput } from '../schemas/recurring.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -33,6 +34,13 @@ export async function remove(req: Request, res: Response, next: NextFunction): P
 export async function runNow(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const tpl = await svc.getRecurring(req.params.id);
+    // Manual admin override — early runs (ahead of next_run_date) are allowed
+    // on purpose, but a paused (or otherwise non-active) template must never be
+    // run: that risks duplicate/early invoices racing the nightly cron or firing
+    // for a template an admin intentionally paused.
+    if (tpl.status !== 'active') {
+      throw new ValidationError('Cannot run a paused template — activate it first.');
+    }
     const invoiceId = await svc.runRecurringOnce(tpl, req.user?.id);
     res.json({ success: true, data: { invoiceId } });
   } catch (err) { next(err); }

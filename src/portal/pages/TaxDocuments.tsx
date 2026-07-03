@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { useTaxDocuments, useCreateTaxDocument, useUpdateTaxDocument, useDeleteTaxDocument, type TaxDocType, type TaxDocument } from '../hooks/useTaxDocuments';
 import { useEmployees } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
@@ -35,6 +35,15 @@ export default function TaxDocuments() {
 
   const handleSave = async () => {
     if (!form.employeeId) { setError('Employee required'); return; }
+    const minYear = 2000;
+    const maxYear = new Date().getUTCFullYear() + 1;
+    if (!Number.isFinite(form.taxYear) || form.taxYear < minYear || form.taxYear > maxYear) {
+      setError(`Tax year must be between ${minYear} and ${maxYear}`);
+      return;
+    }
+    if (form.fileUrl) {
+      try { new URL(form.fileUrl); } catch { setError('File URL must be a valid URL'); return; }
+    }
     setSaving(true); setError('');
     try { await create.mutateAsync(form); setOpen(false); } catch (e: any) { setError(e?.response?.data?.error ?? 'Failed'); }
     finally { setSaving(false); }
@@ -127,25 +136,32 @@ export default function TaxDocuments() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!markSentTarget} onOpenChange={v => { if (!v) setMarkSentTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Mark as Sent?</AlertDialogTitle><AlertDialogDescription>This will record that {markSentTarget?.documentType} for tax year {markSentTarget?.taxYear} has been sent to the employee. This action cannot be undone.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={() => markSentTarget && markSent(markSentTarget)}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!markSentTarget}
+        onOpenChange={v => { if (!v) setMarkSentTarget(null); }}
+        title="Mark as Sent?"
+        description={`This will record that ${markSentTarget?.documentType} for tax year ${markSentTarget?.taxYear} has been sent to the employee. This action cannot be undone.`}
+        confirmLabel="Confirm"
+        destructive={false}
+        loading={update.isPending}
+        onConfirm={() => { if (markSentTarget) markSent(markSentTarget); }}
+      />
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={v => { if (!v) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader><AlertDialogTitle>Delete Document?</AlertDialogTitle><AlertDialogDescription>Remove this tax document record?</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={async () => { await del.mutateAsync(deleteTarget!.id); setDeleteTarget(null); }}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={v => { if (!v) setDeleteTarget(null); }}
+        title="Delete Document?"
+        description="Remove this tax document record?"
+        confirmLabel="Delete"
+        loading={del.isPending}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await del.mutateAsync(deleteTarget.id);
+            setDeleteTarget(null);
+          } catch { /* error surfaced via mutation's own handling */ }
+        }}
+      />
     </div>
   );
 }

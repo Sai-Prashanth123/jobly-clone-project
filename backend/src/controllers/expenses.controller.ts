@@ -15,7 +15,7 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
 
 export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.getExpense(req.params.id);
+    const data = await svc.getExpense(req.params.id, req.user?.role, req.user?.employeeId);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

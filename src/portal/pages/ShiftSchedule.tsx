@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { UsDateInput } from '../components/shared/UsDateInput';
 import { useShifts, useCreateShift, useUpdateShift, useDeleteShift, SHIFT_COLORS, type ShiftType, type Shift } from '../hooks/useShifts';
 import { useEmployees } from '../hooks/useEmployees';
@@ -40,6 +40,7 @@ export default function ShiftSchedule() {
 
   const handleSave = async () => {
     if (!form.employeeId || !form.date) { setError('Employee and date required'); return; }
+    if (!form.startTime || !form.endTime || form.startTime >= form.endTime) { setError('Start time must be before end time'); return; }
     setSaving(true); setError('');
     try {
       if (editing) await updateShift.mutateAsync({ id: editing.id, ...form });
@@ -154,18 +155,21 @@ export default function ShiftSchedule() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={v => { if (!v) setDeleteTarget(null); }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Shift?</AlertDialogTitle>
-            <AlertDialogDescription>Remove this shift for {deleteTarget && employees.find(e => e.id === deleteTarget.employeeId)?.firstName}? This cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction className="bg-red-600 hover:bg-red-700" onClick={() => { deleteShift.mutate(deleteTarget!.id); setDeleteTarget(null); }}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={v => { if (!v) setDeleteTarget(null); }}
+        title="Delete Shift?"
+        description={`Remove this shift for ${deleteTarget ? employees.find(e => e.id === deleteTarget.employeeId)?.firstName ?? '' : ''}? This cannot be undone.`}
+        confirmLabel="Delete"
+        loading={deleteShift.isPending}
+        onConfirm={async () => {
+          if (!deleteTarget) return;
+          try {
+            await deleteShift.mutateAsync(deleteTarget.id);
+            setDeleteTarget(null);
+          } catch { /* error surfaced via mutation's own handling */ }
+        }}
+      />
     </div>
   );
 }

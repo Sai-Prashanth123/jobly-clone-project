@@ -24,8 +24,8 @@ export function PaymentsReceivedReport() {
   const cutoffMonth = useMemo(() => {
     if (monthsBack === 0) return `${new Date().getUTCFullYear()}-01`;
     const now = new Date();
-    const d = new Date(now.getFullYear(), now.getMonth() - (monthsBack - 1), 1);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - (monthsBack - 1), 1));
+    return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`;
   }, [monthsBack]);
 
   const paid = useMemo(() => invoices
@@ -55,8 +55,8 @@ export function PaymentsReceivedReport() {
       }
     } else {
       for (let i = monthsBack - 1; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+        const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1));
+        months.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`);
       }
     }
     return months.map(m => ({

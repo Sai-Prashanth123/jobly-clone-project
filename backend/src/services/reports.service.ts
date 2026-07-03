@@ -261,6 +261,7 @@ export async function getRevenueByDateRange(startDate: string, endDate: string) 
   const { data, error } = await supabaseAdmin
     .from('invoices')
     .select('id, invoice_number, client_id, issue_date, status, total_amount, amount_paid, paid_at')
+    .neq('status', 'draft') // drafts aren't real revenue — never sent to the client
     .gte('issue_date', startDate)
     .lte('issue_date', endDate);
 
@@ -335,8 +336,9 @@ export async function getProfitLoss(startDate: string, endDate: string, basis: '
     // Cash basis: only invoices that have been paid, within paid_at range
     query = query.eq('status', 'paid').gte('paid_at', startDate).lte('paid_at', endDate);
   } else {
-    // Accrual basis: all invoices issued in range (paid or unpaid)
-    query = query.gte('issue_date', startDate).lte('issue_date', endDate);
+    // Accrual basis: all invoices issued in range (paid or unpaid), excluding
+    // drafts — a draft has an issue_date but was never actually billed.
+    query = query.neq('status', 'draft').gte('issue_date', startDate).lte('issue_date', endDate);
   }
 
   const { data: invoices } = await query;

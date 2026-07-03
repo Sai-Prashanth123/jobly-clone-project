@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/assets.service';
+import { ForbiddenError } from '../lib/errors';
 import type { ListAssetsQuery, CreateAssetInput, UpdateAssetInput, AssignAssetInput } from '../schemas/assets.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -18,6 +19,9 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
 
 export async function getForEmployee(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
+    if (req.user!.role === 'employee' && req.params.employeeId !== req.user!.employeeId) {
+      throw new ForbiddenError('You can only view your own assets.');
+    }
     const data = await svc.getEmployeeAssets(req.params.employeeId);
     res.json({ success: true, data });
   } catch (err) { next(err); }

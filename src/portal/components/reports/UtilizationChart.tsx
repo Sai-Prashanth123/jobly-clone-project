@@ -13,7 +13,7 @@ export function UtilizationChart() {
 
   const data = useMemo(() => {
     const now = new Date();
-    const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+    const monthStart = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}-01`;
     return employees
       .map(emp => {
         const empTimesheets = timesheets.filter(

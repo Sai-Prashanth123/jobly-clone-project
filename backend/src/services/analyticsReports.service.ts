@@ -58,17 +58,21 @@ export async function getMilestones(month: string) {
 
   for (const e of employees ?? []) {
     if (e.dob) {
+      // dob/start_date are YYYY-MM-DD strings parsed as UTC midnight — read
+      // them back with UTC getters too, or a server west of UTC rolls
+      // early-month dates into the previous month.
       const d = new Date(e.dob);
-      if (d.getMonth() + 1 === m) {
-        birthdays.push({ ...e, type: 'birthday', day: d.getDate() });
+      if (d.getUTCMonth() + 1 === m) {
+        birthdays.push({ ...e, type: 'birthday', day: d.getUTCDate() });
       }
     }
     if (e.start_date) {
       const s = new Date(e.start_date);
-      if (s.getMonth() + 1 === m) {
-        const thisYearAnniversary = new Date(now.getFullYear(), s.getMonth(), s.getDate());
-        const years = now.getFullYear() - s.getFullYear() - (now >= thisYearAnniversary ? 0 : 1);
-        anniversaries.push({ ...e, type: 'anniversary', day: s.getDate(), years });
+      if (s.getUTCMonth() + 1 === m) {
+        const thisYearAnniversary = Date.UTC(now.getUTCFullYear(), s.getUTCMonth(), s.getUTCDate());
+        const nowUTC = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+        const years = now.getUTCFullYear() - s.getUTCFullYear() - (nowUTC >= thisYearAnniversary ? 0 : 1);
+        anniversaries.push({ ...e, type: 'anniversary', day: s.getUTCDate(), years });
       }
     }
   }

@@ -91,7 +91,7 @@ export async function upsert(req: Request, res: Response, next: NextFunction): P
 export async function update(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.updateMonthlyTimesheet(
-      req.params.id, req.body as UpdateMonthlyTimesheetInput, req.user!.role, req.user?.id,
+      req.params.id, req.body as UpdateMonthlyTimesheetInput, req.user!.role, req.user?.id, req.user?.employeeId ?? null,
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }

@@ -84,7 +84,11 @@ export async function resetUserPassword(userId: string, actorId?: string): Promi
 
   // The reset is one-time: force a fresh first-login password reset so the temp
   // never becomes the user's standing password.
-  await supabaseAdmin.from('portal_users').update({ must_reset_password: true, password_changed_at: null }).eq('id', userId);
+  await supabaseAdmin.from('portal_users').update({
+    must_reset_password: true,
+    password_changed_at: null,
+    temp_password_issued_at: new Date().toISOString(),
+  }).eq('id', userId);
 
   const { data: target } = await supabaseAdmin
     .from('portal_users').select('email, name').eq('id', userId).single();

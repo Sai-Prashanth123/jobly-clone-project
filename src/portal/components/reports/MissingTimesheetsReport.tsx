@@ -6,16 +6,7 @@ import { useEmployees } from '../../hooks/useEmployees';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useTimesheets } from '../../hooks/useTimesheets';
 import { useClients } from '../../hooks/useClients';
-import { formatDate } from '../../lib/utils';
-
-function getCurrentWeekMonday(): string {
-  const today = new Date();
-  const dayOfWeek = today.getDay();
-  const diff = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diff);
-  return monday.toISOString().split('T')[0];
-}
+import { formatDate, getMondayOfWeek } from '../../lib/utils';
 
 export function MissingTimesheetsReport() {
   const { data: empData } = useEmployees({ limit: 500 });
@@ -28,7 +19,7 @@ export function MissingTimesheetsReport() {
   const timesheets = useMemo(() => tsData?.data ?? [], [tsData]);
   const clients = useMemo(() => clientData?.data ?? [], [clientData]);
 
-  const currentWeekStart = getCurrentWeekMonday();
+  const currentWeekStart = getMondayOfWeek(new Date()).toISOString().split('T')[0];
 
   const missing = useMemo(() => assignments
     .filter(a => {

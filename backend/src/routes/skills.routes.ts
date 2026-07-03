@@ -1,6 +1,8 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
+import { validateBody } from '../middleware/validate';
+import { createSkillSchema, updateSkillSchema } from '../schemas/skills.schema';
 import * as svc from '../services/skills.service';
 
 const router = Router();
@@ -20,11 +22,11 @@ router.get('/employee/:employeeId', ALL, async (req, res, next) => {
   try { res.json({ success: true, data: await svc.getEmployeeSkills(req.params.employeeId) }); } catch (e) { next(e); }
 });
 
-router.post('/employee/:employeeId', ALL, async (req, res, next) => {
+router.post('/employee/:employeeId', ALL, validateBody(createSkillSchema), async (req, res, next) => {
   try { res.json({ success: true, data: await svc.addSkill(req.params.employeeId, req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 
-router.put('/:id', ALL, async (req, res, next) => {
+router.put('/:id', ALL, validateBody(updateSkillSchema), async (req, res, next) => {
   try { res.json({ success: true, data: await svc.updateSkill(req.params.id, req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 

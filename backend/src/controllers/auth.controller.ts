@@ -75,13 +75,19 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     }
 
     // Block login when the one-time temp password was never changed AND the
-    // account is older than 7 days. data.user.created_at is already available
-    // from signInWithPassword — no extra DB query needed.
+    // temp password itself is older than 7 days. Uses
+    // portal_users.temp_password_issued_at (stamped whenever a temp password is
+    // issued/re-issued) — NOT data.user.created_at, which is the Supabase Auth
+    // account's immutable creation timestamp and never reflects when the temp
+    // password was actually issued. A null temp_password_issued_at (e.g.
+    // pre-migration accounts that predate this column) means "never expires" —
+    // skip the expiry check rather than rejecting the login.
     const SEVEN_DAYS = 7 * 24 * 60 * 60 * 1000;
     const isTemp = portalUser.must_reset_password === true;
     const neverChanged = !portalUser.password_changed_at;
-    const accountAge = Date.now() - new Date(data.user.created_at).getTime();
-    if (isTemp && neverChanged && accountAge > SEVEN_DAYS) {
+    const tempPasswordIssuedAt = portalUser.temp_password_issued_at;
+    const accountAge = tempPasswordIssuedAt ? Date.now() - new Date(tempPasswordIssuedAt).getTime() : null;
+    if (isTemp && neverChanged && accountAge !== null && accountAge > SEVEN_DAYS) {
       res.status(403).json({
         error: 'TEMP_PASSWORD_EXPIRED',
         message: 'Your temporary password has expired. Please contact HR to issue a new one.',

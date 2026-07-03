@@ -94,6 +94,14 @@ const InvoiceAnalytics = lazy(() => import('./pages/InvoiceAnalytics'));
 const ExpenseAnalytics = lazy(() => import('./pages/ExpenseAnalytics'));
 const CashFlow = lazy(() => import('./pages/CashFlow'));
 
+// Previously-built but unrouted pages — wired in now
+const Assets = lazy(() => import('./pages/Assets'));
+const SkillsRegistry = lazy(() => import('./pages/SkillsRegistry'));
+const ShiftSchedule = lazy(() => import('./pages/ShiftSchedule'));
+const ProbationTracker = lazy(() => import('./pages/ProbationTracker'));
+const PeerFeedback = lazy(() => import('./pages/PeerFeedback'));
+const CapacityReport = lazy(() => import('./pages/CapacityReport'));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center py-20">
@@ -444,6 +452,16 @@ export default function PortalApp() {
             <Route path="invoice-analytics" element={<ProtectedRoute allowedRoles={['admin','finance']}><InvoiceAnalytics /></ProtectedRoute>} />
             <Route path="expense-analytics" element={<ProtectedRoute allowedRoles={['admin','finance']}><ExpenseAnalytics /></ProtectedRoute>} />
             <Route path="cash-flow" element={<ProtectedRoute allowedRoles={['admin','finance']}><CashFlow /></ProtectedRoute>} />
+
+            {/* Previously-built but unrouted pages */}
+            <Route path="assets" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><Assets /></ProtectedRoute>} />
+            <Route path="skills" element={<ProtectedRoute allowedRoles={['admin','hr']}><SkillsRegistry /></ProtectedRoute>} />
+            <Route path="shifts" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><ShiftSchedule /></ProtectedRoute>} />
+            <Route path="probation" element={<ProtectedRoute allowedRoles={['admin','hr']}><ProbationTracker /></ProtectedRoute>} />
+            <Route path="peer-feedback" element={<ProtectedRoute allowedRoles={['admin','hr','operations','finance','employee']}><PeerFeedback /></ProtectedRoute>} />
+            <Route path="capacity" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><CapacityReport /></ProtectedRoute>} />
+            <Route path="estimates" element={<ProtectedRoute allowedRoles={['admin','finance']}><Estimates /></ProtectedRoute>} />
+            <Route path="estimates/new" element={<ProtectedRoute allowedRoles={['admin','finance']}><InvoiceEditor /></ProtectedRoute>} />
 
             <Route path="profile" element={<MyProfile />} />
             {/* Self-edit: employees edit their own record via the same card form

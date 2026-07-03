@@ -21,7 +21,7 @@ export function isVisaExpiringSoon(e: Employee, days = VISA_EXPIRY_WINDOW_DAYS):
   const exp = new Date(e.visaExpiry);
   if (Number.isNaN(exp.getTime())) return false;
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   const limit = new Date(today.getTime() + days * MS_PER_DAY);
   return exp >= today && exp <= limit;
 }
@@ -31,7 +31,7 @@ export function daysUntilVisaExpiry(e: Employee): number | null {
   const exp = new Date(e.visaExpiry);
   if (Number.isNaN(exp.getTime())) return null;
   const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   return Math.ceil((exp.getTime() - today.getTime()) / MS_PER_DAY);
 }
 

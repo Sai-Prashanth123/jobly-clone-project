@@ -84,6 +84,11 @@ export default function Assets() {
   async function saveAsset() {
     if (!form.name.trim()) { toast.error('Asset name is required'); return; }
     const pp = form.purchasePrice ? parseFloat(form.purchasePrice) : undefined;
+    if (pp != null && !Number.isNaN(pp) && pp < 0) { toast.error('Purchase price cannot be negative'); return; }
+    if (form.purchaseDate && form.warrantyExpiry && form.warrantyExpiry < form.purchaseDate) {
+      toast.error('Warranty expiry cannot be before the purchase date');
+      return;
+    }
     try {
       if (editing) {
         await updateMut.mutateAsync({
