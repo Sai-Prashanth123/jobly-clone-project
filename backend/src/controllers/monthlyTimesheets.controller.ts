@@ -3,7 +3,7 @@ import * as svc from '../services/monthlyTimesheets.service';
 import { getLeaveCoverage } from '../services/conflicts.service';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput, PatchMonthlyStatusInput,
-  ListMonthlyTimesheetsQuery,
+  ListMonthlyTimesheetsQuery, PatchEntriesInput,
 } from '../schemas/monthlyTimesheet.schema';
 
 // Per-date approved/pending leave coverage for a (year, month) — drives the
@@ -136,8 +136,7 @@ export async function deleteClientProof(req: Request, res: Response, next: NextF
 
 export async function patchEntries(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const { entries, notes } = req.body as { entries: any[]; notes?: string | null };
-    if (!Array.isArray(entries)) { res.status(400).json({ success: false, error: 'entries must be an array' }); return; }
+    const { entries, notes } = req.body as PatchEntriesInput;
     const data = await svc.patchEntriesByAdmin(req.params.id, entries, notes, req.user?.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Info, Loader2, RotateCcw, Printer, Send, CheckCircle2, Save, Calendar, Users,
-  Upload, FileText, Trash2, AlertTriangle, AlertCircle,
+  Upload, FileText, Trash2, AlertTriangle, AlertCircle, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,6 +24,7 @@ import {
 import { LEAVE_TYPE_SHORT } from '../hooks/useTimesheets';
 import { useHolidays } from '../hooks/useHolidays';
 import { apiClient } from '../lib/apiClient';
+import { exportToCsv } from '../lib/exportCsv';
 import {
   MONTHS, buildMonthSkeleton, computeHours, computeMonthlySummary,
   currentMonth, monthInputValue, parseMonthInput, monthLabel,
@@ -115,6 +116,8 @@ export default function MyMonthlyTimesheet() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [exportYear, setExportYear] = useState(String(currentMonth().year));
+  const [exportingYear, setExportingYear] = useState(false);
   const hydratedKey = useRef<string>('');
 
   const isLocked = sheet?.status === 'submitted' || sheet?.status === 'approved';
@@ -130,6 +133,7 @@ export default function MyMonthlyTimesheet() {
   const isStaffOverride = isStaff;
   const periodClosed = isPastMonth && !isStaffOverride;
   const maxMonthInput = monthInputValue(cur.year, cur.month);
+  const exportYearOptions = [cur.year, cur.year - 1, cur.year - 2].map(String);
   // Date-of-joining floor — the picker can't go before the employee's start month.
   const joinDate = targetEmployee?.startDate; // YYYY-MM-DD
   const minMonthInput = !isStaff && joinDate ? joinDate.slice(0, 7) : undefined;
@@ -277,6 +281,41 @@ export default function MyMonthlyTimesheet() {
       }
       window.print();
     } catch { window.print(); }
+  };
+
+  // Download a full year of this employee's monthly timesheets as one CSV —
+  // the existing PDF download is one-month-at-a-time only. Reuses the
+  // year/employeeId filters the list endpoint already supports.
+  const handleDownloadYear = async () => {
+    if (!targetEmployeeId) return;
+    setExportingYear(true);
+    try {
+      const { data } = await apiClient.get('/monthly-timesheets', {
+        params: { employeeId: targetEmployeeId, year: Number(exportYear), limit: 12 },
+      });
+      const sheets = (data?.data ?? []) as MonthlyTimesheet[];
+      const rows = sheets
+        .flatMap(s => s.entries.map(e => ({
+          Date: e.date,
+          Day: e.dayOfWeek,
+          Project: e.project ?? '',
+          Task: e.task ?? '',
+          Start: e.startTime ?? '',
+          End: e.endTime ?? '',
+          Hours: e.hours,
+          Status: e.status,
+        })))
+        .sort((a, b) => a.Date.localeCompare(b.Date));
+      if (rows.length === 0) {
+        toast.warning(`No timesheet entries found for ${employeeName || 'this employee'} in ${exportYear}.`);
+        return;
+      }
+      exportToCsv(`timesheet-${(employeeName || targetEmployeeId).replace(/\s+/g, '-')}-${exportYear}`, rows);
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
+    } finally {
+      setExportingYear(false);
+    }
   };
 
   const handleClear = () => {
@@ -712,8 +751,23 @@ export default function MyMonthlyTimesheet() {
           )}
 
           <div className="flex items-center justify-between gap-3 flex-wrap">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <Button variant="outline" onClick={handlePrint} className="gap-1.5"><Printer className="h-4 w-4" /> Print / Save PDF</Button>
+              <Select value={exportYear} onValueChange={setExportYear}>
+                <SelectTrigger className="w-24 h-9 text-sm"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {exportYearOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="outline"
+                onClick={handleDownloadYear}
+                disabled={!targetEmployeeId || exportingYear}
+                className="gap-1.5"
+              >
+                {exportingYear ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                Download Year (CSV)
+              </Button>
               <Button variant="outline" onClick={() => setClearOpen(true)} disabled={isLocked || periodClosed} className="gap-1.5"><RotateCcw className="h-4 w-4" /> Clear Entries</Button>
               {!isLocked && !periodClosed && (
                 <span className="text-xs text-muted-foreground flex items-center gap-1.5">

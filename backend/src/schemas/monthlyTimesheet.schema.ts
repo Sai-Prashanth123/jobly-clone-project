@@ -27,6 +27,13 @@ export const updateMonthlyTimesheetSchema = z.object({
   leaveReason: z.string().min(3).max(280).optional().nullable(),
 });
 
+// Admin/HR direct entry edit (PATCH /:id/entries) — entries + optional notes;
+// leaveReason is untouched by this endpoint.
+export const patchEntriesSchema = z.object({
+  entries: z.array(monthlyEntrySchema).max(31),
+  notes: z.string().optional().nullable(),
+});
+
 // Submission is handled by the dedicated /submit endpoint; this one is review-only.
 export const patchMonthlyStatusSchema = z.object({
   status: z.enum(['approved', 'rejected']),
@@ -45,5 +52,6 @@ export const listMonthlyTimesheetsQuerySchema = z.object({
 export type MonthlyTimesheetEntryInput = z.infer<typeof monthlyEntrySchema>;
 export type UpsertMonthlyTimesheetInput = z.infer<typeof upsertMonthlyTimesheetSchema>;
 export type UpdateMonthlyTimesheetInput = z.infer<typeof updateMonthlyTimesheetSchema>;
+export type PatchEntriesInput = z.infer<typeof patchEntriesSchema>;
 export type PatchMonthlyStatusInput = z.infer<typeof patchMonthlyStatusSchema>;
 export type ListMonthlyTimesheetsQuery = z.infer<typeof listMonthlyTimesheetsQuerySchema>;

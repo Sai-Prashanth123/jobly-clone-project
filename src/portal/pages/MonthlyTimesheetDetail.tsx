@@ -10,6 +10,7 @@ import { StatCard } from '../components/shared/StatCard';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { useMonthlyTimesheet, usePatchMonthlyStatus, usePatchHrNotes, usePatchMonthlyTimesheetEntries } from '../hooks/useMonthlyTimesheets';
 import { useAuth } from '../hooks/useAuth';
+import { useHolidays } from '../hooks/useHolidays';
 import { apiClient } from '../lib/apiClient';
 import { formatDate } from '../lib/utils';
 import { MONTHS, monthLabel } from '../lib/monthUtils';
@@ -40,6 +41,11 @@ export default function MonthlyTimesheetDetail() {
   const hrNotesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editEntriesOpen, setEditEntriesOpen] = useState(false);
   const [editEntries, setEditEntries] = useState<MonthlyTimesheetEntry[]>([]);
+  // Purely informational: flag entries whose date is a company holiday added
+  // AFTER the employee's original submission (so the stored status never got
+  // auto-marked 'holiday'). Doesn't change any value automatically.
+  const { data: sheetYearHolidays } = useHolidays(sheet?.year, { enabled: !!sheet?.year });
+  const holidayDatesSet = new Set((sheetYearHolidays ?? []).map(h => h.date));
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
@@ -296,7 +302,7 @@ export default function MonthlyTimesheetDetail() {
       <EntityAuditTrail entityType="monthly_timesheet" entityId={sheet?.id} />
 
       <Dialog open={editEntriesOpen} onOpenChange={setEditEntriesOpen}>
-        <DialogContent className="w-[95vw] max-w-4xl max-h-[90vh] flex flex-col">
+        <DialogContent className="w-[95vw] max-w-5xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>Edit Entries — {monthLabel(sheet.year, sheet.month)}</DialogTitle>
             <DialogDescription>Adjust daily hours and status as admin/HR. Changes bypass the status lock.</DialogDescription>
@@ -308,15 +314,52 @@ export default function MonthlyTimesheetDetail() {
                   <tr className="bg-gray-50 text-[10px] uppercase tracking-wide text-gray-400">
                     <th className="px-3 py-2 text-left w-24">Date</th>
                     <th className="px-3 py-2 text-left w-12">Day</th>
+                    <th className="px-3 py-2 text-left w-32">Project</th>
+                    <th className="px-3 py-2 text-left w-32">Task</th>
                     <th className="px-3 py-2 text-center w-20">Hours</th>
                     <th className="px-3 py-2 text-center w-28">Status</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {editEntries.map((e, i) => (
+                  {editEntries.map((e, i) => {
+                    const isUnmarkedHoliday = e.status !== 'holiday' && e.status !== 'weekend' && holidayDatesSet.has(e.date);
+                    return (
                     <tr key={e.date} className="border-b border-gray-100">
-                      <td className="px-3 py-1 font-mono text-xs text-gray-600">{e.date}</td>
+                      <td className="px-3 py-1 font-mono text-xs text-gray-600">
+                        {e.date}
+                        {isUnmarkedHoliday && (
+                          <span className="ml-1 inline-block text-[9px] font-semibold px-1 py-0.5 rounded bg-violet-100 text-violet-700" title="Company holiday added after this timesheet was submitted">
+                            Holiday
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-1 text-xs text-gray-500">{e.dayOfWeek}</td>
+                      <td className="px-3 py-1">
+                        <input
+                          type="text"
+                          value={e.project ?? ''}
+                          disabled={e.status === 'weekend'}
+                          onChange={ev => {
+                            const updated = [...editEntries];
+                            updated[i] = { ...updated[i], project: ev.target.value };
+                            setEditEntries(updated);
+                          }}
+                          className="w-full rounded border border-gray-200 px-2 py-0.5 text-xs focus:outline-none focus:border-[#4069FF] disabled:bg-gray-50 disabled:text-gray-400"
+                        />
+                      </td>
+                      <td className="px-3 py-1">
+                        <input
+                          type="text"
+                          value={e.task ?? ''}
+                          disabled={e.status === 'weekend'}
+                          onChange={ev => {
+                            const updated = [...editEntries];
+                            updated[i] = { ...updated[i], task: ev.target.value };
+                            setEditEntries(updated);
+                          }}
+                          className="w-full rounded border border-gray-200 px-2 py-0.5 text-xs focus:outline-none focus:border-[#4069FF] disabled:bg-gray-50 disabled:text-gray-400"
+                        />
+                      </td>
                       <td className="px-3 py-1 text-center">
                         <input
                           type="number" min={0} max={24} step={0.5}
@@ -348,7 +391,8 @@ export default function MonthlyTimesheetDetail() {
                         </select>
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

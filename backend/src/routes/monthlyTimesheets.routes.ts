@@ -5,7 +5,7 @@ import { validateBody, validateQuery } from '../middleware/validate';
 import { documentUpload } from '../middleware/upload';
 import {
   upsertMonthlyTimesheetSchema, updateMonthlyTimesheetSchema,
-  patchMonthlyStatusSchema, listMonthlyTimesheetsQuerySchema,
+  patchMonthlyStatusSchema, listMonthlyTimesheetsQuerySchema, patchEntriesSchema,
 } from '../schemas/monthlyTimesheet.schema';
 import * as ctrl from '../controllers/monthlyTimesheets.controller';
 
@@ -33,7 +33,7 @@ router.patch('/:id/status', requireRole('admin', 'hr', 'employee'), validateBody
 router.patch('/:id/hr-notes', requireRole('admin', 'hr'), ctrl.patchHrNotes);
 
 // Admin/HR direct entry edit — skips status guard and closed-month guard.
-router.patch('/:id/entries', requireRole('admin', 'hr'), ctrl.patchEntries);
+router.patch('/:id/entries', requireRole('admin', 'hr'), validateBody(patchEntriesSchema), ctrl.patchEntries);
 
 // Client-signed timesheet proof — required at submit-time when total_hours > 0.
 // Employee can only upload to their own timesheet (controller enforces).
