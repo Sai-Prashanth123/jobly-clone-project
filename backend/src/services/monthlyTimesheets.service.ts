@@ -118,6 +118,32 @@ export async function getMyMonth(employeeId: string | null | undefined, year: nu
   return data ?? null;
 }
 
+/**
+ * Active employees with NO monthly_timesheets row for the given year/month —
+ * drives the "Not Submitted" list on the Attendance Review page. Two-query +
+ * in-memory diff (same style as getProbationEmployees / getCapacityUtilization
+ * in analyticsReports.service.ts) rather than a raw LEFT JOIN, since we're on
+ * the Supabase query builder.
+ */
+export async function getEmployeesWithoutMonthlyTimesheet(year: number, month: number) {
+  const [{ data: employees, error: empErr }, { data: existing, error: mtErr }] = await Promise.all([
+    supabaseAdmin
+      .from('employees')
+      .select('id, display_id, first_name, last_name, department, job_title')
+      .eq('status', 'active')
+      .is('deleted_at', null),
+    supabaseAdmin
+      .from('monthly_timesheets')
+      .select('employee_id')
+      .eq('year', year).eq('month', month),
+  ]);
+  if (empErr) throw empErr;
+  if (mtErr) throw mtErr;
+
+  const submittedIds = new Set((existing ?? []).map(r => r.employee_id));
+  return (employees ?? []).filter(e => !submittedIds.has(e.id));
+}
+
 // ── Writes ──────────────────────────────────────────────────────────────────
 
 export async function upsertMonthlyTimesheet(
@@ -307,6 +333,20 @@ export async function patchMonthlyStatus(id: string, input: PatchMonthlyStatusIn
     allowed = !!managerPortalId && managerPortalId === actorId;
   }
   if (!allowed) throw new ForbiddenError('Only the reporting manager or HR can review this timesheet.');
+
+  // Leave conflict re-check at approval time (mirrors the submit-time gate in
+  // submitMonthlyTimesheet — a day could be marked Present-with-hours before an
+  // approved leave request landed, or the leave could've been approved after
+  // submit). Admin may override.
+  if (input.status === 'approved' && actorRole !== 'admin') {
+    const days = ((row.entries as any[]) ?? [])
+      .filter(e => e?.status === 'present')
+      .map(e => ({ date: e.date as string, hours: Number(e.hours) || 0 }));
+    const { blocking } = await detectLeaveConflictsForDays(row.employee_id, days);
+    if (blocking.length > 0) {
+      throw new ConflictError(approvedLeaveBlockMessage(blocking), { code: 'MONTHLY_PRESENT_ON_APPROVED_LEAVE', conflicts: blocking });
+    }
+  }
 
   const update: Record<string, unknown> = {
     status: input.status,

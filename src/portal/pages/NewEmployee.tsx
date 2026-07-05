@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
   User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
-  AlertTriangle, X, LogOut,
+  AlertTriangle, X, LogOut, Eye, EyeOff,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -384,6 +384,7 @@ export default function NewEmployee() {
   const [submitStep, setSubmitStep] = useState<'idle' | 'creating' | 'uploading' | 'finishing'>('idle');
   const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
   const [draftSaving, setDraftSaving] = useState(false);
+  const [ssnVisible, setSsnVisible] = useState(false);
 
   const submitMutation = isEditMode ? updateEmployee : createEmployee;
 
@@ -1834,19 +1835,31 @@ export default function NewEmployee() {
               )}
               <div>
                 <Label>Social Security Number (SSN) {isOnboarding && <RequiredMark />}</Label>
-                <Input
-                  type="password"
-                  value={form.ssn}
-                  onChange={e => {
-                    const raw = e.target.value.replace(/\D/g, '').slice(0, 9);
-                    const fmt = raw.length <= 3 ? raw
-                      : raw.length <= 5 ? `${raw.slice(0, 3)}-${raw.slice(3)}`
-                      : `${raw.slice(0, 3)}-${raw.slice(3, 5)}-${raw.slice(5)}`;
-                    set('ssn', fmt);
-                  }}
-                  placeholder="XXX-XX-XXXX"
-                  maxLength={11}
-                />
+                <div className="relative">
+                  <Input
+                    type={ssnVisible ? 'text' : 'password'}
+                    value={form.ssn}
+                    onChange={e => {
+                      const raw = e.target.value.replace(/\D/g, '').slice(0, 9);
+                      const fmt = raw.length <= 3 ? raw
+                        : raw.length <= 5 ? `${raw.slice(0, 3)}-${raw.slice(3)}`
+                        : `${raw.slice(0, 3)}-${raw.slice(3, 5)}-${raw.slice(5)}`;
+                      set('ssn', fmt);
+                    }}
+                    placeholder="XXX-XX-XXXX"
+                    maxLength={11}
+                    className="pr-9"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-2 top-1/2 -translate-y-1/2 h-6 w-6 text-gray-400 hover:text-gray-700"
+                    onClick={() => setSsnVisible(v => !v)}
+                  >
+                    {ssnVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </Button>
+                </div>
                 <FieldError msg={errors.ssn} />
               </div>
             </div>

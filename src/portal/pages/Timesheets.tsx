@@ -56,6 +56,22 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
   const minWeekStr = joiningMondayStr ?? fallbackCutoff;
   const maxWeekStr = getMondayOfWeek(new Date(Date.now() + 12 * 7 * 86400000)).toISOString().split('T')[0];
 
+  // Existing timesheets for the selected employee — used to flag weeks that
+  // already have a (non-rejected) timesheet on this assignment so the picker
+  // warns upfront instead of failing silently on submit. The list endpoint has
+  // no assignmentId filter, so fetch by employeeId and narrow client-side.
+  const { data: existingTsData } = useTimesheets(
+    { employeeId: selectedAsgn?.employeeId, limit: 200 },
+    { enabled: !!assignmentId && !!selectedAsgn },
+  );
+  const takenWeeks = useMemo(() => {
+    const set = new Set<string>();
+    for (const t of existingTsData?.data ?? []) {
+      if (t.assignmentId === assignmentId && t.status !== 'rejected') set.add(t.weekStartDate);
+    }
+    return set;
+  }, [existingTsData, assignmentId]);
+
   // Build the list of valid Mondays between min and max
   const weekOptions = useMemo(() => {
     const options: { value: string; label: string }[] = [];
@@ -144,9 +160,19 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
             <SelectValue placeholder="Select a week…" />
           </SelectTrigger>
           <SelectContent className="max-h-64">
-            {weekOptions.map(o => (
-              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-            ))}
+            {weekOptions.map(o => {
+              const taken = takenWeeks.has(o.value);
+              return (
+                <SelectItem
+                  key={o.value}
+                  value={o.value}
+                  disabled={taken}
+                  className={taken ? 'text-muted-foreground' : undefined}
+                >
+                  {o.label}{taken ? ' — Already submitted' : ''}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
         <p className="text-xs text-muted-foreground">

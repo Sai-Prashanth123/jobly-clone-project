@@ -290,13 +290,15 @@ export default function TimesheetDetail() {
             <p className="font-semibold text-2xl mt-0.5">{canEdit ? liveTotalHours : timesheet.totalHours}</p>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-4 pb-4">
-            <p className="text-xs text-muted-foreground">Billable Amount</p>
-            <p className="font-semibold text-sm mt-0.5">{formatCurrency(billableAmount)}</p>
-            <p className="text-xs text-muted-foreground">@ ${assignment?.billRate ?? 0}/hr</p>
-          </CardContent>
-        </Card>
+        {user?.role !== 'employee' && (
+          <Card>
+            <CardContent className="pt-4 pb-4">
+              <p className="text-xs text-muted-foreground">Billable Amount</p>
+              <p className="font-semibold text-sm mt-0.5">{formatCurrency(billableAmount)}</p>
+              <p className="text-xs text-muted-foreground">@ ${assignment?.billRate ?? 0}/hr</p>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       {timesheet.status === 'rejected' && timesheet.rejectionReason && (

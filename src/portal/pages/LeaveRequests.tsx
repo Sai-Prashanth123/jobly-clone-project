@@ -36,6 +36,12 @@ function LeaveStatusBadge({ status }: { status: LeaveRequestStatus }) {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// Leave types that are commonly reported after the fact (illness, bereavement,
+// jury duty, etc.) — these should allow past dates. Planned leave types
+// (vacation, unpaid leave, other) stay future-only.
+const REACTIVE_LEAVE_TYPES: LeaveType[] = ['sick', 'medical_leave', 'bereavement', 'jury_duty'];
+const isReactiveLeaveType = (t: LeaveType) => REACTIVE_LEAVE_TYPES.includes(t);
+
 export default function LeaveRequests() {
   const { user } = useAuth();
   const isReviewer = user?.role === 'admin' || user?.role === 'hr';
@@ -237,7 +243,7 @@ export default function LeaveRequests() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label>From</Label>
-                <UsDateInput min={today()} value={form.startDate}
+                <UsDateInput min={isReactiveLeaveType(form.leaveType) ? undefined : today()} value={form.startDate}
                   onChange={iso => setForm(f => ({ ...f, startDate: iso, endDate: f.endDate < iso ? iso : f.endDate }))} />
               </div>
               <div className="space-y-1.5">

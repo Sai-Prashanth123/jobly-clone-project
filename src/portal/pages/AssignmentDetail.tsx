@@ -47,6 +47,11 @@ export default function AssignmentDetail() {
   const totalHours = asnTimesheets.reduce((s, t) => s + t.totalHours, 0);
   const totalBilled = totalHours * assignment.billRate;
   const canEdit = user?.role === 'admin' || user?.role === 'operations';
+  // Bill Rate / Total Billable are revenue-side figures — hidden from employees
+  // only (operations needs them for assignment management). Pay Rate is a
+  // compensation-side figure — hidden from employees AND operations.
+  const showBillable = user?.role !== 'employee';
+  const showPayRate = user?.role !== 'employee' && user?.role !== 'operations';
 
   const Field = ({ label, value }: { label: string; value?: string | null }) => (
     <div>
@@ -118,24 +123,30 @@ export default function AssignmentDetail() {
         <Card>
           <CardHeader><CardTitle className="text-base">Financial Summary</CardTitle></CardHeader>
           <CardContent className="space-y-4">
-            <div className="text-center p-3 bg-blue-50 rounded-lg">
-              <p className="text-2xl font-bold text-blue-700">{formatCurrency(totalBilled)}</p>
-              <p className="text-xs text-blue-600">Total Billable</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {showBillable && (
+              <div className="text-center p-3 bg-blue-50 rounded-lg">
+                <p className="text-2xl font-bold text-blue-700">{formatCurrency(totalBilled)}</p>
+                <p className="text-xs text-blue-600">Total Billable</p>
+              </div>
+            )}
+            <div className={`grid grid-cols-1 ${showBillable ? 'sm:grid-cols-2' : ''} gap-3`}>
               <div className="text-center p-3 bg-gray-50 rounded-lg">
                 <p className="text-lg font-bold">{totalHours}</p>
                 <p className="text-xs text-muted-foreground">Total Hours</p>
               </div>
-              <div className="text-center p-3 bg-gray-50 rounded-lg">
-                <p className="text-sm font-bold">{formatCurrency(assignment.billRate)}</p>
-                <p className="text-xs text-muted-foreground">Bill Rate/hr</p>
+              {showBillable && (
+                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                  <p className="text-sm font-bold">{formatCurrency(assignment.billRate)}</p>
+                  <p className="text-xs text-muted-foreground">Bill Rate/hr</p>
+                </div>
+              )}
+            </div>
+            {showPayRate && (
+              <div className="p-3 bg-gray-50 rounded-lg text-center">
+                <p className="text-sm font-bold">{formatCurrency(assignment.payRate)}</p>
+                <p className="text-xs text-muted-foreground">Pay Rate/hr</p>
               </div>
-            </div>
-            <div className="p-3 bg-gray-50 rounded-lg text-center">
-              <p className="text-sm font-bold">{formatCurrency(assignment.payRate)}</p>
-              <p className="text-xs text-muted-foreground">Pay Rate/hr</p>
-            </div>
+            )}
           </CardContent>
         </Card>
 

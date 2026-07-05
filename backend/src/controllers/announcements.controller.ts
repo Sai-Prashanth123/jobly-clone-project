@@ -1,12 +1,16 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/announcements.service';
-import { supabaseAdmin } from '../config/supabase';
+import { supabaseAdmin, fetchPortalUser } from '../config/supabase';
 import type { ListAnnouncementsQuery, CreateAnnouncementInput, UpdateAnnouncementInput } from '../schemas/announcements.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const role = req.user!.role;
-    const result = await svc.listAnnouncements(req.query as unknown as ListAnnouncementsQuery, role);
+    // Needed for join-date scoping in the service: a brand-new employee
+    // shouldn't see announcements posted long before their account existed.
+    const viewer = await fetchPortalUser(req.user!.id);
+    const viewerCreatedAt = (viewer as any)?.created_at ?? null;
+    const result = await svc.listAnnouncements(req.query as unknown as ListAnnouncementsQuery, role, viewerCreatedAt);
     res.json({ success: true, ...result });
   } catch (err) { next(err); }
 }
@@ -43,12 +47,13 @@ export async function getUnreadCount(req: Request, res: Response, next: NextFunc
   try {
     const { data: pu } = await supabaseAdmin
       .from('portal_users')
-      .select('announcements_last_viewed_at')
+      .select('announcements_last_viewed_at, created_at')
       .eq('id', req.user!.id)
       .single();
     const count = await svc.getAnnouncementUnreadCount(
       req.user!.role,
       (pu as any)?.announcements_last_viewed_at ?? null,
+      (pu as any)?.created_at ?? null,
     );
     res.json({ count });
   } catch (err) { next(err); }

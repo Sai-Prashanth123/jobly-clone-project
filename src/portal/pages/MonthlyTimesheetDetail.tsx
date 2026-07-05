@@ -72,7 +72,6 @@ export default function MonthlyTimesheetDetail() {
   // a reporting manager — backend already gated the fact they can see it).
   const isOwnSheet = sheet.employeeId === user?.employeeId;
   const canReview = sheet.status === 'submitted' && (user?.role === 'admin' || user?.role === 'hr' || (user?.role === 'employee' && !isOwnSheet));
-  const balance = Math.round((sheet.totalHours - sheet.expectedHours) * 100) / 100;
 
   const handleApprove = async () => {
     try {
@@ -198,10 +197,9 @@ export default function MonthlyTimesheetDetail() {
       )}
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard title="Total Hours" value={sheet.totalHours.toFixed(1)} variant="blue" description="Hours logged" />
         <StatCard title="Expected Hours" value={sheet.expectedHours} variant="orange" description="Working days × 8" />
-        <StatCard title="Balance" value={`${balance >= 0 ? '+' : ''}${balance.toFixed(1)}`} variant={balance >= 0 ? 'green' : 'red'} description="Over / under" />
         <StatCard title="Leave Days" value={sheet.leaveDays} variant="purple" description="Marked as leave" />
         <StatCard title="Working Days" value={sheet.workingDays} variant="cyan" description="In this month" />
       </div>

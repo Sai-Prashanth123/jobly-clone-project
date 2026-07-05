@@ -18,6 +18,9 @@ router.get('/', requireRole('admin', 'hr', 'operations', 'employee'), validateQu
 router.get('/me', requireRole('admin', 'hr', 'employee'), ctrl.getMyMonth);
 // Approved/pending leave coverage for a month (before/after the sheet is saved).
 router.get('/leave-check', requireRole('admin', 'hr', 'employee'), ctrl.leaveCheck);
+// Active employees with no monthly timesheet for a given year/month (Attendance
+// Review "Not Submitted" list). Must stay ahead of `/:id` below.
+router.get('/not-submitted', requireRole('admin', 'hr'), ctrl.getNotSubmitted);
 router.post('/', requireRole('admin', 'hr', 'employee'), validateBody(upsertMonthlyTimesheetSchema), ctrl.upsert);
 router.get('/:id', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getOne);
 router.get('/:id/pdf', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getPdf);

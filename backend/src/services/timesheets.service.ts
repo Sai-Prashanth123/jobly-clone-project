@@ -224,9 +224,9 @@ export async function patchTimesheetStatus(
   // Role-based status transition rules
   const allowed: Record<string, string[]> = {
     submitted:         ['employee', 'admin', 'operations'],
-    manager_approved:  ['admin', 'operations'],
-    client_approved:   ['admin', 'finance'],
-    rejected:          ['admin', 'operations', 'finance'],
+    manager_approved:  ['admin', 'operations', 'hr'],
+    client_approved:   ['admin', 'finance', 'hr'],
+    rejected:          ['admin', 'operations', 'finance', 'hr'],
   };
 
   const action = input.status;
@@ -245,8 +245,15 @@ export async function patchTimesheetStatus(
     if (hours === 0 && !ts.leave_reason) {
       throw new ValidationError('Add a reason (e.g. medical leave, sick, unpaid leave) before submitting a zero-hour timesheet.');
     }
-    // Leave conflict: you can't bill hours on a day you're on APPROVED leave.
-    // (Admin is exempt — handled by the outer `userRole !== 'admin'` guard.)
+  }
+
+  // Leave conflict: you can't bill/approve hours on a day the employee is on
+  // APPROVED leave. Checked at submit-time AND at each approval stage, because
+  // the leave request may be approved independently *after* the timesheet was
+  // already submitted (or while it's sitting in manager_approved awaiting
+  // client sign-off) — re-check on every gate so a stale approval can't slip
+  // hours through. (Admin is exempt — god-mode override.)
+  if ((action === 'submitted' || action === 'manager_approved' || action === 'client_approved') && userRole !== 'admin') {
     const days = ((ts as any).timesheet_entries ?? []).map((e: any) => ({ date: e.entry_date, hours: Number(e.hours) || 0 }));
     const { blocking } = await detectLeaveConflictsForDays(ts.employee_id, days);
     if (blocking.length > 0) {
@@ -421,9 +428,9 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
   // versa, bypassing the state machine's role gates entirely.
   const roleFor: Record<string, string[]> = {
     submitted: ['employee', 'admin', 'operations'],
-    manager_approved: ['admin', 'operations'],
-    client_approved: ['admin', 'finance'],
-    rejected: ['admin', 'operations', 'finance'],
+    manager_approved: ['admin', 'operations', 'hr'],
+    client_approved: ['admin', 'finance', 'hr'],
+    rejected: ['admin', 'operations', 'finance', 'hr'],
   };
   if (!roleFor[status]?.includes(actorRole)) {
     throw new ForbiddenError(`Role '${actorRole}' cannot set status to '${status}'`);

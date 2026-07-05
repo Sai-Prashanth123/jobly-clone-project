@@ -51,7 +51,7 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
     );
   }
 
-  if ((role === 'operations' || role === 'admin') && status === 'submitted') {
+  if ((role === 'operations' || role === 'admin' || role === 'hr') && status === 'submitted') {
     return (
       <>
         <div className="flex gap-2">
@@ -116,7 +116,7 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
     );
   }
 
-  if ((role === 'finance' || role === 'admin') && status === 'manager_approved') {
+  if ((role === 'finance' || role === 'admin' || role === 'hr') && status === 'manager_approved') {
     return (
       <>
         <Button className="gap-2" loading={isLoading} loadingText="Approving…"

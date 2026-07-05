@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/monthlyTimesheets.service';
 import { getLeaveCoverage } from '../services/conflicts.service';
+import { currentYearMonthUTC } from '../lib/dateUtils';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput, PatchMonthlyStatusInput,
   ListMonthlyTimesheetsQuery, PatchEntriesInput,
@@ -31,6 +32,21 @@ export async function leaveCheck(req: Request, res: Response, next: NextFunction
       leaveDays[date] = { status: ref.status, leaveDisplayId: ref.leaveDisplayId, leaveType: ref.leaveType };
     }
     res.json({ success: true, leaveDays });
+  } catch (err) { next(err); }
+}
+
+// Active employees with no monthly_timesheets row for (year, month) — feeds the
+// "Not Submitted" list on the Attendance Review page. Defaults to the current
+// UTC calendar month when year/month are omitted or unparsable.
+export async function getNotSubmitted(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const defaults = currentYearMonthUTC();
+    const yearRaw = Number(req.query.year);
+    const monthRaw = Number(req.query.month);
+    const year = Number.isFinite(yearRaw) && yearRaw > 0 ? yearRaw : defaults.year;
+    const month = Number.isFinite(monthRaw) && monthRaw >= 1 && monthRaw <= 12 ? monthRaw : defaults.month;
+    const data = await svc.getEmployeesWithoutMonthlyTimesheet(year, month);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 }
 

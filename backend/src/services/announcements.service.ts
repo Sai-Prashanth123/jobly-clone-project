@@ -10,7 +10,16 @@ const SELECT = `
   author:portal_users!author_id(id, name, email)
 `.trim();
 
-export async function listAnnouncements(query: ListAnnouncementsQuery, viewerRole: string) {
+// Roles that manage announcements should always see the full historical list
+// (they need it for management/auditing purposes). Everyone else (e.g.
+// employees) only sees announcements posted since they joined.
+const ROLES_EXEMPT_FROM_JOIN_DATE_SCOPING = new Set(['admin', 'hr']);
+
+export async function listAnnouncements(
+  query: ListAnnouncementsQuery,
+  viewerRole: string,
+  viewerCreatedAt?: string | null,
+) {
   const now = new Date().toISOString();
 
   let q = supabaseAdmin
@@ -25,6 +34,15 @@ export async function listAnnouncements(query: ListAnnouncementsQuery, viewerRol
   // Supabase: use contains for the "has role in array" check
   // announcements with target_roles = {} are visible to everyone
   q = q.or(`target_roles.eq.{},target_roles.cs.{${viewerRole}}`);
+
+  // Join-date scoping: non-admin/hr viewers only see announcements created
+  // since their portal account was created, so a brand-new employee doesn't
+  // see announcements posted long before they joined. If we can't resolve
+  // the viewer's created_at for any reason, fail open (show everything)
+  // rather than accidentally hiding announcements that should be visible.
+  if (!ROLES_EXEMPT_FROM_JOIN_DATE_SCOPING.has(viewerRole) && viewerCreatedAt) {
+    q = q.gte('created_at', viewerCreatedAt);
+  }
 
   // Pinned first, then newest
   q = q.order('is_pinned', { ascending: false })
@@ -115,7 +133,11 @@ export async function updateAnnouncement(id: string, input: UpdateAnnouncementIn
   return data as any;
 }
 
-export async function getAnnouncementUnreadCount(userRole: string, lastViewedAt: string | null): Promise<number> {
+export async function getAnnouncementUnreadCount(
+  userRole: string,
+  lastViewedAt: string | null,
+  viewerCreatedAt?: string | null,
+): Promise<number> {
   const now = new Date().toISOString();
   let q = supabaseAdmin
     .from('announcements')
@@ -124,6 +146,13 @@ export async function getAnnouncementUnreadCount(userRole: string, lastViewedAt:
     .or(`expires_at.is.null,expires_at.gt.${now}`)
     .or(`target_roles.eq.{},target_roles.cs.{${userRole}}`);
   if (lastViewedAt) q = q.gt('created_at', lastViewedAt);
+
+  // Same join-date scoping as listAnnouncements, so the unread-count badge
+  // matches what the list actually shows. Fail open on missing data.
+  if (!ROLES_EXEMPT_FROM_JOIN_DATE_SCOPING.has(userRole) && viewerCreatedAt) {
+    q = q.gte('created_at', viewerCreatedAt);
+  }
+
   const { count, error } = await q;
   if (error) throw error;
   return count ?? 0;

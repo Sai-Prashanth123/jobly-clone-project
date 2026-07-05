@@ -104,6 +104,16 @@ export interface MonthlyTimesheet {
   employeeEmail?: string;
 }
 
+// Active employee with no monthly_timesheets row for a given period (HR "who hasn't filed yet" view).
+export interface NotSubmittedEmployee {
+  id: string;
+  displayId?: string;
+  firstName: string;
+  lastName: string;
+  department?: string;
+  jobTitle?: string;
+}
+
 export interface PortalUser {
   id: string;
   email: string;

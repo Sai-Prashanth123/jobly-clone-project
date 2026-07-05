@@ -65,12 +65,14 @@ export default function Assignments() {
     },
     { key: 'projectName', header: 'Project', hideOnMobile: true },
     { key: 'role', header: 'Role', hideOnMobile: true },
-    {
+    // Bill Rate is a revenue-side figure — hidden from employees only
+    // (operations/finance/hr/admin still need it, unlike Pay Rate).
+    ...(user?.role !== 'employee' ? [{
       key: 'billRate',
       header: 'Bill Rate',
       hideOnMobile: true,
-      render: a => `${formatCurrency(a.billRate)}/hr`,
-    },
+      render: (a: Assignment) => `${formatCurrency(a.billRate)}/hr`,
+    }] : []),
     {
       key: 'startDate',
       header: 'Start Date',

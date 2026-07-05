@@ -97,7 +97,7 @@ export default function MyMonthlyTimesheet() {
   const uploadProof = useUploadMonthlyClientProof();
   const deleteProof = useDeleteMonthlyClientProof();
 
-  const { data: leaveByDate } = useMonthlyLeaveCheck(targetEmployeeId || undefined, loaded.year, loaded.month);
+  const { data: leaveByDate, isLoading: leaveCheckLoading } = useMonthlyLeaveCheck(targetEmployeeId || undefined, loaded.year, loaded.month);
   const entriesTableRef = useRef<HTMLDivElement>(null);
 
   // Company holidays for the loaded month/year, so a fresh skeleton pre-marks
@@ -108,8 +108,15 @@ export default function MyMonthlyTimesheet() {
     return new Set((yearHolidays ?? []).filter(h => h.date.startsWith(prefix)).map(h => h.date));
   }, [yearHolidays, loaded.year, loaded.month]);
 
+  // Days already covered by an APPROVED leave request, so a fresh skeleton
+  // pre-marks them 'leave' instead of leaving them editable/defaulted to 8h
+  // Present (mirrors the holiday auto-marking above).
+  const approvedLeaveDatesInMonth = useMemo(() => {
+    return new Set(Object.entries(leaveByDate ?? {}).filter(([, v]) => v.status === 'approved').map(([date]) => date));
+  }, [leaveByDate]);
+
   const [sheet, setSheet] = useState<MonthlyTimesheet | null>(null);
-  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
+  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
   const [notes, setNotes] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -153,29 +160,30 @@ export default function MyMonthlyTimesheet() {
     && (!needsLeaveReason || !!leaveReason);
 
   // Hydrate the grid when the (employee, month) data lands. Also wait on the
-  // holidays fetch so a fresh skeleton has holiday days pre-marked from the
-  // start, rather than building blind and never retroactively updating (the
-  // hydratedKey guard below only runs this once per employee/month).
+  // holidays fetch and the leave-check fetch so a fresh skeleton has holiday
+  // days and approved-leave days pre-marked from the start, rather than
+  // building blind and never retroactively updating (the hydratedKey guard
+  // below only runs this once per employee/month).
   useEffect(() => {
     if (!targetEmployeeId) return;
     const key = `${targetEmployeeId}-${loaded.year}-${loaded.month}`;
-    if (loadingMonth || holidaysLoading) return;
+    if (loadingMonth || holidaysLoading || leaveCheckLoading) return;
     if (hydratedKey.current === key) return;
     hydratedKey.current = key;
     if (serverSheet) {
       setSheet(serverSheet);
-      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
+      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
       setNotes(serverSheet.notes ?? '');
       setLeaveReason(serverSheet.leaveReason ?? '');
     } else {
       setSheet(null);
-      setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
+      setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
       setNotes('');
       setLeaveReason('');
     }
     setDirty(false);
     setSaveState('idle');
-  }, [serverSheet, loadingMonth, holidaysLoading, holidayDatesInMonth, loaded.year, loaded.month, targetEmployeeId]);
+  }, [serverSheet, loadingMonth, holidaysLoading, leaveCheckLoading, holidayDatesInMonth, approvedLeaveDatesInMonth, loaded.year, loaded.month, targetEmployeeId]);
 
   // Debounced draft auto-save (only while editable + after a real edit).
   // Skips for past (closed) periods — server would 400 the upsert anyway.
@@ -319,7 +327,7 @@ export default function MyMonthlyTimesheet() {
   };
 
   const handleClear = () => {
-    setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth));
+    setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
     setNotes('');
     setLeaveReason('');
     setDirty(true);
@@ -425,10 +433,9 @@ export default function MyMonthlyTimesheet() {
       ) : (
         <>
           {/* Stats strip */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <StatCard title="Total Hours" value={summary.totalHours.toFixed(1)} variant="blue" icon={<Calendar />} description="Hours logged" />
             <StatCard title="Expected Hours" value={summary.expectedHours} variant="orange" icon={<Calendar />} description="Working days × 8" />
-            <StatCard title="Balance" value={`${summary.balance >= 0 ? '+' : ''}${summary.balance.toFixed(1)}`} variant={summary.balance >= 0 ? 'green' : 'red'} icon={<Calendar />} description="Over / under" />
             <StatCard title="Leave Days" value={summary.leaveDays} variant="purple" icon={<Calendar />} description="Marked as leave" />
             <StatCard title="Working Days" value={summary.workingDays} variant="cyan" icon={<Calendar />} description="In selected month" />
           </div>

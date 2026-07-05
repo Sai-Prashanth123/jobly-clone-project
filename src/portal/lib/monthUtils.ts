@@ -54,10 +54,18 @@ export function computeHours(start: string, end: string): number {
 /**
  * Build one row per calendar day for the month. Weekends are auto-marked
  * 'weekend' and locked; weekdays default to 'present' 09:00–17:00, unless the
- * date is in `holidayDates` (company holiday), in which case it's pre-marked
- * 'holiday' so it's reflected without the employee having to set it manually.
+ * date is in `holidayDates` (company holiday) or `approvedLeaveDates` (an
+ * approved leave request already covers that day), in which case it's
+ * pre-marked 'holiday' / 'leave' respectively so it's reflected without the
+ * employee having to set it manually. Holiday takes precedence if a date is
+ * (unusually) in both sets.
  */
-export function buildMonthSkeleton(year: number, month: number, holidayDates?: Set<string>): MonthlyTimesheetEntry[] {
+export function buildMonthSkeleton(
+  year: number,
+  month: number,
+  holidayDates?: Set<string>,
+  approvedLeaveDates?: Set<string>,
+): MonthlyTimesheetEntry[] {
   const total = daysInMonth(year, month);
   const rows: MonthlyTimesheetEntry[] = [];
   for (let d = 1; d <= total; d++) {
@@ -65,15 +73,17 @@ export function buildMonthSkeleton(year: number, month: number, holidayDates?: S
     const isWeekend = dow === 0 || dow === 6;
     const date = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const isHoliday = !isWeekend && !!holidayDates?.has(date);
-    const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : 'present';
+    const isApprovedLeave = !isWeekend && !isHoliday && !!approvedLeaveDates?.has(date);
+    const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : isApprovedLeave ? 'leave' : 'present';
+    const isBlank = isWeekend || isHoliday || isApprovedLeave;
     rows.push({
       date,
       dayOfWeek: DAYS_SHORT[dow],
       project: '',
       task: '',
-      startTime: isWeekend || isHoliday ? '' : '09:00',
-      endTime: isWeekend || isHoliday ? '' : '17:00',
-      hours: isWeekend || isHoliday ? 0 : computeHours('09:00', '17:00'),
+      startTime: isBlank ? '' : '09:00',
+      endTime: isBlank ? '' : '17:00',
+      hours: isBlank ? 0 : computeHours('09:00', '17:00'),
       status,
     });
   }

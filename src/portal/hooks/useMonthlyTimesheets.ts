@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 import { isValidId } from '../lib/utils';
 import type { LeaveDayInfo } from './useTimesheets';
-import type { MonthlyTimesheet, MonthlyTimesheetEntry } from '../types';
+import type { MonthlyTimesheet, MonthlyTimesheetEntry, NotSubmittedEmployee } from '../types';
 
 // Approved/pending leave coverage for a (employee, year, month) — drives the
 // monthly attendance leave overlay + present-on-leave submit guard.
@@ -50,6 +50,30 @@ function mapMonthlyTimesheet(raw: any): MonthlyTimesheet {
     hrNotes: raw.hr_notes ?? undefined,
     employeeEmail: raw.employees?.work_email ?? undefined,
   };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapNotSubmittedEmployee(raw: any): NotSubmittedEmployee {
+  return {
+    id: raw.id,
+    displayId: raw.display_id,
+    firstName: raw.first_name,
+    lastName: raw.last_name,
+    department: raw.department ?? undefined,
+    jobTitle: raw.job_title ?? undefined,
+  };
+}
+
+// Active employees with no monthly_timesheets row for the given period (HR "not yet filed" view).
+export function useNotSubmittedEmployees(year: number, month: number) {
+  return useQuery({
+    queryKey: ['monthly-timesheets', 'not-submitted', year, month],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/monthly-timesheets/not-submitted', { params: { year, month } });
+      return (data.data as any[]).map(mapNotSubmittedEmployee); // eslint-disable-line @typescript-eslint/no-explicit-any
+    },
+    enabled: !!year && !!month,
+  });
 }
 
 interface ListParams {
