@@ -179,3 +179,20 @@ export async function getPdf(req: Request, res: Response, next: NextFunction): P
     res.json({ success: true, data: { url } });
   } catch (err) { next(err); }
 }
+
+export async function getDocx(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const row = await svc.getMonthlyTimesheet(req.params.id);
+    if (req.user!.role === 'employee' && row.employee_id !== req.user!.employeeId) {
+      const isMgr = await svc.isReportingManagerOf(req.user!.employeeId, row.employee_id);
+      if (!isMgr) {
+        res.status(403).json({ success: false, error: 'You may only download your own timesheet' });
+        return;
+      }
+    }
+    const { buffer, fileName } = await svc.getMonthlyTimesheetDOCXBuffer(req.params.id);
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+}

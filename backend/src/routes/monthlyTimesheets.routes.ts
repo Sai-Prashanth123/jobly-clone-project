@@ -24,6 +24,7 @@ router.get('/not-submitted', requireRole('admin', 'hr'), ctrl.getNotSubmitted);
 router.post('/', requireRole('admin', 'hr', 'employee'), validateBody(upsertMonthlyTimesheetSchema), ctrl.upsert);
 router.get('/:id', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getOne);
 router.get('/:id/pdf', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getPdf);
+router.get('/:id/docx', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getDocx);
 router.put('/:id', requireRole('admin', 'hr', 'employee'), validateBody(updateMonthlyTimesheetSchema), ctrl.update);
 // Employee submits their own; admin/HR may submit on an employee's behalf.
 // Side-effects: notify manager + HR, email HR, PDF.

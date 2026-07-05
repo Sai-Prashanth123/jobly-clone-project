@@ -8,7 +8,7 @@ import {
 } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import { sendMonthlyTimesheetEmail, mailerConfigured } from '../lib/mailer';
-import { generateMonthlyTimesheetPDF } from '../lib/pdfGenerator';
+import { generateMonthlyTimesheetPDF, generateMonthlyTimesheetDOCX, type MonthlyTimesheetPDFData } from '../lib/pdfGenerator';
 import { env } from '../config/env';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput,
@@ -406,10 +406,13 @@ function rowsForReport(entries: MonthlyEntry[]) {
     }));
 }
 
-export async function generateAndStoreMonthlyPdf(row: any): Promise<string | null> {
+// Single source of truth for the report's data shape, shared by both the PDF
+// (stored to Supabase, emailed to HR) and DOCX (on-demand only) exporters so
+// the two documents can never drift apart.
+async function buildMonthlyReportData(row: any): Promise<MonthlyTimesheetPDFData> {
   const emp = await fetchEmployeeMeta(row.employee_id);
   const employeeName = emp ? `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() : 'Employee';
-  const buffer = await generateMonthlyTimesheetPDF({
+  return {
     displayId: row.display_id,
     employeeName,
     employeeDisplayId: emp?.display_id ?? '',
@@ -422,7 +425,11 @@ export async function generateAndStoreMonthlyPdf(row: any): Promise<string | nul
     workingDays: row.working_days ?? 0,
     leaveDays: row.leave_days ?? 0,
     notes: row.notes ?? undefined,
-  });
+  };
+}
+
+export async function generateAndStoreMonthlyPdf(row: any): Promise<string | null> {
+  const buffer = await generateMonthlyTimesheetPDF(await buildMonthlyReportData(row));
 
   const fileName = `${row.display_id}.pdf`;
   const { error: uploadError } = await supabaseAdmin
@@ -443,6 +450,14 @@ export async function generateAndStoreMonthlyPdf(row: any): Promise<string | nul
 export async function getMonthlyTimesheetPDF(id: string): Promise<string | null> {
   const row = await getMonthlyTimesheet(id);
   return generateAndStoreMonthlyPdf(row);
+}
+
+// On-demand Word-doc export — direct-stream only, no Supabase Storage write
+// and no DB column touched (nothing else references this document).
+export async function getMonthlyTimesheetDOCXBuffer(id: string): Promise<{ buffer: Buffer; fileName: string }> {
+  const row = await getMonthlyTimesheet(id);
+  const buffer = await generateMonthlyTimesheetDOCX(await buildMonthlyReportData(row));
+  return { buffer, fileName: `${row.display_id}.docx` };
 }
 
 // ── Submit side-effects (each guarded; never breaks the submission) ─────────

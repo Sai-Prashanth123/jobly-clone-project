@@ -37,6 +37,7 @@ export default function MonthlyTimesheetDetail() {
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
   const [hrNotes, setHrNotes] = useState<string | undefined>(undefined);
   const hrNotesSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editEntriesOpen, setEditEntriesOpen] = useState(false);
@@ -128,6 +129,29 @@ export default function MonthlyTimesheetDetail() {
     }
   };
 
+  // Word-doc export — a direct binary stream (no public URL to redirect a
+  // pre-opened tab to like the PDF), so fetch as a blob and trigger a
+  // temporary anchor download instead.
+  const handleDownloadWord = async () => {
+    setDownloadingDocx(true);
+    try {
+      const res = await apiClient.get(`/monthly-timesheets/${sheet.id}/docx`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${sheet.displayId ?? 'timesheet'}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Could not generate the Word document.');
+    } finally {
+      setDownloadingDocx(false);
+    }
+  };
+
   return (
     <div className="space-y-5 pb-10">
       <button onClick={() => navigate('/portal/attendance/review')} className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
@@ -159,6 +183,9 @@ export default function MonthlyTimesheetDetail() {
             )}
             <Button variant="outline" size="sm" onClick={handleDownload} loading={downloading} loadingText="Preparing…" className="gap-1.5">
               <Download className="h-4 w-4" /> PDF
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDownloadWord} loading={downloadingDocx} loadingText="Preparing…" className="gap-1.5">
+              <FileText className="h-4 w-4" /> Word
             </Button>
           </div>
         }

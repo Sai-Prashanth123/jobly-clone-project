@@ -125,6 +125,7 @@ export default function MyMonthlyTimesheet() {
   const [clearOpen, setClearOpen] = useState(false);
   const [exportYear, setExportYear] = useState(String(currentMonth().year));
   const [exportingYear, setExportingYear] = useState(false);
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
   const hydratedKey = useRef<string>('');
 
   const isLocked = sheet?.status === 'submitted' || sheet?.status === 'approved';
@@ -289,6 +290,31 @@ export default function MyMonthlyTimesheet() {
       }
       window.print();
     } catch { window.print(); }
+  };
+
+  // Word-doc export — a direct binary stream (no public URL to redirect to
+  // like the PDF's signed URL), so fetch as a blob and trigger a temporary
+  // anchor download, same technique as exportToCsv.
+  const handleDownloadWord = async () => {
+    setDownloadingDocx(true);
+    try {
+      const saved = await ensureSaved();
+      if (!saved?.id) return;
+      const res = await apiClient.get(`/monthly-timesheets/${saved.id}/docx`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${saved.displayId ?? 'timesheet'}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Could not generate the Word document.');
+    } finally {
+      setDownloadingDocx(false);
+    }
   };
 
   // Download a full year of this employee's monthly timesheets as one CSV —
@@ -760,6 +786,9 @@ export default function MyMonthlyTimesheet() {
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
               <Button variant="outline" onClick={handlePrint} className="gap-1.5"><Printer className="h-4 w-4" /> Print / Save PDF</Button>
+              <Button variant="outline" onClick={handleDownloadWord} loading={downloadingDocx} loadingText="Preparing…" className="gap-1.5">
+                <FileText className="h-4 w-4" /> Download as Word
+              </Button>
               <Select value={exportYear} onValueChange={setExportYear}>
                 <SelectTrigger className="w-24 h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
