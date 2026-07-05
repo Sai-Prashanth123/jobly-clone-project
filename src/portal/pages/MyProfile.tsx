@@ -11,7 +11,7 @@ import { useEmployee } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
-import { formatDate, formatCurrency } from '../lib/utils';
+import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
 
 // Identity-doc type codes → the labels shown on the Add Employee form.
 const ID_DOC_LABELS: Record<string, string> = {
@@ -185,10 +185,7 @@ export default function MyProfile() {
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Social Security Number</p>
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className="text-sm font-mono text-gray-900">
-                      {ssnVisible
-                        ? employee.ssn
-                        : employee.ssn.replace(/^(\d{3})-(\d{2})-(\d{4})$/, '***-**-$3')
-                          || employee.ssn.replace(/^(.*)(\d{4})$/, '***-**-$2')}
+                      {ssnVisible ? employee.ssn : maskSsn(employee.ssn)}
                     </span>
                     <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-700" onClick={() => setSsnVisible(v => !v)} title={ssnVisible ? 'Hide SSN' : 'Show SSN'}>
                       {ssnVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}

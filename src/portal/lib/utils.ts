@@ -62,6 +62,19 @@ export function cn(...classes: (string | undefined | false | null)[]): string {
   return classes.filter(Boolean).join(' ');
 }
 
+// Masks an SSN down to its last 4 digits, regardless of how it's stored
+// (with dashes, without, or partial). String.replace() on a non-matching
+// pattern silently returns the input UNCHANGED (not falsy), so a naive
+// `str.replace(/^(\d{3})-(\d{2})-(\d{4})$/, ...) || fallback` chain never
+// reaches its fallback for any non-standard format — it just displays the
+// raw, unmasked value. Always deriving the mask from the digits themselves
+// avoids that failure mode entirely.
+export function maskSsn(ssn: string): string {
+  const digits = ssn.replace(/\D/g, '');
+  const last4 = digits.length >= 4 ? digits.slice(-4) : (digits || ssn.slice(-4));
+  return `***-**-${last4}`;
+}
+
 // Guards against TanStack Query firing /api/.../undefined when useParams returns
 // the literal string "undefined" (which is truthy) or an empty string.
 export function isValidId(id: string | undefined | null): id is string {
