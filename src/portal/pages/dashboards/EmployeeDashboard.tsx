@@ -1,4 +1,4 @@
-import { Clock, CheckCircle, Send, XCircle, Building2, FileEdit, FolderOpen, Briefcase } from 'lucide-react';
+import { Clock, CheckCircle, Send, XCircle, Building2, FileEdit, FolderOpen, Briefcase, AlertCircle } from 'lucide-react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from 'recharts';
@@ -19,7 +19,7 @@ import { useClients } from '../../hooks/useClients';
 
 export function EmployeeDashboard() {
   const { user } = useAuth();
-  const { data: tsData } = useTimesheets({ limit: 100, employeeId: user?.employeeId });
+  const { data: tsData, isError, refetch } = useTimesheets({ limit: 100, employeeId: user?.employeeId });
   const { data: assignData } = useAssignments({ limit: 50, employeeId: user?.employeeId, status: 'active' });
   const { data: clientData } = useClients({ limit: 100 });
 
@@ -71,6 +71,16 @@ export function EmployeeDashboard() {
       .reduce((s, t) => s + t.totalHours, 0),
   }));
   const hoursSpark = hoursSeries.map(h => h.hours);
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load dashboard data.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

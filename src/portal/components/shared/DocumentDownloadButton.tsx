@@ -34,10 +34,11 @@ export function DocumentDownloadButton({
       }
       if (win) win.location.href = url;
       else window.location.href = url;
-    } catch {
-      // The failed GET is already surfaced as a toast by apiClient's global
-      // interceptor — just close the blank tab we opened for it.
+    } catch (err: any) {
+      // Raw apiClient call, not a useMutation — apiClient's interceptor only
+      // handles auth/idle redirects, it never toasts, so this needs its own.
       win?.close();
+      toast.error(err?.response?.data?.error ?? 'Could not generate a download link. Please try again.');
     } finally {
       setLoading(false);
     }

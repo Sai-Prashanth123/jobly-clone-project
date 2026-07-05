@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { Megaphone, Pin, AlertCircle, Info, Calendar, BookOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Panel } from '../shared/Panel';
 import { useAnnouncements } from '../../hooks/useAnnouncements';
 import type { AnnouncementType } from '../../types';
@@ -49,7 +50,7 @@ function timeAgo(dateStr: string): string {
 }
 
 export function AnnouncementsWidget() {
-  const { data } = useAnnouncements({ limit: 3 });
+  const { data, isError, refetch } = useAnnouncements({ limit: 3 });
   const items = data?.data ?? [];
 
   return (
@@ -59,7 +60,12 @@ export function AnnouncementsWidget() {
       icon={<Megaphone className="h-4 w-4 text-[#4069FF]" />}
       action={{ label: 'See all', to: '/portal/announcements' }}
     >
-      {items.length === 0 ? (
+      {isError ? (
+        <div className="flex items-center justify-between gap-2 py-2">
+          <p className="text-sm text-red-500 flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Failed to load announcements.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : items.length === 0 ? (
         <p className="text-sm text-gray-400 py-2">No announcements yet.</p>
       ) : (
         <ul className="space-y-3">

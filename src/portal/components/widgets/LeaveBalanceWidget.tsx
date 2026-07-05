@@ -1,10 +1,11 @@
 import { Link } from 'react-router-dom';
-import { CalendarDays } from 'lucide-react';
+import { CalendarDays, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Panel } from '../shared/Panel';
 import { useMyLeaveBalances } from '../../hooks/useLeaveBalance';
 
 export function LeaveBalanceWidget() {
-  const { data: balances = [], isLoading } = useMyLeaveBalances();
+  const { data: balances = [], isLoading, isError, refetch } = useMyLeaveBalances();
 
   const active = balances.filter(b => b.leaveType.isActive && b.granted > 0);
 
@@ -20,6 +21,11 @@ export function LeaveBalanceWidget() {
           {[1, 2, 3].map(i => (
             <div key={i} className="h-8 bg-gray-100 animate-pulse rounded" />
           ))}
+        </div>
+      ) : isError ? (
+        <div className="flex items-center justify-between gap-2 py-2">
+          <p className="text-sm text-red-500 flex items-center gap-1.5"><AlertCircle className="h-3.5 w-3.5" /> Failed to load leave balances.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
         </div>
       ) : active.length === 0 ? (
         <p className="text-sm text-gray-400 py-2">No leave entitlements configured for this year.</p>

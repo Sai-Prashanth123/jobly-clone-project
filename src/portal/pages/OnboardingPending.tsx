@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, LogOut, RefreshCw, CheckCircle2, MessageSquareWarning, Pencil, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
@@ -56,8 +57,10 @@ export default function OnboardingPending() {
       await apiClient.post(`/employees/${user.employeeId}/onboarding/reopen`, {});
       await refreshUser();
       navigate('/portal/onboarding');
-    } catch {
-      /* failed-request toast raised centrally (queryClient.ts) */
+    } catch (err: any) {
+      // Raw apiClient call, not a useMutation — the central toast handler in
+      // queryClient.ts never sees this, so it needs its own toast.
+      toast.error(err?.response?.data?.error ?? 'Could not reopen onboarding. Please try again.');
     } finally {
       setReopening(false);
     }

@@ -34,8 +34,10 @@ export default function Recurring() {
     try {
       await updateRecurringInline(t.id, { status: t.status === 'active' ? 'paused' : 'active' });
       toast.success(t.status === 'active' ? 'Paused' : 'Resumed');
-    } catch {
-      /* failed-request toast raised centrally (queryClient.ts) */
+    } catch (err: any) {
+      // updateRecurringInline is a raw apiClient call, not a useMutation — the
+      // central toast handler in queryClient.ts never sees this.
+      toast.error(err?.response?.data?.error ?? 'Failed to update the schedule.');
     }
   };
 

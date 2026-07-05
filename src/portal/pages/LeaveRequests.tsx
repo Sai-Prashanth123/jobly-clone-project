@@ -42,6 +42,23 @@ const today = () => new Date().toISOString().slice(0, 10);
 const REACTIVE_LEAVE_TYPES: LeaveType[] = ['sick', 'medical_leave', 'bereavement', 'jury_duty'];
 const isReactiveLeaveType = (t: LeaveType) => REACTIVE_LEAVE_TYPES.includes(t);
 
+// Mirrors the backend's businessDaysInclusive (leaveRequests.service.ts) so a
+// weekend-only range is caught client-side instead of round-tripping to the
+// server for a 400. UTC-anchored per CLAUDE.md date-handling conventions.
+function businessDaysInclusive(start: string, end: string): number {
+  let count = 0;
+  const [sy, sm, sd] = start.split('-').map(Number);
+  const [ey, em, ed] = end.split('-').map(Number);
+  let cursor = Date.UTC(sy, sm - 1, sd);
+  const endMs = Date.UTC(ey, em - 1, ed);
+  for (let i = 0; i < 366 && cursor <= endMs; i++) {
+    const dow = new Date(cursor).getUTCDay(); // 0=Sun … 6=Sat
+    if (dow !== 0 && dow !== 6) count++;
+    cursor += 86400000;
+  }
+  return count;
+}
+
 export default function LeaveRequests() {
   const { user } = useAuth();
   const isReviewer = user?.role === 'admin' || user?.role === 'hr';
@@ -80,6 +97,10 @@ export default function LeaveRequests() {
 
   const submitApply = async () => {
     if (form.endDate < form.startDate) { toast.error('End date must be on or after the start date.'); return; }
+    if (businessDaysInclusive(form.startDate, form.endDate) === 0) {
+      toast.error('That date range has no working days (weekends only) — pick at least one weekday.');
+      return;
+    }
     try {
       await createLeave.mutateAsync({ ...form, reason: form.reason.trim() || null });
       toast.success('Leave request submitted — HR has been notified.');
