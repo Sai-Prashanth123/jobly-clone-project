@@ -5,6 +5,21 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Sonner (our toast library) wraps its actual toast list in an internal
+   <section aria-label="Notifications ..."> that has `position: relative;
+   z-index: 1`. That combination creates its OWN stacking context, which
+   traps the toast list's `z-index: 999999999` inside it — from the outside,
+   the whole toaster only counts as z-index 1. Any dialog/popover portalled
+   straight to <body> with a real z-index (e.g. our Dialog overlay at z-50)
+   then renders on top of it, so toasts appeared to show up BEHIND an open
+   dialog instead of above it. Force the section itself high enough that it
+   never loses that comparison, regardless of what other overlay is open.
+   !important is deliberate here — this is a non-configurable internal
+   element of a third-party library with no other override hook. */
+section[aria-label^="Notifications"] {
+  z-index: 2147483647 !important;
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
