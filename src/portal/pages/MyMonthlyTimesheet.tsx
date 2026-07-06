@@ -127,7 +127,7 @@ export default function MyMonthlyTimesheet() {
   );
   const primaryAssignment = useMemo(() => (assignmentsData?.data ?? [])[0] ?? null, [assignmentsData]);
   const defaultProject = useMemo(
-    () => primaryAssignment ? `${primaryAssignment.clientName ?? 'Client'} — ${primaryAssignment.projectName ?? ''}`.trim() : undefined,
+    () => primaryAssignment?.projectName || undefined,
     [primaryAssignment],
   );
   const assignmentWindow = useMemo(
