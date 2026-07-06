@@ -144,9 +144,14 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
           <SelectContent>
             {myAssignments.map(a => {
               const emp = employees.find(e => e.id === a.employeeId);
+              // Project name first — it's the part that disambiguates between
+              // an employee's multiple assignments, so it should survive the
+              // trigger's single-line clamp/truncation rather than the
+              // employee name (which was previously first and could push the
+              // project name off-screen, misreading as just the employee name).
               return (
                 <SelectItem key={a.id} value={a.id}>
-                  {emp ? `${emp.firstName} ${emp.lastName} — ` : ''}{a.projectName}
+                  {a.projectName}{emp ? ` — ${emp.firstName} ${emp.lastName}` : ''}
                 </SelectItem>
               );
             })}
