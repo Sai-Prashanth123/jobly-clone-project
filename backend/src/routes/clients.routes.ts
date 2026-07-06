@@ -11,13 +11,15 @@ const upload = documentUpload;
 
 router.use(authenticate);
 
-router.get('/', requireRole('admin','operations','finance','employee'), validateQuery(listClientsQuerySchema), ctrl.list);
+router.get('/', requireRole('admin','hr','operations','finance','employee'), validateQuery(listClientsQuerySchema), ctrl.list);
 // Client management is admin-only ("ultimate boss"): admin creates, edits,
-// archives, and uploads client documents. Operations/finance can READ clients
-// (operations needs the list when creating employee→client assignments) but
-// cannot write to them.
+// archives, and uploads client documents. HR/operations/finance can READ
+// clients (HR needs client names to display on timesheets/attendance;
+// operations needs the list when creating employee→client assignments) but
+// cannot write to them (HR's onboarding-status/notes patches below are the
+// one exception, already scoped narrowly).
 router.post('/', requireRole('admin'), validateBody(createClientSchema), ctrl.create);
-router.get('/:id', requireRole('admin','operations','finance','employee'), ctrl.getOne);
+router.get('/:id', requireRole('admin','hr','operations','finance','employee'), ctrl.getOne);
 router.put('/:id', requireRole('admin'), validateBody(updateClientSchema), ctrl.update);
 router.delete('/:id', requireRole('admin'), ctrl.remove);
 
