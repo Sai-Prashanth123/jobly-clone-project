@@ -393,18 +393,49 @@ export default function MyMonthlyTimesheet() {
   };
 
   // Download a full year of this employee's monthly timesheets as one CSV —
-  // the existing PDF download is one-month-at-a-time only. Reuses the
-  // year/employeeId filters the list endpoint already supports.
+  // the existing PDF download is one-month-at-a-time only. Any month in the
+  // year that has no saved monthly timesheet yet is generated on the fly
+  // with the same auto-fill the live page uses (holidays, approved leave,
+  // weekly-hours-for-month, assignment project/window), so the export
+  // reflects all 12 months instead of silently only including whichever
+  // ones happen to already have a saved row.
   const handleDownloadYear = async () => {
     if (!targetEmployeeId) return;
     setExportingYear(true);
     try {
-      const { data } = await apiClient.get('/monthly-timesheets', {
-        params: { employeeId: targetEmployeeId, year: Number(exportYear), limit: 12 },
-      });
-      const sheets = (data?.data ?? []) as MonthlyTimesheet[];
-      const rows = sheets
-        .flatMap(s => s.entries.map(e => ({
+      const year = Number(exportYear);
+      const [monthlyRes, holidaysRes] = await Promise.all([
+        apiClient.get('/monthly-timesheets', { params: { employeeId: targetEmployeeId, year, limit: 12 } }),
+        apiClient.get('/holidays', { params: { year } }),
+      ]);
+      const savedByMonth = new Map(((monthlyRes.data?.data ?? []) as MonthlyTimesheet[]).map(s => [s.month, s]));
+      const yearHolidays = (holidaysRes.data?.data ?? []) as { date: string }[];
+
+      const monthEntries = await Promise.all(
+        Array.from({ length: 12 }, (_, i) => i + 1).map(async (month) => {
+          const saved = savedByMonth.get(month);
+          if (saved && saved.entries.length > 0) return saved.entries;
+          const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+          const holidayDatesInThisMonth = new Set(yearHolidays.filter(h => h.date.startsWith(prefix)).map(h => h.date));
+          const [leaveRes, weeklyRes] = await Promise.all([
+            apiClient.get('/monthly-timesheets/leave-check', { params: { year, month, employeeId: targetEmployeeId } }),
+            apiClient.get('/timesheets/weekly-hours-for-month', { params: { employeeId: targetEmployeeId, year, month } }),
+          ]);
+          const approvedLeaveDates = new Set(
+            Object.entries((leaveRes.data?.leaveDays ?? {}) as Record<string, { status: string }>)
+              .filter(([, v]) => v.status === 'approved')
+              .map(([d]) => d),
+          );
+          const weeklyHoursByDate = new Map<string, number>(
+            ((weeklyRes.data?.data ?? []) as { date: string; hours: number }[]).map(d => [d.date, d.hours]),
+          );
+          return buildMonthSkeleton(year, month, holidayDatesInThisMonth, approvedLeaveDates, defaultProject, assignmentWindow, weeklyHoursByDate);
+        }),
+      );
+
+      const rows = monthEntries
+        .flat()
+        .map(e => ({
           Date: e.date,
           Day: e.dayOfWeek,
           Project: e.project ?? '',
@@ -413,7 +444,7 @@ export default function MyMonthlyTimesheet() {
           End: e.endTime ?? '',
           Hours: e.hours,
           Status: e.status,
-        })))
+        }))
         .sort((a, b) => a.Date.localeCompare(b.Date));
       if (rows.length === 0) {
         toast.warning(`No timesheet entries found for ${employeeName || 'this employee'} in ${exportYear}.`);
