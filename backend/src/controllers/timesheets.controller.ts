@@ -25,6 +25,22 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
   } catch (err) { next(err); }
 }
 
+// Per-day hours already logged on weekly timesheets overlapping a calendar
+// month — used to auto-fill a brand-new monthly attendance timesheet.
+export async function weeklyHoursForMonth(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const employeeId = req.user?.role === 'employee' ? req.user.employeeId : (req.query.employeeId as string | undefined);
+    const year = Number(req.query.year);
+    const month = Number(req.query.month);
+    if (!employeeId || !year || !month) {
+      res.status(400).json({ success: false, error: 'employeeId, year, and month are required' });
+      return;
+    }
+    const data = await svc.getWeeklyHoursForMonth(employeeId, year, month);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 // Per-date approved/pending leave coverage for this timesheet's week — drives the
 // grid's "On leave" overlay and the pre-submit conflict check on the frontend.
 export async function leaveCheck(req: Request, res: Response, next: NextFunction): Promise<void> {

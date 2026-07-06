@@ -13,6 +13,10 @@ router.use(authenticate);
 router.get('/', requireRole('admin','hr','operations','employee','finance'), validateQuery(listTimesheetsQuerySchema), ctrl.list);
 router.post('/', requireRole('admin','operations','employee'), validateBody(createTimesheetSchema), ctrl.create);
 router.get('/export', requireRole('admin', 'hr', 'operations', 'finance'), ctrl.exportTimesheets);
+// Per-day hours already logged on weekly timesheets overlapping a calendar
+// month, used to auto-fill a brand-new monthly attendance timesheet. Must be
+// registered before /:id so the literal path isn't swallowed as an id param.
+router.get('/weekly-hours-for-month', requireRole('admin','hr','operations','employee','finance'), ctrl.weeklyHoursForMonth);
 router.patch('/bulk-status', requireRole('admin', 'operations', 'finance', 'hr'), ctrl.bulkTimesheetStatus);
 router.get('/:id', requireRole('admin','hr','operations','employee','finance'), ctrl.getOne);
 router.get('/:id/leave-check', requireRole('admin','hr','operations','employee','finance'), ctrl.leaveCheck);

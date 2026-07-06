@@ -21,7 +21,7 @@ import {
   useMyMonth, useUpsertMonthlyTimesheet, useSubmitMonthlyTimesheet,
   useUploadMonthlyClientProof, useDeleteMonthlyClientProof, useMonthlyLeaveCheck,
 } from '../hooks/useMonthlyTimesheets';
-import { LEAVE_TYPE_SHORT } from '../hooks/useTimesheets';
+import { LEAVE_TYPE_SHORT, useWeeklyHoursForMonth } from '../hooks/useTimesheets';
 import { useHolidays } from '../hooks/useHolidays';
 import { useAssignments } from '../hooks/useAssignments';
 import { apiClient } from '../lib/apiClient';
@@ -135,8 +135,17 @@ export default function MyMonthlyTimesheet() {
     [primaryAssignment],
   );
 
+  // Weekly and monthly timesheets are otherwise independent systems — pull
+  // hours already logged on any weekly timesheet overlapping this month so a
+  // brand-new monthly attendance sheet auto-fills real data instead of a flat
+  // 8h/day default. Never overwrites an already-saved monthly timesheet (only
+  // feeds the skeleton-building branches below).
+  const { data: weeklyHoursByDate, isLoading: weeklyHoursLoading } = useWeeklyHoursForMonth(
+    targetEmployeeId || undefined, loaded.year, loaded.month,
+  );
+
   const [sheet, setSheet] = useState<MonthlyTimesheet | null>(null);
-  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
+  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow, weeklyHoursByDate));
   const [notes, setNotes] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -206,23 +215,23 @@ export default function MyMonthlyTimesheet() {
     // this effect could lock onto stale/blank cached data the instant it
     // remounts, then never re-run for this key again once the fresh
     // (correctly-saved) data actually lands a moment later.
-    if (loadingMonth || isFetching || holidaysLoading || leaveCheckLoading || assignmentsLoading) return;
+    if (loadingMonth || isFetching || holidaysLoading || leaveCheckLoading || assignmentsLoading || weeklyHoursLoading) return;
     if (hydratedKey.current === key) return;
     hydratedKey.current = key;
     if (serverSheet) {
       setSheet(serverSheet);
-      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
+      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow, weeklyHoursByDate));
       setNotes(serverSheet.notes ?? '');
       setLeaveReason(serverSheet.leaveReason ?? '');
     } else {
       setSheet(null);
-      setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
+      setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow, weeklyHoursByDate));
       setNotes('');
       setLeaveReason('');
     }
     setDirty(false);
     setSaveState('idle');
-  }, [serverSheet, loadingMonth, isFetching, holidaysLoading, leaveCheckLoading, assignmentsLoading, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow, loaded.year, loaded.month, targetEmployeeId]);
+  }, [serverSheet, loadingMonth, isFetching, holidaysLoading, leaveCheckLoading, assignmentsLoading, weeklyHoursLoading, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow, weeklyHoursByDate, loaded.year, loaded.month, targetEmployeeId]);
 
   // Debounced draft auto-save (only while editable + after a real edit).
   // Skips for past (closed) periods — server would 400 the upsert anyway.
@@ -421,7 +430,7 @@ export default function MyMonthlyTimesheet() {
   };
 
   const handleClear = () => {
-    setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
+    setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow, weeklyHoursByDate));
     setNotes('');
     setLeaveReason('');
     setDirty(true);

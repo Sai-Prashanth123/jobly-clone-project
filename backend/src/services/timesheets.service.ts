@@ -66,6 +66,37 @@ export async function getTimesheet(id: string, actorRole?: string, actorEmployee
   return data;
 }
 
+// Per-day hours already logged on WEEKLY timesheets overlapping a calendar
+// month — used to auto-fill a brand-new monthly "attendance" timesheet
+// instead of a generic default, since weekly and monthly timesheets are
+// otherwise fully independent systems. Mirrors the overlap-query pattern in
+// conflicts.service.ts's getWorkedDays, but returns actual hours (not just a
+// worked/not-worked ref) and includes every status (draft included) rather
+// than committed-only, since the goal here is "show what's already logged,"
+// not conflict detection.
+export async function getWeeklyHoursForMonth(employeeId: string, year: number, month: number): Promise<{ date: string; hours: number }[]> {
+  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+  const lastDay = new Date(Date.UTC(year, month, 0)).getUTCDate();
+  const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+  const { data: ts } = await supabaseAdmin
+    .from('timesheets')
+    .select('id, timesheet_entries(entry_date, hours)')
+    .eq('employee_id', employeeId)
+    .lte('week_start_date', monthEnd)
+    .gte('week_end_date', monthStart);
+
+  const hoursByDate = new Map<string, number>();
+  for (const t of ts ?? []) {
+    for (const e of ((t as any).timesheet_entries ?? [])) {
+      const hours = Number(e.hours) || 0;
+      if (hours <= 0 || e.entry_date < monthStart || e.entry_date > monthEnd) continue;
+      hoursByDate.set(e.entry_date, (hoursByDate.get(e.entry_date) ?? 0) + hours);
+    }
+  }
+  return [...hoursByDate.entries()].map(([date, hours]) => ({ date, hours }));
+}
+
 export async function patchHrNotes(id: string, hrNotes: string | null, actorRole: string) {
   if (actorRole !== 'admin' && actorRole !== 'hr') {
     throw new ForbiddenError('Only admin or HR can update notes.');

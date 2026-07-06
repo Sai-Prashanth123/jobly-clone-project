@@ -93,6 +93,20 @@ export function useTimesheetLeaveCheck(id: string | undefined) {
   });
 }
 
+// Per-day hours already logged on weekly timesheets overlapping a calendar
+// month — used to auto-fill a brand-new monthly attendance timesheet instead
+// of a generic default, since weekly/monthly are otherwise independent.
+export function useWeeklyHoursForMonth(employeeId: string | undefined, year: number, month: number) {
+  return useQuery({
+    queryKey: ['timesheets', 'weekly-hours-for-month', employeeId, year, month],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/timesheets/weekly-hours-for-month', { params: { employeeId, year, month } });
+      return new Map<string, number>((data.data as { date: string; hours: number }[]).map(d => [d.date, d.hours]));
+    },
+    enabled: !!employeeId,
+  });
+}
+
 export const LEAVE_TYPE_SHORT: Record<string, string> = {
   medical_leave: 'Medical', sick: 'Sick', vacation: 'Vacation', unpaid_leave: 'Unpaid',
   bereavement: 'Bereavement', jury_duty: 'Jury duty', other: 'Leave',

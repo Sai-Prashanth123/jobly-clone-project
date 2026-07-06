@@ -67,6 +67,12 @@ export function computeHours(start: string, end: string): number {
  * any) as 'absent' rather than a fabricated full workday, since the employee
  * genuinely wasn't assigned yet — counted toward Expected Hours like any
  * other absence, per the confirmed design.
+ *
+ * `weeklyHoursByDate` (date -> hours already logged on a weekly timesheet
+ * overlapping this month) takes priority over the flat 8h default and the
+ * assignment-window 'absent' marking, since it's real logged data rather
+ * than a fabricated guess — but holiday/leave still win if a date is
+ * (unusually) in both, same precedence as everything else here.
  */
 export function buildMonthSkeleton(
   year: number,
@@ -75,6 +81,7 @@ export function buildMonthSkeleton(
   approvedLeaveDates?: Set<string>,
   defaultProject?: string,
   assignmentWindow?: { startDate: string; endDate?: string },
+  weeklyHoursByDate?: Map<string, number>,
 ): MonthlyTimesheetEntry[] {
   const total = daysInMonth(year, month);
   const rows: MonthlyTimesheetEntry[] = [];
@@ -84,7 +91,9 @@ export function buildMonthSkeleton(
     const date = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const isHoliday = !isWeekend && !!holidayDates?.has(date);
     const isApprovedLeave = !isWeekend && !isHoliday && !!approvedLeaveDates?.has(date);
-    const outsideAssignment = !isWeekend && !isHoliday && !isApprovedLeave && !!assignmentWindow
+    const weeklyHours = !isWeekend && !isHoliday && !isApprovedLeave ? weeklyHoursByDate?.get(date) : undefined;
+    const hasWeeklyHours = weeklyHours !== undefined && weeklyHours > 0;
+    const outsideAssignment = !isWeekend && !isHoliday && !isApprovedLeave && !hasWeeklyHours && !!assignmentWindow
       && ((assignmentWindow.startDate && date < assignmentWindow.startDate)
         || (assignmentWindow.endDate && date > assignmentWindow.endDate));
     const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : isApprovedLeave ? 'leave' : outsideAssignment ? 'absent' : 'present';
@@ -94,9 +103,9 @@ export function buildMonthSkeleton(
       dayOfWeek: DAYS_SHORT[dow],
       project: isBlank ? '' : (defaultProject ?? ''),
       task: '',
-      startTime: isBlank ? '' : '09:00',
-      endTime: isBlank ? '' : '17:00',
-      hours: isBlank ? 0 : computeHours('09:00', '17:00'),
+      startTime: isBlank ? '' : (hasWeeklyHours ? '' : '09:00'),
+      endTime: isBlank ? '' : (hasWeeklyHours ? '' : '17:00'),
+      hours: isBlank ? 0 : (hasWeeklyHours ? weeklyHours! : computeHours('09:00', '17:00')),
       status,
     });
   }
