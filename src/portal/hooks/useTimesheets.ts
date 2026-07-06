@@ -13,12 +13,17 @@ function mapTimesheet(raw: any): Timesheet {
     clientId: raw.client_id,
     weekStartDate: raw.week_start_date,
     weekEndDate: raw.week_end_date,
-    entries: (raw.timesheet_entries ?? []).map((e: any) => ({
-      date: e.entry_date,
-      dayOfWeek: e.day_of_week,
-      hours: e.hours,
-      isBillable: e.is_billable,
-    })),
+    // The timesheet_entries join has no ORDER BY, so Supabase can return rows
+    // in insertion order rather than calendar order — sort here so the grid
+    // always renders Mon→Sun regardless of row order from the database.
+    entries: (raw.timesheet_entries ?? [])
+      .map((e: any) => ({
+        date: e.entry_date,
+        dayOfWeek: e.day_of_week,
+        hours: e.hours,
+        isBillable: e.is_billable,
+      }))
+      .sort((a: { date: string }, b: { date: string }) => a.date.localeCompare(b.date)),
     totalHours: raw.total_hours,
     status: raw.status,
     submittedAt: raw.submitted_at ?? undefined,

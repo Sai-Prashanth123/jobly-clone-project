@@ -279,7 +279,7 @@ export interface MonthlyTimesheetPDFData {
   displayId: string;
   employeeName: string;
   employeeDisplayId: string;
-  department?: string;
+  jobTitle?: string;
   monthLabel: string;
   rows: Array<{ date: string; day: string; project: string; task: string; start: string; end: string; hours: number; status: string }>;
   totalHours: number;
@@ -321,7 +321,7 @@ export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Prom
     // Employee meta
     doc.fillColor(navy).fontSize(11).font('Helvetica-Bold').text(data.employeeName, 40, 90);
     doc.fillColor(gray).fontSize(10).font('Helvetica')
-      .text(`${data.employeeDisplayId}${data.department ? '  ·  ' + data.department : ''}  ·  Sheet ${data.displayId}`, 40, 106);
+      .text(`${data.employeeDisplayId}${data.jobTitle ? '  ·  ' + data.jobTitle : ''}  ·  Sheet ${data.displayId}`, 40, 106);
 
     // Table
     const tableTop = 132;
@@ -470,7 +470,7 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
     new Paragraph({ children: [new TextRun({ text: data.employeeName, bold: true, color: navy, size: 22 })] }),
     new Paragraph({
       children: [new TextRun({
-        text: `${data.employeeDisplayId}${data.department ? '  ·  ' + data.department : ''}  ·  Sheet ${data.displayId}`,
+        text: `${data.employeeDisplayId}${data.jobTitle ? '  ·  ' + data.jobTitle : ''}  ·  Sheet ${data.displayId}`,
         color: gray, size: 20,
       })],
     }),

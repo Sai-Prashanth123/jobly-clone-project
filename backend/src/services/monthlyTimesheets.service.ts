@@ -391,7 +391,7 @@ export async function patchMonthlyStatus(id: string, input: PatchMonthlyStatusIn
 async function fetchEmployeeMeta(employeeId: string) {
   const { data } = await supabaseAdmin
     .from('employees')
-    .select('first_name, last_name, display_id, department, reporting_manager_id')
+    .select('first_name, last_name, display_id, job_title, department, reporting_manager_id')
     .eq('id', employeeId).maybeSingle();
   return data;
 }
@@ -419,7 +419,7 @@ async function buildMonthlyReportData(row: any): Promise<MonthlyTimesheetPDFData
     displayId: row.display_id,
     employeeName,
     employeeDisplayId: emp?.display_id ?? '',
-    department: emp?.department ?? undefined,
+    jobTitle: emp?.job_title ?? undefined,
     monthLabel: monthLabel(row.year, row.month),
     rows: rowsForReport(row.entries as MonthlyEntry[]),
     totalHours: Number(row.total_hours) || 0,
