@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Info, Loader2, RotateCcw, Printer, Send, CheckCircle2, Save, Calendar, Users,
   Upload, FileText, Trash2, AlertTriangle, AlertCircle, Download,
@@ -28,7 +28,7 @@ import { apiClient } from '../lib/apiClient';
 import { exportToCsv } from '../lib/exportCsv';
 import {
   MONTHS, buildMonthSkeleton, computeHours, computeMonthlySummary,
-  currentMonth, monthInputValue, parseMonthInput, monthLabel,
+  currentMonth, monthInputValue, parseMonthInput, monthLabel, daysInMonth,
 } from '../lib/monthUtils';
 import type { MonthlyTimesheet, MonthlyTimesheetEntry, MonthlyDayStatus } from '../types';
 
@@ -119,13 +119,28 @@ export default function MyMonthlyTimesheet() {
   // Pre-fill each day's Project field from the employee's active assignment
   // (still freely editable per day), and treat days before the assignment's
   // start date (or after its end date) as 'absent' rather than a fabricated
-  // full workday. No "primary assignment" concept exists app-wide — reuse the
-  // same convention as EmployeeDashboard.tsx (index [0], ordered by
-  // created_at desc server-side) for the case of multiple concurrent ones.
+  // full workday. Pick whichever active assignment's date range actually
+  // overlaps the MONTH BEING VIEWED — not just whichever was created most
+  // recently in real time — otherwise a newer assignment (created today, but
+  // starting later) would wrongly get applied to a past month it hadn't
+  // started yet. Falls back to the EmployeeDashboard.tsx convention (index
+  // [0], ordered by created_at desc server-side) among whichever overlap,
+  // or the full list if none technically overlap.
   const { data: assignmentsData, isLoading: assignmentsLoading } = useAssignments(
     { employeeId: targetEmployeeId, status: 'active' }, { enabled: !!targetEmployeeId },
   );
-  const primaryAssignment = useMemo(() => (assignmentsData?.data ?? [])[0] ?? null, [assignmentsData]);
+  const getPrimaryAssignmentForMonth = useCallback((year: number, month: number) => {
+    const all = assignmentsData?.data ?? [];
+    if (all.length === 0) return null;
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`;
+    const monthEnd = `${year}-${String(month).padStart(2, '0')}-${String(daysInMonth(year, month)).padStart(2, '0')}`;
+    const overlapping = all.filter(a => a.startDate <= monthEnd && (!a.endDate || a.endDate >= monthStart));
+    return overlapping[0] ?? all[0];
+  }, [assignmentsData]);
+  const primaryAssignment = useMemo(
+    () => getPrimaryAssignmentForMonth(loaded.year, loaded.month),
+    [getPrimaryAssignmentForMonth, loaded.year, loaded.month],
+  );
   const defaultProject = useMemo(
     () => primaryAssignment?.projectName || undefined,
     [primaryAssignment],
@@ -429,7 +444,14 @@ export default function MyMonthlyTimesheet() {
           const weeklyHoursByDate = new Map<string, number>(
             ((weeklyRes.data?.data ?? []) as { date: string; hours: number }[]).map(d => [d.date, d.hours]),
           );
-          return buildMonthSkeleton(year, month, holidayDatesInThisMonth, approvedLeaveDates, defaultProject, assignmentWindow, weeklyHoursByDate);
+          // Resolve the assignment PER MONTH being exported, not the one
+          // currently loaded in the main grid — a year's worth of months can
+          // each need a different assignment depending on which was actually
+          // active at that point in time.
+          const monthAssignment = getPrimaryAssignmentForMonth(year, month);
+          const monthDefaultProject = monthAssignment?.projectName || undefined;
+          const monthAssignmentWindow = monthAssignment ? { startDate: monthAssignment.startDate, endDate: monthAssignment.endDate } : undefined;
+          return buildMonthSkeleton(year, month, holidayDatesInThisMonth, approvedLeaveDates, monthDefaultProject, monthAssignmentWindow, weeklyHoursByDate);
         }),
       );
 

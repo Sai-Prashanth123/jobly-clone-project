@@ -11,7 +11,8 @@ interface TimesheetWeekGridProps {
   // Per-date approved/pending leave for this week — flags day columns where
   // logging hours conflicts with leave.
   leaveByDate?: Record<string, LeaveDayInfo>;
-  // Company holidays falling within this week — purely informational overlay.
+  // Company holidays falling within this week — locks that day's hours to 0,
+  // same as the monthly attendance view.
   holidayByDate?: Record<string, Holiday>;
 }
 
@@ -45,6 +46,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveBy
 
   const handleChange = (index: number, hours: number) => {
     if (!onChange) return;
+    if (holidayOf(entries[index].date)) return; // locked — same as the monthly view
     const updated = entries.map((e, i) =>
       i === index ? { ...e, hours: Math.max(0, Math.min(24, hours)), isBillable: hours > 0 } : e
     );
@@ -77,6 +79,8 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveBy
                     <div className={`text-center font-medium ${entry.hours > 0 ? 'text-gray-900' : 'text-gray-300'}`}>
                       {entry.hours > 0 ? entry.hours : '—'}
                     </div>
+                  ) : holidayOf(entry.date) ? (
+                    <Input type="number" value="" placeholder="—" disabled className="w-full text-center" />
                   ) : (
                     <Input
                       type="number"
@@ -117,6 +121,11 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveBy
               <span className={`text-base font-semibold ${entry.hours > 0 ? 'text-gray-900' : 'text-gray-300'}`}>
                 {entry.hours > 0 ? `${entry.hours} hrs` : '—'}
               </span>
+            ) : holidayOf(entry.date) ? (
+              <div className="flex items-center gap-2">
+                <Input type="number" value="" placeholder="—" disabled className="w-20 text-center" />
+                <span className="text-xs text-gray-400">hrs</span>
+              </div>
             ) : (
               <div className="flex items-center gap-2">
                 <Input

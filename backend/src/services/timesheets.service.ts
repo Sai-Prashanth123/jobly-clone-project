@@ -5,6 +5,7 @@ import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './confli
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import { bustNavBadgeCache } from './navBadges.service';
+import { listHolidays } from './holidays.service';
 import type {
   CreateTimesheetInput, UpdateTimesheetInput,
   PatchTimesheetStatusInput, ListTimesheetsQuery,
@@ -109,6 +110,20 @@ export async function patchHrNotes(id: string, hrNotes: string | null, actorRole
   return data;
 }
 
+// Independently re-verify holiday status server-side rather than trusting
+// whatever the client submitted — mirrors the same protection added for
+// monthly timesheets. Weekly entries have no status enum (just hours), so a
+// holiday date's hours/billable simply get forced to 0 regardless of what
+// was submitted.
+async function applyWeeklyHolidayOverrides<T extends { entryDate: string; hours: number; isBillable: boolean }>(entries: T[]): Promise<T[]> {
+  if (entries.length === 0) return entries;
+  // A week can span two calendar years (e.g. Dec 29 - Jan 4).
+  const years = [...new Set(entries.map(e => Number(e.entryDate.slice(0, 4))))];
+  const holidaySets = await Promise.all(years.map(y => listHolidays(y)));
+  const holidayDates = new Set(holidaySets.flat().map(h => h.date));
+  return entries.map(e => holidayDates.has(e.entryDate) ? { ...e, hours: 0, isBillable: false } : e);
+}
+
 export async function createTimesheet(input: CreateTimesheetInput, actorRole?: string) {
   // Timesheets are active from the joining date onward — including FUTURE weeks
   // (plan ahead) and elapsed weeks after joining (catch up). The only floor is
@@ -133,8 +148,10 @@ export async function createTimesheet(input: CreateTimesheetInput, actorRole?: s
 
   if (existing) throw new ConflictError('A timesheet for this employee and week already exists. Open it from the Timesheets list to edit instead of creating a new one.');
 
+  const correctedEntries = await applyWeeklyHolidayOverrides(input.entries);
+
   // total_hours is computed server-side; ignore any client-supplied value.
-  const totalHours = input.entries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
+  const totalHours = correctedEntries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
 
   const { data: ts, error: tsError } = await supabaseAdmin
     .from('timesheets')
@@ -162,8 +179,8 @@ export async function createTimesheet(input: CreateTimesheetInput, actorRole?: s
     throw tsError;
   }
 
-  if (input.entries.length > 0) {
-    const entries = input.entries.map(e => ({
+  if (correctedEntries.length > 0) {
+    const entries = correctedEntries.map(e => ({
       timesheet_id: ts.id,
       entry_date: e.entryDate,
       day_of_week: e.dayOfWeek,
@@ -196,11 +213,12 @@ export async function updateTimesheet(id: string, input: UpdateTimesheetInput, u
     throw new ForbiddenError('Can only edit draft or rejected timesheets');
   }
 
-  const totalHours = input.entries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
+  const correctedEntries = await applyWeeklyHolidayOverrides(input.entries);
+  const totalHours = correctedEntries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
 
   // Upsert entries — avoids duplicate-key errors from concurrent requests
-  if (input.entries.length > 0) {
-    const entries = input.entries.map(e => ({
+  if (correctedEntries.length > 0) {
+    const entries = correctedEntries.map(e => ({
       timesheet_id: id,
       entry_date: e.entryDate,
       day_of_week: e.dayOfWeek,
