@@ -59,12 +59,22 @@ export function computeHours(start: string, end: string): number {
  * pre-marked 'holiday' / 'leave' respectively so it's reflected without the
  * employee having to set it manually. Holiday takes precedence if a date is
  * (unusually) in both sets.
+ *
+ * `defaultProject` pre-fills each working day's Project field from the
+ * employee's active assignment (still freely editable per day — this is a
+ * skeleton-time default only, same as holiday/leave). `assignmentWindow`
+ * marks days before the assignment's start date (or after its end date, if
+ * any) as 'absent' rather than a fabricated full workday, since the employee
+ * genuinely wasn't assigned yet — counted toward Expected Hours like any
+ * other absence, per the confirmed design.
  */
 export function buildMonthSkeleton(
   year: number,
   month: number,
   holidayDates?: Set<string>,
   approvedLeaveDates?: Set<string>,
+  defaultProject?: string,
+  assignmentWindow?: { startDate: string; endDate?: string },
 ): MonthlyTimesheetEntry[] {
   const total = daysInMonth(year, month);
   const rows: MonthlyTimesheetEntry[] = [];
@@ -74,12 +84,15 @@ export function buildMonthSkeleton(
     const date = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
     const isHoliday = !isWeekend && !!holidayDates?.has(date);
     const isApprovedLeave = !isWeekend && !isHoliday && !!approvedLeaveDates?.has(date);
-    const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : isApprovedLeave ? 'leave' : 'present';
-    const isBlank = isWeekend || isHoliday || isApprovedLeave;
+    const outsideAssignment = !isWeekend && !isHoliday && !isApprovedLeave && !!assignmentWindow
+      && ((assignmentWindow.startDate && date < assignmentWindow.startDate)
+        || (assignmentWindow.endDate && date > assignmentWindow.endDate));
+    const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : isApprovedLeave ? 'leave' : outsideAssignment ? 'absent' : 'present';
+    const isBlank = isWeekend || isHoliday || isApprovedLeave || outsideAssignment;
     rows.push({
       date,
       dayOfWeek: DAYS_SHORT[dow],
-      project: '',
+      project: isBlank ? '' : (defaultProject ?? ''),
       task: '',
       startTime: isBlank ? '' : '09:00',
       endTime: isBlank ? '' : '17:00',

@@ -129,7 +129,7 @@ export async function bulkTimesheetStatus(req: Request, res: Response, next: Nex
     const { ids, status } = req.body as { ids: string[]; status: string };
     if (!Array.isArray(ids) || ids.length === 0) { res.status(400).json({ success: false, error: 'ids must be a non-empty array' }); return; }
     if (ids.length > 50) { res.status(400).json({ success: false, error: 'Cannot bulk update more than 50 timesheets at once' }); return; }
-    const result = await bulkPatchTimesheetStatus(ids, status, req.user!.role);
+    const result = await bulkPatchTimesheetStatus(ids, status, req.user!.role, req.user?.employeeId);
     res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }

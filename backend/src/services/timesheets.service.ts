@@ -285,10 +285,12 @@ export async function patchTimesheetStatus(
   logActivity(actorId ?? null, 'status_changed', 'timesheet', id, label, { from: ts.status, to: input.status });
   bustNavBadgeCache();
 
+  const actorIsOwner = actorEmployeeId != null && actorEmployeeId === ts.employee_id;
   await notifyTimesheetStatusChange(
     { id, employeeId: ts.employee_id, label },
     input.status,
     input.rejectionReason,
+    actorIsOwner,
   );
 
   return data;
@@ -304,6 +306,7 @@ async function notifyTimesheetStatusChange(
   ts: { id: string; employeeId: string; label: string },
   newStatus: string,
   rejectionReason?: string,
+  actorIsOwner = true,
 ): Promise<void> {
   try {
     if (newStatus === 'submitted') {
@@ -326,6 +329,19 @@ async function notifyTimesheetStatusChange(
       await Promise.all(broadcast.map(uid =>
         createNotification(uid, 'Timesheet Submitted', `Timesheet ${ts.label} is awaiting your approval.`, 'info', 'timesheet', ts.id)
       ));
+      // Someone other than the employee (e.g. admin filling in on their
+      // behalf) submitted this — let the owner know it happened.
+      if (!actorIsOwner) {
+        const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
+        if (ownerPortalId) {
+          await createNotification(
+            ownerPortalId,
+            'Timesheet Submitted On Your Behalf',
+            `Timesheet ${ts.label} was filled in and submitted for you.`,
+            'info', 'timesheet', ts.id,
+          );
+        }
+      }
     } else if (newStatus === 'manager_approved') {
       const [financeIds, adminIds] = await Promise.all([
         getUserIdsByRole('finance'),
@@ -416,7 +432,7 @@ export async function exportTimesheetsCSV(query: { status?: string; employeeId?:
 
 // ── Bulk status patch ─────────────────────────────────────────────────────────
 
-export async function bulkPatchTimesheetStatus(ids: string[], status: string, actorRole: string): Promise<{ updated: number; failed: string[] }> {
+export async function bulkPatchTimesheetStatus(ids: string[], status: string, actorRole: string, actorEmployeeId?: string | null): Promise<{ updated: number; failed: string[] }> {
   const allowed: Record<string, string[]> = {
     submitted: ['draft', 'rejected'],
     manager_approved: ['submitted'],
@@ -464,9 +480,12 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
     // Fire per-row notifications. Each call is wrapped inside the helper's
     // own try/catch so one failure cannot abort the batch.
     for (const row of eligibleRows) {
+      const actorIsOwner = actorEmployeeId != null && actorEmployeeId === row.employee_id;
       await notifyTimesheetStatusChange(
         { id: row.id, employeeId: row.employee_id, label: row.display_id ?? row.id.slice(0, 8) },
         status,
+        undefined,
+        actorIsOwner,
       );
     }
   }

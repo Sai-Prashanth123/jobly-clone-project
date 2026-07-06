@@ -10,6 +10,7 @@ import { logActivity } from '../lib/activityLogger';
 import { bustNavBadgeCache } from './navBadges.service';
 import { sendMonthlyTimesheetEmail, mailerConfigured } from '../lib/mailer';
 import { generateMonthlyTimesheetPDF, generateMonthlyTimesheetDOCX, type MonthlyTimesheetPDFData } from '../lib/pdfGenerator';
+import { listHolidays } from './holidays.service';
 import { env } from '../config/env';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput,
@@ -47,6 +48,21 @@ function computeSummary(entries: MonthlyEntry[]) {
     working_days: working,
     leave_days: leave,
   };
+}
+
+// Independently re-verify holiday status server-side rather than trusting
+// whatever the client submitted — a client that hasn't picked up a newly
+// added (or newly-recurring) holiday yet could otherwise log/lock real hours
+// on what should be a locked holiday date. Purely additive: only forces
+// `status: 'holiday'` (zero hours) onto entries whose date IS a real holiday;
+// never touches or overrides any other entry.
+async function applyHolidayOverrides(entries: MonthlyEntry[], year: number): Promise<MonthlyEntry[]> {
+  const holidays = await listHolidays(year);
+  const holidayDates = new Set(holidays.map(h => h.date));
+  return entries.map(e => {
+    if (!holidayDates.has(e.date) || e.status === 'holiday') return e;
+    return { ...e, status: 'holiday', hours: 0, project: '', task: '', startTime: '', endTime: '' };
+  });
 }
 
 async function resolveActorEmployeeId(actorId?: string): Promise<string | null> {
@@ -172,12 +188,13 @@ export async function upsertMonthlyTimesheet(
     }
   }
 
-  const entries = input.entries as MonthlyEntry[];
+  let entries = input.entries as MonthlyEntry[];
   const overLimit = entries.find(e => e.status === 'present' && Number(e.hours) > 24);
   if (overLimit) {
     throw new ValidationError(`Hours cannot exceed 24 per day (entry ${overLimit.date} has ${overLimit.hours} hours).`);
   }
 
+  entries = await applyHolidayOverrides(entries, input.year);
   const summary = computeSummary(entries);
 
   const { data: existing } = await supabaseAdmin
@@ -192,7 +209,7 @@ export async function upsertMonthlyTimesheet(
     const { data, error } = await supabaseAdmin
       .from('monthly_timesheets')
       .update({
-        entries: input.entries, notes: input.notes ?? null,
+        entries: entries, notes: input.notes ?? null,
         leave_reason: input.leaveReason ?? null,
         ...summary,
       })
@@ -211,7 +228,7 @@ export async function upsertMonthlyTimesheet(
       .from('monthly_timesheets')
       .insert({
         employee_id: targetEmployee, year: input.year, month: input.month,
-        entries: input.entries, notes: input.notes ?? null,
+        entries: entries, notes: input.notes ?? null,
         leave_reason: input.leaveReason ?? null,
         status: 'draft', ...summary,
       })
@@ -227,7 +244,7 @@ export async function upsertMonthlyTimesheet(
           const { data: updated, error: updErr } = await supabaseAdmin
             .from('monthly_timesheets')
             .update({
-              entries: input.entries, notes: input.notes ?? null,
+              entries: entries, notes: input.notes ?? null,
               leave_reason: input.leaveReason ?? null,
               ...summary,
             })
@@ -258,11 +275,12 @@ export async function updateMonthlyTimesheet(id: string, input: UpdateMonthlyTim
       `${monthLabel(row.year, row.month)} is closed. Past timesheets cannot be edited — contact your admin for a correction.`,
     );
   }
-  const summary = computeSummary(input.entries as MonthlyEntry[]);
+  const entries = await applyHolidayOverrides(input.entries as MonthlyEntry[], row.year);
+  const summary = computeSummary(entries);
   const { data, error } = await supabaseAdmin
     .from('monthly_timesheets')
     .update({
-      entries: input.entries, notes: input.notes ?? null,
+      entries: entries, notes: input.notes ?? null,
       leave_reason: input.leaveReason ?? null,
       ...summary,
     })

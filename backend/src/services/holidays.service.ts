@@ -2,12 +2,39 @@ import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 
+// A recurring holiday (is_recurring=true) is stored under the year it was
+// first added, but should be recognized every year — remap its month-day
+// onto whichever year is being queried rather than requiring it to be
+// re-added annually. Non-recurring holidays are matched by exact date only.
 export async function listHolidays(year?: number) {
-  let q = supabaseAdmin.from('company_holidays').select('*').order('date', { ascending: true });
-  if (year) q = q.gte('date', `${year}-01-01`).lte('date', `${year}-12-31`);
-  const { data, error } = await q;
-  if (error) throw error;
-  return data ?? [];
+  if (!year) {
+    const { data, error } = await supabaseAdmin.from('company_holidays').select('*').order('date', { ascending: true });
+    if (error) throw error;
+    return data ?? [];
+  }
+
+  const [nonRecurring, recurring] = await Promise.all([
+    supabaseAdmin.from('company_holidays').select('*')
+      .eq('is_recurring', false)
+      .gte('date', `${year}-01-01`).lte('date', `${year}-12-31`),
+    supabaseAdmin.from('company_holidays').select('*').eq('is_recurring', true),
+  ]);
+  if (nonRecurring.error) throw nonRecurring.error;
+  if (recurring.error) throw recurring.error;
+
+  const remapped = (recurring.data ?? [])
+    .map(row => {
+      const monthDay = row.date.slice(5); // 'MM-DD'
+      if (monthDay === '02-29' && !isLeapYear(year)) return null; // no Feb 29 this year
+      return { ...row, date: `${year}-${monthDay}` };
+    })
+    .filter((row): row is NonNullable<typeof row> => row !== null);
+
+  return [...(nonRecurring.data ?? []), ...remapped].sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
 }
 
 export async function createHoliday(input: { name: string; date: string; isRecurring?: boolean; countryCode?: string }, actorId: string) {

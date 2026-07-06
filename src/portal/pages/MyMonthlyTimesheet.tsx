@@ -23,6 +23,7 @@ import {
 } from '../hooks/useMonthlyTimesheets';
 import { LEAVE_TYPE_SHORT } from '../hooks/useTimesheets';
 import { useHolidays } from '../hooks/useHolidays';
+import { useAssignments } from '../hooks/useAssignments';
 import { apiClient } from '../lib/apiClient';
 import { exportToCsv } from '../lib/exportCsv';
 import {
@@ -115,8 +116,27 @@ export default function MyMonthlyTimesheet() {
     return new Set(Object.entries(leaveByDate ?? {}).filter(([, v]) => v.status === 'approved').map(([date]) => date));
   }, [leaveByDate]);
 
+  // Pre-fill each day's Project field from the employee's active assignment
+  // (still freely editable per day), and treat days before the assignment's
+  // start date (or after its end date) as 'absent' rather than a fabricated
+  // full workday. No "primary assignment" concept exists app-wide — reuse the
+  // same convention as EmployeeDashboard.tsx (index [0], ordered by
+  // created_at desc server-side) for the case of multiple concurrent ones.
+  const { data: assignmentsData, isLoading: assignmentsLoading } = useAssignments(
+    { employeeId: targetEmployeeId, status: 'active' }, { enabled: !!targetEmployeeId },
+  );
+  const primaryAssignment = useMemo(() => (assignmentsData?.data ?? [])[0] ?? null, [assignmentsData]);
+  const defaultProject = useMemo(
+    () => primaryAssignment ? `${primaryAssignment.clientName ?? 'Client'} — ${primaryAssignment.projectName ?? ''}`.trim() : undefined,
+    [primaryAssignment],
+  );
+  const assignmentWindow = useMemo(
+    () => primaryAssignment ? { startDate: primaryAssignment.startDate, endDate: primaryAssignment.endDate } : undefined,
+    [primaryAssignment],
+  );
+
   const [sheet, setSheet] = useState<MonthlyTimesheet | null>(null);
-  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
+  const [entries, setEntries] = useState<MonthlyTimesheetEntry[]>(() => buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
   const [notes, setNotes] = useState('');
   const [leaveReason, setLeaveReason] = useState('');
   const [dirty, setDirty] = useState(false);
@@ -127,6 +147,18 @@ export default function MyMonthlyTimesheet() {
   const [exportingYear, setExportingYear] = useState(false);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
   const hydratedKey = useRef<string>('');
+  // Always tracks the currently-displayed period/employee, independent of any
+  // effect's own (intentionally narrower) dependency array — used to detect
+  // whether an in-flight save is still relevant by the time it resolves.
+  const liveTargetRef = useRef({ employeeId: targetEmployeeId, year: loaded.year, month: loaded.month });
+  useEffect(() => {
+    liveTargetRef.current = { employeeId: targetEmployeeId, year: loaded.year, month: loaded.month };
+  }, [targetEmployeeId, loaded.year, loaded.month]);
+  // Snapshot of the period/employee a debounced autosave was fired for —
+  // compared against liveTargetRef when it resolves, so a stale save (fired
+  // for employee A/month X, resolving after the user switched to B/Y) can't
+  // overwrite the currently-displayed sheet with the wrong record.
+  const pendingSaveTarget = useRef<{ employeeId: string; year: number; month: number } | null>(null);
 
   const isLocked = sheet?.status === 'submitted' || sheet?.status === 'approved';
   const summary = useMemo(() => computeMonthlySummary(entries), [entries]);
@@ -174,23 +206,23 @@ export default function MyMonthlyTimesheet() {
     // this effect could lock onto stale/blank cached data the instant it
     // remounts, then never re-run for this key again once the fresh
     // (correctly-saved) data actually lands a moment later.
-    if (loadingMonth || isFetching || holidaysLoading || leaveCheckLoading) return;
+    if (loadingMonth || isFetching || holidaysLoading || leaveCheckLoading || assignmentsLoading) return;
     if (hydratedKey.current === key) return;
     hydratedKey.current = key;
     if (serverSheet) {
       setSheet(serverSheet);
-      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
+      setEntries(serverSheet.entries.length ? serverSheet.entries : buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
       setNotes(serverSheet.notes ?? '');
       setLeaveReason(serverSheet.leaveReason ?? '');
     } else {
       setSheet(null);
-      setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
+      setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
       setNotes('');
       setLeaveReason('');
     }
     setDirty(false);
     setSaveState('idle');
-  }, [serverSheet, loadingMonth, isFetching, holidaysLoading, leaveCheckLoading, holidayDatesInMonth, approvedLeaveDatesInMonth, loaded.year, loaded.month, targetEmployeeId]);
+  }, [serverSheet, loadingMonth, isFetching, holidaysLoading, leaveCheckLoading, assignmentsLoading, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow, loaded.year, loaded.month, targetEmployeeId]);
 
   // Debounced draft auto-save (only while editable + after a real edit).
   // Skips for past (closed) periods — server would 400 the upsert anyway.
@@ -198,13 +230,20 @@ export default function MyMonthlyTimesheet() {
     if (!targetEmployeeId || isLocked || !dirty || periodClosed) return;
     setSaveState('saving');
     const t = setTimeout(() => {
+      const target = { employeeId: targetEmployeeId, year: loaded.year, month: loaded.month };
+      pendingSaveTarget.current = target;
       upsert.mutate(
         {
           employeeId: targetEmployeeId, year: loaded.year, month: loaded.month,
           entries, notes, leaveReason: leaveReason || null,
         },
         {
-          onSuccess: (saved) => { setSheet(saved); setDirty(false); setSaveState('saved'); },
+          onSuccess: (saved) => {
+            const live = liveTargetRef.current;
+            const stillCurrent = live.employeeId === target.employeeId && live.year === target.year && live.month === target.month;
+            if (!stillCurrent) return; // user switched period/employee since this save was fired — discard
+            setSheet(saved); setDirty(false); setSaveState('saved');
+          },
           onError: () => setSaveState('idle'),
         },
       );
@@ -239,13 +278,26 @@ export default function MyMonthlyTimesheet() {
     setDirty(true);
   };
 
-  const ensureSaved = async (): Promise<MonthlyTimesheet | null> => {
-    if (sheet && !dirty) return sheet;
+  // Only persists when there's a real edit (dirty) or the caller forces it
+  // (Submit always should). Without the !opts?.force check here, a brand-new
+  // month with sheet===null and dirty===false would still fall through and
+  // save the raw default skeleton — fabricating a full 8h/day "draft" record
+  // just because someone clicked Print/Download/attach-proof without ever
+  // touching a cell.
+  const ensureSaved = async (opts?: { force?: boolean }): Promise<MonthlyTimesheet | null> => {
+    if (!opts?.force && !dirty) return sheet;
+    const target = { employeeId: targetEmployeeId, year: loaded.year, month: loaded.month };
     const saved = await upsert.mutateAsync({
       employeeId: targetEmployeeId, year: loaded.year, month: loaded.month,
       entries, notes, leaveReason: leaveReason || null,
     });
-    setSheet(saved); setDirty(false); setSaveState('saved');
+    const live = liveTargetRef.current;
+    const stillCurrent = live.employeeId === target.employeeId && live.year === target.year && live.month === target.month;
+    // Still hand the saved record back to the caller (Submit/Print/etc. need
+    // its id for their own follow-up request) even if the user switched
+    // period/employee mid-await — just don't let it clobber the now-displayed
+    // sheet's shared state.
+    if (stillCurrent) { setSheet(saved); setDirty(false); setSaveState('saved'); }
     return saved;
   };
 
@@ -274,7 +326,7 @@ export default function MyMonthlyTimesheet() {
       });
     }
     try {
-      const saved = await ensureSaved();
+      const saved = await ensureSaved({ force: true });
       if (!saved) return;
       const res = await submit.mutateAsync(saved.id);
       setSheet(res.timesheet);
@@ -287,13 +339,15 @@ export default function MyMonthlyTimesheet() {
   };
 
   const handlePrint = async () => {
+    const saved = await ensureSaved();
+    if (!saved) {
+      toast.warning('Nothing to export yet — fill in some hours first.');
+      return;
+    }
     try {
-      const saved = await ensureSaved();
-      if (saved?.id) {
-        const { data } = await apiClient.get(`/monthly-timesheets/${saved.id}/pdf`);
-        const url = data?.data?.url;
-        if (url) { window.open(url, '_blank', 'noopener'); return; }
-      }
+      const { data } = await apiClient.get(`/monthly-timesheets/${saved.id}/pdf`);
+      const url = data?.data?.url;
+      if (url) { window.open(url, '_blank', 'noopener'); return; }
       window.print();
     } catch {
       toast.warning('Could not generate the PDF — opening the browser print dialog instead.');
@@ -305,10 +359,13 @@ export default function MyMonthlyTimesheet() {
   // like the PDF's signed URL), so fetch as a blob and trigger a temporary
   // anchor download, same technique as exportToCsv.
   const handleDownloadWord = async () => {
+    const saved = await ensureSaved();
+    if (!saved) {
+      toast.warning('Nothing to export yet — fill in some hours first.');
+      return;
+    }
     setDownloadingDocx(true);
     try {
-      const saved = await ensureSaved();
-      if (!saved?.id) return;
       const res = await apiClient.get(`/monthly-timesheets/${saved.id}/docx`, { responseType: 'blob' });
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
       const url = URL.createObjectURL(blob);
@@ -364,7 +421,7 @@ export default function MyMonthlyTimesheet() {
   };
 
   const handleClear = () => {
-    setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth));
+    setEntries(buildMonthSkeleton(loaded.year, loaded.month, holidayDatesInMonth, approvedLeaveDatesInMonth, defaultProject, assignmentWindow));
     setNotes('');
     setLeaveReason('');
     setDirty(true);
@@ -728,7 +785,7 @@ export default function MyMonthlyTimesheet() {
                         if (!f) return;
                         if (f.size > MAX_PROOF_BYTES) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
                         const saved = await ensureSaved();
-                        if (!saved) return;
+                        if (!saved) { toast.warning('Add some hours before attaching a client-signed proof.'); return; }
                         try {
                           const updated = await uploadProof.mutateAsync({ id: saved.id, file: f });
                           setSheet(updated);
@@ -777,7 +834,7 @@ export default function MyMonthlyTimesheet() {
                       if (!f) return;
                       if (f.size > MAX_PROOF_BYTES) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
                       const saved = await ensureSaved();
-                      if (!saved) return;
+                      if (!saved) { toast.warning('Add some hours before attaching a client-signed proof.'); return; }
                       try {
                         const updated = await uploadProof.mutateAsync({ id: saved.id, file: f });
                         setSheet(updated);

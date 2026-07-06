@@ -84,20 +84,23 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading,
   const { status } = timesheet;
   const role = user.role;
 
-  if (role === 'employee' && status === 'draft' && user.employeeId === timesheet.employeeId) {
-    return (
-      <Button className="gap-2" loading={isLoading} loadingText="Submitting…" onClick={() => onStatusChange('submitted')}>
-        <Send className="h-4 w-4" />
-        Submit Timesheet
-      </Button>
-    );
-  }
+  const isOwnerEmployee = role === 'employee' && user.employeeId === timesheet.employeeId;
+  const isAdminOnBehalf = role === 'admin' && user.employeeId !== timesheet.employeeId;
 
-  if (role === 'employee' && status === 'rejected' && user.employeeId === timesheet.employeeId) {
+  if ((status === 'draft' || status === 'rejected') && (isOwnerEmployee || role === 'admin')) {
+    // A draft with a submittedAt already set was previously submitted and then
+    // Reopened (Reopen clears the approval timestamps but not submittedAt) —
+    // show "Resubmit" so it's clearly distinguished from a first-time submit,
+    // since auto-save alone ("Saved" indicator) is easy to mistake for
+    // "already sent to HR" if the actual submit action isn't unambiguous.
+    const isResubmit = status === 'rejected' || !!timesheet.submittedAt;
+    const label = isResubmit
+      ? (isAdminOnBehalf ? 'Resubmit on Behalf' : 'Resubmit Timesheet')
+      : (isAdminOnBehalf ? 'Submit on Behalf' : 'Submit Timesheet');
     return (
-      <Button className="gap-2" loading={isLoading} loadingText="Resubmitting…" onClick={() => onStatusChange('submitted')}>
+      <Button className="gap-2" loading={isLoading} loadingText={isResubmit ? 'Resubmitting…' : 'Submitting…'} onClick={() => onStatusChange('submitted')}>
         <Send className="h-4 w-4" />
-        Resubmit Timesheet
+        {label}
       </Button>
     );
   }
