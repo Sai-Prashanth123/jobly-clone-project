@@ -12,7 +12,7 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { TimesheetWeekGrid } from '../components/timesheets/TimesheetWeekGrid';
 import { TimesheetApprovalActions } from '../components/timesheets/TimesheetApprovalActions';
-import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useDeleteTimesheet, useUploadWeeklyClientProof, useDeleteWeeklyClientProof, useTimesheetLeaveCheck, usePatchTimesheetHrNotes } from '../hooks/useTimesheets';
+import { useTimesheet, useUpdateTimesheetEntries, usePatchTimesheetStatus, useReopenTimesheet, useDeleteTimesheet, useUploadWeeklyClientProof, useDeleteWeeklyClientProof, useTimesheetLeaveCheck, usePatchTimesheetHrNotes } from '../hooks/useTimesheets';
 import { useEmployee } from '../hooks/useEmployees';
 import { useClient } from '../hooks/useClients';
 import { useAssignment } from '../hooks/useAssignments';
@@ -44,6 +44,7 @@ export default function TimesheetDetail() {
   const { data: assignment } = useAssignment(timesheet?.assignmentId);
   const updateEntries = useUpdateTimesheetEntries(id!);
   const patchStatus = usePatchTimesheetStatus(id!);
+  const reopenTimesheet = useReopenTimesheet(id!);
   const deleteTimesheet = useDeleteTimesheet();
   const uploadProof = useUploadWeeklyClientProof(id!);
   const deleteProof = useDeleteWeeklyClientProof(id!);
@@ -227,6 +228,15 @@ export default function TimesheetDetail() {
     }
   };
 
+  const handleReopen = async (reason?: string) => {
+    try {
+      await reopenTimesheet.mutateAsync({ reason });
+      toast.success('Timesheet reopened — the employee has been notified.');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -258,6 +268,8 @@ export default function TimesheetDetail() {
             timesheet={timesheet}
             onStatusChange={handleStatusChange}
             isLoading={patchStatus.isPending}
+            onReopen={handleReopen}
+            isReopening={reopenTimesheet.isPending}
           />
           {(user?.role === 'admin' || isOwner) && timesheet.status === 'draft' && (
             <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}

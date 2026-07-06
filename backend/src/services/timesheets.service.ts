@@ -4,6 +4,7 @@ import { isWeekBeforeJoiningUTC } from '../lib/dateUtils';
 import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
+import { bustNavBadgeCache } from './navBadges.service';
 import type {
   CreateTimesheetInput, UpdateTimesheetInput,
   PatchTimesheetStatusInput, ListTimesheetsQuery,
@@ -282,6 +283,7 @@ export async function patchTimesheetStatus(
 
   const label = ts.display_id ?? id.slice(0, 8);
   logActivity(actorId ?? null, 'status_changed', 'timesheet', id, label, { from: ts.status, to: input.status });
+  bustNavBadgeCache();
 
   await notifyTimesheetStatusChange(
     { id, employeeId: ts.employee_id, label },
@@ -457,6 +459,8 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
     if (tsField[status]) updateData[tsField[status]] = new Date().toISOString();
     await supabaseAdmin.from('timesheets').update(updateData).in('id', eligible);
 
+    bustNavBadgeCache();
+
     // Fire per-row notifications. Each call is wrapped inside the helper's
     // own try/catch so one failure cannot abort the batch.
     for (const row of eligibleRows) {
@@ -557,5 +561,63 @@ export async function deleteWeeklyClientProof(
     .eq('id', id).select().single();
   if (error) throw error;
   logActivity(actorId ?? null, 'removed_client_proof', 'timesheet', id, ts.display_id ?? id.slice(0, 8));
+  return updated;
+}
+
+// Reopen an already-approved timesheet, handing it back to the employee to
+// correct their actual hours (e.g. a future-dated timesheet was approved in
+// advance, then the employee got sick and the real hours differ). Unlike
+// monthly timesheets' patchEntriesByAdmin (HR silently overwrites entries in
+// place), this hands control back to the EMPLOYEE — resets status to 'draft'
+// so the existing draft/rejected edit gate in updateTimesheet just works,
+// with no new status enum value or DB migration needed.
+export async function reopenTimesheet(
+  id: string, actorRole: string, actorId?: string, reason?: string,
+) {
+  const ts = await getTimesheet(id);
+  if (!['manager_approved', 'client_approved'].includes(ts.status)) {
+    throw new ValidationError(`A '${ts.status}' timesheet cannot be reopened — only manager-approved or client-approved timesheets can be.`);
+  }
+
+  // The previously-uploaded client-signed proof attested to the hours that
+  // are about to change — clear it out (same cleanup as deleteWeeklyClientProof).
+  try {
+    const { data: existing } = await supabaseAdmin.storage
+      .from(WEEKLY_PROOF_BUCKET).list(`weekly/${id}/`, { limit: 100 });
+    if (existing && existing.length > 0) {
+      await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET).remove(existing.map(f => `weekly/${id}/${f.name}`));
+    }
+  } catch (err) {
+    console.error('[timesheets] proof file cleanup failed while reopening', id, err);
+  }
+
+  const { data: updated, error } = await supabaseAdmin
+    .from('timesheets')
+    .update({
+      status: 'draft',
+      manager_approved_at: null,
+      client_approved_at: null,
+      client_signed_url: null,
+      client_signed_filename: null,
+    })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  const label = ts.display_id ?? id.slice(0, 8);
+  logActivity(actorId ?? null, 'updated', 'timesheet', id, label, { event: 'timesheet_reopened', from: ts.status, reason });
+  bustNavBadgeCache();
+
+  const ownerPortalId = await getPortalUserByEmployeeId(ts.employee_id);
+  if (ownerPortalId) {
+    const reasonSuffix = reason ? ` Reason: ${reason}` : '';
+    await createNotification(
+      ownerPortalId, 'Timesheet Reopened',
+      `Your timesheet ${label} was reopened for corrections — please update your actual hours and resubmit.${reasonSuffix}`,
+      'warning', 'timesheet', id,
+    );
+  }
+
   return updated;
 }

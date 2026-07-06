@@ -10,6 +10,7 @@ import {
   getPortalUserByEmployeeId,
 } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
+import { bustNavBadgeCache } from './navBadges.service';
 import type {
   CreateLeaveRequestInput,
   ReviewLeaveRequestInput,
@@ -213,6 +214,7 @@ export async function reviewLeaveRequest(
 
   const label = lr.display_id ?? id.slice(0, 8);
   logActivity(reviewerUserId ?? null, 'status_changed', 'leave_request', id, label, { to: input.status });
+  bustNavBadgeCache();
 
   // Notify the employee of the decision.
   const empUserId = await getPortalUserByEmployeeId(lr.employee_id);

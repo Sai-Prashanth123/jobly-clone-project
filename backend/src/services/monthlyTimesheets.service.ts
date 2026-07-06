@@ -7,6 +7,7 @@ import {
   getPortalUserByEmployeeId, getReportingManagerPortalUserId,
 } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
+import { bustNavBadgeCache } from './navBadges.service';
 import { sendMonthlyTimesheetEmail, mailerConfigured } from '../lib/mailer';
 import { generateMonthlyTimesheetPDF, generateMonthlyTimesheetDOCX, type MonthlyTimesheetPDFData } from '../lib/pdfGenerator';
 import { env } from '../config/env';
@@ -311,6 +312,7 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
 
   const label = row.display_id ?? id.slice(0, 8);
   logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: 'submitted' });
+  bustNavBadgeCache();
 
   // Side-effects (PDF generation + manager/HR notification email) never block
   // the submit response — a slow PDF/SMTP must not delay (or 504) the employee's
@@ -360,6 +362,7 @@ export async function patchMonthlyStatus(id: string, input: PatchMonthlyStatusIn
 
   const label = row.display_id ?? id.slice(0, 8);
   logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: input.status });
+  bustNavBadgeCache();
 
   // Notify the owner (fire-and-forget).
   try {

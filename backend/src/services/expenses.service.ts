@@ -3,6 +3,7 @@ import { logActivity } from '../lib/activityLogger';
 import { createNotification } from './notifications.service';
 import { getPortalUserByEmployeeId, getUserIdsByRole } from './notifications.service';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
+import { bustNavBadgeCache } from './navBadges.service';
 import type { CreateExpenseInput, UpdateExpenseInput, ReviewExpenseInput, ListExpensesQuery } from '../schemas/expenses.schema';
 
 const SELECT = `
@@ -145,6 +146,7 @@ export async function reviewExpense(id: string, input: ReviewExpenseInput, revie
   if (error || !data) throw error ?? new Error('Update returned no data');
 
   void logActivity(reviewerId, 'status_changed', 'expense_report', id, `${input.action} expense: ${expense.title}`);
+  bustNavBadgeCache();
 
   // Notify the employee
   const empUserId = await getPortalUserByEmployeeId(expense.employee_id);

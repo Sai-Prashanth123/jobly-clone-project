@@ -29,6 +29,10 @@ export const patchTimesheetStatusSchema = z.object({
   rejectionReason: z.string().optional(),
 });
 
+export const reopenTimesheetSchema = z.object({
+  reason: z.string().optional(),
+});
+
 export const listTimesheetsQuerySchema = z.object({
   status: z.enum(['draft','submitted','manager_approved','client_approved','rejected']).optional(),
   employeeId: z.string().uuid().optional(),
@@ -48,4 +52,5 @@ export const listTimesheetsQuerySchema = z.object({
 export type CreateTimesheetInput = z.infer<typeof createTimesheetSchema>;
 export type UpdateTimesheetInput = z.infer<typeof updateTimesheetSchema>;
 export type PatchTimesheetStatusInput = z.infer<typeof patchTimesheetStatusSchema>;
+export type ReopenTimesheetInput = z.infer<typeof reopenTimesheetSchema>;
 export type ListTimesheetsQuery = z.infer<typeof listTimesheetsQuerySchema>;

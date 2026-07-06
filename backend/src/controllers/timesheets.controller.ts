@@ -4,7 +4,7 @@ import { exportTimesheetsCSV, bulkPatchTimesheetStatus } from '../services/times
 import { getLeaveCoverage } from '../services/conflicts.service';
 import type {
   ListTimesheetsQuery, CreateTimesheetInput,
-  UpdateTimesheetInput, PatchTimesheetStatusInput,
+  UpdateTimesheetInput, PatchTimesheetStatusInput, ReopenTimesheetInput,
 } from '../schemas/timesheet.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -80,6 +80,18 @@ export async function patchStatus(req: Request, res: Response, next: NextFunctio
       req.user!.role,
       req.user?.id,
       req.user?.employeeId,
+    );
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function reopen(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.reopenTimesheet(
+      req.params.id,
+      req.user!.role,
+      req.user?.id,
+      (req.body as ReopenTimesheetInput).reason,
     );
     res.json({ success: true, data });
   } catch (err) { next(err); }

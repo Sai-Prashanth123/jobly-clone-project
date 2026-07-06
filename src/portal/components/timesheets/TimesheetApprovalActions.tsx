@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
-import { CheckCircle, XCircle, Send } from 'lucide-react';
+import { CheckCircle, XCircle, Send, RotateCcw } from 'lucide-react';
 import type { Timesheet } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
 import { UsDateInput } from '../shared/UsDateInput';
@@ -16,9 +16,11 @@ interface TimesheetApprovalActionsProps {
   timesheet: Timesheet;
   onStatusChange: (status: string, rejectionReason?: string) => void;
   isLoading?: boolean;
+  onReopen?: (reason?: string) => void;
+  isReopening?: boolean;
 }
 
-export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading }: TimesheetApprovalActionsProps) {
+export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading, onReopen, isReopening }: TimesheetApprovalActionsProps) {
   const { user } = useAuth();
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
@@ -27,8 +29,57 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
   const [clientRepName, setClientRepName] = useState('');
   const [clientApprovalDate, setClientApprovalDate] = useState(todayStr());
   const [clientNotes, setClientNotes] = useState('');
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
 
   if (!user) return null;
+
+  const canReopen = (user.role === 'admin' || user.role === 'hr' || user.role === 'operations') && !!onReopen;
+
+  const reopenDialog = (
+    <Dialog open={reopenOpen} onOpenChange={setReopenOpen}>
+      <DialogContent className="w-[95vw] max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Reopen Timesheet</DialogTitle>
+          <DialogDescription>
+            This sends the timesheet back to the employee as a draft so they can correct their actual hours and
+            resubmit. Any client-signed proof already attached will be cleared, since it attested to the old hours.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-3">
+          <Label>Reason <span className="text-muted-foreground font-normal">(optional, shown to the employee)</span></Label>
+          <Textarea
+            placeholder="e.g. Employee was out sick during this period — please update actuals."
+            value={reopenReason}
+            onChange={e => setReopenReason(e.target.value)}
+            rows={3}
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setReopenOpen(false)} disabled={isReopening}>Cancel</Button>
+          <Button
+            loading={isReopening}
+            loadingText="Reopening…"
+            onClick={() => {
+              onReopen?.(reopenReason.trim() || undefined);
+              setReopenOpen(false);
+              setReopenReason('');
+            }}
+          >
+            <RotateCcw className="h-4 w-4 mr-1.5" />
+            Reopen Timesheet
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+
+  const reopenButton = canReopen && (
+    <Button variant="outline" className="gap-2" disabled={isLoading || isReopening} onClick={() => setReopenOpen(true)}>
+      <RotateCcw className="h-4 w-4" />
+      Reopen
+    </Button>
+  );
 
   const { status } = timesheet;
   const role = user.role;
@@ -116,14 +167,20 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
     );
   }
 
-  if ((role === 'finance' || role === 'admin' || role === 'hr') && status === 'manager_approved') {
+  const canClientApprove = role === 'finance' || role === 'admin' || role === 'hr';
+  if (status === 'manager_approved' && (canClientApprove || canReopen)) {
     return (
       <>
-        <Button className="gap-2" loading={isLoading} loadingText="Approving…"
-          onClick={() => { setClientApprovalDate(todayStr()); setClientApproveOpen(true); }}>
-          <CheckCircle className="h-4 w-4" />
-          Client Approve
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {canClientApprove && (
+            <Button className="gap-2" loading={isLoading} loadingText="Approving…"
+              onClick={() => { setClientApprovalDate(todayStr()); setClientApproveOpen(true); }}>
+              <CheckCircle className="h-4 w-4" />
+              Client Approve
+            </Button>
+          )}
+          {reopenButton}
+        </div>
         <Dialog open={clientApproveOpen} onOpenChange={setClientApproveOpen}>
           <DialogContent className="w-[95vw] max-w-md">
             <DialogHeader>
@@ -174,6 +231,16 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading 
             </DialogFooter>
           </DialogContent>
         </Dialog>
+        {reopenDialog}
+      </>
+    );
+  }
+
+  if (status === 'client_approved' && canReopen) {
+    return (
+      <>
+        {reopenButton}
+        {reopenDialog}
       </>
     );
   }

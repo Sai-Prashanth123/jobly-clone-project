@@ -28,6 +28,15 @@ interface SharedCounts {
 const CACHE_TTL_MS = 60_000;
 const sharedCache = new Map<string, { at: number; data: SharedCounts }>();
 
+// Frontend mutations invalidate their own React Query cache on a status
+// change, but this backend cache doesn't know that happened — without this,
+// a badge count can show a stale value for up to CACHE_TTL_MS after a real
+// change. Call this from any mutation that changes a counted field
+// (timesheet/leave/expense/monthly-timesheet status changes).
+export function bustNavBadgeCache(): void {
+  sharedCache.clear();
+}
+
 async function headCount(table: string, apply: (q: any) => any): Promise<number> {
   const { count, error } = await apply(
     supabaseAdmin.from(table).select('id', { count: 'exact', head: true }),

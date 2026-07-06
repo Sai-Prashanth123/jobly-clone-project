@@ -195,6 +195,22 @@ export function usePatchTimesheetStatus(id: string) {
   });
 }
 
+export function useReopenTimesheet(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { reason?: string } = {}) => {
+      const { data } = await apiClient.patch(`/timesheets/${id}/reopen`, body);
+      return mapTimesheet(data.data);
+    },
+    onSuccess: (updated) => {
+      qc.setQueryData(['timesheets', id], updated);
+      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['nav-badges'] });
+    },
+  });
+}
+
 export function useDeleteTimesheet() {
   const qc = useQueryClient();
   return useMutation({
