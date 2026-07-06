@@ -124,6 +124,7 @@ export default function MonthlyTimesheetDetail() {
       else { win?.close(); toast.error('Could not generate the PDF.'); }
     } catch {
       win?.close();
+      toast.error('Could not generate the PDF.');
     } finally {
       setDownloading(false);
     }

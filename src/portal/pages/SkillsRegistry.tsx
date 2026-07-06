@@ -12,7 +12,7 @@ import { useEmployeeSkills, useAddSkill, useDeleteSkill, PROF_COLORS, type Profi
 const PROFICIENCIES: Proficiency[] = ['beginner','intermediate','advanced','expert'];
 
 function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string; employeeName: string }) {
-  const { data: skills = [], isLoading } = useEmployeeSkills(employeeId);
+  const { data: skills = [], isLoading, isError, refetch } = useEmployeeSkills(employeeId);
   const addSkill = useAddSkill();
   const deleteSkill = useDeleteSkill();
   const [open, setOpen] = useState(false);
@@ -53,7 +53,13 @@ function EmployeeSkillsPanel({ employeeId, employeeName }: { employeeId: string;
         <p className="font-medium text-gray-900">{employeeName}</p>
         <Button size="sm" variant="outline" onClick={() => setOpen(true)} className="gap-1 text-xs"><Plus className="h-3 w-3" /> Add Skill</Button>
       </div>
-      {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : (
+      {isLoading ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : isError ? (
+        <div className="flex items-center gap-2">
+          <AlertCircle className="h-4 w-4 text-red-400" />
+          <p className="text-xs text-red-500">Failed to load skills.</p>
+          <Button size="sm" variant="outline" onClick={() => refetch()} className="h-6 text-xs px-2">Retry</Button>
+        </div>
+      ) : (
         <div className="flex flex-wrap gap-1.5">
           {skills.length === 0 && <p className="text-xs text-gray-400">No skills added</p>}
           {skills.map(s => (

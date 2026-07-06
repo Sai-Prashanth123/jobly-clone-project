@@ -168,7 +168,13 @@ export default function MyMonthlyTimesheet() {
   useEffect(() => {
     if (!targetEmployeeId) return;
     const key = `${targetEmployeeId}-${loaded.year}-${loaded.month}`;
-    if (loadingMonth || holidaysLoading || leaveCheckLoading) return;
+    // isFetching (not just isLoading) matters here: after a save invalidates
+    // this query, isLoading stays false (cached data still exists) while a
+    // background refetch runs with isFetching:true. Without waiting on it too,
+    // this effect could lock onto stale/blank cached data the instant it
+    // remounts, then never re-run for this key again once the fresh
+    // (correctly-saved) data actually lands a moment later.
+    if (loadingMonth || isFetching || holidaysLoading || leaveCheckLoading) return;
     if (hydratedKey.current === key) return;
     hydratedKey.current = key;
     if (serverSheet) {
@@ -184,7 +190,7 @@ export default function MyMonthlyTimesheet() {
     }
     setDirty(false);
     setSaveState('idle');
-  }, [serverSheet, loadingMonth, holidaysLoading, leaveCheckLoading, holidayDatesInMonth, approvedLeaveDatesInMonth, loaded.year, loaded.month, targetEmployeeId]);
+  }, [serverSheet, loadingMonth, isFetching, holidaysLoading, leaveCheckLoading, holidayDatesInMonth, approvedLeaveDatesInMonth, loaded.year, loaded.month, targetEmployeeId]);
 
   // Debounced draft auto-save (only while editable + after a real edit).
   // Skips for past (closed) periods — server would 400 the upsert anyway.
@@ -289,7 +295,10 @@ export default function MyMonthlyTimesheet() {
         if (url) { window.open(url, '_blank', 'noopener'); return; }
       }
       window.print();
-    } catch { window.print(); }
+    } catch {
+      toast.warning('Could not generate the PDF — opening the browser print dialog instead.');
+      window.print();
+    }
   };
 
   // Word-doc export — a direct binary stream (no public URL to redirect to
@@ -346,7 +355,9 @@ export default function MyMonthlyTimesheet() {
       }
       exportToCsv(`timesheet-${(employeeName || targetEmployeeId).replace(/\s+/g, '-')}-${exportYear}`, rows);
     } catch {
-      /* failed-request toast raised centrally (queryClient.ts) */
+      // Raw apiClient call, not a useQuery/useMutation — the central toast
+      // handler in queryClient.ts never sees this, so it needs its own toast.
+      toast.error('Could not export the year. Please try again.');
     } finally {
       setExportingYear(false);
     }

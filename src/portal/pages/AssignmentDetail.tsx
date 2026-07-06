@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
@@ -20,7 +20,7 @@ export default function AssignmentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: assignment, isLoading } = useAssignment(id);
+  const { data: assignment, isLoading, isError, refetch } = useAssignment(id);
   const { data: employee } = useEmployee(assignment?.employeeId);
   const { data: client } = useClient(assignment?.clientId);
   const { data: timesheetsData } = useTimesheets({ employeeId: assignment?.employeeId, limit: 100 });
@@ -32,6 +32,16 @@ export default function AssignmentDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load this assignment.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
 
   if (!assignment) {

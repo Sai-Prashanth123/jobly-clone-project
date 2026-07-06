@@ -356,6 +356,11 @@ export interface Assignment {
   payRate: number;
   maxHoursPerWeek: number;
   status: AssignmentStatus;
+  // The true stored status, before the read-time "completed" overlay (which
+  // auto-displays status as Completed once endDate has passed). Edit forms
+  // should seed from this, not `status`, so an unrelated save doesn't
+  // silently persist the decorated value as a real status change.
+  rawStatus?: AssignmentStatus;
   billingType?: BillingType;
   workLocation?: string;
   reportingManagerId?: string;

@@ -18,17 +18,22 @@ const ASSIGNMENT_SELECT = '*, employees!employee_id(first_name, last_name, displ
 // passed and it's still active/pending, present it as completed. Display-only —
 // we never write it, so there are no update races and the Edit form still shows
 // the stored value (admin/ops set the real end-state explicitly).
+// `raw_status` carries the untouched stored value alongside the decorated
+// `status`, so the Edit form can seed itself from the true value instead of
+// silently round-tripping the decorated one back into a real write on save.
 function decorateAssignment(row: any): any {
   const emp = row.employees;
   const cli = row.clients;
   const mgr = row.reporting_manager;
-  let status = row.status;
+  const rawStatus = row.status;
+  let status = rawStatus;
   if (row.end_date && row.end_date < todayUTC() && (status === 'active' || status === 'pending')) {
     status = 'completed';
   }
   return {
     ...row,
     status,
+    raw_status: rawStatus,
     employee_name: emp ? `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() : null,
     employee_display_id: emp?.display_id ?? null,
     employee_email: emp?.work_email ?? null,

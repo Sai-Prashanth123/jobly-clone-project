@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Users, Shield, Activity, Database, KeyRound, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Loader2, Users, Shield, Activity, Database, KeyRound, Trash2, ChevronLeft, ChevronRight, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
@@ -92,7 +92,7 @@ const RISK_COLORS: Record<string, string> = {
 // ── Users Tab ─────────────────────────────────────────────────────────────────
 function UsersTab() {
   const { user: currentUser } = useAuth();
-  const { data: users = [], isLoading } = usePortalUsers();
+  const { data: users = [], isLoading, isError, refetch } = usePortalUsers();
   const updateRole = useUpdateUserRole();
   const deactivate = useDeactivateUser();
   const resetPwd = useResetUserPassword();
@@ -100,6 +100,16 @@ function UsersTab() {
   const [newPwdResult, setNewPwdResult] = useState<{ name: string; password: string } | null>(null);
 
   if (isLoading) return <div className="flex items-center justify-center py-20"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load portal users.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -255,7 +265,7 @@ function ActivityLogsTab() {
   const [page, setPage] = useState(1);
   const limit = 25;
 
-  const { data, isLoading } = useActivityLogs({
+  const { data, isLoading, isError, refetch } = useActivityLogs({
     entityType: entityType || undefined,
     action: action || undefined,
     page,
@@ -298,6 +308,12 @@ function ActivityLogsTab() {
         <CardContent className="pt-4">
           {isLoading ? (
             <div className="flex items-center justify-center py-10"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
+              <AlertCircle className="h-6 w-6 text-red-400" />
+              <p className="text-sm text-red-500">Failed to load activity logs.</p>
+              <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>

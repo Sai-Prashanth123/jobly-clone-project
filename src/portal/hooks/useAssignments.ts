@@ -39,6 +39,7 @@ function mapAssignment(raw: any): Assignment {
     payRate: raw.pay_rate,
     maxHoursPerWeek: raw.max_hours_per_week,
     status: raw.status,
+    rawStatus: raw.raw_status ?? undefined,
     billingType: raw.billing_type ?? undefined,
     workLocation: raw.work_location ?? undefined,
     reportingManagerId: raw.reporting_manager_id ?? undefined,

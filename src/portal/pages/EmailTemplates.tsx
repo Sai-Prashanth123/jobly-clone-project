@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2, Save, Send, Mail, Loader2, Search } from 'lucide-react';
+import { Plus, Trash2, Save, Send, Mail, Loader2, Search, AlertCircle } from 'lucide-react';
 import { RichTextEditor } from '../components/shared/RichTextEditor';
 import {
   useEmailTemplates, useCreateEmailTemplate, useUpdateEmailTemplate, useDeleteEmailTemplate,
@@ -50,7 +50,7 @@ function PreviewPane({ subject, header, body, footer }: { subject: string; heade
 
 // ── Templates manager tab ───────────────────────────────────────────────────────
 function TemplatesTab() {
-  const { data: templates, isLoading } = useEmailTemplates();
+  const { data: templates, isLoading, isError, refetch } = useEmailTemplates();
   const createTpl = useCreateEmailTemplate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = templates?.find(t => t.id === selectedId) ?? null;
@@ -72,14 +72,21 @@ function TemplatesTab() {
         </CardHeader>
         <CardContent className="space-y-1">
           {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-          {(templates ?? []).map(t => (
+          {isError && (
+            <div className="flex flex-col items-center gap-2 px-3 py-4 text-center">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+              <p className="text-xs text-red-500">Failed to load templates.</p>
+              <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+            </div>
+          )}
+          {!isError && (templates ?? []).map(t => (
             <button key={t.id} type="button" onClick={() => setSelectedId(t.id)}
               className={`w-full text-left px-3 py-2 rounded-md text-sm ${selectedId === t.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
               <span className="font-medium">{t.name}</span>
               {t.isDefault && <span className="ml-2 text-[10px] uppercase tracking-wide text-emerald-600">Default</span>}
             </button>
           ))}
-          {!isLoading && (templates ?? []).length === 0 && <p className="text-sm text-muted-foreground px-3 py-2">No templates yet.</p>}
+          {!isLoading && !isError && (templates ?? []).length === 0 && <p className="text-sm text-muted-foreground px-3 py-2">No templates yet.</p>}
         </CardContent>
       </Card>
 
@@ -251,7 +258,7 @@ function ComposeTab() {
 
 // ── Invoice themes tab ───────────────────────────────────────────────────────────
 function InvoiceThemesTab() {
-  const { data: themes, isLoading } = useInvoiceTemplates();
+  const { data: themes, isLoading, isError, refetch } = useInvoiceTemplates();
   const createTheme = useCreateInvoiceTemplate();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = themes?.find(t => t.id === selectedId) ?? null;
@@ -271,7 +278,14 @@ function InvoiceThemesTab() {
         </CardHeader>
         <CardContent className="space-y-1">
           {isLoading && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
-          {(themes ?? []).map(t => (
+          {isError && (
+            <div className="flex flex-col items-center gap-2 px-3 py-4 text-center">
+              <AlertCircle className="h-5 w-5 text-red-400" />
+              <p className="text-xs text-red-500">Failed to load themes.</p>
+              <Button size="sm" variant="outline" onClick={() => refetch()}>Retry</Button>
+            </div>
+          )}
+          {!isError && (themes ?? []).map(t => (
             <button key={t.id} type="button" onClick={() => setSelectedId(t.id)}
               className={`w-full text-left px-3 py-2 rounded-md text-sm flex items-center gap-2 ${selectedId === t.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
               <span className="inline-block h-3 w-3 rounded-full border" style={{ background: t.accentColor }} />

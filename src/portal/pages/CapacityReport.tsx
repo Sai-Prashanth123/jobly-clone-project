@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { BarChart3, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
+import { BarChart3, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { addMonths, subMonths, format } from 'date-fns';
 import { useCapacityUtilization } from '../hooks/useAnalytics';
@@ -7,7 +7,7 @@ import { useCapacityUtilization } from '../hooks/useAnalytics';
 export default function CapacityReport() {
   const [monthDate, setMonthDate] = useState(new Date());
   const month = `${monthDate.getFullYear()}-${String(monthDate.getMonth() + 1).padStart(2, '0')}`;
-  const { data: employees = [], isLoading } = useCapacityUtilization(month);
+  const { data: employees = [], isLoading, isError, refetch } = useCapacityUtilization(month);
 
   const color = (pct: number) => pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-amber-400' : 'bg-red-400';
   const badge = (pct: number) => pct >= 80 ? 'text-green-700 bg-green-100' : pct >= 50 ? 'text-amber-700 bg-amber-100' : 'text-red-700 bg-red-100';
@@ -23,7 +23,13 @@ export default function CapacityReport() {
         </div>
       </div>
 
-      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
+      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : isError ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load capacity data.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b"><tr>{['Employee','Department','Billed Hrs','Utilization'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>

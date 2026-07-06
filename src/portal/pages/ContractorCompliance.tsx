@@ -1,11 +1,12 @@
-import { AlertTriangle, CheckCircle2, Loader2, Users } from 'lucide-react';
+import { AlertTriangle, AlertCircle, CheckCircle2, Loader2, Users } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 import { useContractorCompliance } from '../hooks/useAnalytics';
 
 const RISK_STYLES: Record<string, string> = { ok: 'bg-green-50 border-green-200', warn: 'bg-amber-50 border-amber-200', critical: 'bg-red-50 border-red-200' };
 
 export default function ContractorCompliance() {
-  const { data: contractors = [], isLoading } = useContractorCompliance();
+  const { data: contractors = [], isLoading, isError, refetch } = useContractorCompliance();
   const critical = contractors.filter((c: any) => c.riskLevel === 'critical');
   const warn = contractors.filter((c: any) => c.riskLevel === 'warn');
   const ok = contractors.filter((c: any) => c.riskLevel === 'ok');
@@ -34,7 +35,13 @@ export default function ContractorCompliance() {
         <p className="text-sm text-gray-500">{contractors.length} contractors — {critical.length} critical, {warn.length} warnings, {ok.length} compliant</p>
       </div>
 
-      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : (
+      {isLoading ? <div className="flex justify-center py-16"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div> : isError ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center gap-3">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load contractor compliance data.</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
+        </div>
+      ) : (
         <div className="space-y-6">
           {critical.length > 0 && <section><h2 className="text-sm font-semibold uppercase tracking-wider text-red-600 mb-3">Critical Issues ({critical.length})</h2><div className="space-y-2">{critical.map((c: any) => <Card key={c.id} c={c} />)}</div></section>}
           {warn.length > 0 && <section><h2 className="text-sm font-semibold uppercase tracking-wider text-amber-600 mb-3">Warnings ({warn.length})</h2><div className="space-y-2">{warn.map((c: any) => <Card key={c.id} c={c} />)}</div></section>}

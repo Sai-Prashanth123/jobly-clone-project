@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, CheckSquare2, Square, ListChecks, Eye, EyeOff } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, CheckSquare2, Square, ListChecks, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -37,7 +37,7 @@ export default function EmployeeDetail() {
   // Poll while a reviewer is looking at the page so a parallel re-submission by
   // the employee surfaces within a few seconds (the 409 guards are the safety
   // net; this is the proactive half). 0/false disables for everyone else.
-  const { data: employee, isLoading } = useEmployee(id, { refetchInterval: isReviewer ? 30000 : false });
+  const { data: employee, isLoading, isError, refetch } = useEmployee(id, { refetchInterval: isReviewer ? 30000 : false });
   const { data: assignmentsData } = useAssignments({ employeeId: id, limit: 100 });
   const { data: timesheetsData } = useTimesheets({ employeeId: id, limit: 100 });
   const { data: allEmployeesData } = useEmployees({ limit: 500 });
@@ -91,6 +91,16 @@ export default function EmployeeDetail() {
 
   if (isLoading) {
     return <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>;
+  }
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertCircle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load this employee.</p>
+        <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+      </div>
+    );
   }
 
   if (!employee) {

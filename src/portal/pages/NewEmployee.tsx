@@ -369,7 +369,7 @@ export default function NewEmployee() {
   const createEmployee = useCreateEmployee();
   const updateEmployee = useUpdateEmployee(editId ?? '');
   const completeOnboarding = useCompleteOnboarding(editId ?? '');
-  const { data: existingEmployee, isLoading: loadingEmployee } = useEmployee(editId);
+  const { data: existingEmployee, isLoading: loadingEmployee, isError: employeeLoadError, refetch: refetchEmployee } = useEmployee(editId);
   const { data: employeesData } = useEmployees({ limit: 500 }, { enabled: canListEmployees });
 
   const [form, setForm] = useState<FormState>(defaultForm);
@@ -1159,6 +1159,15 @@ export default function NewEmployee() {
       <div className="text-center py-20">
         <p className="text-muted-foreground">No profile is linked to your account. Please contact HR.</p>
         <Button variant="link" onClick={() => navigate('/portal/profile')}>← Back to my profile</Button>
+      </div>
+    );
+  }
+  if (isEditMode && employeeLoadError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+        <AlertTriangle className="h-8 w-8 text-red-400" />
+        <p className="text-sm text-red-500">Failed to load this employee.</p>
+        <Button variant="outline" onClick={() => refetchEmployee()}>Retry</Button>
       </div>
     );
   }

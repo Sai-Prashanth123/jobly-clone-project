@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { Loader2, Plus, FileCheck2 } from 'lucide-react';
+import { Loader2, Plus, FileCheck2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -12,7 +12,7 @@ import type { Invoice } from '../types';
 
 export default function Estimates() {
   const navigate = useNavigate();
-  const { data, isLoading } = useEstimates();
+  const { data, isLoading, isError, refetch } = useEstimates();
   const { data: clientData } = useClients({ limit: 200 });
   const convertEstimate = useConvertEstimate();
 
@@ -65,6 +65,12 @@ export default function Estimates() {
 
       {isLoading ? (
         <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : isError ? (
+        <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
+          <AlertCircle className="h-8 w-8 text-red-400" />
+          <p className="text-sm text-red-500">Failed to load estimates.</p>
+          <Button variant="outline" onClick={() => refetch()}>Retry</Button>
+        </div>
       ) : (
         <DataTable
           data={estimates}

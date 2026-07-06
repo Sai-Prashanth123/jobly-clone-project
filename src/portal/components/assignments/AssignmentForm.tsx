@@ -30,11 +30,17 @@ const defaultForm: AssignmentFormData = {
 export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: AssignmentFormProps) {
   const { data: empData } = useEmployees({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
-  const [form, setForm] = useState<AssignmentFormData>({ ...defaultForm, ...initial });
+  // Seed Status from the TRUE stored value (rawStatus), not the decorated
+  // display value (status) — the backend auto-displays "Completed" once
+  // endDate passes without ever writing that, but this form always sends
+  // back whatever Status shows, so seeding from the decorated value would
+  // silently persist "Completed" on any unrelated save.
+  const seedStatus = (src?: Partial<Assignment>) => src?.rawStatus ?? src?.status ?? defaultForm.status;
+  const [form, setForm] = useState<AssignmentFormData>({ ...defaultForm, ...initial, status: seedStatus(initial) });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    setForm({ ...defaultForm, ...initial });
+    setForm({ ...defaultForm, ...initial, status: seedStatus(initial) });
     setErrors({});
   }, [initial?.id]);
 
