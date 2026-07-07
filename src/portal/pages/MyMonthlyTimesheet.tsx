@@ -311,7 +311,13 @@ export default function MyMonthlyTimesheet() {
   // just because someone clicked Print/Download/attach-proof without ever
   // touching a cell.
   const ensureSaved = async (opts?: { force?: boolean }): Promise<MonthlyTimesheet | null> => {
-    if (!opts?.force && !dirty) return sheet;
+    // A never-touched (dirty=false) month can still hold genuinely accurate
+    // data if it was auto-filled from the employee's weekly timesheets or
+    // active assignment — not just the flat fabricated 8h/day default the
+    // phantom-data guard was originally written to block. Treat that as
+    // real data worth saving/exporting too.
+    const hasRealAutoFillData = (weeklyHoursByDate?.size ?? 0) > 0 || !!defaultProject;
+    if (!opts?.force && !dirty && !hasRealAutoFillData) return sheet;
     const target = { employeeId: targetEmployeeId, year: loaded.year, month: loaded.month };
     const saved = await upsert.mutateAsync({
       employeeId: targetEmployeeId, year: loaded.year, month: loaded.month,
