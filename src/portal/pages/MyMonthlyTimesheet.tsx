@@ -167,6 +167,7 @@ export default function MyMonthlyTimesheet() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [previewOpen, setPreviewOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [yearlyDialogOpen, setYearlyDialogOpen] = useState(false);
   const [exportYear, setExportYear] = useState(String(currentMonth().year));
   const [exportingYear, setExportingYear] = useState(false);
   const [exportingYearPdf, setExportingYearPdf] = useState(false);
@@ -978,29 +979,13 @@ export default function MyMonthlyTimesheet() {
               <Button variant="outline" onClick={handleDownloadWord} loading={downloadingDocx} loadingText="Preparing…" className="gap-1.5">
                 <FileText className="h-4 w-4" /> Download as Word
               </Button>
-              <Select value={exportYear} onValueChange={setExportYear}>
-                <SelectTrigger className="w-24 h-9 text-sm"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {exportYearOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
-                </SelectContent>
-              </Select>
               <Button
                 variant="outline"
-                onClick={handleDownloadYear}
-                disabled={!targetEmployeeId || exportingYear}
+                onClick={() => setYearlyDialogOpen(true)}
+                disabled={!targetEmployeeId}
                 className="gap-1.5"
               >
-                {exportingYear ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
-                Download Year (CSV)
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleDownloadYearPdf}
-                disabled={!targetEmployeeId || exportingYearPdf}
-                className="gap-1.5"
-              >
-                {exportingYearPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                Download Year (PDF)
+                <Calendar className="h-4 w-4" /> Yearly Timesheet
               </Button>
               <Button variant="outline" onClick={() => setClearOpen(true)} disabled={isLocked || periodClosed} className="gap-1.5"><RotateCcw className="h-4 w-4" /> Clear Entries</Button>
               {!isLocked && !periodClosed && (
@@ -1069,6 +1054,45 @@ export default function MyMonthlyTimesheet() {
         confirmLabel="Clear Entries"
         onConfirm={handleClear}
       />
+
+      <Dialog open={yearlyDialogOpen} onOpenChange={setYearlyDialogOpen}>
+        <DialogContent className="w-[95vw] max-w-md">
+          <DialogHeader>
+            <DialogTitle>Yearly Timesheet</DialogTitle>
+            <DialogDescription>
+              Pick a year to download {employeeName || 'this employee'}'s full-year timesheet, combining every month.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 py-1">
+            <Label>Year</Label>
+            <Select value={exportYear} onValueChange={setExportYear}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {exportYearOptions.map(y => <SelectItem key={y} value={y}>{y}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter className="gap-2 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={handleDownloadYear}
+              disabled={!targetEmployeeId || exportingYear}
+              className="gap-1.5"
+            >
+              {exportingYear ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Download CSV
+            </Button>
+            <Button
+              onClick={handleDownloadYearPdf}
+              disabled={!targetEmployeeId || exportingYearPdf}
+              className="gap-1.5"
+            >
+              {exportingYearPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+              Download PDF
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
