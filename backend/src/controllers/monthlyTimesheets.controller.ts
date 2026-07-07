@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/monthlyTimesheets.service';
 import { getLeaveCoverage } from '../services/conflicts.service';
 import { currentYearMonthUTC } from '../lib/dateUtils';
-import { generateYearlyTimesheetPDF } from '../lib/pdfGenerator';
+import { generateYearlyTimesheetPDF, generateMonthlyTimesheetDOCX } from '../lib/pdfGenerator';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput, PatchMonthlyStatusInput,
   ListMonthlyTimesheetsQuery, PatchEntriesInput, YearlyTimesheetPdfInput,
@@ -222,6 +222,34 @@ export async function getYearlyPdf(req: Request, res: Response, next: NextFuncti
     );
     const fileName = `${input.employeeDisplayId}-${input.year}-timesheet.pdf`;
     res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+}
+
+// Same idea as getYearlyPdf but for a single month's Word doc — lets
+// Print/Download-as-Word render straight from whatever is currently on
+// screen (already-saved data, or a not-yet-saved auto-filled preview)
+// without requiring the month to be persisted first just to view it.
+export async function getDocxFromData(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const input = req.body as YearlyTimesheetPdfInput;
+    const m = input.months[0];
+    const buffer = await generateMonthlyTimesheetDOCX({
+      displayId: m.displayId,
+      employeeName: input.employeeName,
+      employeeDisplayId: input.employeeDisplayId,
+      jobTitle: input.jobTitle,
+      monthLabel: m.monthLabel,
+      rows: m.rows,
+      totalHours: m.totalHours,
+      expectedHours: m.expectedHours,
+      balance: m.balance,
+      workingDays: m.workingDays,
+      leaveDays: m.leaveDays,
+    });
+    const fileName = `${input.employeeDisplayId}-${m.monthLabel.replace(/\s+/g, '-')}.docx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(buffer);
   } catch (err) { next(err); }

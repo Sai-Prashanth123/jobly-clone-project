@@ -25,6 +25,9 @@ router.get('/not-submitted', requireRole('admin', 'hr'), ctrl.getNotSubmitted);
 // Combines a full year of already-assembled monthly data (same data the
 // "Download Year (CSV)" export uses) into one PDF. Must stay ahead of `/:id`.
 router.post('/yearly-pdf', requireRole('admin', 'hr', 'operations', 'employee'), validateBody(yearlyTimesheetPdfSchema), ctrl.getYearlyPdf);
+// Single-month Word doc rendered straight from already-assembled data (same
+// shape as yearly-pdf, months[0] used) — no DB row needed just to preview.
+router.post('/docx-from-data', requireRole('admin', 'hr', 'operations', 'employee'), validateBody(yearlyTimesheetPdfSchema), ctrl.getDocxFromData);
 router.post('/', requireRole('admin', 'hr', 'employee'), validateBody(upsertMonthlyTimesheetSchema), ctrl.upsert);
 router.get('/:id', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getOne);
 router.get('/:id/pdf', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getPdf);

@@ -370,40 +370,53 @@ export default function MyMonthlyTimesheet() {
     }
   };
 
+  // Renders straight from whatever is currently on screen (already-saved
+  // data, or a not-yet-saved auto-filled preview) — Print/Download-as-Word
+  // are pure previews and should never need to persist anything just to be
+  // viewed. Only Submit actually saves.
+  const buildCurrentMonthPdfPayload = () => {
+    const s = computeMonthlySummary(entries);
+    return {
+      employeeName: employeeName || 'Employee',
+      employeeDisplayId: targetEmployee?.displayId ?? '',
+      jobTitle: targetEmployee?.jobTitle,
+      year: loaded.year,
+      months: [{
+        displayId: sheet?.displayId ?? 'Not yet saved',
+        monthLabel: monthLabel(loaded.year, loaded.month),
+        rows: entries.filter(e => e.status !== 'weekend').map(e => ({
+          date: e.date, day: e.dayOfWeek, project: e.project ?? '', task: e.task ?? '',
+          start: e.startTime ?? '', end: e.endTime ?? '', hours: e.hours, status: e.status,
+        })),
+        totalHours: s.totalHours, expectedHours: s.expectedHours,
+        balance: s.balance, workingDays: s.workingDays, leaveDays: s.leaveDays,
+      }],
+    };
+  };
+
   const handlePrint = async () => {
-    const saved = await ensureSaved();
-    if (!saved) {
-      toast.warning('Nothing to export yet — fill in some hours first.');
-      return;
-    }
     try {
-      const { data } = await apiClient.get(`/monthly-timesheets/${saved.id}/pdf`);
-      const url = data?.data?.url;
-      if (url) { window.open(url, '_blank', 'noopener'); return; }
-      window.print();
+      const res = await apiClient.post('/monthly-timesheets/yearly-pdf', buildCurrentMonthPdfPayload(), { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank', 'noopener');
     } catch {
       toast.warning('Could not generate the PDF — opening the browser print dialog instead.');
       window.print();
     }
   };
 
-  // Word-doc export — a direct binary stream (no public URL to redirect to
-  // like the PDF's signed URL), so fetch as a blob and trigger a temporary
-  // anchor download, same technique as exportToCsv.
+  // Word-doc export — a direct binary stream, so fetch as a blob and trigger
+  // a temporary anchor download, same technique as exportToCsv.
   const handleDownloadWord = async () => {
-    const saved = await ensureSaved();
-    if (!saved) {
-      toast.warning('Nothing to export yet — fill in some hours first.');
-      return;
-    }
     setDownloadingDocx(true);
     try {
-      const res = await apiClient.get(`/monthly-timesheets/${saved.id}/docx`, { responseType: 'blob' });
+      const res = await apiClient.post('/monthly-timesheets/docx-from-data', buildCurrentMonthPdfPayload(), { responseType: 'blob' });
       const blob = new Blob([res.data], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `${saved.displayId ?? 'timesheet'}.docx`;
+      a.download = `${sheet?.displayId ?? 'timesheet'}.docx`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
