@@ -328,6 +328,20 @@ export function useRequestOnboardingChanges(id: string) {
   });
 }
 
+// Ask an employee (any status — active, onboarding, on-leave) for a document
+// or piece of information outside the onboarding flow. Pure notification —
+// no employee fields change, so there's nothing to update in the cache.
+// Takes the employee id per-call (not bound at hook-creation time) since
+// callers like ExpiringDocuments.tsx need one mutation shared across many
+// rows, each for a different employee.
+export function useRequestEmployeeDocuments() {
+  return useMutation({
+    mutationFn: async ({ employeeId, message }: { employeeId: string; message: string }) => {
+      await apiClient.post(`/employees/${employeeId}/request-documents`, { message });
+    },
+  });
+}
+
 // Employee-side: self-reopen the wizard while still on "pending review" (before
 // HR has acted). Clears onboarding_completed_at; status stays 'onboarding'.
 export function useReopenOnboarding(id: string) {

@@ -1,11 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileWarning, Loader2, AlertCircle } from 'lucide-react';
+import { FileWarning, Loader2, AlertCircle, Mail } from 'lucide-react';
+import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable } from '../components/shared/DataTable';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { useExpiringDocuments, type ExpiringDocEntry } from '../hooks/useEmployees';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { useExpiringDocuments, useRequestEmployeeDocuments, type ExpiringDocEntry } from '../hooks/useEmployees';
 
 function urgencyBadge(days: number) {
   if (days <= 14) return <Badge variant="destructive">{days}d left</Badge>;
@@ -27,6 +31,9 @@ export function ExpiringDocuments() {
   const navigate = useNavigate();
   const [days, setDays] = useState(90);
   const { data: docs = [], isLoading, isError, refetch } = useExpiringDocuments(days);
+  const requestDocuments = useRequestEmployeeDocuments();
+  const [notifyTarget, setNotifyTarget] = useState<ExpiringDocEntry | null>(null);
+  const [notifyMessage, setNotifyMessage] = useState('');
 
   const columns = [
     {
@@ -59,6 +66,24 @@ export function ExpiringDocuments() {
       header: 'Time Remaining',
       render: (r: ExpiringDocEntry) => urgencyBadge(r.daysRemaining),
       getValue: (r: ExpiringDocEntry) => String(r.daysRemaining),
+    },
+    {
+      key: 'actions',
+      header: '',
+      getValue: () => '',
+      render: (r: ExpiringDocEntry) => (
+        <div onClick={e => e.stopPropagation()}>
+          <Button
+            variant="ghost" size="sm" className="h-8 gap-1.5 text-blue-700 hover:bg-blue-50"
+            onClick={() => {
+              setNotifyMessage(`Your ${r.documentType} is expiring on ${new Date(r.expiryDate + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} — please upload a renewed copy from your profile page.`);
+              setNotifyTarget(r);
+            }}
+          >
+            <Mail className="h-3.5 w-3.5" /> Notify
+          </Button>
+        </div>
+      ),
     },
   ];
 
@@ -107,6 +132,56 @@ export function ExpiringDocuments() {
           searchKeys={['firstName', 'lastName', 'documentType', 'displayId'] as (keyof ExpiringDocEntry)[]}
         />
       )}
+
+      <Dialog open={!!notifyTarget} onOpenChange={(open) => !requestDocuments.isPending && !open && setNotifyTarget(null)}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Notify {notifyTarget?.firstName} {notifyTarget?.lastName}</DialogTitle>
+            <DialogDescription>
+              They&rsquo;ll get an email + in-app notification about their expiring {notifyTarget?.documentType}.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              value={notifyMessage}
+              onChange={(e) => setNotifyMessage(e.target.value)}
+              rows={5}
+              maxLength={2000}
+              disabled={requestDocuments.isPending}
+              className="resize-y"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setNotifyTarget(null)} disabled={requestDocuments.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!notifyTarget) return;
+                const msg = notifyMessage.trim();
+                if (msg.length < 1) {
+                  toast.error('Please enter a message.');
+                  return;
+                }
+                try {
+                  await requestDocuments.mutateAsync({ employeeId: notifyTarget.employeeId, message: msg });
+                  toast.success(`${notifyTarget.firstName} has been notified.`);
+                  setNotifyTarget(null);
+                } catch {
+                  toast.error('Could not send the request. Please try again.');
+                }
+              }}
+              loading={requestDocuments.isPending}
+              loadingText="Sending…"
+              disabled={notifyMessage.trim().length < 1}
+              className="gap-2"
+            >
+              <Mail className="h-4 w-4" />
+              Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

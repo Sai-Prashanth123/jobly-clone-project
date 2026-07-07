@@ -16,7 +16,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import {
   useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials,
-  useRequestOnboardingChanges, usePlaceOnLeave, useReturnFromLeave, useTerminateEmployee, useRehireEmployee,
+  useRequestOnboardingChanges, useRequestEmployeeDocuments, usePlaceOnLeave, useReturnFromLeave, useTerminateEmployee, useRehireEmployee,
 } from '../hooks/useEmployees';
 import { useAssignments } from '../hooks/useAssignments';
 import { useTimesheets } from '../hooks/useTimesheets';
@@ -47,6 +47,7 @@ export default function EmployeeDetail() {
   const deleteEmployee = useDeleteEmployee();
   const resendCreds = useResendEmployeeCredentials();
   const requestChanges = useRequestOnboardingChanges(id!);
+  const requestDocuments = useRequestEmployeeDocuments();
   const placeOnLeave = usePlaceOnLeave(id!);
   const returnFromLeave = useReturnFromLeave(id!);
   const terminateEmployee = useTerminateEmployee(id!);
@@ -58,6 +59,8 @@ export default function EmployeeDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [changesMessage, setChangesMessage] = useState('');
+  const [docRequestOpen, setDocRequestOpen] = useState(false);
+  const [docRequestMessage, setDocRequestMessage] = useState('');
   // Part B — place-on-leave dialog.
   const [leaveOpen, setLeaveOpen] = useState(false);
   const [leaveStart, setLeaveStart] = useState(todayStr);
@@ -319,6 +322,20 @@ export default function EmployeeDetail() {
             >
               <MessageSquareWarning className="h-4 w-4" />
               Request Changes
+            </Button>
+          )}
+          {/* Request Documents — for an employee post-onboarding, HR may still
+              need something from them (a renewed visa, an updated ID, etc).
+              Unlike Request Changes, this isn't gated to onboarding status. */}
+          {employee.status === 'active' && (user?.role === 'admin' || user?.role === 'hr') && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-blue-700 border-blue-200 hover:bg-blue-50"
+              onClick={() => { setDocRequestMessage(''); setDocRequestOpen(true); }}
+            >
+              <Mail className="h-4 w-4" />
+              Request Documents
             </Button>
           )}
           {(user?.role === 'admin' || user?.role === 'hr') && (
@@ -839,6 +856,60 @@ export default function EmployeeDetail() {
               className="gap-2"
             >
               <MessageSquareWarning className="h-4 w-4" />
+              Send to employee
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={docRequestOpen} onOpenChange={(open) => !requestDocuments.isPending && setDocRequestOpen(open)}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Request documents from {employee.firstName} {employee.lastName}</DialogTitle>
+            <DialogDescription>
+              Send a note about what's needed (e.g. a renewed visa, an updated ID). They&rsquo;ll get an
+              email + in-app notification.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Textarea
+              value={docRequestMessage}
+              onChange={(e) => setDocRequestMessage(e.target.value)}
+              placeholder="e.g. Your work visa is expiring soon — please upload a renewed copy from your profile page."
+              rows={6}
+              maxLength={2000}
+              disabled={requestDocuments.isPending}
+              className="resize-y"
+            />
+            <p className="text-xs text-muted-foreground text-right tabular-nums">
+              {docRequestMessage.length} / 2000
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDocRequestOpen(false)} disabled={requestDocuments.isPending}>
+              Cancel
+            </Button>
+            <Button
+              onClick={async () => {
+                const msg = docRequestMessage.trim();
+                if (msg.length < 1) {
+                  toast.error('Please enter a message.');
+                  return;
+                }
+                try {
+                  await requestDocuments.mutateAsync({ employeeId: id!, message: msg });
+                  toast.success(`${employee.firstName} has been notified.`);
+                  setDocRequestOpen(false);
+                } catch {
+                  toast.error('Could not send the request. Please try again.');
+                }
+              }}
+              loading={requestDocuments.isPending}
+              loadingText="Sending…"
+              disabled={docRequestMessage.trim().length < 1}
+              className="gap-2"
+            >
+              <Mail className="h-4 w-4" />
               Send to employee
             </Button>
           </DialogFooter>

@@ -881,6 +881,60 @@ export async function sendOnboardingChangesRequestedEmail(
   });
 }
 
+export interface DocumentRequestEmailPayload {
+  to: string | string[];
+  employeeName: string;
+  displayId: string;
+  message: string;      // HR's freeform message describing what's needed
+  portalUrl?: string;   // Deep link to the employee's profile/documents page
+}
+
+// Sent when HR/admin uses "Request Documents" on an active (post-onboarding)
+// employee's profile, or "Notify" on an expiring-document row — asks the
+// employee to upload/provide something outside the onboarding flow.
+export async function sendDocumentRequestEmail(payload: DocumentRequestEmailPayload): Promise<void> {
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+  }
+  const { to, employeeName, displayId, message, portalUrl } = payload;
+  const link = portalUrl || `${PORTAL_URL}/portal/profile`;
+  const messageHtml = esc(message).replace(/\n/g, '<br>');
+
+  const body = `
+<p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.7;">Hi <strong style="color:#111827;">${esc(employeeName)}</strong>,</p>
+<p style="margin:0 0 20px;color:#6b7280;font-size:14px;line-height:1.7;">
+  HR needs something from you regarding your employee record <strong style="color:#374151;">${esc(displayId)}</strong>. Please see their note below.
+</p>
+
+<p style="margin:0 0 10px;font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#9ca3af;">HR's Request</p>
+<div style="background:#eff6ff;border-left:4px solid #4069FF;border-radius:0 10px 10px 0;padding:16px 18px;margin-bottom:28px;font-size:14px;color:#1e3a8a;line-height:1.65;">
+  ${messageHtml}
+</div>
+
+<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
+  <tr><td align="center">
+    <a href="${esc(link)}" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
+      Go to My Profile &rarr;
+    </a>
+  </td></tr>
+</table>
+<p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">Questions about what's needed? Reach out to your HR team directly.</p>`;
+
+  const html = emailShell({
+    previewText: `HR needs something from you — ${displayId}`,
+    title: 'Document Request',
+    subtitle: `HR has a request regarding your record ${esc(displayId)}`,
+    body,
+  });
+
+  await sendWithRetry({
+    from: FROM,
+    to,
+    subject: `Action needed — HR request for ${employeeName} (${displayId})`,
+    html,
+  });
+}
+
 // Diagnostic smoke-test — sends a plain-text email to the given address so an
 // admin can confirm the SMTP transport is working end-to-end from the portal.
 export async function testEmailDelivery(to: string): Promise<{ ok: boolean; error?: string }> {

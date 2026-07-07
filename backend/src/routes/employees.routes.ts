@@ -42,5 +42,8 @@ router.post('/:id/onboarding/request-changes', requireRole('admin','hr'), ctrl.r
 // Employee self-reopens the wizard while still in the "pending review" state
 // (before HR has acted). The service enforces ownership.
 router.post('/:id/onboarding/reopen', requireRole('admin','hr','employee'), ctrl.reopenOnboarding);
+// HR/admin asks an employee (any status) for a document or piece of
+// information outside the onboarding flow.
+router.post('/:id/request-documents', requireRole('admin','hr'), ctrl.requestDocuments);
 
 export default router;

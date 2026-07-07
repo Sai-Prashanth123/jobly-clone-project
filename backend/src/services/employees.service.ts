@@ -1,7 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { ConflictError, NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
-import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRequestedEmail, mailerConfigured } from '../lib/mailer';
+import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRequestedEmail, sendDocumentRequestEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { computeOnboarding } from '../lib/onboarding';
 import { todayUTC } from '../lib/dateUtils';
@@ -936,6 +936,54 @@ async function notifyOnboardingChangesRequested(emp: any, message: string): Prom
     }
   } catch (err) {
     console.error('[employees.service] changes-requested notification failed', err);
+  }
+}
+
+// Ask an employee (any status — active, onboarding, on-leave) for a document
+// or piece of information outside the onboarding flow (e.g. a renewed visa,
+// an updated ID). Unlike requestOnboardingChanges, this has no status gate
+// and doesn't touch onboarding-workflow columns — it's a plain notification.
+export async function requestEmployeeDocuments(id: string, message: string, actorId?: string): Promise<{ employee: any }> {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('*').eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+
+  logActivity(actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8), {
+    event: 'documents_requested',
+  });
+
+  void notifyDocumentsRequested(emp, message);
+
+  return { employee: emp };
+}
+
+async function notifyDocumentsRequested(emp: any, message: string): Promise<void> {
+  const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
+  try {
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id, email').eq('employee_id', emp.id).maybeSingle();
+    if (pu?.id) {
+      await createNotification(
+        pu.id,
+        'HR has requested a document from you',
+        message.length > 280 ? `${message.slice(0, 277)}…` : message,
+        'warning',
+        'employee',
+        emp.id,
+      );
+    }
+    if (pu?.email && mailerConfigured) {
+      const portalBase = (process.env.FRONTEND_URL ?? '').replace(/\/$/, '');
+      await sendDocumentRequestEmail({
+        to: pu.email,
+        employeeName: fullName || 'there',
+        displayId: emp.display_id ?? emp.id,
+        message,
+        portalUrl: portalBase ? `${portalBase}/portal/profile` : undefined,
+      });
+    }
+  } catch (err) {
+    console.error('[employees.service] document-request notification failed', err);
   }
 }
 
