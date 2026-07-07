@@ -171,6 +171,7 @@ export default function MyMonthlyTimesheet() {
   const [exportYear, setExportYear] = useState(String(currentMonth().year));
   const [exportingYear, setExportingYear] = useState(false);
   const [exportingYearPdf, setExportingYearPdf] = useState(false);
+  const [savingDraft, setSavingDraft] = useState(false);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
   const hydratedKey = useRef<string>('');
   // Always tracks the currently-displayed period/employee, independent of any
@@ -558,6 +559,21 @@ export default function MyMonthlyTimesheet() {
       toast.error('Could not export the year as PDF. Please try again.');
     } finally {
       setExportingYearPdf(false);
+    }
+  };
+
+  // Explicit save action — since Print/Download no longer persist anything
+  // (they're pure previews), this is the one deliberate way to save a draft
+  // without needing to Submit it.
+  const handleSaveDraft = async () => {
+    setSavingDraft(true);
+    try {
+      await ensureSaved({ force: true });
+      toast.success('Draft saved.');
+    } catch {
+      /* failed-request toast raised centrally (queryClient.ts) */
+    } finally {
+      setSavingDraft(false);
     }
   };
 
@@ -994,6 +1010,11 @@ export default function MyMonthlyTimesheet() {
 
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <div className="flex items-center gap-2 flex-wrap">
+              {!isLocked && !periodClosed && (
+                <Button variant="outline" onClick={handleSaveDraft} loading={savingDraft} loadingText="Saving…" disabled={!targetEmployeeId} className="gap-1.5">
+                  <Save className="h-4 w-4" /> Save
+                </Button>
+              )}
               <Button variant="outline" onClick={handlePrint} className="gap-1.5"><Printer className="h-4 w-4" /> Print / Save PDF</Button>
               <Button variant="outline" onClick={handleDownloadWord} loading={downloadingDocx} loadingText="Preparing…" className="gap-1.5">
                 <FileText className="h-4 w-4" /> Download as Word
