@@ -2,9 +2,10 @@ import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/monthlyTimesheets.service';
 import { getLeaveCoverage } from '../services/conflicts.service';
 import { currentYearMonthUTC } from '../lib/dateUtils';
+import { generateYearlyTimesheetPDF } from '../lib/pdfGenerator';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput, PatchMonthlyStatusInput,
-  ListMonthlyTimesheetsQuery, PatchEntriesInput,
+  ListMonthlyTimesheetsQuery, PatchEntriesInput, YearlyTimesheetPdfInput,
 } from '../schemas/monthlyTimesheet.schema';
 
 // Per-date approved/pending leave coverage for a (year, month) — drives the
@@ -192,6 +193,35 @@ export async function getDocx(req: Request, res: Response, next: NextFunction): 
     }
     const { buffer, fileName } = await svc.getMonthlyTimesheetDOCXBuffer(req.params.id);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+    res.send(buffer);
+  } catch (err) { next(err); }
+}
+
+// Combines a full year's worth of monthly timesheet data (already assembled
+// and authorized by the frontend, same data the CSV export uses) into one
+// PDF, one page per month. Purely a rendering step — no DB record is looked
+// up here, so there's nothing extra to authorize beyond the route's role gate.
+export async function getYearlyPdf(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const input = req.body as YearlyTimesheetPdfInput;
+    const buffer = await generateYearlyTimesheetPDF(
+      input.months.map(m => ({
+        displayId: m.displayId,
+        employeeName: input.employeeName,
+        employeeDisplayId: input.employeeDisplayId,
+        jobTitle: input.jobTitle,
+        monthLabel: m.monthLabel,
+        rows: m.rows,
+        totalHours: m.totalHours,
+        expectedHours: m.expectedHours,
+        balance: m.balance,
+        workingDays: m.workingDays,
+        leaveDays: m.leaveDays,
+      })),
+    );
+    const fileName = `${input.employeeDisplayId}-${input.year}-timesheet.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
     res.send(buffer);
   } catch (err) { next(err); }

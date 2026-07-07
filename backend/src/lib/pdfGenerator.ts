@@ -290,15 +290,11 @@ export interface MonthlyTimesheetPDFData {
   notes?: string;
 }
 
-export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Promise<Buffer> {
-  return new Promise((resolve, reject) => {
-    // A4 landscape so the wide attendance table fits.
-    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
-    const chunks: Buffer[] = [];
-    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
-    doc.on('end', () => resolve(Buffer.concat(chunks)));
-    doc.on('error', reject);
-
+// Draws one month's full timesheet report (header, table, summary) onto the
+// CURRENT page of an already-open PDFDocument. Shared by the single-month
+// export and the yearly export (which calls this once per month, adding a
+// page between each) so the two can never visually drift apart.
+function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimesheetPDFData): void {
     const blue = '#4069FF';
     const navy = '#04213F';
     const gray = '#6B7280';
@@ -393,7 +389,35 @@ export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Prom
       y += 14;
       doc.fillColor(gray).fontSize(9).font('Helvetica').text(data.notes, 40, y, { width: contentW });
     }
+}
 
+export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    // A4 landscape so the wide attendance table fits.
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    drawMonthlyTimesheetPage(doc, data);
+    doc.end();
+  });
+}
+
+// One combined PDF covering a full year — one page (or more, if a month's
+// rows overflow) per month, reusing the exact same per-month layout as
+// generateMonthlyTimesheetPDF so the two can never visually drift apart.
+export function generateYearlyTimesheetPDF(months: MonthlyTimesheetPDFData[]): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+    months.forEach((monthData, i) => {
+      if (i > 0) doc.addPage();
+      drawMonthlyTimesheetPage(doc, monthData);
+    });
     doc.end();
   });
 }

@@ -169,6 +169,7 @@ export default function MyMonthlyTimesheet() {
   const [clearOpen, setClearOpen] = useState(false);
   const [exportYear, setExportYear] = useState(String(currentMonth().year));
   const [exportingYear, setExportingYear] = useState(false);
+  const [exportingYearPdf, setExportingYearPdf] = useState(false);
   const [downloadingDocx, setDownloadingDocx] = useState(false);
   const hydratedKey = useRef<string>('');
   // Always tracks the currently-displayed period/employee, independent of any
@@ -407,56 +408,63 @@ export default function MyMonthlyTimesheet() {
     }
   };
 
+  // Shared by both "Download Year" exports (CSV and PDF): for each of the 12
+  // months in `year`, use the saved monthly timesheet if one exists,
+  // otherwise generate the same auto-filled data the live page would show
+  // (holidays, approved leave, weekly-hours-for-month, assignment
+  // project/window) — so neither export silently omits a month that just
+  // hasn't been opened/saved yet.
+  const assembleYearMonths = async (year: number): Promise<{ month: number; displayId: string; entries: MonthlyTimesheetEntry[] }[]> => {
+    const [monthlyRes, holidaysRes] = await Promise.all([
+      apiClient.get('/monthly-timesheets', { params: { employeeId: targetEmployeeId, year, limit: 12 } }),
+      apiClient.get('/holidays', { params: { year } }),
+    ]);
+    const savedByMonth = new Map(((monthlyRes.data?.data ?? []) as MonthlyTimesheet[]).map(s => [s.month, s]));
+    const yearHolidays = (holidaysRes.data?.data ?? []) as { date: string }[];
+
+    return Promise.all(
+      Array.from({ length: 12 }, (_, i) => i + 1).map(async (month) => {
+        const saved = savedByMonth.get(month);
+        if (saved && saved.entries.length > 0) {
+          return { month, displayId: saved.displayId ?? `${year}-${month}`, entries: saved.entries };
+        }
+        const prefix = `${year}-${String(month).padStart(2, '0')}-`;
+        const holidayDatesInThisMonth = new Set(yearHolidays.filter(h => h.date.startsWith(prefix)).map(h => h.date));
+        const [leaveRes, weeklyRes] = await Promise.all([
+          apiClient.get('/monthly-timesheets/leave-check', { params: { year, month, employeeId: targetEmployeeId } }),
+          apiClient.get('/timesheets/weekly-hours-for-month', { params: { employeeId: targetEmployeeId, year, month } }),
+        ]);
+        const approvedLeaveDates = new Set(
+          Object.entries((leaveRes.data?.leaveDays ?? {}) as Record<string, { status: string }>)
+            .filter(([, v]) => v.status === 'approved')
+            .map(([d]) => d),
+        );
+        const weeklyHoursByDate = new Map<string, number>(
+          ((weeklyRes.data?.data ?? []) as { date: string; hours: number }[]).map(d => [d.date, d.hours]),
+        );
+        // Resolve the assignment PER MONTH being exported, not the one
+        // currently loaded in the main grid — a year's worth of months can
+        // each need a different assignment depending on which was actually
+        // active at that point in time.
+        const monthAssignment = getPrimaryAssignmentForMonth(year, month);
+        const monthDefaultProject = monthAssignment?.projectName || undefined;
+        const monthAssignmentWindow = monthAssignment ? { startDate: monthAssignment.startDate, endDate: monthAssignment.endDate } : undefined;
+        const entries = buildMonthSkeleton(year, month, holidayDatesInThisMonth, approvedLeaveDates, monthDefaultProject, monthAssignmentWindow, weeklyHoursByDate);
+        return { month, displayId: 'Not yet saved', entries };
+      }),
+    );
+  };
+
   // Download a full year of this employee's monthly timesheets as one CSV —
-  // the existing PDF download is one-month-at-a-time only. Any month in the
-  // year that has no saved monthly timesheet yet is generated on the fly
-  // with the same auto-fill the live page uses (holidays, approved leave,
-  // weekly-hours-for-month, assignment project/window), so the export
-  // reflects all 12 months instead of silently only including whichever
-  // ones happen to already have a saved row.
+  // the existing PDF download is one-month-at-a-time only.
   const handleDownloadYear = async () => {
     if (!targetEmployeeId) return;
     setExportingYear(true);
     try {
       const year = Number(exportYear);
-      const [monthlyRes, holidaysRes] = await Promise.all([
-        apiClient.get('/monthly-timesheets', { params: { employeeId: targetEmployeeId, year, limit: 12 } }),
-        apiClient.get('/holidays', { params: { year } }),
-      ]);
-      const savedByMonth = new Map(((monthlyRes.data?.data ?? []) as MonthlyTimesheet[]).map(s => [s.month, s]));
-      const yearHolidays = (holidaysRes.data?.data ?? []) as { date: string }[];
-
-      const monthEntries = await Promise.all(
-        Array.from({ length: 12 }, (_, i) => i + 1).map(async (month) => {
-          const saved = savedByMonth.get(month);
-          if (saved && saved.entries.length > 0) return saved.entries;
-          const prefix = `${year}-${String(month).padStart(2, '0')}-`;
-          const holidayDatesInThisMonth = new Set(yearHolidays.filter(h => h.date.startsWith(prefix)).map(h => h.date));
-          const [leaveRes, weeklyRes] = await Promise.all([
-            apiClient.get('/monthly-timesheets/leave-check', { params: { year, month, employeeId: targetEmployeeId } }),
-            apiClient.get('/timesheets/weekly-hours-for-month', { params: { employeeId: targetEmployeeId, year, month } }),
-          ]);
-          const approvedLeaveDates = new Set(
-            Object.entries((leaveRes.data?.leaveDays ?? {}) as Record<string, { status: string }>)
-              .filter(([, v]) => v.status === 'approved')
-              .map(([d]) => d),
-          );
-          const weeklyHoursByDate = new Map<string, number>(
-            ((weeklyRes.data?.data ?? []) as { date: string; hours: number }[]).map(d => [d.date, d.hours]),
-          );
-          // Resolve the assignment PER MONTH being exported, not the one
-          // currently loaded in the main grid — a year's worth of months can
-          // each need a different assignment depending on which was actually
-          // active at that point in time.
-          const monthAssignment = getPrimaryAssignmentForMonth(year, month);
-          const monthDefaultProject = monthAssignment?.projectName || undefined;
-          const monthAssignmentWindow = monthAssignment ? { startDate: monthAssignment.startDate, endDate: monthAssignment.endDate } : undefined;
-          return buildMonthSkeleton(year, month, holidayDatesInThisMonth, approvedLeaveDates, monthDefaultProject, monthAssignmentWindow, weeklyHoursByDate);
-        }),
-      );
-
-      const rows = monthEntries
-        .flat()
+      const months = await assembleYearMonths(year);
+      const rows = months
+        .flatMap(m => m.entries)
         .map(e => ({
           Date: e.date,
           Day: e.dayOfWeek,
@@ -479,6 +487,57 @@ export default function MyMonthlyTimesheet() {
       toast.error('Could not export the year. Please try again.');
     } finally {
       setExportingYear(false);
+    }
+  };
+
+  // Download a full year as one combined PDF (one page per month), reusing
+  // the exact same assembled data as the CSV export — so the two can never
+  // show different numbers for the same year. Rendering happens server-side
+  // (generateYearlyTimesheetPDF); this just posts the already-assembled data.
+  const handleDownloadYearPdf = async () => {
+    if (!targetEmployeeId) return;
+    setExportingYearPdf(true);
+    try {
+      const year = Number(exportYear);
+      const months = await assembleYearMonths(year);
+      const monthsWithData = months.filter(m => m.entries.some(e => e.status !== 'weekend'));
+      if (monthsWithData.length === 0) {
+        toast.warning(`No timesheet entries found for ${employeeName || 'this employee'} in ${exportYear}.`);
+        return;
+      }
+      const payload = {
+        employeeName: employeeName || 'Employee',
+        employeeDisplayId: targetEmployee?.displayId ?? '',
+        jobTitle: targetEmployee?.jobTitle,
+        year,
+        months: monthsWithData.map(m => {
+          const s = computeMonthlySummary(m.entries);
+          return {
+            displayId: m.displayId,
+            monthLabel: monthLabel(year, m.month),
+            rows: m.entries.filter(e => e.status !== 'weekend').map(e => ({
+              date: e.date, day: e.dayOfWeek, project: e.project ?? '', task: e.task ?? '',
+              start: e.startTime ?? '', end: e.endTime ?? '', hours: e.hours, status: e.status,
+            })),
+            totalHours: s.totalHours, expectedHours: s.expectedHours,
+            balance: s.balance, workingDays: s.workingDays, leaveDays: s.leaveDays,
+          };
+        }),
+      };
+      const res = await apiClient.post('/monthly-timesheets/yearly-pdf', payload, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${targetEmployee?.displayId ?? targetEmployeeId}-${exportYear}-timesheet.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch {
+      toast.error('Could not export the year as PDF. Please try again.');
+    } finally {
+      setExportingYearPdf(false);
     }
   };
 
@@ -933,6 +992,15 @@ export default function MyMonthlyTimesheet() {
               >
                 {exportingYear ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
                 Download Year (CSV)
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDownloadYearPdf}
+                disabled={!targetEmployeeId || exportingYearPdf}
+                className="gap-1.5"
+              >
+                {exportingYearPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                Download Year (PDF)
               </Button>
               <Button variant="outline" onClick={() => setClearOpen(true)} disabled={isLocked || periodClosed} className="gap-1.5"><RotateCcw className="h-4 w-4" /> Clear Entries</Button>
               {!isLocked && !periodClosed && (

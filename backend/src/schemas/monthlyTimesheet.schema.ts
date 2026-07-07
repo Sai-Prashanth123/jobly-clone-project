@@ -49,7 +49,36 @@ export const listMonthlyTimesheetsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(1000).default(50),
 });
 
+// Yearly PDF export — the frontend already assembles accurate, complete data
+// for all 12 months (real saved entries where they exist, auto-filled from
+// holidays/leave/weekly-timesheet-hours/assignment otherwise, same as the
+// existing "Download Year (CSV)" export) and sends it here purely for PDF
+// rendering — no server-side re-computation, so the two exports can never
+// show different numbers for the same year.
+const yearlyPdfRowSchema = z.object({
+  date: z.string(), day: z.string(), project: z.string(), task: z.string(),
+  start: z.string(), end: z.string(), hours: z.number(), status: z.string(),
+});
+const yearlyPdfMonthSchema = z.object({
+  displayId: z.string(),
+  monthLabel: z.string(),
+  rows: z.array(yearlyPdfRowSchema).max(31),
+  totalHours: z.number(),
+  expectedHours: z.number(),
+  balance: z.number(),
+  workingDays: z.number(),
+  leaveDays: z.number(),
+});
+export const yearlyTimesheetPdfSchema = z.object({
+  employeeName: z.string(),
+  employeeDisplayId: z.string(),
+  jobTitle: z.string().optional(),
+  year: z.number().int().min(2000).max(2100),
+  months: z.array(yearlyPdfMonthSchema).min(1).max(12),
+});
+
 export type MonthlyTimesheetEntryInput = z.infer<typeof monthlyEntrySchema>;
+export type YearlyTimesheetPdfInput = z.infer<typeof yearlyTimesheetPdfSchema>;
 export type UpsertMonthlyTimesheetInput = z.infer<typeof upsertMonthlyTimesheetSchema>;
 export type UpdateMonthlyTimesheetInput = z.infer<typeof updateMonthlyTimesheetSchema>;
 export type PatchEntriesInput = z.infer<typeof patchEntriesSchema>;

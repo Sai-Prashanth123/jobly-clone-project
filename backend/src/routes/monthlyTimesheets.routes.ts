@@ -6,6 +6,7 @@ import { documentUpload } from '../middleware/upload';
 import {
   upsertMonthlyTimesheetSchema, updateMonthlyTimesheetSchema,
   patchMonthlyStatusSchema, listMonthlyTimesheetsQuerySchema, patchEntriesSchema,
+  yearlyTimesheetPdfSchema,
 } from '../schemas/monthlyTimesheet.schema';
 import * as ctrl from '../controllers/monthlyTimesheets.controller';
 
@@ -21,6 +22,9 @@ router.get('/leave-check', requireRole('admin', 'hr', 'employee'), ctrl.leaveChe
 // Active employees with no monthly timesheet for a given year/month (Attendance
 // Review "Not Submitted" list). Must stay ahead of `/:id` below.
 router.get('/not-submitted', requireRole('admin', 'hr'), ctrl.getNotSubmitted);
+// Combines a full year of already-assembled monthly data (same data the
+// "Download Year (CSV)" export uses) into one PDF. Must stay ahead of `/:id`.
+router.post('/yearly-pdf', requireRole('admin', 'hr', 'operations', 'employee'), validateBody(yearlyTimesheetPdfSchema), ctrl.getYearlyPdf);
 router.post('/', requireRole('admin', 'hr', 'employee'), validateBody(upsertMonthlyTimesheetSchema), ctrl.upsert);
 router.get('/:id', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getOne);
 router.get('/:id/pdf', requireRole('admin', 'hr', 'operations', 'employee'), ctrl.getPdf);
