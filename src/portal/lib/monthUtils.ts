@@ -51,6 +51,17 @@ export function computeHours(start: string, end: string): number {
   return diff > 0 ? Math.round((diff / 60) * 100) / 100 : 0;
 }
 
+/** Inverse of computeHours — a display-only end time so a known hours total
+ * (e.g. from a weekly timesheet, which has no real clock times) still shows
+ * something in the Start/End columns instead of leaving them blank. */
+export function addHoursToTime(start: string, hours: number): string {
+  const [sh, sm] = start.split(':').map(Number);
+  const totalMinutes = sh * 60 + sm + Math.round(hours * 60);
+  const h = Math.floor(totalMinutes / 60) % 24;
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 /**
  * Build one row per calendar day for the month. Weekends are auto-marked
  * 'weekend' and locked; weekdays default to 'present' 09:00–17:00, unless the
@@ -103,8 +114,11 @@ export function buildMonthSkeleton(
       dayOfWeek: DAYS_SHORT[dow],
       project: isBlank ? '' : (defaultProject ?? ''),
       task: '',
-      startTime: isBlank ? '' : (hasWeeklyHours ? '' : '09:00'),
-      endTime: isBlank ? '' : (hasWeeklyHours ? '' : '17:00'),
+      // Weekly timesheets only store a total-hours figure, no real clock
+      // times — derive a placeholder end time from the actual hours instead
+      // of leaving Start/End blank, which read as broken/not-loading.
+      startTime: isBlank ? '' : '09:00',
+      endTime: isBlank ? '' : (hasWeeklyHours ? addHoursToTime('09:00', weeklyHours!) : '17:00'),
       hours: isBlank ? 0 : (hasWeeklyHours ? weeklyHours! : computeHours('09:00', '17:00')),
       status,
     });
