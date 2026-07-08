@@ -308,13 +308,13 @@ function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimeshee
       // Draw a white badge behind it so the logo is visible against the navy bar.
       const logoH = 48;
       const logoW = Math.round(174 * (logoH / 80));
-      const pad = 6;
-      doc.roundedRect(40 - pad, 12 - pad, logoW + pad * 2, logoH + pad * 2, 4).fill('#ffffff');
+      const pad = 2;
+      doc.rect(40 - pad, 12 - pad, logoW + pad * 2, logoH + pad * 2).fill('#ffffff');
       doc.image(getJoblyLogoBuffer(), 40, 12, { height: logoH });
     } catch {
       doc.fillColor('#ffffff').fontSize(20).font('Helvetica-Bold').text('JOBLY SOLUTIONS', 40, 22);
     }
-    doc.fontSize(9).font('Helvetica').fillColor('rgba(255,255,255,0.7)').text('Monthly Timesheet', 40, 62);
+    doc.fontSize(9).font('Helvetica').fillColor('rgba(255,255,255,0.7)').text('Monthly Timesheet', 40, 66);
     doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
       .text(data.monthLabel, pageRight - 220, 26, { width: 220, align: 'right' });
 
