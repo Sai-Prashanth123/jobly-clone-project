@@ -5,7 +5,6 @@ export const createCycleSchema = z.object({
   description:        z.string().max(2000).optional().nullable(),
   reviewType:         z.enum(['annual','quarterly','project','probation']).default('annual'),
   selfAssessmentDue:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
-  peerFeedbackDue:    z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
   managerReviewDue:   z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().nullable(),
 });
 
@@ -31,20 +30,8 @@ export const managerReviewSchema = z.object({
   goals:        z.string().max(5000).optional().nullable(),
 });
 
-export const nominatePeersSchema = z.object({
-  peerEmployeeIds: z.array(z.string().uuid()).min(1).max(10),
-});
-
-export const submitPeerFeedbackSchema = z.object({
-  rating:       z.number().int().min(1).max(5).optional().nullable(),
-  strengths:    z.string().max(5000).optional().nullable(),
-  improvements: z.string().max(5000).optional().nullable(),
-});
-
 export type CreateCycleInput        = z.infer<typeof createCycleSchema>;
 export type UpdateCycleInput        = z.infer<typeof updateCycleSchema>;
 export type AddParticipantInput     = z.infer<typeof addParticipantSchema>;
 export type SelfAssessmentInput     = z.infer<typeof selfAssessmentSchema>;
 export type ManagerReviewInput      = z.infer<typeof managerReviewSchema>;
-export type NominatePeersInput      = z.infer<typeof nominatePeersSchema>;
-export type SubmitPeerFeedbackInput = z.infer<typeof submitPeerFeedbackSchema>;

@@ -7,8 +7,7 @@ import timesheetRoutes from './timesheets.routes';
 import monthlyTimesheetRoutes from './monthlyTimesheets.routes';
 import leaveRequestRoutes from './leaveRequests.routes';
 import invoiceRoutes from './invoices.routes';
-import productRoutes from './products.routes';
-import recurringRoutes from './recurring.routes';
+
 import publicRoutes from './public.routes';
 import reportRoutes from './reports.routes';
 import documentRoutes from './documents.routes';
@@ -44,8 +43,7 @@ router.use('/timesheets', timesheetRoutes);
 router.use('/monthly-timesheets', monthlyTimesheetRoutes);
 router.use('/leave-requests', leaveRequestRoutes);
 router.use('/invoices', invoiceRoutes);
-router.use('/products', productRoutes);
-router.use('/recurring-invoices', recurringRoutes);
+
 router.use('/public', publicRoutes);
 router.use('/reports', reportRoutes);
 router.use('/documents', documentRoutes);

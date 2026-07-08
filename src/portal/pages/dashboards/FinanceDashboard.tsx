@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { DollarSign, FileText, AlertTriangle, CheckCircle, TrendingUp, BarChart3, Inbox, RotateCw, FileCheck2, Clock, AlertCircle } from 'lucide-react';
+import { DollarSign, FileText, AlertTriangle, CheckCircle, TrendingUp, BarChart3, Inbox, FileCheck2, AlertCircle } from 'lucide-react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer,
@@ -15,7 +15,6 @@ import { formatCurrency, formatDate } from '../../lib/utils';
 import { useInvoices } from '../../hooks/useInvoices';
 import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
-import { useRecurringTemplates } from '../../hooks/useRecurring';
 import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -30,12 +29,9 @@ export function FinanceDashboard() {
   const { data: invData, isError, refetch } = useInvoices({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
   const { data: tsData } = useTimesheets({ limit: 200, status: 'client_approved' });
-  const { data: recurring } = useRecurringTemplates();
-
   const invoices = useMemo(() => invData?.data ?? [], [invData]);
   const clients = useMemo(() => clientData?.data ?? [], [clientData]);
   const readyToInvoice = tsData?.total ?? 0;
-  const recurringTemplates = useMemo(() => recurring ?? [], [recurring]);
 
   const pendingInvoices = invoices.filter(i => i.status === 'draft').length;
 
@@ -63,11 +59,6 @@ export function FinanceDashboard() {
   // Total collected = sum of recorded payments (amount_paid), so partial
   // payments count too — not just fully-paid invoices.
   const totalCollected = useMemo(() => invoices.reduce((s, i) => s + (i.amountPaid ?? 0), 0), [invoices]);
-
-  const upcomingRecurring = useMemo(() => [...recurringTemplates]
-    .filter(t => t.status === 'active')
-    .sort((a, b) => a.nextRunDate.localeCompare(b.nextRunDate))
-    .slice(0, 5), [recurringTemplates]);
 
   const months = useMemo(() => {
     const now = new Date();
@@ -146,7 +137,6 @@ export function FinanceDashboard() {
         actions={[
           { label: 'New Invoice',   to: '/portal/invoices/new',  icon: FileText, tone: 'green' },
           { label: 'New Estimate',  to: '/portal/estimates/new', icon: FileCheck2, tone: 'blue' },
-          { label: 'Recurring',     to: '/portal/recurring', icon: RotateCw, tone: 'cyan' },
           { label: 'Revenue Report', to: '/portal/reports',  icon: BarChart3, tone: 'orange' },
         ]}
       />
@@ -205,31 +195,6 @@ export function FinanceDashboard() {
             ))}
           </div>
       </Panel>
-
-      {upcomingRecurring.length > 0 && (
-        <Panel
-          eyebrow="Scheduled"
-          title="Upcoming recurring"
-          icon={<RotateCw className="text-[#4069FF]" />}
-          action={{ label: 'Manage', to: '/portal/recurring' }}
-          flush
-        >
-            <div>
-              {upcomingRecurring.map(t => (
-                <div key={t.id} className="portal-data-row text-sm">
-                  <div className="min-w-0">
-                    <p className="font-medium truncate text-[#0b1220]">{t.title || t.clientName || 'Recurring invoice'}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{t.frequency} · {t.clientName ?? ''}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs text-muted-foreground flex items-center gap-1 justify-end"><Clock className="h-3 w-3" /> {formatDate(t.nextRunDate)}</p>
-                    {t.autoSend && <p className="text-[10px] text-emerald-600">auto-send</p>}
-                  </div>
-                </div>
-              ))}
-            </div>
-        </Panel>
-      )}
 
       {/* Status legend — answers "what does Draft mean?" right on the dashboard. */}
       <div className="bg-blue-50/40 border border-blue-100 rounded-md px-3 py-2.5">

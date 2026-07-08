@@ -5,7 +5,7 @@ import { validateBody as validate } from '../middleware/validate';
 import * as ctrl from '../controllers/reviews.controller';
 import {
   createCycleSchema, updateCycleSchema, addParticipantSchema,
-  selfAssessmentSchema, managerReviewSchema, nominatePeersSchema, submitPeerFeedbackSchema,
+  selfAssessmentSchema, managerReviewSchema,
 } from '../schemas/reviews.schema';
 
 const router = Router();
@@ -13,10 +13,6 @@ router.use(authenticate);
 
 const HR_ADMIN = requireRole('admin', 'hr');
 const ALL      = requireRole('admin', 'hr', 'operations', 'finance', 'employee');
-
-// ── Peer feedback (must be before /:id to avoid Express matching 'peer-requests' as an id) ──
-router.get ('/peer-requests/mine',        ALL,      ctrl.getMyPeerRequests);
-router.post('/peer-requests/:requestId',  ALL,      validate(submitPeerFeedbackSchema), ctrl.submitPeerFeedback);
 
 // ── Cycles ────────────────────────────────────────────────────────────────────
 router.get ('/',                           ALL,      ctrl.listCycles);
@@ -40,8 +36,5 @@ router.get ('/:id/my-results',            ALL,      ctrl.getMyReviewResults);
 
 // ── Manager review ────────────────────────────────────────────────────────────
 router.post('/:id/manager-review',        HR_ADMIN, validate(managerReviewSchema), ctrl.submitManagerReview);
-
-// ── Peer feedback ─────────────────────────────────────────────────────────────
-router.post('/:id/nominate-peers',        ALL,      validate(nominatePeersSchema), ctrl.nominatePeers);
 
 export default router;

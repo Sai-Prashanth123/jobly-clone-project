@@ -1,21 +1,16 @@
 import { useState } from 'react';
-import { Star, CheckCircle2, Clock, Loader2, AlertCircle, Send, Users } from 'lucide-react';
+import { Star, CheckCircle2, Clock, Loader2, AlertCircle, Send } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog';
 import {
   useReviewCycles, useMyReview, useMyReviewResults,
-  useSubmitSelfAssessment, useNominatePeers,
+  useSubmitSelfAssessment,
   STATUS_LABELS, type ReviewCycle,
 } from '../hooks/useReviews';
-import { useEmployeeDirectory } from '../hooks/useEmployees';
-import { useAuth } from '../hooks/useAuth';
-
 function StarDisplay({ value, label }: { value: number | null | undefined; label: string }) {
   return (
     <div className="flex items-center gap-2">
@@ -84,21 +79,15 @@ function CycleCard({
               <StarDisplay value={results.overallRating} label="Overall Rating" />
               <StarDisplay value={results.selfRating ?? null} label="Self Rating" />
               <StarDisplay value={results.managerRating ?? null} label="Manager Rating" />
-              {results.peerFeedbackSummary && (
-                <StarDisplay value={results.peerFeedbackSummary.avgPeerRating} label={`Peer Rating (${results.peerFeedbackSummary.peerCount})`} />
-              )}
             </div>
           )}
         </div>
         <div className="flex flex-col gap-2">
-          {['active', 'peer_feedback'].includes(cycle.status) && !submitted && (
+          {['active'].includes(cycle.status) && !submitted && (
             <Button size="sm" onClick={() => onOpen(cycle)} className="gap-1"><Send className="h-3.5 w-3.5" /> Submit Self-Assessment</Button>
           )}
           {submitted && !released && (
             <Button size="sm" variant="outline" onClick={() => onOpen(cycle)}>Edit Self-Assessment</Button>
-          )}
-          {['active','peer_feedback'].includes(cycle.status) && (
-            <Button size="sm" variant="outline" onClick={() => onOpen(cycle)}>Nominate Peers</Button>
           )}
         </div>
       </div>
@@ -107,21 +96,16 @@ function CycleCard({
 }
 
 export default function MyReview() {
-  const { user } = useAuth();
   const { data: cycles = [], isLoading, isError, refetch } = useReviewCycles();
-  const { data: employees = [] } = useEmployeeDirectory();
   const submitSelf = useSubmitSelfAssessment();
-  const nominatePeers = useNominatePeers();
 
   const [activeCycle, setActiveCycle] = useState<ReviewCycle | null>(null);
   const { data: myReview } = useMyReview(activeCycle?.id);
   const [selfForm, setSelfForm] = useState({ strengths: '', improvements: '', goals: '', rating: null as number | null });
-  const [peerIds, setPeerIds] = useState<string[]>([]);
-  const [tab, setTab] = useState<'self' | 'peers'>('self');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const myCycles = cycles.filter(c => ['active','peer_feedback','manager_review','completed'].includes(c.status));
+  const myCycles = cycles.filter(c => ['active','manager_review','completed'].includes(c.status));
 
   const openCycle = (c: ReviewCycle) => {
     setActiveCycle(c);
@@ -135,8 +119,6 @@ export default function MyReview() {
     } else {
       setSelfForm({ strengths: '', improvements: '', goals: '', rating: null });
     }
-    setPeerIds([]);
-    setTab('self');
     setError('');
   };
 
@@ -149,22 +131,6 @@ export default function MyReview() {
     } catch (e: any) { setError(e?.response?.data?.error ?? e?.message ?? 'Failed'); }
     finally { setSaving(false); }
   };
-
-  const handleNominatePeers = async () => {
-    if (!activeCycle || peerIds.length === 0) return;
-    setSaving(true); setError('');
-    try {
-      await nominatePeers.mutateAsync({ cycleId: activeCycle.id, peerEmployeeIds: peerIds });
-      setActiveCycle(null);
-    } catch (e: any) { setError(e?.response?.data?.error ?? e?.message ?? 'Failed'); }
-    finally { setSaving(false); }
-  };
-
-  const togglePeer = (id: string) => {
-    setPeerIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
-  };
-
-  const activeEmployees = employees.filter(e => e.id !== user?.employeeId && e.id !== myReview?.managerId);
 
   return (
     <div className="max-w-3xl mx-auto px-4 py-6 space-y-6">
@@ -195,73 +161,37 @@ export default function MyReview() {
         </div>
       )}
 
-      {/* Self-assessment / Peer nomination dialog */}
+      {/* Self-assessment dialog */}
       <Dialog open={!!activeCycle} onOpenChange={v => { if (!v) setActiveCycle(null); }}>
         <DialogContent className="w-[95vw] max-w-xl" aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>{activeCycle?.name}</DialogTitle>
           </DialogHeader>
 
-          {/* Tabs */}
-          <div className="flex gap-2 border-b border-gray-200 mb-4">
-            {(['self', 'peers'] as const).map(t => (
-              <button key={t} onClick={() => setTab(t)}
-                className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${tab === t ? 'border-blue-600 text-blue-700' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                {t === 'self' ? 'Self-Assessment' : 'Nominate Peers'}
-              </button>
-            ))}
-          </div>
-
           {error && <p className="text-sm text-red-600 flex items-center gap-1 mb-3"><AlertCircle className="h-4 w-4" />{error}</p>}
 
-          {tab === 'self' && (
-            <div className="space-y-4">
-              <div className="space-y-1">
-                <Label>Self Rating</Label>
-                <StarInput value={selfForm.rating} onChange={v => setSelfForm(p => ({ ...p, rating: v }))} />
-              </div>
-              <div className="space-y-1">
-                <Label>Strengths</Label>
-                <Textarea value={selfForm.strengths} onChange={e => setSelfForm(p => ({ ...p, strengths: e.target.value }))} rows={3} placeholder="What have you done well this period?" />
-              </div>
-              <div className="space-y-1">
-                <Label>Areas for Improvement</Label>
-                <Textarea value={selfForm.improvements} onChange={e => setSelfForm(p => ({ ...p, improvements: e.target.value }))} rows={3} placeholder="Where can you grow?" />
-              </div>
-              <div className="space-y-1">
-                <Label>Goals for Next Period</Label>
-                <Textarea value={selfForm.goals} onChange={e => setSelfForm(p => ({ ...p, goals: e.target.value }))} rows={2} placeholder="What do you want to achieve?" />
-              </div>
+          <div className="space-y-4">
+            <div className="space-y-1">
+              <Label>Self Rating</Label>
+              <StarInput value={selfForm.rating} onChange={v => setSelfForm(p => ({ ...p, rating: v }))} />
             </div>
-          )}
-
-          {tab === 'peers' && (
-            <div className="space-y-3">
-              <p className="text-sm text-gray-500">Select colleagues to give you feedback (1–10 peers)</p>
-              <div className="max-h-64 overflow-y-auto space-y-2">
-                {activeEmployees.map(e => (
-                  <label key={e.id} className={`flex items-center gap-3 p-2.5 rounded-lg border cursor-pointer transition-colors ${peerIds.includes(e.id) ? 'border-blue-400 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'}`}>
-                    <input type="checkbox" checked={peerIds.includes(e.id)} onChange={() => togglePeer(e.id)} className="h-4 w-4 rounded border-gray-300" />
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{e.firstName} {e.lastName}</p>
-                      <p className="text-xs text-gray-400">{e.jobTitle} · {e.department}</p>
-                    </div>
-                  </label>
-                ))}
-              </div>
-              <p className="text-xs text-gray-400">{peerIds.length} selected</p>
+            <div className="space-y-1">
+              <Label>Strengths</Label>
+              <Textarea value={selfForm.strengths} onChange={e => setSelfForm(p => ({ ...p, strengths: e.target.value }))} rows={3} placeholder="What have you done well this period?" />
             </div>
-          )}
+            <div className="space-y-1">
+              <Label>Areas for Improvement</Label>
+              <Textarea value={selfForm.improvements} onChange={e => setSelfForm(p => ({ ...p, improvements: e.target.value }))} rows={3} placeholder="Where can you grow?" />
+            </div>
+            <div className="space-y-1">
+              <Label>Goals for Next Period</Label>
+              <Textarea value={selfForm.goals} onChange={e => setSelfForm(p => ({ ...p, goals: e.target.value }))} rows={2} placeholder="What do you want to achieve?" />
+            </div>
+          </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setActiveCycle(null)}>Cancel</Button>
-            {tab === 'self' ? (
-              <Button onClick={handleSubmitSelf} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Self-Assessment'}</Button>
-            ) : (
-              <Button onClick={handleNominatePeers} disabled={saving || peerIds.length === 0}>
-                {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : `Nominate ${peerIds.length} Peers`}
-              </Button>
-            )}
+            <Button onClick={handleSubmitSelf} disabled={saving}>{saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Submit Self-Assessment'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

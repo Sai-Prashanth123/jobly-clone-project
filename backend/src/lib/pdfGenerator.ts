@@ -304,9 +304,13 @@ function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimeshee
     // Header bar
     doc.rect(0, 0, doc.page.width, 72).fill(navy);
     try {
-      // Logo is a 174x80 PNG; height-constrain so it fits inside the 72px bar
-      // with breathing room, width auto-scales from the aspect ratio.
-      doc.image(getJoblyLogoBuffer(), 40, 12, { height: 48 });
+      // Logo is a 174x80 PNG with a transparent background and dark elements.
+      // Draw a white badge behind it so the logo is visible against the navy bar.
+      const logoH = 48;
+      const logoW = Math.round(174 * (logoH / 80));
+      const pad = 6;
+      doc.roundedRect(40 - pad, 12 - pad, logoW + pad * 2, logoH + pad * 2, 4).fill('#ffffff');
+      doc.image(getJoblyLogoBuffer(), 40, 12, { height: logoH });
     } catch {
       doc.fillColor('#ffffff').fontSize(20).font('Helvetica-Bold').text('JOBLY SOLUTIONS', 40, 22);
     }
@@ -452,7 +456,10 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 120, bottom: 120, left: 120, right: 120 },
       children: [
-        new Paragraph({ children: [new ImageRun({ type: 'png', data: getJoblyLogoBuffer(), transformation: { width: 130, height: 60 } })] }),
+        new Paragraph({
+          shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FFFFFF' },
+          children: [new ImageRun({ type: 'png', data: getJoblyLogoBuffer(), transformation: { width: 130, height: 60 } })],
+        }),
         new Paragraph({ children: [new TextRun({ text: 'Monthly Timesheet', color: 'FFFFFF', size: 16 })] }),
       ],
     });
@@ -463,7 +470,10 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
       verticalAlign: VerticalAlign.CENTER,
       margins: { top: 120, bottom: 120, left: 120, right: 120 },
       children: [
-        new Paragraph({ children: [new TextRun({ text: 'JOBLY SOLUTIONS', bold: true, color: 'FFFFFF', size: 32 })] }),
+        new Paragraph({
+          shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FFFFFF' },
+          children: [new TextRun({ text: 'JOBLY SOLUTIONS', bold: true, color: navy, size: 32 })],
+        }),
         new Paragraph({ children: [new TextRun({ text: 'Monthly Timesheet', color: 'FFFFFF', size: 16 })] }),
       ],
     });

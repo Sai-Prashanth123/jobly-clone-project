@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 
-export type CycleStatus = 'draft' | 'active' | 'peer_feedback' | 'manager_review' | 'completed';
+export type CycleStatus = 'draft' | 'active' | 'manager_review' | 'completed';
 export type ReviewType  = 'annual' | 'quarterly' | 'project' | 'probation';
 
 export interface ReviewCycle {
@@ -12,7 +12,6 @@ export interface ReviewCycle {
   reviewType: ReviewType;
   status: CycleStatus;
   selfAssessmentDue?: string | null;
-  peerFeedbackDue?: string | null;
   managerReviewDue?: string | null;
   resultsReleasedAt?: string | null;
   createdBy?: string | null;
@@ -45,34 +44,12 @@ export interface ReviewParticipant {
   releasedAt?: string | null;
 }
 
-export interface PeerRequest {
-  id: string;
-  cycleId: string;
-  status: 'pending' | 'submitted';
-  rating?: number | null;
-  strengths?: string | null;
-  improvements?: string | null;
-  submittedAt?: string | null;
-  revieweeName?: string;
-  revieweeTitle?: string;
-  cycleName?: string;
-  cycleStatus?: CycleStatus;
-  cyclePeerDue?: string | null;
-}
-
 export interface ReviewResults extends ReviewParticipant {
-  peerFeedbackSummary: {
-    peerCount: number;
-    avgPeerRating: number | null;
-    aggregatedStrengths: string[];
-    aggregatedImprovements: string[];
-  };
 }
 
 const STATUS_LABELS: Record<CycleStatus, string> = {
   draft:          'Draft',
   active:         'Active',
-  peer_feedback:  'Peer Feedback',
   manager_review: 'Manager Review',
   completed:      'Completed',
 };
@@ -95,7 +72,6 @@ function mapCycle(r: any): ReviewCycle {
     reviewType:       r.review_type as ReviewType,
     status:           r.status as CycleStatus,
     selfAssessmentDue: r.self_assessment_due ?? null,
-    peerFeedbackDue:  r.peer_feedback_due ?? null,
     managerReviewDue: r.manager_review_due ?? null,
     resultsReleasedAt: r.results_released_at ?? null,
     createdBy:        r.created_by ?? null,
@@ -133,25 +109,6 @@ function mapParticipant(r: any): ReviewParticipant {
   };
 }
 
-function mapPeerRequest(r: any): PeerRequest {
-  const rv = r.reviewee ?? {};
-  const cy = r.cycle ?? {};
-  return {
-    id:           r.id,
-    cycleId:      r.cycle_id,
-    status:       r.status,
-    rating:       r.rating ?? null,
-    strengths:    r.strengths ?? null,
-    improvements: r.improvements ?? null,
-    submittedAt:  r.submitted_at ?? null,
-    revieweeName: rv.first_name ? `${rv.first_name} ${rv.last_name}`.trim() : undefined,
-    revieweeTitle: rv.job_title ?? undefined,
-    cycleName:    cy.name ?? undefined,
-    cycleStatus:  cy.status ?? undefined,
-    cyclePeerDue: cy.peer_feedback_due ?? null,
-  };
-}
-
 // ── Cycle hooks ───────────────────────────────────────────────────────────────
 
 export function useReviewCycles() {
@@ -183,7 +140,7 @@ export function useCreateCycle() {
       const { data } = await apiClient.post('/reviews', {
         name: input.name, description: input.description,
         reviewType: input.reviewType, selfAssessmentDue: input.selfAssessmentDue,
-        peerFeedbackDue: input.peerFeedbackDue, managerReviewDue: input.managerReviewDue,
+        managerReviewDue: input.managerReviewDue,
       });
       return mapCycle(data.data);
     },
@@ -198,7 +155,7 @@ export function useUpdateCycle() {
       const { data } = await apiClient.put(`/reviews/${id}`, {
         name: input.name, description: input.description,
         reviewType: input.reviewType, selfAssessmentDue: input.selfAssessmentDue,
-        peerFeedbackDue: input.peerFeedbackDue, managerReviewDue: input.managerReviewDue,
+        managerReviewDue: input.managerReviewDue,
       });
       return mapCycle(data.data);
     },
@@ -217,7 +174,7 @@ export function useActivateCycle() {
 export function useAdvanceCycle() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, toStatus }: { id: string; toStatus: 'peer_feedback' | 'manager_review' }) => {
+    mutationFn: async ({ id, toStatus }: { id: string; toStatus: 'manager_review' }) => {
       const { data } = await apiClient.post(`/reviews/${id}/advance`, { toStatus });
       return mapCycle(data.data);
     },
@@ -327,35 +284,4 @@ export function useSubmitManagerReview() {
   });
 }
 
-// ── Peer feedback hooks ───────────────────────────────────────────────────────
 
-export function useNominatePeers() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ cycleId, peerEmployeeIds }: { cycleId: string; peerEmployeeIds: string[] }) => {
-      await apiClient.post(`/reviews/${cycleId}/nominate-peers`, { peerEmployeeIds });
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['peer-requests'] }),
-  });
-}
-
-export function useMyPeerRequests() {
-  return useQuery({
-    queryKey: ['peer-requests'],
-    queryFn: async () => {
-      const { data } = await apiClient.get('/reviews/peer-requests/mine');
-      return (data.data as any[]).map(mapPeerRequest);
-    },
-    staleTime: 30_000,
-  });
-}
-
-export function useSubmitPeerFeedback() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ requestId, ...input }: { requestId: string; rating?: number; strengths?: string; improvements?: string }) => {
-      await apiClient.post(`/reviews/peer-requests/${requestId}`, input);
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['peer-requests'] }),
-  });
-}

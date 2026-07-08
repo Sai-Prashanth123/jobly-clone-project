@@ -14,11 +14,11 @@ import {
 import {
   LayoutDashboard, Users, Building2, ClipboardList,
   Clock, FileText, BarChart3, LogOut, Bell, UserCircle, Settings, FolderOpen, Search, UserPlus,
-  CalendarCheck, CalendarClock, CalendarDays, KeyRound, Package, RotateCw, Mail,
+  CalendarCheck, CalendarClock, CalendarDays, KeyRound, Package, Mail,
   Megaphone, Users2, Receipt,
   Star,
   Shield, Gift, Calendar, DollarSign, TrendingUp, FileWarning,
-  Award, UserCheck, MessageSquare, FileSpreadsheet, Gauge,
+  Award, UserCheck, FileSpreadsheet, Gauge,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -54,8 +54,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Expenses',            path: '/portal/expenses',            icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'], badgeKey: 'expenses' },
   { label: 'Reviews',             path: '/portal/reviews',             icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'] },
   { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
-  { label: 'Recurring',           path: '/portal/recurring',           icon: <RotateCw className="h-4 w-4" />,        roles: ['admin','finance'] },
-  { label: 'Products',            path: '/portal/products',            icon: <Package className="h-4 w-4" />,         roles: ['admin','finance'] },
+
   { label: 'Templates',           path: '/portal/templates',           icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'] },
   { label: 'Documents',           path: '/portal/documents',           icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'] },
   { label: 'Reports',             path: '/portal/reports',             icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','hr'] },
@@ -80,7 +79,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Skills Registry',     path: '/portal/skills',              icon: <Award className="h-4 w-4" />,           roles: ['admin','hr'] },
   { label: 'Shift Schedule',      path: '/portal/shifts',              icon: <Calendar className="h-4 w-4" />,        roles: ['admin','hr','operations'] },
   { label: 'Probation Tracker',   path: '/portal/probation',           icon: <UserCheck className="h-4 w-4" />,       roles: ['admin','hr'] },
-  { label: 'Peer Feedback',       path: '/portal/peer-feedback',       icon: <MessageSquare className="h-4 w-4" />,   roles: ['admin','hr','operations','finance','employee'] },
+
   { label: 'Capacity Report',     path: '/portal/capacity',            icon: <Gauge className="h-4 w-4" />,           roles: ['admin','hr','operations'] },
   { label: 'Estimates',           path: '/portal/estimates',           icon: <FileSpreadsheet className="h-4 w-4" />, roles: ['admin','finance'] },
 ];

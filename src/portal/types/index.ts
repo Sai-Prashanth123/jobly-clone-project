@@ -26,17 +26,6 @@ export interface LeaveRequest {
 export type InvoiceStatus = 'draft' | 'sent' | 'viewed' | 'partially_paid' | 'paid' | 'overdue';
 export type EstimateStatus = 'draft' | 'sent' | 'viewed' | 'accepted' | 'declined' | 'converted';
 
-export interface Product {
-  id: string;
-  name: string;
-  description?: string;
-  unitPrice: number;
-  unit: 'hour' | 'item' | 'day' | 'fixed';
-  active: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Payment {
   id: string;
   invoiceId: string;
@@ -417,7 +406,6 @@ export interface InvoiceLineItem {
   description: string;
   employeeId?: string;
   timesheetId?: string;
-  productId?: string;
   quantity?: number;
   hours: number;
   billRate: number;

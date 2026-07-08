@@ -2,7 +2,6 @@ import cron from 'node-cron';
 import { supabaseAdmin } from '../config/supabase';
 import { todayUTC, daysBetween } from '../lib/dateUtils';
 import { sendInvoiceReminderEmail, mailerConfigured } from '../lib/mailer';
-import { processDueRecurring } from '../services/recurring.service';
 import { reactivateReturnedEmployees } from '../services/employees.service';
 import {
   triggerTimesheetReminders,
@@ -77,8 +76,7 @@ async function processReminders(): Promise<void> {
 }
 
 // One daily tick. Exported so it can also be triggered manually (admin "Run now").
-export async function runDailyTick(): Promise<{ recurring: number; reactivated: number }> {
-  const recurring = await processDueRecurring();
+export async function runDailyTick(): Promise<{ reactivated: number }> {
   await processReminders();
   // Auto-reactivate employees whose extended-leave return date has arrived.
   const reactivated = await reactivateReturnedEmployees();
@@ -103,7 +101,7 @@ export async function runDailyTick(): Promise<{ recurring: number; reactivated: 
     console.error('[scheduler] triggerDocumentExpiryAlerts failed', err);
   }
 
-  return { recurring, reactivated };
+  return { reactivated };
 }
 
 // Boot the cron scheduler. Guarded by ENABLE_SCHEDULER so local dev / tests

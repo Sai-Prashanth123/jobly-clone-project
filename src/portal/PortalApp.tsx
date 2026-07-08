@@ -28,14 +28,10 @@ const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
 const TimesheetDetail = lazy(() => import('./pages/TimesheetDetail'));
 const InvoiceDetail = lazy(() => import('./pages/InvoiceDetail'));
 const Reports = lazy(() => import('./pages/Reports'));
-const Products = lazy(() => import('./pages/Products'));
 const Estimates = lazy(() => import('./pages/Estimates'));
-const Recurring = lazy(() => import('./pages/Recurring'));
 const PublicInvoiceView = lazy(() => import('./pages/PublicInvoiceView'));
 // Full-page finance editors (replace the old popup dialogs)
 const InvoiceEditor = lazy(() => import('./pages/InvoiceEditor'));
-const RecurringEditor = lazy(() => import('./pages/RecurringEditor'));
-const ProductEditor = lazy(() => import('./pages/ProductEditor'));
 const RecordPayment = lazy(() => import('./pages/RecordPayment'));
 const AdminSettings = lazy(() => import('./pages/AdminSettings'));
 const Documents = lazy(() => import('./pages/Documents'));
@@ -99,7 +95,6 @@ const Assets = lazy(() => import('./pages/Assets'));
 const SkillsRegistry = lazy(() => import('./pages/SkillsRegistry'));
 const ShiftSchedule = lazy(() => import('./pages/ShiftSchedule'));
 const ProbationTracker = lazy(() => import('./pages/ProbationTracker'));
-const PeerFeedback = lazy(() => import('./pages/PeerFeedback'));
 const CapacityReport = lazy(() => import('./pages/CapacityReport'));
 
 function RouteFallback() {
@@ -220,14 +215,6 @@ export default function PortalApp() {
             />
 
             <Route
-              path="products"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'finance']}>
-                  <Products />
-                </ProtectedRoute>
-              }
-            />
-            <Route
               path="templates"
               element={
                 <ProtectedRoute allowedRoles={['admin', 'finance']}>
@@ -235,20 +222,7 @@ export default function PortalApp() {
                 </ProtectedRoute>
               }
             />
-            <Route
-              path="recurring"
-              element={
-                <ProtectedRoute allowedRoles={['admin', 'finance']}>
-                  <Recurring />
-                </ProtectedRoute>
-              }
-            />
-
             {/* ── Full-page finance editors (replace popup dialogs) ── */}
-            <Route path="products/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><ProductEditor /></ProtectedRoute>} />
-            <Route path="products/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><ProductEditor /></ProtectedRoute>} />
-            <Route path="recurring/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecurringEditor /></ProtectedRoute>} />
-            <Route path="recurring/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecurringEditor /></ProtectedRoute>} />
             <Route path="invoices/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><InvoiceEditor /></ProtectedRoute>} />
             <Route path="invoices/:id/edit" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><InvoiceEditor /></ProtectedRoute>} />
             <Route path="invoices/:id/payments/new" element={<ProtectedRoute allowedRoles={['admin', 'finance']}><RecordPayment /></ProtectedRoute>} />
@@ -458,7 +432,6 @@ export default function PortalApp() {
             <Route path="skills" element={<ProtectedRoute allowedRoles={['admin','hr']}><SkillsRegistry /></ProtectedRoute>} />
             <Route path="shifts" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><ShiftSchedule /></ProtectedRoute>} />
             <Route path="probation" element={<ProtectedRoute allowedRoles={['admin','hr']}><ProbationTracker /></ProtectedRoute>} />
-            <Route path="peer-feedback" element={<ProtectedRoute allowedRoles={['admin','hr','operations','finance','employee']}><PeerFeedback /></ProtectedRoute>} />
             <Route path="capacity" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><CapacityReport /></ProtectedRoute>} />
             <Route path="estimates" element={<ProtectedRoute allowedRoles={['admin','finance']}><Estimates /></ProtectedRoute>} />
             <Route path="estimates/new" element={<ProtectedRoute allowedRoles={['admin','finance']}><InvoiceEditor /></ProtectedRoute>} />

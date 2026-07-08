@@ -33,7 +33,6 @@ import { UsDateInput } from '../components/shared/UsDateInput';
 const STATUS_COLORS: Record<CycleStatus, string> = {
   draft:          'bg-gray-100 text-gray-600',
   active:         'bg-blue-100 text-blue-700',
-  peer_feedback:  'bg-violet-100 text-violet-700',
   manager_review: 'bg-amber-100 text-amber-700',
   completed:      'bg-green-100 text-green-700',
 };
@@ -60,7 +59,7 @@ function StarRating({ value }: { value: number | null | undefined }) {
 
 interface CycleFormData {
   name: string; description: string; reviewType: ReviewType;
-  selfAssessmentDue: string; peerFeedbackDue: string; managerReviewDue: string;
+  selfAssessmentDue: string; managerReviewDue: string;
 }
 
 interface CycleFormProps {
@@ -90,14 +89,10 @@ function CycleForm({ form, setForm, error }: CycleFormProps) {
           </SelectContent>
         </Select>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label>Self-Assessment Due</Label>
           <UsDateInput value={form.selfAssessmentDue} onChange={iso => setForm(p => ({ ...p, selfAssessmentDue: iso }))} />
-        </div>
-        <div className="space-y-1">
-          <Label>Peer Feedback Due</Label>
-          <UsDateInput value={form.peerFeedbackDue} onChange={iso => setForm(p => ({ ...p, peerFeedbackDue: iso }))} />
         </div>
         <div className="space-y-1">
           <Label>Manager Review Due</Label>
@@ -110,7 +105,7 @@ function CycleForm({ form, setForm, error }: CycleFormProps) {
 
 const EMPTY_FORM: CycleFormData = {
   name: '', description: '', reviewType: 'annual',
-  selfAssessmentDue: '', peerFeedbackDue: '', managerReviewDue: '',
+  selfAssessmentDue: '', managerReviewDue: '',
 };
 
 export default function Reviews() {
@@ -151,7 +146,6 @@ export default function Reviews() {
       name: c.name, description: c.description ?? '',
       reviewType: c.reviewType,
       selfAssessmentDue: c.selfAssessmentDue ?? '',
-      peerFeedbackDue: c.peerFeedbackDue ?? '',
       managerReviewDue: c.managerReviewDue ?? '',
     });
     setError('');
@@ -177,7 +171,7 @@ export default function Reviews() {
     try { await activateCycle.mutateAsync(id); } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed to activate'); }
   };
 
-  const handleAdvance = async (id: string, toStatus: 'peer_feedback' | 'manager_review') => {
+  const handleAdvance = async (id: string, toStatus: 'manager_review') => {
     try { await advanceCycle.mutateAsync({ id, toStatus }); } catch (e: any) { toast.error(e?.response?.data?.error ?? 'Failed'); }
   };
 
@@ -272,7 +266,6 @@ export default function Reviews() {
                   {cycle.description && <p className="text-sm text-gray-500 mt-1 line-clamp-1">{cycle.description}</p>}
                   <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-400">
                     {cycle.selfAssessmentDue && <span>Self-assessment: {format(parseISO(cycle.selfAssessmentDue), 'MMM d, yyyy')}</span>}
-                    {cycle.peerFeedbackDue && <span>Peer feedback: {format(parseISO(cycle.peerFeedbackDue), 'MMM d, yyyy')}</span>}
                     {cycle.managerReviewDue && <span>Manager review: {format(parseISO(cycle.managerReviewDue), 'MMM d, yyyy')}</span>}
                   </div>
                 </div>
@@ -285,11 +278,6 @@ export default function Reviews() {
                     </>
                   )}
                   {cycle.status === 'active' && (
-                    <Button size="sm" variant="outline" onClick={() => handleAdvance(cycle.id, 'peer_feedback')} disabled={advanceCycle.isPending} className="gap-1">
-                      <RefreshCw className="h-3 w-3" /> → Peer Feedback
-                    </Button>
-                  )}
-                  {cycle.status === 'peer_feedback' && (
                     <Button size="sm" variant="outline" onClick={() => handleAdvance(cycle.id, 'manager_review')} disabled={advanceCycle.isPending} className="gap-1">
                       <RefreshCw className="h-3 w-3" /> → Manager Review
                     </Button>
@@ -345,7 +333,7 @@ export default function Reviews() {
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {['active','peer_feedback','manager_review'].includes(cycle.status) && (
+                            {['active','manager_review'].includes(cycle.status) && (
                               <Button size="sm" variant="outline" className="text-xs" onClick={() => {
                                 setMgrReviewOpen(p.employeeId);
                                 setMgrForm({

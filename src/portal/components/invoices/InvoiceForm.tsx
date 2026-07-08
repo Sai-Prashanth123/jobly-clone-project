@@ -15,7 +15,6 @@ import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useAssignments } from '../../hooks/useAssignments';
-import { useProducts } from '../../hooks/useProducts';
 import { useUploadInvoiceAttachment, useDeleteInvoiceAttachment, type CreateInvoiceBody } from '../../hooks/useInvoices';
 import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates';
 import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
@@ -41,7 +40,7 @@ export interface InvoiceFormInitial {
   notes?: string;
   terms?: string;
   attachments?: InvoiceAttachment[];
-  lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number; productId?: string }[];
+  lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number }[];
 }
 
 export interface InvoiceFormHandle {
@@ -88,8 +87,8 @@ function addDays(dateIso: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-interface DraftLine { id: string; itemName: string; description: string; quantity: string; unitPrice: string; productId?: string }
-const blankLine = (): DraftLine => ({ id: crypto.randomUUID(), itemName: '', description: '', quantity: '1', unitPrice: '', productId: undefined });
+interface DraftLine { id: string; itemName: string; description: string; quantity: string; unitPrice: string }
+const blankLine = (): DraftLine => ({ id: crypto.randomUUID(), itemName: '', description: '', quantity: '1', unitPrice: '' });
 const linesFromInitial = (initial?: InvoiceFormInitial): DraftLine[] => {
   if (!initial?.lineItems?.length) return [blankLine()];
   return initial.lineItems.map(li => ({
@@ -98,7 +97,6 @@ const linesFromInitial = (initial?: InvoiceFormInitial): DraftLine[] => {
     description: li.description ?? '',
     quantity: String(li.quantity ?? 1),
     unitPrice: li.unitPrice != null ? String(li.unitPrice) : '',
-    productId: li.productId,
   }));
 };
 
@@ -134,7 +132,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const [terms, setTerms] = useState(initial?.terms ?? '');
   const [footerOpen, setFooterOpen] = useState(!!initial?.terms);
   const [lines, setLines] = useState<DraftLine[]>(() => linesFromInitial(initial));
-  const [catalogPick, setCatalogPick] = useState('');
 
   // ── Discount (Wave "Add a discount") — manual mode only ──
   const [discountMode, setDiscountMode] = useState<'none' | 'percentage' | 'fixed'>(initial?.discountType ?? 'none');
@@ -154,10 +151,9 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   // The timesheet picker (and its employee/assignment lookups) only exists in
   // create-mode's "From approved timesheets" tab. Edit mode is manual-only, so
   // gate those 3 heavy queries off there — they were the main cause of the slow
-  // Edit open. Clients + products are still needed in both modes.
+  // Edit open. Clients are still needed in both modes.
   const needsTimesheetData = !isEdit && mode === 'timesheets';
   const { data: clientData } = useClients({ limit: 200 });
-  const { data: productData } = useProducts({ active: true });
   const { data: tsData } = useTimesheets({
     limit: 200, status: 'client_approved', clientId: clientId || undefined, excludeInvoiced: true,
   }, { enabled: needsTimesheetData });
@@ -166,7 +162,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
 
   const { data: invoiceThemes } = useInvoiceTemplates();
   const clients = clientData?.data ?? [];
-  const products = productData?.data ?? [];
   const clientTimesheets = tsData?.data ?? [];
   const employees = empData?.data ?? [];
   const assignments = assignData?.data ?? [];
@@ -215,15 +210,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     setLines(prev => prev.map(l => (l.id === id ? { ...l, ...patch } : l)));
   const addLine = () => setLines(prev => [...prev, blankLine()]);
   const removeLine = (id: string) => setLines(prev => (prev.length > 1 ? prev.filter(l => l.id !== id) : prev));
-  const addFromCatalog = (productId: string) => {
-    const p = products.find(x => x.id === productId);
-    if (!p) return;
-    setLines(prev => [
-      ...prev.filter(l => l.itemName || l.unitPrice || l.description),
-      { id: crypto.randomUUID(), itemName: p.name, description: p.description ?? '', quantity: '1', unitPrice: String(p.unitPrice), productId: p.id },
-    ]);
-    setCatalogPick('');
-  };
 
   // ── Attachment handling ──
   const validateFile = (file: File): string | null => {
@@ -296,7 +282,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
         description: l.description || null,
         quantity: l.qty,
         unitPrice: l.price,
-        productId: l.productId ?? null,
       })),
     });
   };
@@ -417,19 +402,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
 
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between gap-2 flex-wrap">
-                <CardTitle className="text-base">Items</CardTitle>
-                {products.length > 0 && (
-                  <div className="w-56">
-                    <Select value={catalogPick} onValueChange={addFromCatalog}>
-                      <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="+ Add from catalog" /></SelectTrigger>
-                      <SelectContent>
-                        {products.map(p => <SelectItem key={p.id} value={p.id}>{p.name} — {formatCurrency(p.unitPrice)}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
-              </div>
+              <CardTitle className="text-base">Items</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="hidden sm:grid grid-cols-[1.4fr_2fr_70px_110px_90px_32px] gap-2 text-[11px] font-medium text-gray-400 uppercase tracking-wide px-1">

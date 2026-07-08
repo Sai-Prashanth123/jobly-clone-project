@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/reviews.service';
 import type {
   CreateCycleInput, UpdateCycleInput, AddParticipantInput,
-  SelfAssessmentInput, ManagerReviewInput, NominatePeersInput, SubmitPeerFeedbackInput,
+  SelfAssessmentInput, ManagerReviewInput,
 } from '../schemas/reviews.schema';
 
 function ok(res: Response, data: unknown, total?: number) {
@@ -32,7 +32,7 @@ export async function activateCycle(req: Request, res: Response, next: NextFunct
 
 export async function advanceCycle(req: Request, res: Response, next: NextFunction) {
   try {
-    const toStatus = req.body.toStatus as 'peer_feedback' | 'manager_review';
+    const toStatus = req.body.toStatus as 'manager_review';
     ok(res, await svc.advanceCycleStatus(req.params.id, toStatus, req.user!.id));
   } catch (e) { next(e); }
 }
@@ -75,32 +75,6 @@ export async function getMyParticipant(req: Request, res: Response, next: NextFu
 
 export async function submitManagerReview(req: Request, res: Response, next: NextFunction) {
   try { ok(res, await svc.submitManagerReview(req.params.id, req.body as ManagerReviewInput, req.user!.id)); } catch (e) { next(e); }
-}
-
-export async function nominatePeers(req: Request, res: Response, next: NextFunction) {
-  try {
-    const empId = req.user!.employeeId;
-    if (!empId) { res.status(403).json({ success: false, error: 'No employee record' }); return; }
-    await svc.nominatePeers(req.params.id, req.body as NominatePeersInput, empId, req.user!.id);
-    res.json({ success: true });
-  } catch (e) { next(e); }
-}
-
-export async function getMyPeerRequests(req: Request, res: Response, next: NextFunction) {
-  try {
-    const empId = req.user!.employeeId;
-    if (!empId) { res.json({ success: true, data: [] }); return; }
-    ok(res, await svc.getMyPeerRequests(empId));
-  } catch (e) { next(e); }
-}
-
-export async function submitPeerFeedback(req: Request, res: Response, next: NextFunction) {
-  try {
-    const empId = req.user!.employeeId;
-    if (!empId) { res.status(403).json({ success: false, error: 'No employee record' }); return; }
-    await svc.submitPeerFeedback(req.params.requestId, req.body as SubmitPeerFeedbackInput, empId, req.user!.id);
-    res.json({ success: true });
-  } catch (e) { next(e); }
 }
 
 export async function getMyReviewResults(req: Request, res: Response, next: NextFunction) {
