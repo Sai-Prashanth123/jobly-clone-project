@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, CalendarDays, RefreshCw, AlertCircle } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarDays, RefreshCw, AlertCircle, List, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '../components/shared/PageHeader';
+import { HolidayCalendarGrid } from '../components/shared/HolidayCalendarGrid';
 import { useHolidays } from '../hooks/useHolidays';
 
 const MONTH_NAMES = [
@@ -25,8 +26,16 @@ function getDayName(dateStr: string): string {
 
 export default function CompanyHolidays() {
   const currentYear = new Date().getFullYear();
+  const currentMonthNum = new Date().getUTCMonth() + 1;
   const [year, setYear] = useState(currentYear);
+  const [month, setMonth] = useState(currentMonthNum);
+  const [view, setView] = useState<'calendar' | 'list'>('calendar');
   const { data: holidays = [], isLoading, isError, refetch } = useHolidays(year);
+
+  const handleMonthChange = (y: number, m: number) => {
+    setMonth(m);
+    if (y !== year) setYear(y);
+  };
 
   // Group by month
   const byMonth: Record<number, typeof holidays> = {};
@@ -50,6 +59,24 @@ export default function CompanyHolidays() {
         }
         action={
           <div className="flex items-center gap-2">
+            <div className="flex items-center rounded-md border border-gray-200 p-0.5">
+              <Button
+                variant={view === 'calendar' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-2 gap-1"
+                onClick={() => setView('calendar')}
+              >
+                <CalendarIcon className="h-3.5 w-3.5" /> Calendar
+              </Button>
+              <Button
+                variant={view === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                className="h-7 px-2 gap-1"
+                onClick={() => setView('list')}
+              >
+                <List className="h-3.5 w-3.5" /> List
+              </Button>
+            </div>
             <Button variant="outline" size="sm" onClick={() => setYear(y => y - 1)}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -57,7 +84,7 @@ export default function CompanyHolidays() {
             <Button variant="outline" size="sm" onClick={() => setYear(y => y + 1)}>
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => { setYear(currentYear); refetch(); }}>
+            <Button variant="ghost" size="sm" onClick={() => { setYear(currentYear); setMonth(currentMonthNum); refetch(); }}>
               <RefreshCw className="h-4 w-4" />
             </Button>
           </div>
@@ -72,11 +99,13 @@ export default function CompanyHolidays() {
         </div>
       ) : isLoading ? (
         <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">Loading holidays…</div>
-      ) : holidays.length === 0 ? (
+      ) : holidays.length === 0 && view === 'list' ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-400 gap-3">
           <CalendarDays className="h-10 w-10 text-gray-300" />
           <p className="text-sm">No holidays have been added for {year} yet.</p>
         </div>
+      ) : view === 'calendar' ? (
+        <HolidayCalendarGrid year={year} month={month} onMonthChange={handleMonthChange} holidays={holidays} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {MONTH_NAMES.map((monthName, idx) => {

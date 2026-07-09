@@ -5,7 +5,13 @@ import { logActivity } from '../lib/activityLogger';
 // A recurring holiday (is_recurring=true) is stored under the year it was
 // first added, but should be recognized every year — remap its month-day
 // onto whichever year is being queried rather than requiring it to be
-// re-added annually. Non-recurring holidays are matched by exact date only.
+// re-added annually. This only produces a correct date for FIXED-date
+// holidays (e.g. Jan 1, Jul 4, Dec 25) — floating holidays ("3rd Monday of
+// January") fall on a different day each year and must NOT be marked
+// recurring; add a fresh dated entry for each year instead. If a
+// non-recurring entry with the same name already exists for the queried
+// year, it overrides the remap (lets a specific year's manual entry win,
+// e.g. an observed-day shift or a corrected floating-holiday date).
 export async function listHolidays(year?: number) {
   if (!year) {
     const { data, error } = await supabaseAdmin.from('company_holidays').select('*').order('date', { ascending: true });
@@ -22,13 +28,21 @@ export async function listHolidays(year?: number) {
   if (nonRecurring.error) throw nonRecurring.error;
   if (recurring.error) throw recurring.error;
 
+  const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
   const remapped = (recurring.data ?? [])
     .map(row => {
       const monthDay = row.date.slice(5); // 'MM-DD'
       if (monthDay === '02-29' && !isLeapYear(year)) return null; // no Feb 29 this year
       return { ...row, date: `${year}-${monthDay}` };
     })
-    .filter((row): row is NonNullable<typeof row> => row !== null);
+    .filter((row): row is NonNullable<typeof row> => row !== null)
+    // A manually-entered holiday already covers this exact year under the same
+    // name — it overrides the remap (e.g. a fixed-date holiday observed on a
+    // different weekday because its calendar date landed on a weekend, or a
+    // floating holiday whose "Nth weekday of month" date isn't the same as
+    // last year's and was corrected by hand for this year).
+    .filter(row => !(nonRecurring.data ?? []).some(nr => sameName(nr.name, row.name)));
 
   return [...(nonRecurring.data ?? []), ...remapped].sort((a, b) => a.date.localeCompare(b.date));
 }

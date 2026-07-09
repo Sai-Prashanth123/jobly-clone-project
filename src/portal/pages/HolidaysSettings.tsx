@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Calendar, Plus, Trash2, Edit2, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Calendar, Plus, Trash2, Edit2, Loader2, AlertCircle, ChevronLeft, ChevronRight, List, Calendar as CalendarIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { UsDateInput } from '../components/shared/UsDateInput';
+import { HolidayCalendarGrid } from '../components/shared/HolidayCalendarGrid';
 import { useHolidays, useCreateHoliday, useUpdateHoliday, useDeleteHoliday, type Holiday } from '../hooks/useHolidays';
 import { format } from 'date-fns';
 
@@ -13,7 +14,10 @@ const EMPTY: Omit<Holiday,'id'> = { name: '', date: '', isRecurring: false, coun
 
 export default function HolidaysSettings() {
   const currentYear = new Date().getFullYear();
+  const currentMonthNum = new Date().getUTCMonth() + 1;
   const [year, setYear] = useState(currentYear);
+  const [month, setMonth] = useState(currentMonthNum);
+  const [view, setView] = useState<'calendar' | 'list'>('calendar');
   const { data: holidays = [], isLoading, isError, refetch } = useHolidays(year);
   const create = useCreateHoliday();
   const update = useUpdateHoliday();
@@ -25,11 +29,22 @@ export default function HolidaysSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  const handleMonthChange = (y: number, m: number) => {
+    setMonth(m);
+    if (y !== year) setYear(y);
+  };
+
   // Default the new-holiday date to the currently-viewed year so adding a
   // holiday while browsing a past/future year doesn't silently create it
   // under today's year instead.
   const openCreate = () => { setEditing(null); setForm({ ...EMPTY, date: `${year}-01-01` }); setError(''); setOpen(true); };
   const openEdit = (h: Holiday) => { setEditing(h); setForm({ name: h.name, date: h.date, isRecurring: h.isRecurring, countryCode: h.countryCode }); setError(''); setOpen(true); };
+  // Calendar cell click — edit that day's holiday if one exists, otherwise
+  // open the create dialog prefilled with the clicked date.
+  const openForDate = (date: string, holiday?: Holiday) => {
+    if (holiday) openEdit(holiday);
+    else { setEditing(null); setForm({ ...EMPTY, date }); setError(''); setOpen(true); }
+  };
 
   const handleSave = async () => {
     if (!form.name || !form.date) { setError('Name and date are required'); return; }
@@ -47,6 +62,14 @@ export default function HolidaysSettings() {
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Calendar className="h-5 w-5 text-blue-600" /> Company Holidays</h2>
         <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-md border border-gray-200 p-0.5">
+            <Button variant={view === 'calendar' ? 'default' : 'ghost'} size="sm" className="h-7 px-2 gap-1" onClick={() => setView('calendar')}>
+              <CalendarIcon className="h-3.5 w-3.5" /> Calendar
+            </Button>
+            <Button variant={view === 'list' ? 'default' : 'ghost'} size="sm" className="h-7 px-2 gap-1" onClick={() => setView('list')}>
+              <List className="h-3.5 w-3.5" /> List
+            </Button>
+          </div>
           <Button variant="outline" size="sm" onClick={() => setYear(y => y - 1)}><ChevronLeft className="h-4 w-4" /></Button>
           <span className="text-sm font-semibold w-12 text-center">{year}</span>
           <Button variant="outline" size="sm" onClick={() => setYear(y => y + 1)}><ChevronRight className="h-4 w-4" /></Button>
@@ -62,6 +85,11 @@ export default function HolidaysSettings() {
         </div>
       ) : isLoading ? (
         <div className="flex justify-center py-8"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
+      ) : view === 'calendar' ? (
+        <>
+          <p className="text-xs text-gray-400">Click a day to add a holiday, or click an existing holiday to edit it.</p>
+          <HolidayCalendarGrid year={year} month={month} onMonthChange={handleMonthChange} holidays={holidays} onDayClick={openForDate} />
+        </>
       ) : (
         <div className="space-y-2">
           {holidays.map(h => (
