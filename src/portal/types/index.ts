@@ -45,7 +45,7 @@ export type I9Status = 'pending' | 'complete' | 'expired';
 
 // ── Monthly attendance timesheet (separate from the weekly billing Timesheet) ──
 export type MonthlyTimesheetStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
-export type MonthlyDayStatus = 'present' | 'leave' | 'holiday' | 'absent' | 'weekend';
+export type MonthlyDayStatus = 'present' | 'leave' | 'holiday' | 'absent' | 'weekend' | 'none';
 
 export interface MonthlyTimesheetEntry {
   date: string;        // YYYY-MM-DD

@@ -64,12 +64,15 @@ export function addHoursToTime(start: string, hours: number): string {
 
 /**
  * Build one row per calendar day for the month. Weekends are auto-marked
- * 'weekend' and locked; weekdays default to 'present' 09:00–17:00, unless the
- * date is in `holidayDates` (company holiday) or `approvedLeaveDates` (an
- * approved leave request already covers that day), in which case it's
- * pre-marked 'holiday' / 'leave' respectively so it's reflected without the
- * employee having to set it manually. Holiday takes precedence if a date is
- * (unusually) in both sets.
+ * 'weekend' and locked. Weekdays are only marked 'present' with real hours
+ * when `weeklyHoursByDate` actually has logged data for that date — a
+ * working day with no known source data (no weekly-hours entry, and not a
+ * holiday/leave/outside-assignment day) is marked 'none' (0 hours, blank
+ * project/times) rather than fabricating an 8h/09:00-17:00 guess. The date
+ * is in `holidayDates` (company holiday) or `approvedLeaveDates` (an
+ * approved leave request already covers that day) pre-marks 'holiday' /
+ * 'leave' respectively so it's reflected without the employee having to set
+ * it manually. Holiday takes precedence if a date is (unusually) in both sets.
  *
  * `defaultProject` pre-fills each working day's Project field from the
  * employee's active assignment (still freely editable per day — this is a
@@ -80,10 +83,8 @@ export function addHoursToTime(start: string, hours: number): string {
  * other absence, per the confirmed design.
  *
  * `weeklyHoursByDate` (date -> hours already logged on a weekly timesheet
- * overlapping this month) takes priority over the flat 8h default and the
- * assignment-window 'absent' marking, since it's real logged data rather
- * than a fabricated guess — but holiday/leave still win if a date is
- * (unusually) in both, same precedence as everything else here.
+ * overlapping this month) is the ONLY source for 'present' status — but
+ * holiday/leave still win if a date is (unusually) in both.
  */
 export function buildMonthSkeleton(
   year: number,
@@ -107,8 +108,9 @@ export function buildMonthSkeleton(
     const outsideAssignment = !isWeekend && !isHoliday && !isApprovedLeave && !hasWeeklyHours && !!assignmentWindow
       && ((assignmentWindow.startDate && date < assignmentWindow.startDate)
         || (assignmentWindow.endDate && date > assignmentWindow.endDate));
-    const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : isApprovedLeave ? 'leave' : outsideAssignment ? 'absent' : 'present';
-    const isBlank = isWeekend || isHoliday || isApprovedLeave || outsideAssignment;
+    const status: MonthlyDayStatus = isWeekend ? 'weekend' : isHoliday ? 'holiday' : isApprovedLeave ? 'leave'
+      : outsideAssignment ? 'absent' : hasWeeklyHours ? 'present' : 'none';
+    const isBlank = status !== 'present';
     rows.push({
       date,
       dayOfWeek: DAYS_SHORT[dow],
@@ -118,8 +120,8 @@ export function buildMonthSkeleton(
       // times — derive a placeholder end time from the actual hours instead
       // of leaving Start/End blank, which read as broken/not-loading.
       startTime: isBlank ? '' : '09:00',
-      endTime: isBlank ? '' : (hasWeeklyHours ? addHoursToTime('09:00', weeklyHours!) : '17:00'),
-      hours: isBlank ? 0 : (hasWeeklyHours ? weeklyHours! : computeHours('09:00', '17:00')),
+      endTime: isBlank ? '' : addHoursToTime('09:00', weeklyHours!),
+      hours: isBlank ? 0 : weeklyHours!,
       status,
     });
   }

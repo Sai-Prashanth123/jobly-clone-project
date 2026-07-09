@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, FileCheck2, CalendarOff, AlertCircle, HelpCircle, UserX } from 'lucide-react';
+import { Loader2, FileCheck2, CalendarOff, AlertCircle, HelpCircle, UserX, ChevronLeft, ChevronRight } from 'lucide-react';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useMonthlyTimesheets, useNotSubmittedEmployees } from '../hooks/useMonthlyTimesheets';
 import { formatDate } from '../lib/utils';
-import { monthLabel, currentMonth } from '../lib/monthUtils';
+import { MONTHS, monthLabel, currentMonth } from '../lib/monthUtils';
 import type { MonthlyTimesheet, NotSubmittedEmployee } from '../types';
 
 const LEAVE_REASON_LABELS: Record<string, string> = {
@@ -24,15 +25,29 @@ const STATUS_FILTERS = [
   { value: 'draft', label: 'Draft' },
 ];
 
+const { year: CURRENT_YEAR, month: CURRENT_MONTH } = currentMonth();
+
 export default function MonthlyTimesheets() {
   const navigate = useNavigate();
   const [status, setStatus] = useState('all');
-  const { data, isLoading, isError, refetch } = useMonthlyTimesheets(status === 'all' ? { limit: 200 } : { status, limit: 200 });
+  // Period filter — defaults to the current month/year but lets HR review any
+  // past period, or "All Months" of a given year, instead of only whatever
+  // happens to be in the most recent 200 records.
+  const [year, setYear] = useState(CURRENT_YEAR);
+  const [month, setMonth] = useState<number | 'all'>(CURRENT_MONTH);
+  const { data, isLoading, isError, refetch } = useMonthlyTimesheets({
+    ...(status !== 'all' ? { status } : {}),
+    year,
+    ...(month !== 'all' ? { month } : {}),
+    limit: 200,
+  });
   const rows = data?.data ?? [];
 
-  // "Not Submitted" tab: active employees with no monthly_timesheets row yet for the current period.
-  const { year: notSubmittedYear, month: notSubmittedMonth } = currentMonth();
-  const { data: notSubmittedRows = [], isLoading: isNotSubmittedLoading } = useNotSubmittedEmployees(notSubmittedYear, notSubmittedMonth);
+  // "Not Submitted" tab: active employees with no monthly_timesheets row yet
+  // for the selected period ("All Months" falls back to the current month —
+  // not-submitted is inherently a single-period check).
+  const notSubmittedMonth = month === 'all' ? CURRENT_MONTH : month;
+  const { data: notSubmittedRows = [], isLoading: isNotSubmittedLoading } = useNotSubmittedEmployees(year, notSubmittedMonth);
 
   // Split the queue: timesheets with logged hours go to Client Timesheets tab
   // (client proof review); timesheets with ONLY leave days (no hours) go to
@@ -172,12 +187,26 @@ export default function MonthlyTimesheets() {
         title="Attendance Review"
         description={isLoading ? 'Loading…' : `${rows.length} monthly timesheet${rows.length === 1 ? '' : 's'}`}
         action={
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {STATUS_FILTERS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1">
+              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setYear(y => y - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+              <span className="text-sm font-semibold w-12 text-center">{year}</span>
+              <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => setYear(y => y + 1)}><ChevronRight className="h-4 w-4" /></Button>
+            </div>
+            <Select value={String(month)} onValueChange={v => setMonth(v === 'all' ? 'all' : Number(v))}>
+              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Months</SelectItem>
+                {MONTHS.map((m, i) => <SelectItem key={m} value={String(i + 1)}>{m}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="w-[200px]"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                {STATUS_FILTERS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         }
         onRefresh={refetch}
       />
@@ -246,7 +275,8 @@ export default function MonthlyTimesheets() {
           <TabsContent value="not-submitted">
             <div className="mb-3 flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              Active employees with no monthly timesheet started yet for {monthLabel(notSubmittedYear, notSubmittedMonth)}.
+              Active employees with no monthly timesheet started yet for {monthLabel(year, notSubmittedMonth)}
+              {month === 'all' ? ' (this tab always checks a single month — showing the current month since "All Months" is selected above).' : '.'}
             </div>
             {isNotSubmittedLoading ? (
               <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
@@ -258,7 +288,7 @@ export default function MonthlyTimesheets() {
                 searchKeys={['displayId', 'firstName', 'lastName', 'department']}
                 getRowKey={e => e.id}
                 emptyTitle="Everyone has started their timesheet"
-                emptyDescription={`All active employees have a monthly timesheet for ${monthLabel(notSubmittedYear, notSubmittedMonth)}.`}
+                emptyDescription={`All active employees have a monthly timesheet for ${monthLabel(year, notSubmittedMonth)}.`}
                 exportFilename="not-submitted-employees"
               />
             )}

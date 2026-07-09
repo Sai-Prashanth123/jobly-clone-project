@@ -23,6 +23,7 @@ const PILL: Record<MonthlyDayStatus, string> = {
   holiday: 'bg-violet-100 text-violet-700',
   absent: 'bg-red-100 text-red-700',
   weekend: 'bg-gray-100 text-gray-500',
+  none: 'bg-slate-100 text-slate-500',
 };
 
 export default function MonthlyTimesheetDetail() {
@@ -409,6 +410,7 @@ export default function MonthlyTimesheetDetail() {
                           }}
                           className="rounded border border-gray-200 px-2 py-0.5 text-xs focus:outline-none focus:border-[#4069FF]"
                         >
+                          <option value="none">None</option>
                           <option value="present">Present</option>
                           <option value="leave">Leave</option>
                           <option value="absent">Absent</option>

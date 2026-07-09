@@ -9,7 +9,7 @@ const monthlyEntrySchema = z.object({
   startTime: z.string().default(''),  // 'HH:MM'
   endTime: z.string().default(''),
   hours: z.number().min(0).max(24).default(0),
-  status: z.enum(['present', 'leave', 'holiday', 'absent', 'weekend']),
+  status: z.enum(['present', 'leave', 'holiday', 'absent', 'weekend', 'none']),
 });
 
 export const upsertMonthlyTimesheetSchema = z.object({

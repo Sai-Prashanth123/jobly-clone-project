@@ -33,10 +33,23 @@ import {
 import type { MonthlyTimesheet, MonthlyTimesheetEntry, MonthlyDayStatus } from '../types';
 
 const DAY_STATUS_OPTIONS: { value: MonthlyDayStatus; label: string }[] = [
+  { value: 'none', label: 'None' },
   { value: 'present', label: 'Present' },
   { value: 'leave', label: 'Leave' },
   { value: 'holiday', label: 'Holiday' },
   { value: 'absent', label: 'Absent' },
+];
+
+// Filter for the day-rows table — lets an employee/HR reviewer jump straight
+// to e.g. "None" days (missing data) or "Absent" days in a long 30-31 row month.
+const DAY_FILTER_OPTIONS: { value: MonthlyDayStatus | 'all'; label: string }[] = [
+  { value: 'all', label: 'Show: All days' },
+  { value: 'none', label: 'Show: None only' },
+  { value: 'present', label: 'Show: Present only' },
+  { value: 'leave', label: 'Show: Leave only' },
+  { value: 'holiday', label: 'Show: Holiday only' },
+  { value: 'absent', label: 'Show: Absent only' },
+  { value: 'weekend', label: 'Show: Weekend only' },
 ];
 
 // Leave-reason options surfaced when the employee submits a zero-hour month
@@ -61,6 +74,7 @@ const ROW_TINT: Record<string, string> = {
   leave: 'bg-amber-50/60',
   absent: 'bg-red-50/50',
   present: '',
+  none: 'bg-slate-50/60',
 };
 
 function DayStatusPill({ status }: { status: MonthlyDayStatus }) {
@@ -70,6 +84,7 @@ function DayStatusPill({ status }: { status: MonthlyDayStatus }) {
     holiday: 'bg-violet-100 text-violet-700',
     absent: 'bg-red-100 text-red-700',
     weekend: 'bg-gray-100 text-gray-500',
+    none: 'bg-slate-100 text-slate-500',
   };
   return <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide ${map[status]}`}>{status}</span>;
 }
@@ -172,6 +187,7 @@ export default function MyMonthlyTimesheet() {
   const [exportingYear, setExportingYear] = useState(false);
   const [exportingYearPdf, setExportingYearPdf] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
+  const [dayFilter, setDayFilter] = useState<MonthlyDayStatus | 'all'>('all');
   const [downloadingDocx, setDownloadingDocx] = useState(false);
   const hydratedKey = useRef<string>('');
   // Always tracks the currently-displayed period/employee, independent of any
@@ -293,7 +309,7 @@ export default function MyMonthlyTimesheet() {
           next.startTime = next.startTime || '09:00';
           next.endTime = next.endTime || '17:00';
           next.hours = computeHours(next.startTime, next.endTime);
-        } else if (patch.status === 'leave' || patch.status === 'holiday' || patch.status === 'absent') {
+        } else if (patch.status === 'leave' || patch.status === 'holiday' || patch.status === 'absent' || patch.status === 'none') {
           next.startTime = '';
           next.endTime = '';
           next.hours = 0;
@@ -701,7 +717,16 @@ export default function MyMonthlyTimesheet() {
                   <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-amber-300 inline-block" />Leave</span>
                   <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-violet-300 inline-block" />Holiday</span>
                   <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-gray-300 inline-block" />Weekend</span>
+                  <span className="flex items-center gap-1"><i className="h-2 w-2 rounded-full bg-slate-300 inline-block" />None</span>
                 </div>
+              </div>
+              <div className="mt-2">
+                <Select value={dayFilter} onValueChange={v => setDayFilter(v as MonthlyDayStatus | 'all')}>
+                  <SelectTrigger className="h-8 w-[180px] bg-white/10 border-white/20 text-white text-xs"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DAY_FILTER_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -712,6 +737,11 @@ export default function MyMonthlyTimesheet() {
                   <AlertCircle className="h-8 w-8 text-red-400" />
                   <p className="text-sm text-red-500">Failed to load this month's timesheet. Please try again.</p>
                   <Button variant="outline" size="sm" onClick={() => refetchMonth()}>Retry</Button>
+                </div>
+              ) : dayFilter !== 'all' && !entries.some(e => e.status === dayFilter) ? (
+                <div className="flex flex-col items-center justify-center py-16 text-center gap-2">
+                  <p className="text-sm text-muted-foreground">No days match this filter this month.</p>
+                  <Button variant="outline" size="sm" onClick={() => setDayFilter('all')}>Show all days</Button>
                 </div>
               ) : (
                 <>
@@ -731,7 +761,7 @@ export default function MyMonthlyTimesheet() {
                       </tr>
                     </thead>
                     <tbody>
-                      {entries.map((e, idx) => {
+                      {entries.map((e, idx) => ({ e, idx })).filter(({ e }) => dayFilter === 'all' || e.status === dayFilter).map(({ e, idx }) => {
                         const isWeekend = e.status === 'weekend';
                         // Worked-day fields are editable only on Present days; weekend +
                         // leave/holiday/absent rows are greyed out.
@@ -797,7 +827,7 @@ export default function MyMonthlyTimesheet() {
 
                 {/* Mobile — one card per day (mirrors the table inputs/handlers) */}
                 <div className="md:hidden divide-y divide-gray-100">
-                  {entries.map((e, idx) => {
+                  {entries.map((e, idx) => ({ e, idx })).filter(({ e }) => dayFilter === 'all' || e.status === dayFilter).map(({ e, idx }) => {
                     const isWeekend = e.status === 'weekend';
                     const fieldsDisabled = isLocked || e.status !== 'present';
                     const dayNum = Number(e.date.slice(-2));
