@@ -7,6 +7,7 @@ import {
 import { formatDateSafe, formatDateUS } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
 import { getTimesheetHeaderBuffer, getTimesheetFooterBuffer } from './timesheetBranding';
+import { RATING_CRITERIA } from '../schemas/performanceReviews.schema';
 
 export interface InvoicePDFLineItem {
   itemName?: string;
@@ -695,4 +696,271 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
   });
 
   return Packer.toBuffer(doc);
+}
+
+// ── Performance Appraisal Report PDF ─────────────────────────────────────────
+// Portrait US Letter, matching the reference "Employee Performance Appraisal
+// Report" template. Reuses the exact same letterhead images and asymmetric
+// crop technique as the timesheet redesign (see TS_HEADER_CROP_TOP_PX /
+// TS_HEADER_CROP_BOTTOM_PX / TS_HEADER_NATIVE_W above) — same brand assets,
+// same visual language, just recomputed for this page's narrower width.
+
+export interface PerformanceReviewPDFData {
+  displayId: string;
+  employeeName: string;
+  employeeDisplayId: string;
+  salutation: string;
+  employeeNumber: string;
+  titlePayrollTitle: string;
+  employeeType: string;
+  supervisorName: string;
+  supervisedFullPeriod: boolean;
+  supervisedMonths?: number;
+  periodStart: string;
+  periodEnd: string;
+  jobRelatedPerformance: string;
+  overallEvaluation: string;
+  ratings: Record<string, number>;
+  jobFunction: string;
+  weightPercent: number;
+  statusGoal: string;
+  completePercent: number;
+  performanceEvaluation: string;
+  futureGoals: string;
+  employeeSignedDate?: string;
+  supervisorSignedDate?: string;
+}
+
+const PR_PAGE_W = 612; // US Letter width in points
+const PR_HEADER_H = Math.round((TS_HEADER_CROP_BOTTOM_PX - TS_HEADER_CROP_TOP_PX) * (PR_PAGE_W / TS_HEADER_NATIVE_W));
+const PR_FOOTER_H = 16;
+const PR_MARGIN = 44;
+
+function drawPerformanceReviewChrome(doc: PDFKit.PDFDocument): void {
+  const pageW = doc.page.width;
+  const pageH = doc.page.height;
+  const scale = pageW / TS_HEADER_NATIVE_W;
+
+  doc.save();
+  doc.rect(0, 0, pageW, PR_HEADER_H).clip();
+  doc.image(getTimesheetHeaderBuffer(), 0, -TS_HEADER_CROP_TOP_PX * scale, { width: pageW });
+  doc.restore();
+
+  doc.save();
+  doc.rect(0, pageH - PR_FOOTER_H, pageW, PR_FOOTER_H).clip();
+  doc.image(getTimesheetFooterBuffer(), 0, pageH - PR_FOOTER_H, { cover: [pageW, PR_FOOTER_H], valign: 'bottom' });
+  doc.restore();
+}
+
+function stampPerformanceReviewPageNumbers(doc: PDFKit.PDFDocument): void {
+  const generatedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const pageW = doc.page.width;
+    const y = doc.page.height - PR_FOOTER_H - 12;
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
+    doc.fillColor('#9CA3AF').fontSize(6.5).font('Helvetica')
+      .text(`Generated on ${generatedOn}  ·  Page ${i - range.start + 1} of ${range.count}`, 40, y, { width: pageW - 80, align: 'center', lineBreak: false });
+    doc.page.margins.bottom = savedBottom;
+  }
+}
+
+function drawReviewSectionHeading(doc: PDFKit.PDFDocument, text: string): void {
+  const navy = '#04213F';
+  doc.moveDown(0.7);
+  doc.x = doc.page.margins.left;
+  doc.fillColor(navy).fontSize(10.5).font('Helvetica-Bold').text(text.toUpperCase());
+  doc.moveDown(0.25);
+  doc.x = doc.page.margins.left;
+}
+
+function drawReviewNarrative(doc: PDFKit.PDFDocument, text: string): void {
+  const ink = '#111827';
+  doc.fillColor(ink).fontSize(9.5).font('Helvetica').text(text?.trim() || '—', { align: 'left', lineGap: 2.5 });
+  doc.x = doc.page.margins.left;
+}
+
+// Bordered info card — a grid of label/value pairs, 2 columns x N rows.
+// Advances doc.y past the card; does not paginate (cards are short).
+function drawInfoCard(doc: PDFKit.PDFDocument, rows: Array<[string, string, string, string]>): void {
+  const gray = '#6B7280';
+  const navy = '#04213F';
+  const left = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const rowH = 26;
+  const cardH = rowH * rows.length + 10;
+  const cardY = doc.y;
+  doc.roundedRect(left, cardY, width, cardH, 4).fillAndStroke('#FAFBFC', '#E5E7EB');
+  const colW = width / 2;
+  rows.forEach(([label1, value1, label2, value2], i) => {
+    const y = cardY + 6 + i * rowH;
+    doc.fillColor(gray).fontSize(6.5).font('Helvetica-Bold').text(label1, left + 12, y, { width: colW - 24 });
+    doc.fillColor(navy).fontSize(9).font('Helvetica-Bold').text(value1 || '—', left + 12, y + 9, { width: colW - 24, ellipsis: true, height: 12 });
+    doc.fillColor(gray).fontSize(6.5).font('Helvetica-Bold').text(label2, left + colW + 12, y, { width: colW - 24 });
+    doc.fillColor(navy).fontSize(9).font('Helvetica-Bold').text(value2 || '—', left + colW + 12, y + 9, { width: colW - 24, ellipsis: true, height: 12 });
+  });
+  doc.x = left;
+  doc.y = cardY + cardH + 12;
+}
+
+// 12-criterion x 5-column rating grid — empty circle per column, filled at
+// the selected rating (columns run 5 to 1, left to right, matching the
+// source document). Paginates manually (checking remaining space per row)
+// since this is a dense grid, not flowing text.
+function drawRatingsGrid(doc: PDFKit.PDFDocument, ratings: Record<string, number>): void {
+  const navy = '#04213F';
+  const blue = '#4069FF';
+  const ink = '#111827';
+  const left = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const labelW = width * 0.5;
+  const colW = (width - labelW) / 5;
+  const rowH = 17;
+  const bottomLimit = doc.page.height - doc.page.margins.bottom;
+
+  const drawHeaderRow = () => {
+    // Capture y once — pdfkit advances doc.y after every .text() call even
+    // when an explicit x/y is given, so re-reading doc.y per-column would
+    // stagger each subsequent number diagonally instead of aligning them.
+    const y = doc.y;
+    doc.fontSize(7.5).font('Helvetica-Bold').fillColor(navy);
+    ['5', '4', '3', '2', '1'].forEach((n, i) => {
+      doc.text(n, left + labelW + i * colW, y, { width: colW, align: 'center' });
+    });
+    doc.y = y + 12;
+    doc.moveTo(left, doc.y).lineTo(left + labelW + 5 * colW, doc.y).lineWidth(1.2).strokeColor(blue).stroke();
+    doc.y += 4;
+  };
+
+  drawHeaderRow();
+  for (const c of RATING_CRITERIA) {
+    if (doc.y + rowH > bottomLimit) {
+      doc.addPage(); // 'pageAdded' listener redraws the letterhead
+      doc.x = left;
+      doc.y = doc.page.margins.top;
+      drawHeaderRow();
+    }
+    const rowY = doc.y;
+    doc.fontSize(7.5).font('Helvetica').fillColor(ink).text(c.label, left, rowY + 3, { width: labelW - 8 });
+    const selected = ratings[c.key];
+    for (let col = 0; col < 5; col++) {
+      const ratingValue = 5 - col;
+      const cx = left + labelW + col * colW + colW / 2;
+      const cy = rowY + rowH / 2;
+      doc.circle(cx, cy, 4.5).lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+      if (selected === ratingValue) doc.circle(cx, cy, 2.4).fillColor(blue).fill();
+    }
+    doc.y = rowY + rowH;
+  }
+  doc.x = left;
+  doc.y += 10;
+}
+
+export function generatePerformanceReviewPDF(data: PerformanceReviewPDFData): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const blue = '#4069FF';
+    const navy = '#04213F';
+    const gray = '#6B7280';
+    const ink = '#111827';
+
+    const doc = new PDFDocument({
+      size: 'LETTER',
+      margins: { top: PR_HEADER_H + 18, bottom: PR_FOOTER_H + 26, left: PR_MARGIN, right: PR_MARGIN },
+      bufferPages: true,
+    });
+    doc.on('pageAdded', () => drawPerformanceReviewChrome(doc));
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    drawPerformanceReviewChrome(doc); // first page — 'pageAdded' doesn't fire for it
+
+    // Title block
+    doc.fillColor(navy).fontSize(15).font('Helvetica-Bold').text('EMPLOYEE PERFORMANCE APPRAISAL REPORT', { align: 'center' });
+    doc.fillColor(blue).fontSize(11).font('Helvetica-Bold').text('Jobly Solutions LLC.', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fillColor(gray).fontSize(8).font('Helvetica').text('This form is used to evaluate the performance of employees.', { align: 'center' });
+    doc.moveDown(0.4);
+    doc.fillColor(ink).fontSize(9).font('Helvetica-Bold')
+      .text(`Period covered (month/day/year): ${formatDateUS(data.periodStart)}  to  ${formatDateUS(data.periodEnd)}`, { align: 'center' });
+    doc.moveDown(0.6);
+    doc.x = doc.page.margins.left;
+
+    // Employee / supervisor info card
+    const fullName = `${data.salutation ? data.salutation + ' ' : ''}${data.employeeName}`.trim();
+    const supervisedLine = data.supervisedFullPeriod
+      ? 'Yes'
+      : `No (${data.supervisedMonths ?? 0} months)`;
+    drawInfoCard(doc, [
+      ['EMPLOYEE', fullName, 'EMPLOYEE NUMBER', data.employeeNumber || data.employeeDisplayId],
+      ['TITLE / PAYROLL TITLE', data.titlePayrollTitle, 'EMPLOYEE TYPE', data.employeeType],
+      ['SUPERVISOR', data.supervisorName, 'SUPERVISED FOR ENTIRE PERIOD?', supervisedLine],
+    ]);
+
+    drawReviewSectionHeading(doc, 'Job-Related Performance');
+    drawReviewNarrative(doc, data.jobRelatedPerformance);
+
+    drawReviewSectionHeading(doc, 'Overall Evaluation');
+    drawReviewNarrative(doc, data.overallEvaluation);
+
+    doc.moveDown(0.6);
+    doc.x = doc.page.margins.left;
+    doc.fillColor(navy).fontSize(9.5).font('Helvetica-Bold')
+      .text("Supervisor's Recommendation:", { continued: true })
+      .font('Helvetica').fillColor(ink)
+      .text(' Based on meeting the targets/accomplishments, performance for the above period is rated as below.');
+    doc.moveDown(0.4);
+    doc.x = doc.page.margins.left;
+    doc.fillColor(gray).fontSize(7.5).font('Helvetica')
+      .text('Rating key: (1) Unsatisfactory - Requires constant supervision.   (2) Marginal - Needs improvement, not always on time.   (3) Meets Requirements - Tasks completed on time.   (4) Exceeds Requirements - Goes above and beyond.   (5) Exceptional - Always exceeds what is required.', { lineGap: 1.5 });
+    doc.moveDown(0.5);
+    doc.x = doc.page.margins.left;
+
+    drawRatingsGrid(doc, data.ratings ?? {});
+
+    // Job function / weight / status / complete
+    drawInfoCard(doc, [
+      ['JOB FUNCTION', data.jobFunction, 'WEIGHT', `${data.weightPercent}%`],
+      ['STATUS', data.statusGoal, 'COMPLETE', `${data.completePercent}%`],
+    ]);
+
+    drawReviewSectionHeading(doc, 'Performance Evaluation');
+    drawReviewNarrative(doc, data.performanceEvaluation);
+
+    drawReviewSectionHeading(doc, 'Future Goals or Performance Expectations');
+    drawReviewNarrative(doc, data.futureGoals);
+
+    // Signatures
+    doc.moveDown(1.2);
+    doc.x = doc.page.margins.left;
+    if (doc.y > doc.page.height - doc.page.margins.bottom - 90) {
+      doc.addPage();
+      doc.x = doc.page.margins.left;
+      doc.y = doc.page.margins.top;
+    }
+    doc.fillColor(navy).fontSize(9.5).font('Helvetica-Bold').text('SIGNATURES');
+    doc.moveDown(1.4);
+    const sigLeft = doc.page.margins.left;
+    const sigWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const lineY = doc.y;
+    doc.moveTo(sigLeft, lineY).lineTo(sigLeft + sigWidth * 0.55, lineY).lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+    doc.moveTo(sigLeft + sigWidth * 0.65, lineY).lineTo(sigLeft + sigWidth, lineY).lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+    doc.fillColor(gray).fontSize(7.5).font('Helvetica')
+      .text('Employee: I have read and received a copy of this evaluation.', sigLeft, lineY + 4, { width: sigWidth * 0.55 });
+    doc.text(`Date: ${data.employeeSignedDate ? formatDateUS(data.employeeSignedDate) : '_______________'}`, sigLeft + sigWidth * 0.65, lineY + 4, { width: sigWidth * 0.35 });
+    doc.moveDown(2.2);
+    doc.x = sigLeft;
+    const lineY2 = doc.y;
+    doc.moveTo(sigLeft, lineY2).lineTo(sigLeft + sigWidth * 0.55, lineY2).lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+    doc.moveTo(sigLeft + sigWidth * 0.65, lineY2).lineTo(sigLeft + sigWidth, lineY2).lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+    doc.fillColor(gray).fontSize(7.5).font('Helvetica')
+      .text("Supervisor: This is my evaluation of the employee's performance during the review period.", sigLeft, lineY2 + 4, { width: sigWidth * 0.55 });
+    doc.text(`Date: ${data.supervisorSignedDate ? formatDateUS(data.supervisorSignedDate) : '_______________'}`, sigLeft + sigWidth * 0.65, lineY2 + 4, { width: sigWidth * 0.35 });
+
+    stampPerformanceReviewPageNumbers(doc);
+    doc.end();
+  });
 }

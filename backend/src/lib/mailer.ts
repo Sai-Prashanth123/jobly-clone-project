@@ -1,5 +1,5 @@
 import { EmailClient, KnownEmailSendStatus, type EmailMessage } from '@azure/communication-email';
-import { formatDateSafe } from './dateUtils';
+import { formatDateSafe, formatDateUS } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
 
 // HTML-escape any user-supplied string before it lands in an email body.
@@ -1016,5 +1016,52 @@ export async function sendAnnouncementEmail(p: AnnouncementEmailPayload): Promis
     to: p.to,
     subject: `[Announcement] ${p.announcementTitle}`,
     html,
+  });
+}
+
+// ── Performance appraisal report ─────────────────────────────────────────────
+
+export interface PerformanceReviewEmailPayload {
+  to: string;
+  employeeName: string;
+  displayId: string;
+  periodStart: string;
+  periodEnd: string;
+  pdfBuffer: Buffer;
+  pdfFileName: string;
+}
+
+export async function sendPerformanceReviewEmail(payload: PerformanceReviewEmailPayload): Promise<void> {
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+  }
+  const { to, employeeName, displayId, periodStart, periodEnd, pdfBuffer, pdfFileName } = payload;
+  const period = `${formatDateUS(periodStart)} to ${formatDateUS(periodEnd)}`;
+
+  const body = `
+<p style="margin:0 0 20px;color:#374151;font-size:16px;line-height:1.7;">Dear <strong style="color:#111827;">${esc(employeeName)}</strong>,</p>
+<p style="margin:0 0 24px;color:#6b7280;font-size:14px;line-height:1.7;">
+  Your performance evaluation for the period <strong style="color:#374151;">${esc(period)}</strong> is attached as a PDF. Please review it at your convenience.
+</p>
+<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:16px 20px;margin-bottom:24px;">
+  <p style="margin:0;font-size:13px;color:#374151;">Report ID: <strong style="color:#1d4ed8;">${esc(displayId)}</strong></p>
+</div>
+<p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;">
+  Questions about this evaluation? Reach out to your supervisor or HR.
+</p>`;
+
+  const html = emailShell({
+    previewText: `Your performance evaluation for ${period} is ready`,
+    title: 'Performance Evaluation',
+    subtitle: `${esc(displayId)} &middot; ${esc(period)}`,
+    body,
+  });
+
+  await sendWithRetry({
+    from: FROM,
+    to,
+    subject: `Performance Evaluation — ${period}`,
+    html,
+    attachments: [{ filename: pdfFileName, content: pdfBuffer, contentType: 'application/pdf' }],
   });
 }

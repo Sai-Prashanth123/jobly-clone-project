@@ -52,7 +52,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Company Holidays',    path: '/portal/company-holidays',    icon: <CalendarDays className="h-4 w-4" />,    roles: ['admin','hr','operations','finance','employee'] },
   { label: 'Attendance Review',   path: '/portal/attendance/review',   icon: <CalendarClock className="h-4 w-4" />,   roles: ['admin','hr','operations'], badgeKey: 'attendanceReview' },
   { label: 'Expenses',            path: '/portal/expenses',            icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'], badgeKey: 'expenses' },
-  { label: 'Reviews',             path: '/portal/reviews',             icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'] },
+  { label: 'Performance Reviews', path: '/portal/reviews',             icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'] },
+  { label: 'My Reviews',          path: '/portal/my-reviews',          icon: <Star className="h-4 w-4" />,            roles: ['employee'] },
   { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
 
   { label: 'Templates',           path: '/portal/templates',           icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'] },
