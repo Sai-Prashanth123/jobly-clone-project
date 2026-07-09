@@ -291,11 +291,16 @@ export interface MonthlyTimesheetPDFData {
   notes?: string;
 }
 
-// Full-width letterhead. The header carries real information (phone/email/
-// address), so its crop height is tuned to show it in full at full page
-// width. The footer is purely decorative (a wave graphic, no text), so it's
-// cropped down tighter to a thin strip.
-const TS_HEADER_H = 130; // full-width band, center-cropped from the 2547x450 source
+// Full-width letterhead. The header source image (2547x450) has its content
+// (logo + contact block) sitting well off-center — roughly rows 65-430 out
+// of 450px, i.e. much more empty margin above than below — so a naive
+// symmetric center-crop wastes crop budget on the (larger) top margin and
+// clips the (already-tight) bottom content first as the target height
+// shrinks. Crop asymmetrically to the actual content band instead.
+const TS_HEADER_CROP_TOP_PX = 65;
+const TS_HEADER_CROP_BOTTOM_PX = 430;
+const TS_HEADER_NATIVE_W = 2547;
+const TS_HEADER_H = 121; // = (430-65) * (pageWidth/2547), computed per-page below
 const TS_HEADER_RESERVED = TS_HEADER_H;
 const TS_FOOTER_H = 22;  // thin wave-graphic strip, bottom-cropped from the 2539x449 source
 const TS_STATUS_COLORS: Record<string, string> = {
@@ -305,18 +310,23 @@ const TS_STATUS_COLORS: Record<string, string> = {
 
 // Letterhead, drawn on every physical page (including a mid-month overflow
 // continuation page) so the branding is never missing partway through a
-// document. pdfkit's `cover` only scales+positions — it does not clip, so
-// the scaled image is drawn in full and can overflow the given box;
-// explicitly clip so the "crop" is an actual crop, not an overlap.
+// document.
 function drawTimesheetChrome(doc: PDFKit.PDFDocument): void {
   const pageW = doc.page.width;
   const pageH = doc.page.height;
+  const scale = pageW / TS_HEADER_NATIVE_W;
 
+  // Header: full width, cropped to the actual content band (see note above)
+  // by shifting the scaled image up so that source-row TS_HEADER_CROP_TOP_PX
+  // lands at y=0, then clipping to the target height.
   doc.save();
   doc.rect(0, 0, pageW, TS_HEADER_H).clip();
-  doc.image(getTimesheetHeaderBuffer(), 0, 0, { cover: [pageW, TS_HEADER_H], valign: 'center' });
+  doc.image(getTimesheetHeaderBuffer(), 0, -TS_HEADER_CROP_TOP_PX * scale, { width: pageW });
   doc.restore();
 
+  // Footer: full-width thin strip. pdfkit's `cover` only scales+positions —
+  // it does not clip, so the scaled image is drawn in full and can overflow
+  // the given box; explicitly clip so the "crop" is an actual crop.
   doc.save();
   doc.rect(0, pageH - TS_FOOTER_H, pageW, TS_FOOTER_H).clip();
   doc.image(getTimesheetFooterBuffer(), 0, pageH - TS_FOOTER_H, { cover: [pageW, TS_FOOTER_H], valign: 'bottom' });
