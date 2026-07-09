@@ -2,10 +2,11 @@ import PDFDocument from 'pdfkit';
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
   ImageRun, WidthType, AlignmentType, BorderStyle, PageOrientation,
-  ShadingType, VerticalAlign,
+  ShadingType, VerticalAlign, Header, Footer,
 } from 'docx';
 import { formatDateSafe } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
+import { getTimesheetHeaderBuffer, getTimesheetFooterBuffer } from './timesheetBranding';
 
 export interface InvoicePDFLineItem {
   itemName?: string;
@@ -290,88 +291,155 @@ export interface MonthlyTimesheetPDFData {
   notes?: string;
 }
 
-// Draws one month's full timesheet report (header, table, summary) onto the
-// CURRENT page of an already-open PDFDocument. Shared by the single-month
-// export and the yearly export (which calls this once per month, adding a
-// page between each) so the two can never visually drift apart.
+// The header carries real information (phone/email/address) that must stay
+// legible, so it's shown in full — scaled down as a whole (width capped, no
+// crop) rather than cropped to a short full-bleed band. The footer is purely
+// decorative (a wave graphic, no text), so it's fine to crop it down to a
+// thin full-width strip.
+const TS_HEADER_ASPECT = 2547 / 450;
+const TS_HEADER_W = 460;                              // scaled-down, uncropped width
+const TS_HEADER_H = TS_HEADER_W / TS_HEADER_ASPECT;    // ≈ 81pt
+const TS_HEADER_Y = 10;
+const TS_HEADER_RESERVED = TS_HEADER_Y + TS_HEADER_H;  // space to clear before body content
+const TS_FOOTER_H = 22; // thin wave-graphic strip, bottom-cropped from the 2539x449 source
+const TS_STATUS_COLORS: Record<string, string> = {
+  present: '#059669', leave: '#D97706', holiday: '#7C3AED',
+  absent: '#DC2626', weekend: '#6B7280', none: '#64748B',
+};
+
+// Letterhead, drawn on every physical page (including a mid-month overflow
+// continuation page) so the branding is never missing partway through a
+// document.
+function drawTimesheetChrome(doc: PDFKit.PDFDocument): void {
+  const pageW = doc.page.width;
+  const pageH = doc.page.height;
+
+  // Header: whole image, centered, scaled down — never cropped.
+  doc.image(getTimesheetHeaderBuffer(), (pageW - TS_HEADER_W) / 2, TS_HEADER_Y, { width: TS_HEADER_W });
+
+  // Footer: full-width thin strip. pdfkit's `cover` only scales+positions —
+  // it does not clip, so the scaled image is drawn in full and can overflow
+  // the given box; explicitly clip so the "crop" is an actual crop.
+  doc.save();
+  doc.rect(0, pageH - TS_FOOTER_H, pageW, TS_FOOTER_H).clip();
+  doc.image(getTimesheetFooterBuffer(), 0, pageH - TS_FOOTER_H, { cover: [pageW, TS_FOOTER_H], valign: 'bottom' });
+  doc.restore();
+}
+
+// Starts a fresh page with the letterhead already drawn, returning the y
+// coordinate where body content should resume.
+function newChromedTimesheetPage(doc: PDFKit.PDFDocument): number {
+  doc.addPage();
+  drawTimesheetChrome(doc);
+  return TS_HEADER_RESERVED + 14;
+}
+
+// Stamps "Generated on … · Page X of Y" just above the footer band on every
+// buffered page — requires the PDFDocument to have been created with
+// `bufferPages: true` so the total page count is known.
+function stampTimesheetPageNumbers(doc: PDFKit.PDFDocument): void {
+  const generatedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  const range = doc.bufferedPageRange();
+  for (let i = range.start; i < range.start + range.count; i++) {
+    doc.switchToPage(i);
+    const pageW = doc.page.width;
+    const y = doc.page.height - TS_FOOTER_H - 14;
+    doc.fillColor('#9CA3AF').fontSize(7).font('Helvetica')
+      .text(`Generated on ${generatedOn}  ·  Page ${i - range.start + 1} of ${range.count}`, 40, y, { width: pageW - 80, align: 'center' });
+  }
+}
+
+// Draws one month's full timesheet report (letterhead, title, employee info
+// card, table, summary card) onto the CURRENT page of an already-open
+// PDFDocument. Shared by the single-month export and the yearly export
+// (which calls this once per month, adding a page between each) so the two
+// can never visually drift apart.
 function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimesheetPDFData): void {
     const blue = '#4069FF';
     const navy = '#04213F';
     const gray = '#6B7280';
+    const ink = '#111827';
     const pageRight = doc.page.width - 40;
     const contentW = doc.page.width - 80;
+    const contentBottom = doc.page.height - TS_FOOTER_H - 24;
 
-    // Header bar
-    doc.rect(0, 0, doc.page.width, 72).fill(navy);
-    try {
-      // Logo is a 174x80 PNG with a transparent background and dark elements.
-      // Draw a white badge behind it so the logo is visible against the navy bar.
-      const logoH = 48;
-      const logoW = Math.round(174 * (logoH / 80));
-      const pad = 2;
-      doc.rect(40 - pad, 12 - pad, logoW + pad * 2, logoH + pad * 2).fill('#ffffff');
-      doc.image(getJoblyLogoBuffer(), 40, 12, { height: logoH });
-    } catch {
-      doc.fillColor('#ffffff').fontSize(20).font('Helvetica-Bold').text('JOBLY SOLUTIONS', 40, 22);
-    }
-    doc.fontSize(9).font('Helvetica').fillColor('rgba(255,255,255,0.7)').text('Monthly Timesheet', 40, 66);
-    doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold')
-      .text(data.monthLabel, pageRight - 220, 26, { width: 220, align: 'right' });
+    drawTimesheetChrome(doc);
 
-    // Employee meta
-    doc.fillColor(navy).fontSize(11).font('Helvetica-Bold').text(data.employeeName, 40, 90);
-    doc.fillColor(gray).fontSize(10).font('Helvetica')
-      .text(`${data.employeeDisplayId}${data.jobTitle ? '  ·  ' + data.jobTitle : ''}  ·  Sheet ${data.displayId}`, 40, 106);
+    // Title row: document title (left) + month (right), with a thin accent rule.
+    let y = TS_HEADER_RESERVED + 14;
+    doc.fillColor(navy).fontSize(12).font('Helvetica-Bold').text('MONTHLY TIMESHEET', 40, y);
+    doc.fillColor(blue).fontSize(15).font('Helvetica-Bold')
+      .text(data.monthLabel, pageRight - 220, y - 2, { width: 220, align: 'right' });
+    y += 20;
+    doc.rect(40, y, contentW, 1.5).fill(blue);
+    y += 12;
+
+    // Employee info card — 4-column label/value grid in a bordered box.
+    const cardH = 44;
+    doc.roundedRect(40, y, contentW, cardH, 4).fillAndStroke('#FAFBFC', '#E5E7EB');
+    const infoCols = [
+      { label: 'EMPLOYEE', value: data.employeeName },
+      { label: 'EMPLOYEE ID', value: data.employeeDisplayId },
+      { label: 'JOB TITLE', value: data.jobTitle || '—' },
+      { label: 'SHEET ID', value: data.displayId },
+    ];
+    const infoColW = contentW / infoCols.length;
+    infoCols.forEach((c, i) => {
+      const x = 40 + i * infoColW + 14;
+      doc.fillColor(gray).fontSize(7).font('Helvetica-Bold').text(c.label, x, y + 9, { width: infoColW - 20 });
+      doc.fillColor(navy).fontSize(10.5).font('Helvetica-Bold').text(c.value, x, y + 21, { width: infoColW - 20, ellipsis: true });
+    });
+    y += cardH + 14;
 
     // Table
-    const tableTop = 132;
     const cols = [
       { h: 'Date', w: 80, align: 'left' as const },
       { h: 'Day', w: 45, align: 'left' as const },
       { h: 'Project', w: 130, align: 'left' as const },
-      { h: 'Task', w: 230, align: 'left' as const },
+      { h: 'Task', w: 220, align: 'left' as const },
       { h: 'Start', w: 55, align: 'center' as const },
       { h: 'End', w: 55, align: 'center' as const },
-      { h: 'Hours', w: 55, align: 'center' as const },
+      { h: 'Hours', w: 60, align: 'right' as const },
       { h: 'Status', w: 65, align: 'center' as const },
     ];
     const tableLeft = 40;
     const colX: number[] = [tableLeft];
     for (let i = 1; i < cols.length; i++) colX.push(colX[i - 1] + cols[i - 1].w);
 
-    const drawHeader = (y: number) => {
-      doc.rect(tableLeft, y, contentW, 22).fill(blue);
-      doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
-      cols.forEach((c, i) => doc.text(c.h, colX[i] + 6, y + 7, { width: c.w - 12, align: c.align }));
+    const drawTableHeader = (headerY: number) => {
+      doc.fillColor(navy).fontSize(8.5).font('Helvetica-Bold');
+      cols.forEach((c, i) => doc.text(c.h.toUpperCase(), colX[i] + 6, headerY + 7, { width: c.w - 12, align: c.align }));
+      doc.rect(tableLeft, headerY + 22, contentW, 1.5).fill(blue);
     };
-    drawHeader(tableTop);
+    drawTableHeader(y);
+    y += 24;
 
-    let y = tableTop + 22;
     doc.fontSize(8.5);
-    data.rows.forEach((r, idx) => {
-      if (y > doc.page.height - 110) {            // new page
-        doc.addPage();
-        y = 40;
-        drawHeader(y);
-        y += 22;
+    data.rows.forEach(r => {
+      if (y > contentBottom) {            // new page — redraw full letterhead + table header
+        y = newChromedTimesheetPage(doc);
+        drawTableHeader(y);
+        y += 24;
       }
-      const bg = idx % 2 === 0 ? '#F9FAFB' : '#FFFFFF';
-      doc.rect(tableLeft, y, contentW, 20).fill(bg);
-      doc.fillColor('#111827').font('Helvetica');
+      doc.rect(tableLeft, y + 22, contentW, 0.5).fill('#EEF0F3');
       const vals = [
         r.date, r.day, r.project || '—', r.task || '—',
         r.start || '—', r.end || '—', r.hours > 0 ? r.hours.toFixed(1) : '—',
-        r.status.charAt(0).toUpperCase() + r.status.slice(1),
       ];
-      cols.forEach((c, i) => doc.text(String(vals[i]), colX[i] + 6, y + 6, { width: c.w - 12, align: c.align, ellipsis: true }));
-      y += 20;
+      cols.slice(0, 7).forEach((c, i) => {
+        doc.fillColor(ink).font('Helvetica').text(String(vals[i]), colX[i] + 6, y + 5, { width: c.w - 12, align: c.align, ellipsis: true });
+      });
+      const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
+      doc.fillColor(TS_STATUS_COLORS[r.status] ?? ink).font('Helvetica-Bold')
+        .text(statusLabel, colX[7] + 6, y + 5, { width: cols[7].w - 12, align: cols[7].align, ellipsis: true });
+      y += 24;
     });
 
-    // Summary block
-    y += 16;
-    if (y > doc.page.height - 90) { doc.addPage(); y = 50; }
-    doc.fillColor(navy).fontSize(11).font('Helvetica-Bold').text('Summary', 40, y);
-    y += 18;
+    // Summary "totals card" — 5 metrics side by side.
+    y += 14;
+    if (y > contentBottom - 90) { y = newChromedTimesheetPage(doc); }
+    const summaryH = 66;
+    doc.roundedRect(40, y, contentW, summaryH, 4).fillAndStroke('#FAFBFC', '#E5E7EB');
     const sum: Array<[string, string]> = [
       ['Total Hours Logged', `${data.totalHours.toFixed(1)} hrs`],
       ['Expected Hours', `${data.expectedHours.toFixed(1)} hrs`],
@@ -379,16 +447,16 @@ function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimeshee
       ['Working Days', String(data.workingDays)],
       ['Leave Days', String(data.leaveDays)],
     ];
-    doc.fontSize(10).font('Helvetica');
-    sum.forEach(([label, value]) => {
-      doc.fillColor(gray).text(label, 40, y, { width: 160, align: 'left', continued: false });
-      doc.fillColor('#111827').font('Helvetica-Bold').text(value, 200, y, { width: 120, align: 'left' });
-      doc.font('Helvetica');
-      y += 16;
+    const sumColW = contentW / sum.length;
+    sum.forEach(([label, value], i) => {
+      const x = 40 + i * sumColW + 16;
+      doc.fillColor(gray).fontSize(8).font('Helvetica').text(label, x, y + 14, { width: sumColW - 24 });
+      doc.fillColor(navy).fontSize(15).font('Helvetica-Bold').text(value, x, y + 30, { width: sumColW - 24 });
     });
+    y += summaryH + 14;
 
     if (data.notes) {
-      y += 10;
+      if (y > contentBottom - 30) { y = newChromedTimesheetPage(doc); }
       doc.fillColor(navy).fontSize(10).font('Helvetica-Bold').text('Notes:', 40, y);
       y += 14;
       doc.fillColor(gray).fontSize(9).font('Helvetica').text(data.notes, 40, y, { width: contentW });
@@ -398,12 +466,13 @@ function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimeshee
 export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     // A4 landscape so the wide attendance table fits.
-    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape', bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
     drawMonthlyTimesheetPage(doc, data);
+    stampTimesheetPageNumbers(doc);
     doc.end();
   });
 }
@@ -413,7 +482,7 @@ export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Prom
 // generateMonthlyTimesheetPDF so the two can never visually drift apart.
 export function generateYearlyTimesheetPDF(months: MonthlyTimesheetPDFData[]): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape' });
+    const doc = new PDFDocument({ margin: 40, size: 'A4', layout: 'landscape', bufferPages: true });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
     doc.on('end', () => resolve(Buffer.concat(chunks)));
@@ -422,93 +491,99 @@ export function generateYearlyTimesheetPDF(months: MonthlyTimesheetPDFData[]): P
       if (i > 0) doc.addPage();
       drawMonthlyTimesheetPage(doc, monthData);
     });
+    stampTimesheetPageNumbers(doc);
     doc.end();
   });
 }
 
-// Word-document equivalent of generateMonthlyTimesheetPDF, same input shape so
-// the two exports can never drift apart. docx has no free-floating colored
-// rect primitive like pdfkit's doc.rect().fill() — a full-width shaded table
-// cell is the standard workaround for the navy/blue bands.
 const NO_BORDERS = {
   top: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
   bottom: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
   left: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
   right: { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' },
 };
+// Hairline row divider (body rows) vs. a bolder accent rule (table header row).
+const HAIRLINE_BOTTOM = { ...NO_BORDERS, bottom: { style: BorderStyle.SINGLE, size: 2, color: 'EEF0F3' } };
+const RULE_BOTTOM = (color: string, size: number) => ({ ...NO_BORDERS, bottom: { style: BorderStyle.SINGLE, size, color } });
 
+const DOCX_STATUS_COLORS: Record<string, string> = {
+  present: '059669', leave: 'D97706', holiday: '7C3AED',
+  absent: 'DC2626', weekend: '6B7280', none: '64748B',
+};
+
+// Word-document equivalent of generateMonthlyTimesheetPDF, same input shape so
+// the two exports can never drift apart. Uses docx's native Header/Footer
+// sections for the letterhead (a real Word header/footer region, not a body
+// table masquerading as one) — the header shows the whole logo/contact image
+// (scaled down, never cropped, since it carries real information), the
+// footer shows the whole wave graphic at a small decorative size.
 export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData): Promise<Buffer> {
   const navy = '04213F';
   const blue = '4069FF';
   const gray = '6B7280';
   const ink = '111827';
-  const zebra = 'F9FAFB';
 
   const spacer = () => new Paragraph({ text: '', spacing: { after: 100 } });
 
-  // Header: logo (left) + "Monthly Timesheet" sub-label, month label (right,
-  // bold) — one navy-shaded row split across two cells.
-  let logoCell: TableCell;
-  try {
-    logoCell = new TableCell({
-      width: { size: 60, type: WidthType.PERCENTAGE },
-      shading: { type: ShadingType.CLEAR, color: 'auto', fill: navy },
-      verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 120, bottom: 120, left: 120, right: 120 },
-      children: [
-        new Paragraph({
-          shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FFFFFF' },
-          children: [new ImageRun({ type: 'png', data: getJoblyLogoBuffer(), transformation: { width: 130, height: 60 } })],
-        }),
-        new Paragraph({ children: [new TextRun({ text: 'Monthly Timesheet', color: 'FFFFFF', size: 16 })] }),
-      ],
-    });
-  } catch {
-    logoCell = new TableCell({
-      width: { size: 60, type: WidthType.PERCENTAGE },
-      shading: { type: ShadingType.CLEAR, color: 'auto', fill: navy },
-      verticalAlign: VerticalAlign.CENTER,
-      margins: { top: 120, bottom: 120, left: 120, right: 120 },
-      children: [
-        new Paragraph({
-          shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FFFFFF' },
-          children: [new TextRun({ text: 'JOBLY SOLUTIONS', bold: true, color: navy, size: 32 })],
-        }),
-        new Paragraph({ children: [new TextRun({ text: 'Monthly Timesheet', color: 'FFFFFF', size: 16 })] }),
-      ],
-    });
-  }
+  const headerSection = new Header({
+    children: [new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new ImageRun({ type: 'jpg', data: getTimesheetHeaderBuffer(), transformation: { width: 390, height: 69 } })],
+    })],
+  });
+  const footerSection = new Footer({
+    children: [new Paragraph({
+      alignment: AlignmentType.CENTER,
+      children: [new ImageRun({ type: 'jpg', data: getTimesheetFooterBuffer(), transformation: { width: 170, height: 30 } })],
+    })],
+  });
 
-  const headerTable = new Table({
+  // Title row: document title (left) + month (right) — a borderless 2-cell
+  // table, same lightweight pattern the old navy header used, minus the shading.
+  const titleTable = new Table({
     width: { size: 100, type: WidthType.PERCENTAGE },
-    borders: NO_BORDERS,
+    borders: RULE_BOTTOM(blue, 12),
     rows: [new TableRow({
       children: [
-        logoCell,
+        new TableCell({
+          width: { size: 60, type: WidthType.PERCENTAGE },
+          verticalAlign: VerticalAlign.CENTER,
+          margins: { top: 40, bottom: 80, left: 0, right: 0 },
+          children: [new Paragraph({ children: [new TextRun({ text: 'MONTHLY TIMESHEET', bold: true, color: navy, size: 22 })] })],
+        }),
         new TableCell({
           width: { size: 40, type: WidthType.PERCENTAGE },
-          shading: { type: ShadingType.CLEAR, color: 'auto', fill: navy },
           verticalAlign: VerticalAlign.CENTER,
-          margins: { top: 120, bottom: 120, left: 120, right: 120 },
-          children: [new Paragraph({
-            alignment: AlignmentType.RIGHT,
-            children: [new TextRun({ text: data.monthLabel, bold: true, color: 'FFFFFF', size: 28 })],
-          })],
+          margins: { top: 40, bottom: 80, left: 0, right: 0 },
+          children: [new Paragraph({ alignment: AlignmentType.RIGHT, children: [new TextRun({ text: data.monthLabel, bold: true, color: blue, size: 28 })] })],
         }),
       ],
     })],
   });
 
-  // Employee meta line
-  const metaParas = [
-    new Paragraph({ children: [new TextRun({ text: data.employeeName, bold: true, color: navy, size: 22 })] }),
-    new Paragraph({
-      children: [new TextRun({
-        text: `${data.employeeDisplayId}${data.jobTitle ? '  ·  ' + data.jobTitle : ''}  ·  Sheet ${data.displayId}`,
-        color: gray, size: 20,
-      })],
-    }),
+  // Employee info card — 4-column label/value grid in a bordered box.
+  const CARD_BORDER = { style: BorderStyle.SINGLE, size: 4, color: 'E5E7EB' };
+  const infoCols = [
+    { label: 'EMPLOYEE', value: data.employeeName },
+    { label: 'EMPLOYEE ID', value: data.employeeDisplayId },
+    { label: 'JOB TITLE', value: data.jobTitle || '—' },
+    { label: 'SHEET ID', value: data.displayId },
   ];
+  const infoCardTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: { top: CARD_BORDER, bottom: CARD_BORDER, left: CARD_BORDER, right: CARD_BORDER, insideHorizontal: CARD_BORDER, insideVertical: CARD_BORDER },
+    rows: [new TableRow({
+      children: infoCols.map(c => new TableCell({
+        width: { size: 25, type: WidthType.PERCENTAGE },
+        shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FAFBFC' },
+        margins: { top: 100, bottom: 100, left: 120, right: 120 },
+        children: [
+          new Paragraph({ children: [new TextRun({ text: c.label, bold: true, color: gray, size: 13 })] }),
+          new Paragraph({ children: [new TextRun({ text: c.value, bold: true, color: navy, size: 21 })] }),
+        ],
+      })),
+    })],
+  });
 
   // 8-column attendance table
   const cols = ['Date', 'Day', 'Project', 'Task', 'Start', 'End', 'Hours', 'Status'];
@@ -516,49 +591,77 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
   const headerRow = new TableRow({
     children: cols.map((h, i) => new TableCell({
       width: { size: colWidths[i], type: WidthType.PERCENTAGE },
-      shading: { type: ShadingType.CLEAR, color: 'auto', fill: blue },
+      borders: RULE_BOTTOM(blue, 10),
       margins: { top: 60, bottom: 60, left: 80, right: 80 },
-      children: [new Paragraph({ children: [new TextRun({ text: h, bold: true, color: 'FFFFFF', size: 16 })] })],
+      children: [new Paragraph({
+        alignment: h === 'Hours' ? AlignmentType.RIGHT : undefined,
+        children: [new TextRun({ text: h.toUpperCase(), bold: true, color: navy, size: 16 })],
+      })],
     })),
   });
-  const bodyRows = data.rows.map((r, idx) => {
+  const bodyRows = data.rows.map(r => {
     const vals = [
       r.date, r.day, r.project || '—', r.task || '—',
       r.start || '—', r.end || '—', r.hours > 0 ? r.hours.toFixed(1) : '—',
-      r.status.charAt(0).toUpperCase() + r.status.slice(1),
     ];
-    const fill = idx % 2 === 0 ? zebra : 'FFFFFF';
+    const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
     return new TableRow({
-      children: vals.map(v => new TableCell({
-        shading: { type: ShadingType.CLEAR, color: 'auto', fill },
-        margins: { top: 60, bottom: 60, left: 80, right: 80 },
-        children: [new Paragraph({ children: [new TextRun({ text: String(v), size: 15, color: ink })] })],
-      })),
+      children: [
+        ...vals.map((v, i) => new TableCell({
+          borders: HAIRLINE_BOTTOM,
+          margins: { top: 60, bottom: 60, left: 80, right: 80 },
+          children: [new Paragraph({
+            alignment: cols[i] === 'Hours' ? AlignmentType.RIGHT : undefined,
+            children: [new TextRun({ text: String(v), size: 15, color: ink })],
+          })],
+        })),
+        new TableCell({
+          borders: HAIRLINE_BOTTOM,
+          margins: { top: 60, bottom: 60, left: 80, right: 80 },
+          children: [new Paragraph({ children: [new TextRun({ text: statusLabel, bold: true, size: 15, color: DOCX_STATUS_COLORS[r.status] ?? ink })] })],
+        }),
+      ],
     });
   });
   const attendanceTable = new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [headerRow, ...bodyRows] });
 
-  // Summary + optional Notes
-  const summaryParas = [
-    new Paragraph({ children: [new TextRun({ text: 'Summary', bold: true, color: navy, size: 22 })], spacing: { before: 200 } }),
-    ...([
-      ['Total Hours Logged', `${data.totalHours.toFixed(1)} hrs`],
-      ['Expected Hours', `${data.expectedHours.toFixed(1)} hrs`],
-      ['Balance', `${data.balance >= 0 ? '+' : ''}${data.balance.toFixed(1)} hrs`],
-      ['Working Days', String(data.workingDays)],
-      ['Leave Days', String(data.leaveDays)],
-    ] as const).map(([label, value]) => new Paragraph({
-      children: [
-        new TextRun({ text: `${label}: `, color: gray, size: 20 }),
-        new TextRun({ text: value, bold: true, color: ink, size: 20 }),
-      ],
-    })),
+  // Summary "totals card" — 5 metrics side by side in a bordered table.
+  const sum: Array<[string, string]> = [
+    ['Total Hours Logged', `${data.totalHours.toFixed(1)} hrs`],
+    ['Expected Hours', `${data.expectedHours.toFixed(1)} hrs`],
+    ['Balance', `${data.balance >= 0 ? '+' : ''}${data.balance.toFixed(1)} hrs`],
+    ['Working Days', String(data.workingDays)],
+    ['Leave Days', String(data.leaveDays)],
   ];
+  const summaryTable = new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    borders: { top: CARD_BORDER, bottom: CARD_BORDER, left: CARD_BORDER, right: CARD_BORDER, insideHorizontal: CARD_BORDER, insideVertical: CARD_BORDER },
+    rows: [new TableRow({
+      children: sum.map(([label, value]) => new TableCell({
+        width: { size: 20, type: WidthType.PERCENTAGE },
+        shading: { type: ShadingType.CLEAR, color: 'auto', fill: 'FAFBFC' },
+        margins: { top: 140, bottom: 140, left: 140, right: 140 },
+        children: [
+          new Paragraph({ children: [new TextRun({ text: label, color: gray, size: 15 })] }),
+          new Paragraph({ children: [new TextRun({ text: value, bold: true, color: navy, size: 24 })], spacing: { before: 60 } }),
+        ],
+      })),
+    })],
+  });
 
   const notesParas = data.notes ? [
     new Paragraph({ children: [new TextRun({ text: 'Notes:', bold: true, color: navy, size: 20 })], spacing: { before: 160 } }),
     new Paragraph({ children: [new TextRun({ text: data.notes, color: gray, size: 18 })] }),
   ] : [];
+
+  const generatedPara = new Paragraph({
+    alignment: AlignmentType.CENTER,
+    spacing: { before: 240 },
+    children: [new TextRun({
+      text: `Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
+      color: '9CA3AF', size: 14,
+    })],
+  });
 
   const doc = new Document({
     sections: [{
@@ -568,7 +671,12 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
           margin: { top: 720, bottom: 720, left: 720, right: 720 },
         },
       },
-      children: [headerTable, spacer(), ...metaParas, spacer(), attendanceTable, spacer(), ...summaryParas, ...notesParas],
+      headers: { default: headerSection },
+      footers: { default: footerSection },
+      children: [
+        titleTable, spacer(), infoCardTable, spacer(),
+        attendanceTable, spacer(), summaryTable, ...notesParas, generatedPara,
+      ],
     }],
   });
 
