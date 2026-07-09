@@ -342,28 +342,6 @@ function newChromedTimesheetPage(doc: PDFKit.PDFDocument): number {
   return TS_HEADER_RESERVED + 14;
 }
 
-// Stamps "Generated on … · Page X of Y" just above the footer band on every
-// buffered page — requires the PDFDocument to have been created with
-// `bufferPages: true` so the total page count is known.
-function stampTimesheetPageNumbers(doc: PDFKit.PDFDocument): void {
-  const generatedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const range = doc.bufferedPageRange();
-  for (let i = range.start; i < range.start + range.count; i++) {
-    doc.switchToPage(i);
-    const pageW = doc.page.width;
-    const y = doc.page.height - TS_FOOTER_H - 14;
-    // This sits inside the page's bottom margin band — pdfkit's automatic
-    // pagination silently starts a new page for text placed there (even with
-    // an explicit x/y), producing a stray near-blank trailing page per real
-    // page. Zero out the bottom margin just for this draw so it stays put.
-    const savedBottom = doc.page.margins.bottom;
-    doc.page.margins.bottom = 0;
-    doc.fillColor('#9CA3AF').fontSize(7).font('Helvetica')
-      .text(`Generated on ${generatedOn}  ·  Page ${i - range.start + 1} of ${range.count}`, 40, y, { width: pageW - 80, align: 'center', lineBreak: false });
-    doc.page.margins.bottom = savedBottom;
-  }
-}
-
 // Draws one month's full timesheet report (letterhead, title, employee info
 // card, table, summary card) onto the CURRENT page of an already-open
 // PDFDocument. Shared by the single-month export and the yearly export
@@ -487,7 +465,6 @@ export function generateMonthlyTimesheetPDF(data: MonthlyTimesheetPDFData): Prom
     doc.on('end', () => resolve(Buffer.concat(chunks)));
     doc.on('error', reject);
     drawMonthlyTimesheetPage(doc, data);
-    stampTimesheetPageNumbers(doc);
     doc.end();
   });
 }
@@ -506,7 +483,6 @@ export function generateYearlyTimesheetPDF(months: MonthlyTimesheetPDFData[]): P
       if (i > 0) doc.addPage();
       drawMonthlyTimesheetPage(doc, monthData);
     });
-    stampTimesheetPageNumbers(doc);
     doc.end();
   });
 }
@@ -669,15 +645,6 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
     new Paragraph({ children: [new TextRun({ text: data.notes, color: gray, size: 18 })] }),
   ] : [];
 
-  const generatedPara = new Paragraph({
-    alignment: AlignmentType.CENTER,
-    spacing: { before: 240 },
-    children: [new TextRun({
-      text: `Generated on ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`,
-      color: '9CA3AF', size: 14,
-    })],
-  });
-
   const doc = new Document({
     sections: [{
       properties: {
@@ -690,7 +657,7 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
       footers: { default: footerSection },
       children: [
         titleTable, spacer(), infoCardTable, spacer(),
-        attendanceTable, spacer(), summaryTable, ...notesParas, generatedPara,
+        attendanceTable, spacer(), summaryTable, ...notesParas,
       ],
     }],
   });
@@ -750,21 +717,6 @@ function drawPerformanceReviewChrome(doc: PDFKit.PDFDocument): void {
   doc.rect(0, pageH - PR_FOOTER_H, pageW, PR_FOOTER_H).clip();
   doc.image(getTimesheetFooterBuffer(), 0, pageH - PR_FOOTER_H, { cover: [pageW, PR_FOOTER_H], valign: 'bottom' });
   doc.restore();
-}
-
-function stampPerformanceReviewPageNumbers(doc: PDFKit.PDFDocument): void {
-  const generatedOn = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-  const range = doc.bufferedPageRange();
-  for (let i = range.start; i < range.start + range.count; i++) {
-    doc.switchToPage(i);
-    const pageW = doc.page.width;
-    const y = doc.page.height - PR_FOOTER_H - 12;
-    const savedBottom = doc.page.margins.bottom;
-    doc.page.margins.bottom = 0;
-    doc.fillColor('#9CA3AF').fontSize(6.5).font('Helvetica')
-      .text(`Generated on ${generatedOn}  ·  Page ${i - range.start + 1} of ${range.count}`, 40, y, { width: pageW - 80, align: 'center', lineBreak: false });
-    doc.page.margins.bottom = savedBottom;
-  }
 }
 
 function drawReviewSectionHeading(doc: PDFKit.PDFDocument, text: string): void {
@@ -960,7 +912,6 @@ export function generatePerformanceReviewPDF(data: PerformanceReviewPDFData): Pr
       .text("Supervisor: This is my evaluation of the employee's performance during the review period.", sigLeft, lineY2 + 4, { width: sigWidth * 0.55 });
     doc.text(`Date: ${data.supervisorSignedDate ? formatDateUS(data.supervisorSignedDate) : '_______________'}`, sigLeft + sigWidth * 0.65, lineY2 + 4, { width: sigWidth * 0.35 });
 
-    stampPerformanceReviewPageNumbers(doc);
     doc.end();
   });
 }
