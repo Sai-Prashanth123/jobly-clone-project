@@ -291,17 +291,13 @@ export interface MonthlyTimesheetPDFData {
   notes?: string;
 }
 
-// The header carries real information (phone/email/address) that must stay
-// legible, so it's shown in full — scaled down as a whole (width capped, no
-// crop) rather than cropped to a short full-bleed band. The footer is purely
-// decorative (a wave graphic, no text), so it's fine to crop it down to a
-// thin full-width strip.
-const TS_HEADER_ASPECT = 2547 / 450;
-const TS_HEADER_W = 460;                              // scaled-down, uncropped width
-const TS_HEADER_H = TS_HEADER_W / TS_HEADER_ASPECT;    // ≈ 81pt
-const TS_HEADER_Y = 10;
-const TS_HEADER_RESERVED = TS_HEADER_Y + TS_HEADER_H;  // space to clear before body content
-const TS_FOOTER_H = 22; // thin wave-graphic strip, bottom-cropped from the 2539x449 source
+// Full-width letterhead. The header carries real information (phone/email/
+// address), so its crop height is tuned to show it in full at full page
+// width. The footer is purely decorative (a wave graphic, no text), so it's
+// cropped down tighter to a thin strip.
+const TS_HEADER_H = 130; // full-width band, center-cropped from the 2547x450 source
+const TS_HEADER_RESERVED = TS_HEADER_H;
+const TS_FOOTER_H = 22;  // thin wave-graphic strip, bottom-cropped from the 2539x449 source
 const TS_STATUS_COLORS: Record<string, string> = {
   present: '#059669', leave: '#D97706', holiday: '#7C3AED',
   absent: '#DC2626', weekend: '#6B7280', none: '#64748B',
@@ -309,17 +305,18 @@ const TS_STATUS_COLORS: Record<string, string> = {
 
 // Letterhead, drawn on every physical page (including a mid-month overflow
 // continuation page) so the branding is never missing partway through a
-// document.
+// document. pdfkit's `cover` only scales+positions — it does not clip, so
+// the scaled image is drawn in full and can overflow the given box;
+// explicitly clip so the "crop" is an actual crop, not an overlap.
 function drawTimesheetChrome(doc: PDFKit.PDFDocument): void {
   const pageW = doc.page.width;
   const pageH = doc.page.height;
 
-  // Header: whole image, centered, scaled down — never cropped.
-  doc.image(getTimesheetHeaderBuffer(), (pageW - TS_HEADER_W) / 2, TS_HEADER_Y, { width: TS_HEADER_W });
+  doc.save();
+  doc.rect(0, 0, pageW, TS_HEADER_H).clip();
+  doc.image(getTimesheetHeaderBuffer(), 0, 0, { cover: [pageW, TS_HEADER_H], valign: 'center' });
+  doc.restore();
 
-  // Footer: full-width thin strip. pdfkit's `cover` only scales+positions —
-  // it does not clip, so the scaled image is drawn in full and can overflow
-  // the given box; explicitly clip so the "crop" is an actual crop.
   doc.save();
   doc.rect(0, pageH - TS_FOOTER_H, pageW, TS_FOOTER_H).clip();
   doc.image(getTimesheetFooterBuffer(), 0, pageH - TS_FOOTER_H, { cover: [pageW, TS_FOOTER_H], valign: 'bottom' });
@@ -344,8 +341,15 @@ function stampTimesheetPageNumbers(doc: PDFKit.PDFDocument): void {
     doc.switchToPage(i);
     const pageW = doc.page.width;
     const y = doc.page.height - TS_FOOTER_H - 14;
+    // This sits inside the page's bottom margin band — pdfkit's automatic
+    // pagination silently starts a new page for text placed there (even with
+    // an explicit x/y), producing a stray near-blank trailing page per real
+    // page. Zero out the bottom margin just for this draw so it stays put.
+    const savedBottom = doc.page.margins.bottom;
+    doc.page.margins.bottom = 0;
     doc.fillColor('#9CA3AF').fontSize(7).font('Helvetica')
-      .text(`Generated on ${generatedOn}  ·  Page ${i - range.start + 1} of ${range.count}`, 40, y, { width: pageW - 80, align: 'center' });
+      .text(`Generated on ${generatedOn}  ·  Page ${i - range.start + 1} of ${range.count}`, 40, y, { width: pageW - 80, align: 'center', lineBreak: false });
+    doc.page.margins.bottom = savedBottom;
   }
 }
 
@@ -387,7 +391,7 @@ function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimeshee
     infoCols.forEach((c, i) => {
       const x = 40 + i * infoColW + 14;
       doc.fillColor(gray).fontSize(7).font('Helvetica-Bold').text(c.label, x, y + 9, { width: infoColW - 20 });
-      doc.fillColor(navy).fontSize(10.5).font('Helvetica-Bold').text(c.value, x, y + 21, { width: infoColW - 20, ellipsis: true });
+      doc.fillColor(navy).fontSize(10.5).font('Helvetica-Bold').text(c.value, x, y + 21, { width: infoColW - 20, height: 14, ellipsis: true });
     });
     y += cardH + 14;
 
@@ -427,11 +431,11 @@ function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimeshee
         r.start || '—', r.end || '—', r.hours > 0 ? r.hours.toFixed(1) : '—',
       ];
       cols.slice(0, 7).forEach((c, i) => {
-        doc.fillColor(ink).font('Helvetica').text(String(vals[i]), colX[i] + 6, y + 5, { width: c.w - 12, align: c.align, ellipsis: true });
+        doc.fillColor(ink).font('Helvetica').text(String(vals[i]), colX[i] + 6, y + 5, { width: c.w - 12, height: 14, align: c.align, ellipsis: true });
       });
       const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);
       doc.fillColor(TS_STATUS_COLORS[r.status] ?? ink).font('Helvetica-Bold')
-        .text(statusLabel, colX[7] + 6, y + 5, { width: cols[7].w - 12, align: cols[7].align, ellipsis: true });
+        .text(statusLabel, colX[7] + 6, y + 5, { width: cols[7].w - 12, height: 14, align: cols[7].align, ellipsis: true });
       y += 24;
     });
 
