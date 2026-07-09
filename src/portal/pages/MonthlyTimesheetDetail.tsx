@@ -12,8 +12,8 @@ import { useMonthlyTimesheet, usePatchMonthlyStatus, usePatchHrNotes, usePatchMo
 import { useAuth } from '../hooks/useAuth';
 import { useHolidays } from '../hooks/useHolidays';
 import { apiClient } from '../lib/apiClient';
-import { formatDate } from '../lib/utils';
-import { MONTHS, monthLabel } from '../lib/monthUtils';
+import { formatDate, formatDateUS } from '../lib/utils';
+import { monthLabel } from '../lib/monthUtils';
 import type { MonthlyDayStatus, MonthlyTimesheetEntry } from '../types';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
@@ -255,11 +255,9 @@ export default function MonthlyTimesheetDetail() {
               </thead>
               <tbody>
                 {sheet.entries.map(e => {
-                  const dayNum = Number(e.date.slice(-2));
-                  const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[sheet.month - 1].slice(0, 3)}`;
                   return (
                     <tr key={e.date} className="border-b border-gray-100">
-                      <td className="px-3 py-1.5 font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</td>
+                      <td className="px-3 py-1.5 font-mono text-xs text-gray-600 whitespace-nowrap">{formatDateUS(e.date)}</td>
                       <td className="px-3 py-1.5 text-xs text-gray-500">{e.dayOfWeek}</td>
                       <td className="px-3 py-1.5 text-xs">{e.project || '—'}</td>
                       <td className="px-3 py-1.5 text-xs">{e.task || '—'}</td>
@@ -353,7 +351,7 @@ export default function MonthlyTimesheetDetail() {
                     return (
                     <tr key={e.date} className="border-b border-gray-100">
                       <td className="px-3 py-1 font-mono text-xs text-gray-600">
-                        {e.date}
+                        {formatDateUS(e.date)}
                         {isUnmarkedHoliday && (
                           <span className="ml-1 inline-block text-[9px] font-semibold px-1 py-0.5 rounded bg-violet-100 text-violet-700" title="Company holiday added after this timesheet was submitted">
                             Holiday

@@ -4,7 +4,7 @@ import {
   ImageRun, WidthType, AlignmentType, BorderStyle, PageOrientation,
   ShadingType, VerticalAlign, Header, Footer,
 } from 'docx';
-import { formatDateSafe } from './dateUtils';
+import { formatDateSafe, formatDateUS } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
 import { getTimesheetHeaderBuffer, getTimesheetFooterBuffer } from './timesheetBranding';
 
@@ -437,7 +437,7 @@ function drawMonthlyTimesheetPage(doc: PDFKit.PDFDocument, data: MonthlyTimeshee
       }
       doc.rect(tableLeft, y + 22, contentW, 0.5).fill('#EEF0F3');
       const vals = [
-        r.date, r.day, r.project || '—', r.task || '—',
+        formatDateUS(r.date), r.day, r.project || '—', r.task || '—',
         r.start || '—', r.end || '—', r.hours > 0 ? r.hours.toFixed(1) : '—',
       ];
       cols.slice(0, 7).forEach((c, i) => {
@@ -615,7 +615,7 @@ export async function generateMonthlyTimesheetDOCX(data: MonthlyTimesheetPDFData
   });
   const bodyRows = data.rows.map(r => {
     const vals = [
-      r.date, r.day, r.project || '—', r.task || '—',
+      formatDateUS(r.date), r.day, r.project || '—', r.task || '—',
       r.start || '—', r.end || '—', r.hours > 0 ? r.hours.toFixed(1) : '—',
     ];
     const statusLabel = r.status.charAt(0).toUpperCase() + r.status.slice(1);

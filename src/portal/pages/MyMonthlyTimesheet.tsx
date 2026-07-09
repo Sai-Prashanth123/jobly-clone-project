@@ -26,8 +26,9 @@ import { useHolidays } from '../hooks/useHolidays';
 import { useAssignments } from '../hooks/useAssignments';
 import { apiClient } from '../lib/apiClient';
 import { exportToCsv } from '../lib/exportCsv';
+import { formatDateUS } from '../lib/utils';
 import {
-  MONTHS, buildMonthSkeleton, computeHours, computeMonthlySummary,
+  buildMonthSkeleton, computeHours, computeMonthlySummary,
   currentMonth, monthInputValue, parseMonthInput, monthLabel, daysInMonth,
 } from '../lib/monthUtils';
 import type { MonthlyTimesheet, MonthlyTimesheetEntry, MonthlyDayStatus } from '../types';
@@ -502,8 +503,9 @@ export default function MyMonthlyTimesheet() {
       const months = await assembleYearMonths(year);
       const rows = months
         .flatMap(m => m.entries)
+        .sort((a, b) => a.date.localeCompare(b.date)) // sort by raw ISO before reformatting — MM/DD/YYYY strings don't sort chronologically
         .map(e => ({
-          Date: e.date,
+          Date: formatDateUS(e.date),
           Day: e.dayOfWeek,
           Project: e.project ?? '',
           Task: e.task ?? '',
@@ -511,8 +513,7 @@ export default function MyMonthlyTimesheet() {
           End: e.endTime ?? '',
           Hours: e.hours,
           Status: e.status,
-        }))
-        .sort((a, b) => a.Date.localeCompare(b.Date));
+        }));
       if (rows.length === 0) {
         toast.warning(`No timesheet entries found for ${employeeName || 'this employee'} in ${exportYear}.`);
         return;
@@ -766,13 +767,11 @@ export default function MyMonthlyTimesheet() {
                         // Worked-day fields are editable only on Present days; weekend +
                         // leave/holiday/absent rows are greyed out.
                         const fieldsDisabled = isLocked || e.status !== 'present';
-                        const dayNum = Number(e.date.slice(-2));
-                        const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[loaded.month - 1].slice(0, 3)}`;
                         return (
                           <tr key={e.date} className={`border-b border-gray-100 ${ROW_TINT[e.status] ?? ''}`}>
                             <td className="px-3 py-2.5 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
                             <td className="px-3 py-2.5 font-mono text-xs text-gray-600 whitespace-nowrap">
-                              {dateStr}
+                              {formatDateUS(e.date)}
                               {leaveByDate?.[e.date] && (
                                 <span
                                   title={`${leaveByDate[e.date].status} leave ${leaveByDate[e.date].leaveDisplayId} (${LEAVE_TYPE_SHORT[leaveByDate[e.date].leaveType] ?? 'Leave'})`}
@@ -830,15 +829,13 @@ export default function MyMonthlyTimesheet() {
                   {entries.map((e, idx) => ({ e, idx })).filter(({ e }) => dayFilter === 'all' || e.status === dayFilter).map(({ e, idx }) => {
                     const isWeekend = e.status === 'weekend';
                     const fieldsDisabled = isLocked || e.status !== 'present';
-                    const dayNum = Number(e.date.slice(-2));
-                    const dateStr = `${String(dayNum).padStart(2, '0')} ${MONTHS[loaded.month - 1].slice(0, 3)}`;
                     const leave = leaveByDate?.[e.date];
                     return (
                       <div key={e.date} className={`px-3 py-3 ${ROW_TINT[e.status] ?? ''}`}>
                         {/* Header: date + day badge + status */}
                         <div className="flex items-center justify-between gap-2 mb-2.5">
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="font-mono text-xs text-gray-600 whitespace-nowrap">{dateStr}</span>
+                            <span className="font-mono text-xs text-gray-600 whitespace-nowrap">{formatDateUS(e.date)}</span>
                             <span className={`inline-block min-w-[36px] text-center px-2 py-0.5 rounded text-[11px] font-semibold ${isWeekend ? 'bg-gray-200 text-gray-500' : 'bg-[#4069FF]/10 text-[#4069FF]'}`}>{e.dayOfWeek}</span>
                             {leave && (
                               <span className={`text-[9px] font-semibold px-1 py-0.5 rounded ${leave.status === 'approved' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -1181,10 +1178,10 @@ Employee ID   : ${employeeDisplayId}
 Department    : ${department}
 Month / Year  : ${ml}
 ${sep}
-DATE     DAY  PROJECT          TASK                      START  END    HOURS  STATUS`;
+DATE        DAY  PROJECT          TASK                      START  END    HOURS  STATUS`;
 
   const rows = entries.filter(e => e.status !== 'weekend').map(e => {
-    const date = e.date.slice(-2).padEnd(8);
+    const date = formatDateUS(e.date).padEnd(11);
     const day = (e.dayOfWeek || '').padEnd(4);
     const proj = (e.project || '—').slice(0, 15).padEnd(16);
     const task = (e.task || '—').slice(0, 24).padEnd(25);

@@ -1,5 +1,5 @@
 import { Input } from '@/components/ui/input';
-import { parseNumberInput } from '../../lib/utils';
+import { parseNumberInput, formatDateUS } from '../../lib/utils';
 import { type LeaveDayInfo, LEAVE_TYPE_SHORT } from '../../hooks/useTimesheets';
 import type { Holiday } from '../../hooks/useHolidays';
 import type { TimesheetEntry } from '../../types';
@@ -61,9 +61,9 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveBy
           <thead>
             <tr className="bg-gray-50 border-b">
               {entries.map(entry => (
-                <th key={entry.date} className="px-3 py-2 text-center font-medium text-gray-700 min-w-[90px]">
+                <th key={entry.date} className="px-3 py-2 text-center font-medium text-gray-700 min-w-[104px]">
                   <div>{entry.dayOfWeek.slice(0, 3)}</div>
-                  <div className="text-xs text-gray-500 font-normal">{entry.date.slice(5)}</div>
+                  <div className="text-xs text-gray-500 font-normal">{formatDateUS(entry.date)}</div>
                   {holidayOf(entry.date) && <HolidayBadge holiday={holidayOf(entry.date)!} />}
                   {leaveOf(entry.date) && <LeaveBadge info={leaveOf(entry.date)!} />}
                 </th>
@@ -113,7 +113,7 @@ export function TimesheetWeekGrid({ entries, onChange, readonly = false, leaveBy
           <div key={entry.date} className="flex items-center justify-between py-2.5 px-3 rounded-lg bg-gray-50 border border-gray-100">
             <div>
               <p className="text-sm font-medium text-gray-900">{entry.dayOfWeek}</p>
-              <p className="text-xs text-gray-400">{entry.date.slice(5)}</p>
+              <p className="text-xs text-gray-400">{formatDateUS(entry.date)}</p>
               {holidayOf(entry.date) && <HolidayBadge holiday={holidayOf(entry.date)!} />}
               {leaveOf(entry.date) && <LeaveBadge info={leaveOf(entry.date)!} />}
             </div>

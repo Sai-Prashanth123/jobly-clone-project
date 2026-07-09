@@ -17,6 +17,16 @@ export function formatDate(date: string | undefined | null): string {
   }
 }
 
+/** Format a YYYY-MM-DD date as MM/DD/YYYY — used for per-day timesheet date lists. */
+export function formatDateUS(date: string | undefined | null): string {
+  if (!date) return '—';
+  try {
+    return format(parseISO(date), 'MM/dd/yyyy');
+  } catch {
+    return date;
+  }
+}
+
 export function formatDateTime(date: string | undefined | null): string {
   if (!date) return '—';
   try {

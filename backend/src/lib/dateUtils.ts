@@ -163,3 +163,13 @@ export function formatDateSafe(dateStr: string | undefined | null, opts: { long?
   const months = opts.long ? MONTHS_LONG : MONTHS_SHORT;
   return `${months[m - 1]} ${d}, ${y}`;
 }
+
+/** Format a YYYY-MM-DD date as MM/DD/YYYY, same no-Date-object-parsing approach as formatDateSafe. */
+export function formatDateUS(dateStr: string | undefined | null): string {
+  if (!dateStr) return '';
+  const parts = dateStr.slice(0, 10).split('-');
+  if (parts.length !== 3) return dateStr;
+  const [y, m, d] = parts;
+  if (!y || !m || !d) return dateStr;
+  return `${m}/${d}/${y}`;
+}
