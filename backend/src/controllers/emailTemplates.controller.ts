@@ -2,8 +2,11 @@ import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/emailTemplates.service';
 import type { CreateEmailTemplateInput, UpdateEmailTemplateInput, BulkClientEmailInput } from '../schemas/emailTemplate.schema';
 
-export async function list(_req: Request, res: Response, next: NextFunction): Promise<void> {
-  try { res.json({ success: true, data: await svc.listEmailTemplates() }); } catch (err) { next(err); }
+export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const type = req.query.type as 'general' | 'invoice' | undefined;
+    res.json({ success: true, data: await svc.listEmailTemplates(type) });
+  } catch (err) { next(err); }
 }
 
 export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {

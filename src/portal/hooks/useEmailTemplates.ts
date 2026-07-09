@@ -1,9 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 
+export type EmailTemplateType = 'general' | 'invoice';
+
 export interface EmailTemplate {
   id: string;
   name: string;
+  type: EmailTemplateType;
   subject: string;
   headerHtml: string;
   bodyHtml: string;
@@ -18,6 +21,7 @@ function mapTemplate(raw: any): EmailTemplate {
   return {
     id: raw.id,
     name: raw.name,
+    type: raw.type === 'invoice' ? 'invoice' : 'general',
     subject: raw.subject ?? '',
     headerHtml: raw.header_html ?? '',
     bodyHtml: raw.body_html ?? '',
@@ -30,6 +34,7 @@ function mapTemplate(raw: any): EmailTemplate {
 
 export interface EmailTemplateBody {
   name: string;
+  type?: EmailTemplateType;
   subject?: string;
   headerHtml?: string;
   bodyHtml?: string;
@@ -37,11 +42,11 @@ export interface EmailTemplateBody {
   isDefault?: boolean;
 }
 
-export function useEmailTemplates() {
+export function useEmailTemplates(params?: { type?: EmailTemplateType }) {
   return useQuery({
-    queryKey: ['email-templates'],
+    queryKey: ['email-templates', params],
     queryFn: async () => {
-      const { data } = await apiClient.get('/email-templates');
+      const { data } = await apiClient.get('/email-templates', { params });
       return (data.data as unknown[]).map(mapTemplate);
     },
   });
@@ -99,4 +104,14 @@ export const EMAIL_TEMPLATE_VARIABLES = [
   { token: '{{client_name}}', label: 'Client name' },
   { token: '{{contact_email}}', label: 'Contact email' },
   { token: '{{today}}', label: "Today's date" },
+];
+
+// Additional placeholders available only on type='invoice' templates — the
+// invoice-send flow fills these in alongside the client-level ones above.
+export const EMAIL_TEMPLATE_INVOICE_VARIABLES = [
+  { token: '{{invoice_number}}', label: 'Invoice number' },
+  { token: '{{issue_date}}', label: 'Issue date' },
+  { token: '{{due_date}}', label: 'Due date' },
+  { token: '{{total_amount}}', label: 'Total amount' },
+  { token: '{{balance_due}}', label: 'Balance due' },
 ];

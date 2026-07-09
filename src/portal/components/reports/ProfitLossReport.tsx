@@ -15,11 +15,11 @@ function getYearRange(year: number) {
 const currentYear = new Date().getUTCFullYear();
 
 export function ProfitLossReport() {
-  const [basis, setBasis] = useState<'accrual' | 'cash'>('accrual');
+  const [basis, setBasis] = useState<'accrual' | 'cash' | 'unpaid'>('accrual');
   const [yearMode, setYearMode] = useState<string>(String(currentYear));
   const [customStart, setCustomStart] = useState('');
   const [customEnd, setCustomEnd] = useState('');
-  const [applied, setApplied] = useState<{ start: string; end: string; basis: 'accrual' | 'cash' }>({
+  const [applied, setApplied] = useState<{ start: string; end: string; basis: 'accrual' | 'cash' | 'unpaid' }>({
     ...getYearRange(currentYear),
     basis: 'accrual',
   });
@@ -76,11 +76,12 @@ export function ProfitLossReport() {
             </div>
             <div className="space-y-1">
               <p className="text-xs font-medium text-gray-600">Report Type</p>
-              <Select value={basis} onValueChange={v => setBasis(v as 'accrual' | 'cash')}>
+              <Select value={basis} onValueChange={v => setBasis(v as 'accrual' | 'cash' | 'unpaid')}>
                 <SelectTrigger className="w-52 h-9 text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="accrual">Accrual (Paid &amp; Unpaid)</SelectItem>
                   <SelectItem value="cash">Cash Basis (Paid Only)</SelectItem>
+                  <SelectItem value="unpaid">Unpaid Only</SelectItem>
                 </SelectContent>
               </Select>
             </div>

@@ -17,6 +17,7 @@ import { useEmployees } from '../../hooks/useEmployees';
 import { useAssignments } from '../../hooks/useAssignments';
 import { useUploadInvoiceAttachment, useDeleteInvoiceAttachment, type CreateInvoiceBody } from '../../hooks/useInvoices';
 import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates';
+import { useEmailTemplates } from '../../hooks/useEmailTemplates';
 import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
 import { UsDateInput } from '../shared/UsDateInput';
 import type { InvoiceAttachment, InvoiceStatus } from '../../types';
@@ -36,6 +37,7 @@ export interface InvoiceFormInitial {
   discountType?: 'percentage' | 'fixed' | null;
   discountValue?: number;
   invoiceTemplateId?: string;
+  emailTemplateId?: string;
   amountPaid?: number;
   notes?: string;
   terms?: string;
@@ -68,7 +70,6 @@ const PAYMENT_TERMS_OPTIONS = [
   { value: 'net_30', label: 'Net 30', days: 30 },
   { value: 'net_45', label: 'Net 45', days: 45 },
   { value: 'net_60', label: 'Net 60', days: 60 },
-  { value: 'custom', label: 'Custom date', days: -1 },
 ];
 
 // Mirrors backend ALLOWED_MIME_TYPES (middleware/upload.ts) for instant feedback.
@@ -123,11 +124,9 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
 
   const [poNumber, setPoNumber] = useState(initial?.poNumber ?? '');
   const [paymentTerms, setPaymentTerms] = useState(initial?.paymentTerms ?? 'net_30');
-  const [customDueDate, setCustomDueDate] = useState(
-    initial?.paymentTerms === 'custom' ? (initial?.dueDate ?? '') : '',
-  );
   const [currency, setCurrency] = useState(initial?.currency ?? 'USD');
   const [invoiceTemplateId, setInvoiceTemplateId] = useState(initial?.invoiceTemplateId ?? '');
+  const [emailTemplateId, setEmailTemplateId] = useState(initial?.emailTemplateId ?? '');
   const [notes, setNotes] = useState(initial?.notes ?? '');
   const [terms, setTerms] = useState(initial?.terms ?? '');
   const [footerOpen, setFooterOpen] = useState(!!initial?.terms);
@@ -161,6 +160,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const { data: assignData } = useAssignments({ limit: 200 }, { enabled: needsTimesheetData });
 
   const { data: invoiceThemes } = useInvoiceTemplates();
+  const { data: invoiceEmailTemplates } = useEmailTemplates({ type: 'invoice' });
   const clients = clientData?.data ?? [];
   const clientTimesheets = tsData?.data ?? [];
   const employees = empData?.data ?? [];
@@ -181,9 +181,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     return { ...l, qty, price, amount: Math.round(qty * price * 100) / 100 };
   });
   const manualSubtotal = Math.round(manualLines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
-  const dueDate = paymentTerms === 'custom'
-    ? (customDueDate || '—')
-    : addDays(issueDate, PAYMENT_TERMS_OPTIONS.find(o => o.value === paymentTerms)?.days ?? 30);
+  const dueDate = addDays(issueDate, PAYMENT_TERMS_OPTIONS.find(o => o.value === paymentTerms)?.days ?? 30);
 
   // ── Timesheet totals ──
   const getEmployee = (id: string) => employees.find(e => e.id === id);
@@ -258,7 +256,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     // invoice — block those explicitly rather than letting a zero-value
     // invoice reach the client.
     if (total <= 0) { setError('Invoice total must be greater than zero'); return; }
-    if (paymentTerms === 'custom' && !customDueDate) { setError('Pick a custom due date'); return; }
     if (discountMode !== 'none' && discountValue <= 0) { setError('Enter a discount amount, or remove the discount'); return; }
     if (discountMode === 'percentage' && discountValue > 100) { setError('A percentage discount cannot exceed 100%'); return; }
     setError('');
@@ -269,12 +266,12 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
       poNumber: poNumber || null,
       paymentTerms,
       issueDate,
-      dueDate: paymentTerms === 'custom' ? customDueDate : null,
       currency,
       taxRate,
       discountType,
       discountValue: discountType ? discountValue : null,
       invoiceTemplateId: invoiceTemplateId || null,
+      emailTemplateId: emailTemplateId || null,
       notes: notes || null,
       terms: terms || null,
       lineItems: valid.map(l => ({
@@ -379,15 +376,9 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-1.5">
-                <Label>{paymentTerms === 'custom' ? 'Due date' : 'Due date (auto)'}</Label>
-                {paymentTerms === 'custom'
-                  ? <UsDateInput value={customDueDate} onChange={setCustomDueDate} />
-                  : <Input value={dueDate} disabled />}
-              </div>
               {(invoiceThemes && invoiceThemes.length > 0) && (
                 <div className="space-y-1.5">
-                  <Label>Template / theme</Label>
+                  <Label>PDF theme</Label>
                   <Select value={invoiceTemplateId || '__default'} onValueChange={v => setInvoiceTemplateId(v === '__default' ? '' : v)}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
@@ -395,6 +386,19 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                       {invoiceThemes.map(t => <SelectItem key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (default)' : ''}</SelectItem>)}
                     </SelectContent>
                   </Select>
+                </div>
+              )}
+              {(invoiceEmailTemplates && invoiceEmailTemplates.length > 0) && (
+                <div className="space-y-1.5">
+                  <Label>Email template</Label>
+                  <Select value={emailTemplateId || '__default'} onValueChange={v => setEmailTemplateId(v === '__default' ? '' : v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__default">Default invoice email</SelectItem>
+                      {invoiceEmailTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}{t.isDefault ? ' (default)' : ''}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <p className="text-[11px] text-muted-foreground">Controls the email sent when this invoice is sent to the client. Edit templates under Templates → Email templates.</p>
                 </div>
               )}
             </CardContent>

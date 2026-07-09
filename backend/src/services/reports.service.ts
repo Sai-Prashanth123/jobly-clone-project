@@ -1,5 +1,9 @@
 import { supabaseAdmin } from '../config/supabase';
 
+// Invoices that are billed but not (fully) paid — mirrors the convention
+// already used inline elsewhere in this file and in OutstandingInvoicesReport.tsx.
+const OUTSTANDING_STATUSES = ['sent', 'viewed', 'partially_paid', 'overdue'];
+
 export async function getEmployeeUtilization() {
   const [{ data: assignments }, { data: timesheets }, { data: employees }] = await Promise.all([
     supabaseAdmin
@@ -325,7 +329,7 @@ export async function getRevenueByDateRange(startDate: string, endDate: string) 
   };
 }
 
-export async function getProfitLoss(startDate: string, endDate: string, basis: 'accrual' | 'cash') {
+export async function getProfitLoss(startDate: string, endDate: string, basis: 'accrual' | 'cash' | 'unpaid') {
   // Fetch invoices based on accounting basis
   let query = supabaseAdmin
     .from('invoices')
@@ -335,6 +339,11 @@ export async function getProfitLoss(startDate: string, endDate: string, basis: '
   if (basis === 'cash') {
     // Cash basis: only invoices that have been paid, within paid_at range
     query = query.eq('status', 'paid').gte('paid_at', startDate).lte('paid_at', endDate);
+  } else if (basis === 'unpaid') {
+    // Unpaid basis: invoices that are billed but not (fully) paid, issued in
+    // range — there's no single "unpaid_at" so, like accrual, this dates by
+    // issue_date rather than a payment event that hasn't happened.
+    query = query.in('status', OUTSTANDING_STATUSES).gte('issue_date', startDate).lte('issue_date', endDate);
   } else {
     // Accrual basis: all invoices issued in range (paid or unpaid), excluding
     // drafts — a draft has an issue_date but was never actually billed.

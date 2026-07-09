@@ -310,6 +310,12 @@ export interface InvoiceEmailPayload {
   terms?: string;
   lineItems: { itemName?: string; description: string; quantity: number; unitPrice: number; amount: number; isHours?: boolean }[];
   attachmentFiles?: { filename: string; content: Buffer; contentType?: string }[];
+  // Optional: an admin-authored template (already placeholder-rendered) chosen
+  // on the invoice. When present, the header/body/footer replace the default
+  // branded shell (via buildBrandedEmail) but the line-items/total/dates block
+  // below is always appended — a custom template can't omit the real billing
+  // data. Absent → behavior is identical to before this field existed.
+  customTemplate?: { subject?: string; headerHtml?: string; bodyHtml?: string; footerHtml?: string };
 }
 
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<void> {
@@ -422,12 +428,21 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
   Questions about this invoice? Contact us at <a href="mailto:billing@joblysolutions.com" style="color:#4069FF;text-decoration:none;">billing@joblysolutions.com</a>
 </p>`;
 
-  const html = emailShell({
-    previewText: `Invoice ${invoiceNumber} from Jobly Solutions — ${fmt(balanceDue ?? totalAmount)} due ${fmtDate(dueDate)}`,
-    title: `Invoice from Jobly Solutions`,
-    subtitle: `${esc(invoiceNumber)} · ${esc(clientName)}`,
-    body: invoiceBody,
-  });
+  const { customTemplate } = payload;
+  const defaultSubject = `Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`;
+
+  const html = customTemplate
+    ? buildBrandedEmail({
+        headerHtml: customTemplate.headerHtml,
+        bodyHtml: `${customTemplate.bodyHtml ?? ''}${invoiceBody}`,
+        footerHtml: customTemplate.footerHtml,
+      })
+    : emailShell({
+        previewText: `Invoice ${invoiceNumber} from Jobly Solutions — ${fmt(balanceDue ?? totalAmount)} due ${fmtDate(dueDate)}`,
+        title: `Invoice from Jobly Solutions`,
+        subtitle: `${esc(invoiceNumber)} · ${esc(clientName)}`,
+        body: invoiceBody,
+      });
 
   // Build attachments: invoice PDF + any uploaded docs (PSL.pdf etc.)
   const attachments: MailOptions['attachments'] = [];
@@ -447,7 +462,7 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
   await sendWithRetry({
     from: FROM,
     to,
-    subject: `Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`,
+    subject: (customTemplate?.subject && customTemplate.subject.trim()) || defaultSubject,
     html,
     attachments,
   });

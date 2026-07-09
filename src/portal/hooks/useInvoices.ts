@@ -38,6 +38,7 @@ function mapInvoice(raw: any): Invoice {
     poNumber: raw.po_number ?? undefined,
     paymentTerms: raw.payment_terms ?? undefined,
     invoiceTemplateId: raw.invoice_template_id ?? undefined,
+    emailTemplateId: raw.email_template_id ?? undefined,
     currency: raw.currency ?? 'USD',
     terms: raw.terms ?? undefined,
     publicToken: raw.public_token ?? undefined,
@@ -73,6 +74,7 @@ export interface CreateInvoiceBody {
   discountType?: 'percentage' | 'fixed' | null;
   discountValue?: number | null;
   invoiceTemplateId?: string | null;
+  emailTemplateId?: string | null;
   notes?: string | null;
   terms?: string | null;
 }
@@ -180,6 +182,7 @@ export function useUpdateInvoice(id: string) {
       notes?: string | null; terms?: string | null; poNumber?: string | null; taxRate?: number;
       invoiceNumber?: string; discountType?: 'percentage' | 'fixed' | null; discountValue?: number | null;
       invoiceTemplateId?: string | null;
+      emailTemplateId?: string | null;
       clientId?: string; paymentTerms?: string; issueDate?: string; dueDate?: string | null; currency?: string;
       lineItems?: { itemName?: string | null; description?: string | null; quantity: number; unitPrice: number; productId?: string | null }[];
     }) => {

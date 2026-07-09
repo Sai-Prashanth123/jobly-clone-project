@@ -131,6 +131,7 @@ export default function InvoiceEditor() {
         discountType: invoice!.discountType,
         discountValue: invoice!.discountValue,
         invoiceTemplateId: invoice!.invoiceTemplateId,
+        emailTemplateId: invoice!.emailTemplateId,
         amountPaid: invoice!.amountPaid,
         notes: invoice!.notes,
         terms: invoice!.terms,

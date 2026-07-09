@@ -11,7 +11,8 @@ import { Plus, Trash2, Save, Send, Mail, Loader2, Search, AlertCircle } from 'lu
 import { RichTextEditor } from '../components/shared/RichTextEditor';
 import {
   useEmailTemplates, useCreateEmailTemplate, useUpdateEmailTemplate, useDeleteEmailTemplate,
-  useSendBulkClientEmail, EMAIL_TEMPLATE_VARIABLES, type EmailTemplate,
+  useSendBulkClientEmail, EMAIL_TEMPLATE_VARIABLES, EMAIL_TEMPLATE_INVOICE_VARIABLES,
+  type EmailTemplate, type EmailTemplateType,
 } from '../hooks/useEmailTemplates';
 import {
   useInvoiceTemplates, useCreateInvoiceTemplate, useUpdateInvoiceTemplate, useDeleteInvoiceTemplate,
@@ -83,6 +84,9 @@ function TemplatesTab() {
             <button key={t.id} type="button" onClick={() => setSelectedId(t.id)}
               className={`w-full text-left px-3 py-2 rounded-md text-sm ${selectedId === t.id ? 'bg-blue-50 text-blue-700' : 'hover:bg-gray-50'}`}>
               <span className="font-medium">{t.name}</span>
+              <span className={`ml-2 text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${t.type === 'invoice' ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-500'}`}>
+                {t.type === 'invoice' ? 'Invoice' : 'General'}
+              </span>
               {t.isDefault && <span className="ml-2 text-[10px] uppercase tracking-wide text-emerald-600">Default</span>}
             </button>
           ))}
@@ -100,11 +104,13 @@ function TemplateEditor({ template, onDeleted }: { template: EmailTemplate; onDe
   const updateTpl = useUpdateEmailTemplate(template.id);
   const deleteTpl = useDeleteEmailTemplate();
   const [name, setName] = useState(template.name);
+  const [type, setType] = useState<EmailTemplateType>(template.type);
   const [subject, setSubject] = useState(template.subject);
   const [header, setHeader] = useState(template.headerHtml);
   const [body, setBody] = useState(template.bodyHtml);
   const [footer, setFooter] = useState(template.footerHtml);
   const [isDefault, setIsDefault] = useState(template.isDefault);
+  const variables = type === 'invoice' ? [...EMAIL_TEMPLATE_VARIABLES, ...EMAIL_TEMPLATE_INVOICE_VARIABLES] : EMAIL_TEMPLATE_VARIABLES;
 
   return (
     <Card>
@@ -119,7 +125,7 @@ function TemplateEditor({ template, onDeleted }: { template: EmailTemplate; onDe
           <Button size="sm" className="gap-1.5" loading={updateTpl.isPending} loadingText="Saving…"
             onClick={async () => {
               if (!name.trim()) { toast.error('Name is required'); return; }
-              try { await updateTpl.mutateAsync({ name, subject, headerHtml: header, bodyHtml: body, footerHtml: footer, isDefault }); toast.success('Template saved'); }
+              try { await updateTpl.mutateAsync({ name, type, subject, headerHtml: header, bodyHtml: body, footerHtml: footer, isDefault }); toast.success('Template saved'); }
               catch { toast.error('Save failed'); }
             }}>
             <Save className="h-4 w-4" /> Save
@@ -127,15 +133,30 @@ function TemplateEditor({ template, onDeleted }: { template: EmailTemplate; onDe
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="space-y-1.5"><Label>Template name</Label><Input value={name} onChange={e => setName(e.target.value)} /></div>
+          <div className="space-y-1.5">
+            <Label>Used for</Label>
+            <Select value={type} onValueChange={v => setType(v as EmailTemplateType)}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="general">General (Email clients blast)</SelectItem>
+                <SelectItem value="invoice">Invoice emails</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5"><Label>Subject</Label><Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="e.g. Payment reminder for {{company_name}}" /></div>
         </div>
-        <div className="space-y-1.5"><Label>Header</Label><RichTextEditor value={header} onChange={setHeader} variables={EMAIL_TEMPLATE_VARIABLES} minHeight={80} placeholder="Optional header / greeting…" /></div>
-        <div className="space-y-1.5"><Label>Body</Label><RichTextEditor value={body} onChange={setBody} variables={EMAIL_TEMPLATE_VARIABLES} minHeight={200} placeholder="Main message…" /></div>
-        <div className="space-y-1.5"><Label>Footer</Label><RichTextEditor value={footer} onChange={setFooter} variables={EMAIL_TEMPLATE_VARIABLES} minHeight={80} placeholder="Sign-off / signature…" /></div>
+        {type === 'invoice' && (
+          <p className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-md px-3 py-2">
+            This template can be selected on the invoice form's "Email template" picker. The line items, total, and due date are always included automatically below your content — no need to add them yourself.
+          </p>
+        )}
+        <div className="space-y-1.5"><Label>Header</Label><RichTextEditor value={header} onChange={setHeader} variables={variables} minHeight={80} placeholder="Optional header / greeting…" /></div>
+        <div className="space-y-1.5"><Label>Body</Label><RichTextEditor value={body} onChange={setBody} variables={variables} minHeight={200} placeholder="Main message…" /></div>
+        <div className="space-y-1.5"><Label>Footer</Label><RichTextEditor value={footer} onChange={setFooter} variables={variables} minHeight={80} placeholder="Sign-off / signature…" /></div>
         <label className="flex items-center gap-2 text-sm">
-          <Checkbox checked={isDefault} onCheckedChange={v => setIsDefault(!!v)} /> Use as the default template
+          <Checkbox checked={isDefault} onCheckedChange={v => setIsDefault(!!v)} /> Use as the default template for this type
         </label>
         <PreviewPane subject={subject} header={header} body={body} footer={footer} />
       </CardContent>
@@ -145,7 +166,9 @@ function TemplateEditor({ template, onDeleted }: { template: EmailTemplate; onDe
 
 // ── Compose / send blast tab ─────────────────────────────────────────────────────
 function ComposeTab() {
-  const { data: templates } = useEmailTemplates();
+  // Only "general" templates make sense as a starting point for the bulk
+  // client blast — "invoice" templates are scoped to the invoice-send flow.
+  const { data: templates } = useEmailTemplates({ type: 'general' });
   const { data: clientData } = useClients({ limit: 500 });
   const sendBulk = useSendBulkClientEmail();
 

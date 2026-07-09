@@ -34,9 +34,10 @@ const clean = (html: string) => sanitizeHtml(html ?? '', SANITIZE_OPTS);
 
 // ── CRUD ──────────────────────────────────────────────────────────────────────
 
-export async function listEmailTemplates() {
-  const { data, error } = await supabaseAdmin
-    .from('email_templates').select('*').order('created_at', { ascending: true });
+export async function listEmailTemplates(type?: 'general' | 'invoice') {
+  let query = supabaseAdmin.from('email_templates').select('*').order('created_at', { ascending: true });
+  if (type) query = query.eq('type', type);
+  const { data, error } = await query;
   if (error) throw error;
   return data ?? [];
 }
@@ -48,9 +49,13 @@ export async function getEmailTemplate(id: string) {
 }
 
 export async function createEmailTemplate(input: CreateEmailTemplateInput, actorId?: string) {
-  if (input.isDefault) await supabaseAdmin.from('email_templates').update({ is_default: false }).eq('is_default', true);
+  const type = input.type ?? 'general';
+  // "Default" is scoped per type — setting a default invoice template must not
+  // clear the default general (bulk-blast) template, and vice versa.
+  if (input.isDefault) await supabaseAdmin.from('email_templates').update({ is_default: false }).eq('is_default', true).eq('type', type);
   const { data, error } = await supabaseAdmin.from('email_templates').insert({
     name: input.name,
+    type,
     subject: input.subject ?? '',
     header_html: clean(input.headerHtml ?? ''),
     body_html: clean(input.bodyHtml ?? ''),
@@ -63,10 +68,12 @@ export async function createEmailTemplate(input: CreateEmailTemplateInput, actor
 }
 
 export async function updateEmailTemplate(id: string, input: UpdateEmailTemplateInput, _actorId?: string) {
-  await getEmailTemplate(id);
-  if (input.isDefault) await supabaseAdmin.from('email_templates').update({ is_default: false }).eq('is_default', true);
+  const existing = await getEmailTemplate(id);
+  const type = input.type ?? existing.type ?? 'general';
+  if (input.isDefault) await supabaseAdmin.from('email_templates').update({ is_default: false }).eq('is_default', true).eq('type', type);
   const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (input.name !== undefined) patch.name = input.name;
+  if (input.type !== undefined) patch.type = input.type;
   if (input.subject !== undefined) patch.subject = input.subject;
   if (input.headerHtml !== undefined) patch.header_html = clean(input.headerHtml);
   if (input.bodyHtml !== undefined) patch.body_html = clean(input.bodyHtml);

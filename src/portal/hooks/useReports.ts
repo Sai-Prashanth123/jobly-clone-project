@@ -92,7 +92,7 @@ export function useRevenueByDateRange(startDate?: string, endDate?: string) {
   });
 }
 
-export function useProfitLoss(startDate?: string, endDate?: string, basis?: 'accrual' | 'cash') {
+export function useProfitLoss(startDate?: string, endDate?: string, basis?: 'accrual' | 'cash' | 'unpaid') {
   return useQuery({
     queryKey: ['reports', 'profit-loss', startDate, endDate, basis ?? 'accrual'],
     queryFn: async () => {

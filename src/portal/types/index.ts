@@ -435,6 +435,7 @@ export interface Invoice {
   poNumber?: string;
   paymentTerms?: string;
   invoiceTemplateId?: string;
+  emailTemplateId?: string;
   currency?: string;
   terms?: string;
   publicToken?: string;

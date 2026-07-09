@@ -83,7 +83,8 @@ export async function profitLoss(req: Request, res: Response, next: NextFunction
       res.status(400).json({ success: false, error: 'startDate and endDate are required' });
       return;
     }
-    const data = await svc.getProfitLoss(startDate, endDate, (basis === 'cash' ? 'cash' : 'accrual'));
+    const resolvedBasis = basis === 'cash' ? 'cash' : basis === 'unpaid' ? 'unpaid' : 'accrual';
+    const data = await svc.getProfitLoss(startDate, endDate, resolvedBasis);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

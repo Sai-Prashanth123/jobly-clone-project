@@ -2,10 +2,11 @@ import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../lib/errors';
 import { generateInvoicePDF, type InvoicePDFData } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
-import { sendInvoiceEmail, mailerConfigured } from '../lib/mailer';
+import { sendInvoiceEmail, mailerConfigured, renderTemplate } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { uploadDocument, deleteDocument, downloadDocumentBuffer } from './storage.service';
 import { getInvoiceTheme } from './invoiceTemplates.service';
+import { getEmailTemplate } from './emailTemplates.service';
 import { addDaysToDate, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
 import { paymentTermsDays } from '../schemas/invoice.schema';
@@ -357,6 +358,7 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
     payment_terms: input.paymentTerms,
     currency: input.currency,
     invoice_template_id: input.invoiceTemplateId ?? null,
+    email_template_id: input.emailTemplateId ?? null,
     notes: input.notes ?? null,
     terms: input.terms ?? null,
   }, input.invoiceNumber || undefined);
@@ -469,6 +471,7 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   if (input.terms !== undefined) updateData.terms = input.terms;
   if (input.poNumber !== undefined) updateData.po_number = input.poNumber;
   if (input.invoiceTemplateId !== undefined) updateData.invoice_template_id = input.invoiceTemplateId;
+  if (input.emailTemplateId !== undefined) updateData.email_template_id = input.emailTemplateId;
 
   if (input.invoiceNumber !== undefined && input.invoiceNumber !== inv.invoice_number) {
     if (input.invoiceNumber) updateData.invoice_number = input.invoiceNumber;
@@ -655,6 +658,37 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string) {
 
   const pdfData = buildInvoicePdfData(inv, client);
 
+  // If this invoice has an admin-authored email template attached, render its
+  // subject/header/body/footer with invoice-specific placeholders — a stale
+  // reference (template deleted since) must never block sending, so a lookup
+  // failure just falls back to the default hardcoded email.
+  let customTemplate: { subject?: string; headerHtml?: string; bodyHtml?: string; footerHtml?: string } | undefined;
+  if (inv.email_template_id) {
+    try {
+      const template = await getEmailTemplate(inv.email_template_id);
+      const vars: Record<string, string> = {
+        invoice_number: inv.invoice_number ?? '',
+        issue_date: inv.issue_date ?? '',
+        due_date: inv.due_date ?? '',
+        total_amount: pdfData.totalAmount != null ? String(pdfData.totalAmount) : '',
+        balance_due: pdfData.balanceDue != null ? String(pdfData.balanceDue) : '',
+        client_name: client?.company_name ?? '',
+        company_name: client?.company_name ?? '',
+        contact_name: client?.billing_contact_name || client?.contact_name || 'there',
+        contact_email: client?.billing_contact_email || client?.contact_email || '',
+        today: new Date().toISOString().slice(0, 10),
+      };
+      customTemplate = {
+        subject: renderTemplate(template.subject, vars),
+        headerHtml: renderTemplate(template.header_html, vars),
+        bodyHtml: renderTemplate(template.body_html, vars),
+        footerHtml: renderTemplate(template.footer_html, vars),
+      };
+    } catch (err) {
+      console.error('[invoices.service] failed to load email template for invoice', id, err);
+    }
+  }
+
   // Attempt to send the email. Capture success/failure so the caller can
   // surface a structured warning instead of throwing a generic 500. Mirrors
   // the pattern in employees.service.ts:issueCredentials.
@@ -694,6 +728,7 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string) {
         isHours: li.isHours,
       })),
       attachmentFiles: attachmentFiles.length > 0 ? attachmentFiles : undefined,
+      customTemplate,
     });
     emailSent = true;
   } catch (err: any) {
