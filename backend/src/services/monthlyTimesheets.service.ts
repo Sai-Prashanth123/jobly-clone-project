@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isCurrentOrFutureMonthUTC, isMonthBeforeJoiningUTC } from '../lib/dateUtils';
+import { isCurrentOrFutureMonthUTC, isMonthBeforeJoiningUTC, isWeekendUTC } from '../lib/dateUtils';
 import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import {
   createNotification, getUserIdsByRole,
@@ -55,12 +55,16 @@ function computeSummary(entries: MonthlyEntry[]) {
 // added (or newly-recurring) holiday yet could otherwise log/lock real hours
 // on what should be a locked holiday date. Purely additive: only forces
 // `status: 'holiday'` (zero hours) onto entries whose date IS a real holiday;
-// never touches or overrides any other entry.
+// never touches or overrides any other entry. Weekend always wins — a
+// holiday's literal calendar date can fall on a Saturday/Sunday (e.g. July 4
+// landing on a Saturday, observed the preceding Friday instead), and that
+// weekend date itself must stay 'weekend', matching buildMonthSkeleton's
+// same isWeekend-first precedence on the frontend.
 async function applyHolidayOverrides(entries: MonthlyEntry[], year: number): Promise<MonthlyEntry[]> {
   const holidays = await listHolidays(year);
   const holidayDates = new Set(holidays.map(h => h.date));
   return entries.map(e => {
-    if (!holidayDates.has(e.date) || e.status === 'holiday') return e;
+    if (!holidayDates.has(e.date) || e.status === 'holiday' || isWeekendUTC(e.date)) return e;
     return { ...e, status: 'holiday', hours: 0, project: '', task: '', startTime: '', endTime: '' };
   });
 }

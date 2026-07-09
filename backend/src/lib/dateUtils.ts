@@ -14,6 +14,12 @@ export function parseDateUTC(dateStr: string): Date {
   return new Date(Date.UTC(y, m - 1, d));
 }
 
+/** True if a YYYY-MM-DD date falls on a Saturday or Sunday, in UTC. */
+export function isWeekendUTC(dateStr: string): boolean {
+  const dow = parseDateUTC(dateStr).getUTCDay();
+  return dow === 0 || dow === 6;
+}
+
 /** Add `days` to a YYYY-MM-DD string and return a new YYYY-MM-DD string. */
 export function addDaysToDate(dateStr: string, days: number): string {
   const d = parseDateUTC(dateStr);
