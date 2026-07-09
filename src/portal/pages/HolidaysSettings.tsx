@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Calendar, Plus, Trash2, Edit2, Loader2, AlertCircle } from 'lucide-react';
+import { Calendar, Plus, Trash2, Edit2, Loader2, AlertCircle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -12,7 +12,8 @@ import { format } from 'date-fns';
 const EMPTY: Omit<Holiday,'id'> = { name: '', date: '', isRecurring: false, countryCode: 'US' };
 
 export default function HolidaysSettings() {
-  const year = new Date().getFullYear();
+  const currentYear = new Date().getFullYear();
+  const [year, setYear] = useState(currentYear);
   const { data: holidays = [], isLoading, isError, refetch } = useHolidays(year);
   const create = useCreateHoliday();
   const update = useUpdateHoliday();
@@ -24,7 +25,10 @@ export default function HolidaysSettings() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const openCreate = () => { setEditing(null); setForm(EMPTY); setError(''); setOpen(true); };
+  // Default the new-holiday date to the currently-viewed year so adding a
+  // holiday while browsing a past/future year doesn't silently create it
+  // under today's year instead.
+  const openCreate = () => { setEditing(null); setForm({ ...EMPTY, date: `${year}-01-01` }); setError(''); setOpen(true); };
   const openEdit = (h: Holiday) => { setEditing(h); setForm({ name: h.name, date: h.date, isRecurring: h.isRecurring, countryCode: h.countryCode }); setError(''); setOpen(true); };
 
   const handleSave = async () => {
@@ -40,9 +44,14 @@ export default function HolidaysSettings() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Calendar className="h-5 w-5 text-blue-600" /> Company Holidays ({year})</h2>
-        <Button size="sm" onClick={openCreate} className="gap-1"><Plus className="h-4 w-4" /> Add Holiday</Button>
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2"><Calendar className="h-5 w-5 text-blue-600" /> Company Holidays</h2>
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setYear(y => y - 1)}><ChevronLeft className="h-4 w-4" /></Button>
+          <span className="text-sm font-semibold w-12 text-center">{year}</span>
+          <Button variant="outline" size="sm" onClick={() => setYear(y => y + 1)}><ChevronRight className="h-4 w-4" /></Button>
+          <Button size="sm" onClick={openCreate} className="gap-1"><Plus className="h-4 w-4" /> Add Holiday</Button>
+        </div>
       </div>
 
       {isError ? (

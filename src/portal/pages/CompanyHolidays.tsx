@@ -94,14 +94,14 @@ export default function CompanyHolidays() {
                       const isWeekend = dayName === 'Sat' || dayName === 'Sun';
                       const isPast = h.date < new Date().toISOString().slice(0, 10);
                       return (
-                        <li key={h.id} className={`flex items-start gap-3 px-4 py-3 ${isPast ? 'opacity-50' : ''}`}>
-                          <div className={`flex-shrink-0 w-10 text-center pt-0.5 rounded-lg py-1 ${isWeekend ? 'bg-gray-100' : 'bg-blue-100'}`}>
+                        <li key={h.id} className={`flex items-center gap-3 px-4 py-3 ${isPast ? 'opacity-50' : ''}`}>
+                          <div className={`flex-shrink-0 w-10 text-center rounded-lg py-1 ${isWeekend ? 'bg-gray-100' : 'bg-blue-100'}`}>
                             <p className={`text-xs font-medium ${isWeekend ? 'text-gray-500' : 'text-blue-600'}`}>{dayName}</p>
                             <p className={`text-base font-bold leading-none ${isWeekend ? 'text-gray-700' : 'text-blue-800'}`}>
                               {new Date(h.date + 'T00:00:00Z').getUTCDate()}
                             </p>
                           </div>
-                          <div className="flex-1 min-w-0 pt-0.5">
+                          <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium text-gray-900 truncate">{h.name}</p>
                             {h.isRecurring && (
                               <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 mt-0.5">Annual</Badge>
