@@ -39,6 +39,7 @@ const DAY_STATUS_OPTIONS: { value: MonthlyDayStatus; label: string }[] = [
   { value: 'leave', label: 'Leave' },
   { value: 'holiday', label: 'Holiday' },
   { value: 'absent', label: 'Absent' },
+  { value: 'weekend', label: 'Weekend' },
 ];
 
 // Filter for the day-rows table — lets an employee/HR reviewer jump straight
@@ -310,7 +311,7 @@ export default function MyMonthlyTimesheet() {
           next.startTime = next.startTime || '09:00';
           next.endTime = next.endTime || '17:00';
           next.hours = computeHours(next.startTime, next.endTime);
-        } else if (patch.status === 'leave' || patch.status === 'holiday' || patch.status === 'absent' || patch.status === 'none') {
+        } else if (patch.status === 'leave' || patch.status === 'holiday' || patch.status === 'absent' || patch.status === 'none' || patch.status === 'weekend') {
           next.startTime = '';
           next.endTime = '';
           next.hours = 0;
