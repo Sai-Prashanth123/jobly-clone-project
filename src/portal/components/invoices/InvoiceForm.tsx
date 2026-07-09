@@ -155,7 +155,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const needsTimesheetData = !isEdit && mode === 'timesheets';
   const { data: clientData } = useClients({ limit: 200 });
   const { data: tsData } = useTimesheets({
-    limit: 200, status: 'client_approved', clientId: clientId || undefined, excludeInvoiced: true,
+    limit: 200, status: 'manager_approved', clientId: clientId || undefined, excludeInvoiced: true,
   }, { enabled: needsTimesheetData });
   const { data: empData } = useEmployees({ limit: 500 }, { enabled: needsTimesheetData });
   const { data: assignData } = useAssignments({ limit: 200 }, { enabled: needsTimesheetData });

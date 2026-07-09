@@ -74,7 +74,7 @@ All entities have both a UUID primary key (`id`) and a human-readable `displayId
 All dates must be computed in UTC to avoid timezone drift. Use the utilities in `backend/src/lib/dateUtils.ts` on the backend and `getMondayOfWeek()` / UTC-safe `Date.UTC()` patterns on the frontend. Never use `getDay()`, `setDate()`, or `new Date('YYYY-MM-DD')` without UTC anchoring.
 
 ### Timesheet state machine
-Valid transitions only: `draft → submitted → manager_approved → client_approved`. Rejection can happen from `submitted` or `manager_approved` → `rejected`. The backend enforces this; do not allow arbitrary status patches.
+Valid transitions only: `draft → submitted → manager_approved`. Rejection can happen from `submitted` or `manager_approved` → `rejected`. The backend enforces this; do not allow arbitrary status patches.
 
 ### Portal CSS isolation
 The portal is wrapped in `<div className="portal-scope">`. All portal-specific CSS must be under `.portal-scope` in `portal.css` to avoid bleeding into the public site's Bootstrap/template styles. Never apply Tailwind classes directly to elements that also carry Bootstrap classes.

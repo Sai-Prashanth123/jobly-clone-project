@@ -413,8 +413,7 @@ export default function Timesheets() {
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="submitted">Submitted</SelectItem>
-                  <SelectItem value="manager_approved">Mgr Approved</SelectItem>
-                  <SelectItem value="client_approved">Client Approved</SelectItem>
+                  <SelectItem value="manager_approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
                 </SelectContent>
               </Select>

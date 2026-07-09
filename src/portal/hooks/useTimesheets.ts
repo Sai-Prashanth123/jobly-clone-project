@@ -28,7 +28,6 @@ function mapTimesheet(raw: any): Timesheet {
     status: raw.status,
     submittedAt: raw.submitted_at ?? undefined,
     managerApprovedAt: raw.manager_approved_at ?? undefined,
-    clientApprovedAt: raw.client_approved_at ?? undefined,
     rejectionReason: raw.rejection_reason ?? undefined,
     notes: raw.notes ?? undefined,
     createdAt: raw.created_at,

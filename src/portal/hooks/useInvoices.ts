@@ -164,7 +164,7 @@ export function useGenerateInvoice() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['invoices'] });
       // The invoiced timesheets must disappear from the Generate-Invoice picker
-      // (which lists status='client_approved' timesheets) — otherwise the user
+      // (which lists status='manager_approved' timesheets) — otherwise the user
       // can re-select and double-invoice.
       qc.invalidateQueries({ queryKey: ['timesheets'] });
       qc.invalidateQueries({ queryKey: ['reports'] });

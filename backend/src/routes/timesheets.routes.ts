@@ -22,7 +22,7 @@ router.get('/:id', requireRole('admin','hr','operations','employee','finance'), 
 router.get('/:id/leave-check', requireRole('admin','hr','operations','employee','finance'), ctrl.leaveCheck);
 router.put('/:id', requireRole('admin','operations','employee'), validateBody(updateTimesheetSchema), ctrl.update);
 router.patch('/:id/status', requireRole('admin','hr','operations','employee','finance'), validateBody(patchTimesheetStatusSchema), ctrl.patchStatus);
-// Reopen an approved timesheet (manager_approved/client_approved -> draft) so
+// Reopen an approved timesheet (manager_approved -> draft) so
 // the employee can correct their actual hours and resubmit.
 router.patch('/:id/reopen', requireRole('admin','hr','operations'), validateBody(reopenTimesheetSchema), ctrl.reopen);
 router.delete('/:id', requireRole('admin','operations','employee'), ctrl.remove);

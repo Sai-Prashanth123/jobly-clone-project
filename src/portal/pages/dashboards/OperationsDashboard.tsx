@@ -61,7 +61,7 @@ export function OperationsDashboard() {
     return weeks.map(({ key, label }) => ({
       week: label,
       approved: timesheets.filter(t => {
-        if (t.status !== 'manager_approved' && t.status !== 'client_approved') return false;
+        if (t.status !== 'manager_approved') return false;
         if (!t.weekStartDate) return false;
         return weekKey(new Date(t.weekStartDate)) === key;
       }).length,

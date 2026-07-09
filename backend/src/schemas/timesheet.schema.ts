@@ -25,7 +25,7 @@ export const updateTimesheetSchema = z.object({
 });
 
 export const patchTimesheetStatusSchema = z.object({
-  status: z.enum(['submitted','manager_approved','client_approved','rejected']),
+  status: z.enum(['submitted','manager_approved','rejected']),
   rejectionReason: z.string().optional(),
 });
 
@@ -34,7 +34,7 @@ export const reopenTimesheetSchema = z.object({
 });
 
 export const listTimesheetsQuerySchema = z.object({
-  status: z.enum(['draft','submitted','manager_approved','client_approved','rejected']).optional(),
+  status: z.enum(['draft','submitted','manager_approved','rejected']).optional(),
   employeeId: z.string().uuid().optional(),
   clientId: z.string().uuid().optional(),
   weekStartDate: z.string().optional(),

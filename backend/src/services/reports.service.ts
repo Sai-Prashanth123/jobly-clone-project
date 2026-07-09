@@ -9,7 +9,7 @@ export async function getEmployeeUtilization() {
     supabaseAdmin
       .from('timesheets')
       .select('employee_id, total_hours, week_start_date')
-      .in('status', ['submitted', 'manager_approved', 'client_approved'])
+      .in('status', ['submitted', 'manager_approved'])
       .gte('week_start_date', getWeekStartOffset(-4)),
     supabaseAdmin
       .from('employees')
@@ -117,7 +117,7 @@ export async function getTimesheetSummary(startDate: string, endDate: string) {
     .select('employee_id, client_id, total_hours, week_start_date, status')
     .gte('week_start_date', startDate)
     .lte('week_start_date', endDate)
-    .in('status', ['submitted', 'manager_approved', 'client_approved']);
+    .in('status', ['submitted', 'manager_approved']);
 
   if (error) throw error;
 
@@ -181,7 +181,7 @@ export async function getProfitability() {
     supabaseAdmin
       .from('timesheets')
       .select('assignment_id, client_id, employee_id, total_hours')
-      .eq('status', 'client_approved'),
+      .eq('status', 'manager_approved'),
     supabaseAdmin
       .from('clients')
       .select('id, company_name'),

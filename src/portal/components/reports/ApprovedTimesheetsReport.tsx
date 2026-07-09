@@ -9,7 +9,7 @@ import { useAssignments } from '../../hooks/useAssignments';
 import { formatDate, formatCurrency } from '../../lib/utils';
 
 export function ApprovedTimesheetsReport() {
-  const { data: tsData } = useTimesheets({ limit: 500, status: 'client_approved' });
+  const { data: tsData } = useTimesheets({ limit: 500, status: 'manager_approved' });
   const { data: empData } = useEmployees({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
   const { data: assignData } = useAssignments({ limit: 500 });

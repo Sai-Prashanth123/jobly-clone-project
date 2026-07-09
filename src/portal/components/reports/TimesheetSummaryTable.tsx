@@ -19,7 +19,6 @@ export function TimesheetSummaryTable() {
         draft: empTS.filter(t => t.status === 'draft').length,
         submitted: empTS.filter(t => t.status === 'submitted').length,
         manager_approved: empTS.filter(t => t.status === 'manager_approved').length,
-        client_approved: empTS.filter(t => t.status === 'client_approved').length,
         rejected: empTS.filter(t => t.status === 'rejected').length,
       };
       return { emp, totalHours, byStatus, count: empTS.length };
@@ -60,7 +59,7 @@ export function TimesheetSummaryTable() {
                     {byStatus.submitted > 0 ? <span className="text-yellow-600 font-medium">{byStatus.submitted}</span> : <span className="text-gray-300">—</span>}
                   </TableCell>
                   <TableCell className="text-center">
-                    {byStatus.client_approved > 0 ? <span className="text-green-600 font-medium">{byStatus.client_approved}</span> : <span className="text-gray-300">—</span>}
+                    {byStatus.manager_approved > 0 ? <span className="text-green-600 font-medium">{byStatus.manager_approved}</span> : <span className="text-gray-300">—</span>}
                   </TableCell>
                   <TableCell className="text-center">
                     {byStatus.rejected > 0 ? <span className="text-red-600 font-medium">{byStatus.rejected}</span> : <span className="text-gray-300">—</span>}

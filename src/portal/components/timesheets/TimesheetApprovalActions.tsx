@@ -1,16 +1,12 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { CheckCircle, XCircle, Send, RotateCcw } from 'lucide-react';
 import type { Timesheet } from '../../types';
 import { useAuth } from '../../hooks/useAuth';
-import { UsDateInput } from '../shared/UsDateInput';
-
-const todayStr = () => new Date().toISOString().split('T')[0];
 
 interface TimesheetApprovalActionsProps {
   timesheet: Timesheet;
@@ -25,10 +21,6 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading,
   const [rejectOpen, setRejectOpen] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [approveOpen, setApproveOpen] = useState(false);
-  const [clientApproveOpen, setClientApproveOpen] = useState(false);
-  const [clientRepName, setClientRepName] = useState('');
-  const [clientApprovalDate, setClientApprovalDate] = useState(todayStr());
-  const [clientNotes, setClientNotes] = useState('');
   const [reopenOpen, setReopenOpen] = useState(false);
   const [reopenReason, setReopenReason] = useState('');
 
@@ -125,7 +117,7 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading,
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Approve Timesheet?</AlertDialogTitle>
-              <AlertDialogDescription>This will mark the timesheet as manager-approved and send it for client approval.</AlertDialogDescription>
+              <AlertDialogDescription>This will approve the timesheet and make the hours eligible for invoicing.</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel>Cancel</AlertDialogCancel>
@@ -170,76 +162,7 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading,
     );
   }
 
-  const canClientApprove = role === 'finance' || role === 'admin' || role === 'hr';
-  if (status === 'manager_approved' && (canClientApprove || canReopen)) {
-    return (
-      <>
-        <div className="flex flex-wrap gap-2">
-          {canClientApprove && (
-            <Button className="gap-2" loading={isLoading} loadingText="Approving…"
-              onClick={() => { setClientApprovalDate(todayStr()); setClientApproveOpen(true); }}>
-              <CheckCircle className="h-4 w-4" />
-              Client Approve
-            </Button>
-          )}
-          {reopenButton}
-        </div>
-        <Dialog open={clientApproveOpen} onOpenChange={setClientApproveOpen}>
-          <DialogContent className="w-[95vw] max-w-md">
-            <DialogHeader>
-              <DialogTitle>Client Approval</DialogTitle>
-              <DialogDescription>Record the client's sign-off on this timesheet before marking it as client-approved.</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-3 py-1">
-              <div className="space-y-1">
-                <Label>Client representative name <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Input
-                  placeholder="e.g. Jane Smith"
-                  value={clientRepName}
-                  onChange={e => setClientRepName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Approval date</Label>
-                <UsDateInput
-                  value={clientApprovalDate}
-                  onChange={setClientApprovalDate}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <Textarea
-                  placeholder="Any additional notes from the client…"
-                  value={clientNotes}
-                  onChange={e => setClientNotes(e.target.value)}
-                  rows={2}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setClientApproveOpen(false)} disabled={isLoading}>Cancel</Button>
-              <Button
-                loading={isLoading}
-                loadingText="Approving…"
-                onClick={() => {
-                  setClientApproveOpen(false);
-                  onStatusChange('client_approved');
-                  setClientRepName('');
-                  setClientNotes('');
-                }}
-              >
-                <CheckCircle className="h-4 w-4 mr-1.5" />
-                Confirm Client Approval
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-        {reopenDialog}
-      </>
-    );
-  }
-
-  if (status === 'client_approved' && canReopen) {
+  if (status === 'manager_approved' && canReopen) {
     return (
       <>
         {reopenButton}

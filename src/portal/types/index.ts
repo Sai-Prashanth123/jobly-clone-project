@@ -1,6 +1,6 @@
 export type UserRole = 'admin' | 'hr' | 'operations' | 'finance' | 'employee';
 export type EmployeeStatus = 'active' | 'inactive' | 'onboarding';
-export type TimesheetStatus = 'draft' | 'submitted' | 'manager_approved' | 'client_approved' | 'rejected';
+export type TimesheetStatus = 'draft' | 'submitted' | 'manager_approved' | 'rejected';
 export type LeaveType = 'medical_leave' | 'sick' | 'vacation' | 'unpaid_leave' | 'bereavement' | 'jury_duty' | 'other';
 export type LeaveRequestStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
@@ -388,7 +388,6 @@ export interface Timesheet {
   status: TimesheetStatus;
   submittedAt?: string;
   managerApprovedAt?: string;
-  clientApprovedAt?: string;
   rejectionReason?: string;
   notes?: string;
   createdAt: string;

@@ -89,8 +89,8 @@ export async function getWorkedDays(
 ): Promise<WorkedDayRef[]> {
   const committedOnly = opts?.committedOnly ?? true;
   const weeklyStatuses = committedOnly
-    ? ['submitted', 'manager_approved', 'client_approved']
-    : ['draft', 'submitted', 'manager_approved', 'client_approved', 'rejected'];
+    ? ['submitted', 'manager_approved']
+    : ['draft', 'submitted', 'manager_approved', 'rejected'];
 
   const out: WorkedDayRef[] = [];
 

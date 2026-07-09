@@ -589,14 +589,8 @@ export default function TimesheetDetail() {
             )}
             {timesheet.managerApprovedAt && (
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Manager Approved</span>
+                <span className="text-muted-foreground">Approved</span>
                 <span>{formatDateTime(timesheet.managerApprovedAt)}</span>
-              </div>
-            )}
-            {timesheet.clientApprovedAt && (
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Client Approved</span>
-                <span>{formatDateTime(timesheet.clientApprovedAt)}</span>
               </div>
             )}
             {timesheet.status === 'rejected' && (

@@ -28,7 +28,7 @@ const STATUS_LABELS: Record<string, string> = { draft: 'Draft', sent: 'Sent', vi
 export function FinanceDashboard() {
   const { data: invData, isError, refetch } = useInvoices({ limit: 500 });
   const { data: clientData } = useClients({ limit: 200 });
-  const { data: tsData } = useTimesheets({ limit: 200, status: 'client_approved' });
+  const { data: tsData } = useTimesheets({ limit: 200, status: 'manager_approved' });
   const invoices = useMemo(() => invData?.data ?? [], [invData]);
   const clients = useMemo(() => clientData?.data ?? [], [clientData]);
   const readyToInvoice = tsData?.total ?? 0;

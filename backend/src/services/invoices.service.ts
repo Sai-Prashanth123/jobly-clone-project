@@ -143,13 +143,13 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
     .from('timesheets')
     .select('*, timesheet_entries(*)')
     .in('id', input.timesheetIds)
-    .eq('status', 'client_approved');
+    .eq('status', 'manager_approved');
 
   if (tsError) throw tsError;
 
-  // All requested timesheets must exist and be client_approved.
+  // All requested timesheets must exist and be manager_approved.
   if (!timesheets || timesheets.length !== input.timesheetIds.length) {
-    throw new ValidationError('One or more timesheets are missing or not client-approved');
+    throw new ValidationError('One or more timesheets are missing or not approved');
   }
 
   // Every timesheet must belong to the supplied client — guards against the

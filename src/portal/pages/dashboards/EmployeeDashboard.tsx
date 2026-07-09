@@ -33,11 +33,11 @@ export function EmployeeDashboard() {
     : 'None assigned';
 
   const pendingTimesheets = timesheets.filter(
-    t => t.status === 'submitted' || t.status === 'manager_approved'
+    t => t.status === 'submitted'
   ).length;
 
   const approvedHours = timesheets
-    .filter(t => t.status === 'client_approved')
+    .filter(t => t.status === 'manager_approved')
     .reduce((s, t) => s + t.totalHours, 0);
 
   const rejected = timesheets.filter(t => t.status === 'rejected');

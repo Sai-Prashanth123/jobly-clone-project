@@ -276,11 +276,11 @@ export async function triggerContractExpiryAlerts(): Promise<{ sent: number }> {
  * per finance user.
  */
 export async function triggerInvoiceReadinessReminders(): Promise<{ sent: number }> {
-  // Fetch all client-approved timesheets
+  // Fetch all fully-approved timesheets
   const { data: approved } = await supabaseAdmin
     .from('timesheets')
     .select('id, display_id, client_id, total_hours, week_start_date, week_end_date')
-    .eq('status', 'client_approved');
+    .eq('status', 'manager_approved');
 
   const approvedList = approved ?? [];
   if (approvedList.length === 0) return { sent: 0 };

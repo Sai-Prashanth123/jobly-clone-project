@@ -263,8 +263,7 @@ export async function patchTimesheetStatus(
   const validTransitions: Record<string, string[]> = {
     draft:            ['submitted'],
     submitted:        ['manager_approved', 'rejected'],
-    manager_approved: ['client_approved', 'rejected'],
-    client_approved:  [],
+    manager_approved: ['rejected'],
     rejected:         ['submitted'],
   };
   if (!validTransitions[ts.status]?.includes(input.status)) {
@@ -275,7 +274,6 @@ export async function patchTimesheetStatus(
   const allowed: Record<string, string[]> = {
     submitted:         ['employee', 'admin', 'operations'],
     manager_approved:  ['admin', 'operations', 'hr'],
-    client_approved:   ['admin', 'finance', 'hr'],
     rejected:          ['admin', 'operations', 'finance', 'hr'],
   };
 
@@ -303,7 +301,7 @@ export async function patchTimesheetStatus(
   // already submitted (or while it's sitting in manager_approved awaiting
   // client sign-off) — re-check on every gate so a stale approval can't slip
   // hours through. (Admin is exempt — god-mode override.)
-  if ((action === 'submitted' || action === 'manager_approved' || action === 'client_approved') && userRole !== 'admin') {
+  if ((action === 'submitted' || action === 'manager_approved') && userRole !== 'admin') {
     const days = ((ts as any).timesheet_entries ?? []).map((e: any) => ({ date: e.entry_date, hours: Number(e.hours) || 0 }));
     const { blocking } = await detectLeaveConflictsForDays(ts.employee_id, days);
     if (blocking.length > 0) {
@@ -314,7 +312,6 @@ export async function patchTimesheetStatus(
   const updateData: Record<string, unknown> = { status: input.status };
   if (input.status === 'submitted') updateData.submitted_at = new Date().toISOString();
   if (input.status === 'manager_approved') updateData.manager_approved_at = new Date().toISOString();
-  if (input.status === 'client_approved') updateData.client_approved_at = new Date().toISOString();
   if (input.status === 'rejected') {
     updateData.rejection_reason = input.rejectionReason ?? null;
   } else {
@@ -392,12 +389,16 @@ async function notifyTimesheetStatusChange(
         }
       }
     } else if (newStatus === 'manager_approved') {
+      const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
+      if (ownerPortalId) {
+        await createNotification(ownerPortalId, 'Timesheet Approved', `Timesheet ${ts.label} has been approved.`, 'success', 'timesheet', ts.id);
+      }
       const [financeIds, adminIds] = await Promise.all([
         getUserIdsByRole('finance'),
         getUserIdsByRole('admin'),
       ]);
       await Promise.all([...new Set([...financeIds, ...adminIds])].map(uid =>
-        createNotification(uid, 'Timesheet Ready for Client Approval', `Timesheet ${ts.label} has been manager-approved.`, 'info', 'timesheet', ts.id)
+        createNotification(uid, 'Timesheet Ready to Invoice', `Timesheet ${ts.label} is approved and ready to be invoiced.`, 'info', 'timesheet', ts.id)
       ));
     } else if (newStatus === 'rejected') {
       const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
@@ -405,22 +406,6 @@ async function notifyTimesheetStatusChange(
         const reason = rejectionReason ? `: "${rejectionReason}"` : '';
         await createNotification(ownerPortalId, 'Timesheet Rejected', `Timesheet ${ts.label} was rejected${reason}.`, 'error', 'timesheet', ts.id);
       }
-    } else if (newStatus === 'client_approved') {
-      // Notify the employee who owns the timesheet
-      const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
-      if (ownerPortalId) {
-        await createNotification(ownerPortalId, 'Timesheet Approved', `Timesheet ${ts.label} has been fully approved.`, 'success', 'timesheet', ts.id);
-      }
-      // Spec: finance users get realtime heads-up that this is ready to invoice.
-      const financeIds = await getUserIdsByRole('finance');
-      await Promise.all(financeIds.map(uid =>
-        createNotification(
-          uid,
-          'Timesheet Ready to Invoice',
-          `Timesheet ${ts.label} is fully approved and ready to be invoiced.`,
-          'info', 'timesheet', ts.id,
-        )
-      ));
     }
   } catch (err) {
     // Notification failure must not affect the main state-change flow, but log
@@ -485,18 +470,16 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
   const allowed: Record<string, string[]> = {
     submitted: ['draft', 'rejected'],
     manager_approved: ['submitted'],
-    client_approved: ['manager_approved'],
     rejected: ['submitted', 'manager_approved'],
   };
   if (!allowed[status]) throw new Error(`Invalid target status: ${status}`);
 
   // Same per-transition role rules as the single patch path — without this,
-  // operations could bulk-advance to client_approved (finance-only) and vice
-  // versa, bypassing the state machine's role gates entirely.
+  // a role could bulk-advance a status it shouldn't, bypassing the state
+  // machine's role gates entirely.
   const roleFor: Record<string, string[]> = {
     submitted: ['employee', 'admin', 'operations'],
     manager_approved: ['admin', 'operations', 'hr'],
-    client_approved: ['admin', 'finance', 'hr'],
     rejected: ['admin', 'operations', 'finance', 'hr'],
   };
   if (!roleFor[status]?.includes(actorRole)) {
@@ -518,7 +501,6 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
     const tsField: Record<string, string> = {
       submitted: 'submitted_at',
       manager_approved: 'manager_approved_at',
-      client_approved: 'client_approved_at',
     };
     const updateData: Record<string, unknown> = { status };
     if (tsField[status]) updateData[tsField[status]] = new Date().toISOString();
@@ -643,8 +625,8 @@ export async function reopenTimesheet(
   id: string, actorRole: string, actorId?: string, reason?: string,
 ) {
   const ts = await getTimesheet(id);
-  if (!['manager_approved', 'client_approved'].includes(ts.status)) {
-    throw new ValidationError(`A '${ts.status}' timesheet cannot be reopened — only manager-approved or client-approved timesheets can be.`);
+  if (ts.status !== 'manager_approved') {
+    throw new ValidationError(`A '${ts.status}' timesheet cannot be reopened — only manager-approved timesheets can be.`);
   }
 
   // The previously-uploaded client-signed proof attested to the hours that
@@ -664,7 +646,6 @@ export async function reopenTimesheet(
     .update({
       status: 'draft',
       manager_approved_at: null,
-      client_approved_at: null,
       client_signed_url: null,
       client_signed_filename: null,
     })

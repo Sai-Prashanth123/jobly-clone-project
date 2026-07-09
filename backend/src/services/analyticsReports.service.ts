@@ -113,7 +113,7 @@ export async function getCapacityUtilization(month: string) {
 
   const [emps, timesheets] = await Promise.all([
     supabaseAdmin.from('employees').select('id, first_name, last_name, display_id, department').eq('status', 'active').is('deleted_at', null),
-    supabaseAdmin.from('timesheets').select('employee_id, total_hours').gte('week_start_date', start).lte('week_start_date', end).in('status', ['submitted','manager_approved','client_approved']),
+    supabaseAdmin.from('timesheets').select('employee_id, total_hours').gte('week_start_date', start).lte('week_start_date', end).in('status', ['submitted','manager_approved']),
   ]);
 
   const hoursMap = new Map<string, number>();
@@ -185,7 +185,7 @@ export async function getClientSLA(month: string) {
   const [clients, assignments, timesheets] = await Promise.all([
     supabaseAdmin.from('clients').select('id, company_name, display_id').is('deleted_at', null),
     supabaseAdmin.from('assignments').select('id, client_id, employee_id, max_hours_per_week').eq('status', 'active'),
-    supabaseAdmin.from('timesheets').select('employee_id, total_hours, week_start_date, assignment_id').gte('week_start_date', start).lte('week_start_date', end).in('status', ['submitted','manager_approved','client_approved']),
+    supabaseAdmin.from('timesheets').select('employee_id, total_hours, week_start_date, assignment_id').gte('week_start_date', start).lte('week_start_date', end).in('status', ['submitted','manager_approved']),
   ]);
 
   const clientMap = new Map((clients.data ?? []).map(c => [c.id, c]));
