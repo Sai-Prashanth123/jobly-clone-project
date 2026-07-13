@@ -156,6 +156,9 @@ async function sendWithRetry(mail: MailOptions): Promise<void> {
 
 const FROM = ACS_SENDER;
 const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
+// Always the live USCIS-hosted PDF — never store/attach a static copy, so it
+// can never go stale when USCIS updates the form.
+const I9_USCIS_URL = 'https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf';
 
 export async function verifyMailer(): Promise<void> {
   if (!mailerConfigured) {
@@ -253,6 +256,18 @@ ${showCreds ? `
   <p style="margin:0;font-size:17px;font-weight:600;font-family:'Courier New',Courier,monospace;color:#111827;word-break:break-all;">${esc(loginEmail)}</p>
 </div>
 ` : '')}
+
+${showCreds ? `
+<p style="margin:0 0 12px;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#9ca3af;">Next Steps</p>
+<div style="background:#f0f4ff;border:2px solid #c7d5ff;border-radius:12px;padding:18px 20px;margin-bottom:28px;">
+  <p style="margin:0 0 12px;font-size:14px;color:#374151;line-height:1.5;">
+    &#128196; &nbsp;<a href="${esc(I9_USCIS_URL)}" style="color:#4069FF;font-weight:600;text-decoration:none;">Download the I-9 Employment Eligibility Verification form (USCIS)</a> &mdash; always the current version.
+  </p>
+  <p style="margin:0;font-size:14px;color:#374151;line-height:1.5;">
+    &#128203; &nbsp;<a href="${esc(PORTAL_URL)}/portal/enrollment-forms" style="color:#4069FF;font-weight:600;text-decoration:none;">Complete your Benefits Enrollment Form</a> in the portal once HR assigns it to you.
+  </p>
+</div>
+` : ''}
 
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">

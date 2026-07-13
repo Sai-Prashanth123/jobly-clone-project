@@ -19,6 +19,7 @@ import {
   Star,
   Shield, Gift, Calendar, DollarSign, TrendingUp, FileWarning,
   Award, UserCheck, FileSpreadsheet, Gauge,
+  HeartPulse,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -54,6 +55,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Expenses',            path: '/portal/expenses',            icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'], badgeKey: 'expenses' },
   { label: 'Performance Reviews', path: '/portal/reviews',             icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'] },
   { label: 'My Reviews',          path: '/portal/my-reviews',          icon: <Star className="h-4 w-4" />,            roles: ['employee'] },
+  { label: 'Enrollment Forms',    path: '/portal/enrollment-forms',    icon: <HeartPulse className="h-4 w-4" />,      roles: ['admin','hr','employee'] },
   { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'] },
 
   { label: 'Templates',           path: '/portal/templates',           icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'] },

@@ -68,6 +68,8 @@ const Expenses = lazy(() => import('./pages/Expenses'));
 const PerformanceReviews = lazy(() => import('./pages/PerformanceReviews'));
 const PerformanceReviewDetail = lazy(() => import('./pages/PerformanceReviewDetail'));
 const MyPerformanceReviews = lazy(() => import('./pages/MyPerformanceReviews'));
+const EnrollmentForms = lazy(() => import('./pages/EnrollmentForms'));
+const EnrollmentFormDetail = lazy(() => import('./pages/EnrollmentFormDetail'));
 
 // Phase 4 — Admin
 const AuditLog = lazy(() => import('./pages/AuditLog'));
@@ -318,6 +320,23 @@ export default function PortalApp() {
               }
             />
             <Route path="my-reviews" element={<MyPerformanceReviews />} />
+
+            <Route
+              path="enrollment-forms"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
+                  <EnrollmentForms />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="enrollment-forms/:id"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
+                  <EnrollmentFormDetail />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="leave-requests"

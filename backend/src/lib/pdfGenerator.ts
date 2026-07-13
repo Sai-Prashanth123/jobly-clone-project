@@ -8,6 +8,7 @@ import { formatDateSafe, formatDateUS } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
 import { getTimesheetHeaderBuffer, getTimesheetFooterBuffer } from './timesheetBranding';
 import { RATING_CRITERIA } from '../schemas/performanceReviews.schema';
+import { SECTION_H_TITLE, SECTION_H_TEXT, SECTION_I_TITLE, SECTION_I_TEXT } from './enrollmentFormText';
 
 export interface InvoicePDFLineItem {
   itemName?: string;
@@ -911,6 +912,296 @@ export function generatePerformanceReviewPDF(data: PerformanceReviewPDFData): Pr
     doc.fillColor(gray).fontSize(7.5).font('Helvetica')
       .text("Supervisor: This is my evaluation of the employee's performance during the review period.", sigLeft, lineY2 + 4, { width: sigWidth * 0.55 });
     doc.text(`Date: ${data.supervisorSignedDate ? formatDateUS(data.supervisorSignedDate) : '_______________'}`, sigLeft + sigWidth * 0.65, lineY2 + 4, { width: sigWidth * 0.35 });
+
+    doc.end();
+  });
+}
+
+// ── Benefits Enrollment Form PDF ─────────────────────────────────────────────
+// Portrait US Letter, reusing the exact same letterhead + chrome technique as
+// the Performance Review PDF above (see TS_HEADER_CROP_TOP_PX / _BOTTOM_PX /
+// _NATIVE_W). Not a pixel-perfect replica of the source National General PDF
+// — a clean, complete data dump organized by the same section letters
+// (A/B/D/E/F/G/H/I; Section C is out of scope, see enrollmentForms schema).
+
+export interface EnrollmentFormPDFData {
+  displayId: string;
+  employeeName: string;
+  employeeDisplayId: string;
+  status: string;
+  submittedAt?: string;
+  sectionA: Record<string, any>;
+  sectionB: Record<string, any>;
+  sectionD: Record<string, any>;
+  sectionE: Record<string, any>;
+  sectionF: Record<string, any>;
+  sectionG: Array<Record<string, any>>;
+  sectionI: Record<string, any>;
+}
+
+const EF_PAGE_W = 612;
+const EF_HEADER_H = Math.round((TS_HEADER_CROP_BOTTOM_PX - TS_HEADER_CROP_TOP_PX) * (EF_PAGE_W / TS_HEADER_NATIVE_W));
+const EF_FOOTER_H = 16;
+const EF_MARGIN = 44;
+
+function drawEnrollmentFormChrome(doc: PDFKit.PDFDocument): void {
+  const pageW = doc.page.width;
+  const pageH = doc.page.height;
+  const scale = pageW / TS_HEADER_NATIVE_W;
+
+  doc.save();
+  doc.rect(0, 0, pageW, EF_HEADER_H).clip();
+  doc.image(getTimesheetHeaderBuffer(), 0, -TS_HEADER_CROP_TOP_PX * scale, { width: pageW });
+  doc.restore();
+
+  doc.save();
+  doc.rect(0, pageH - EF_FOOTER_H, pageW, EF_FOOTER_H).clip();
+  doc.image(getTimesheetFooterBuffer(), 0, pageH - EF_FOOTER_H, { cover: [pageW, EF_FOOTER_H], valign: 'bottom' });
+  doc.restore();
+}
+
+// Small bordered table — header row + N data rows, auto-paginating (redraws
+// the header row on each new page, mirroring drawRatingsGrid's approach).
+function drawSimpleTable(doc: PDFKit.PDFDocument, headers: string[], rows: string[][]): void {
+  const navy = '#04213F';
+  const ink = '#111827';
+  const left = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  const colW = width / headers.length;
+  const rowH = 16;
+  const bottomLimit = doc.page.height - doc.page.margins.bottom;
+
+  const drawHeaderRow = () => {
+    const y = doc.y;
+    doc.rect(left, y, width, rowH).fillColor('#F3F4F6').fill();
+    doc.fillColor(navy).fontSize(7).font('Helvetica-Bold');
+    headers.forEach((h, i) => doc.text(h, left + i * colW + 4, y + 4, { width: colW - 8, height: 10, ellipsis: true }));
+    doc.y = y + rowH;
+    doc.x = left;
+  };
+
+  if (rows.length === 0) {
+    doc.fillColor('#6B7280').fontSize(8.5).font('Helvetica').text('None provided.');
+    doc.x = left;
+    doc.moveDown(0.4);
+    return;
+  }
+
+  drawHeaderRow();
+  for (const row of rows) {
+    if (doc.y + rowH > bottomLimit) {
+      doc.addPage();
+      doc.x = left;
+      doc.y = doc.page.margins.top;
+      drawHeaderRow();
+    }
+    const y = doc.y;
+    doc.fillColor(ink).fontSize(7).font('Helvetica');
+    row.forEach((cell, i) => doc.text(cell || '—', left + i * colW + 4, y + 4, { width: colW - 8, height: 10, ellipsis: true }));
+    doc.moveTo(left, y + rowH).lineTo(left + width, y + rowH).lineWidth(0.5).strokeColor('#E5E7EB').stroke();
+    doc.y = y + rowH;
+    doc.x = left;
+  }
+  doc.moveDown(0.4);
+}
+
+// Compact 2-column list of only the *checked* condition labels — not the
+// full ~40-item checkbox grid the source PDF shows.
+function drawChecklistSummary(doc: PDFKit.PDFDocument, items: string[]): void {
+  const ink = '#111827';
+  const left = doc.page.margins.left;
+  const width = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+  if (!items.length) {
+    doc.fillColor('#6B7280').fontSize(8.5).font('Helvetica').text('None reported.');
+    doc.x = left;
+    doc.moveDown(0.4);
+    return;
+  }
+  const cols = 2;
+  const colW = width / cols;
+  doc.fillColor(ink).fontSize(8.5).font('Helvetica');
+  const y0 = doc.y;
+  let maxRowY = y0;
+  items.forEach((item, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const x = left + col * colW;
+    const y = y0 + row * 13;
+    doc.text(`•  ${item}`, x, y, { width: colW - 8, height: 12, ellipsis: true });
+    maxRowY = Math.max(maxRowY, y + 13);
+  });
+  doc.x = left;
+  doc.y = maxRowY + 8;
+}
+
+function drawFootnoteText(doc: PDFKit.PDFDocument, title: string, text: string): void {
+  const navy = '#04213F';
+  const gray = '#6B7280';
+  doc.fillColor(navy).fontSize(8).font('Helvetica-Bold').text(title);
+  doc.moveDown(0.2);
+  doc.x = doc.page.margins.left;
+  doc.fillColor(gray).fontSize(6.8).font('Helvetica').text(text, { align: 'left', lineGap: 2 });
+  doc.x = doc.page.margins.left;
+  doc.moveDown(0.5);
+}
+
+function yn(v: unknown): string {
+  if (v === true) return 'Yes';
+  if (v === false) return 'No';
+  return '—';
+}
+
+export function generateEnrollmentFormPDF(data: EnrollmentFormPDFData): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const blue = '#4069FF';
+    const navy = '#04213F';
+    const gray = '#6B7280';
+    const ink = '#111827';
+
+    const doc = new PDFDocument({
+      size: 'LETTER',
+      margins: { top: EF_HEADER_H + 18, bottom: EF_FOOTER_H + 26, left: EF_MARGIN, right: EF_MARGIN },
+      bufferPages: true,
+    });
+    doc.on('pageAdded', () => drawEnrollmentFormChrome(doc));
+    const chunks: Buffer[] = [];
+    doc.on('data', (chunk: Buffer) => chunks.push(chunk));
+    doc.on('end', () => resolve(Buffer.concat(chunks)));
+    doc.on('error', reject);
+
+    drawEnrollmentFormChrome(doc); // first page — 'pageAdded' doesn't fire for it
+
+    const a = data.sectionA ?? {};
+    const b = data.sectionB ?? {};
+    const d = data.sectionD ?? {};
+    const e = data.sectionE ?? {};
+    const f = data.sectionF ?? {};
+    const g = Array.isArray(data.sectionG) ? data.sectionG : [];
+    const i = data.sectionI ?? {};
+
+    // Title block
+    doc.fillColor(navy).fontSize(15).font('Helvetica-Bold').text('EMPLOYEE ENROLLMENT FORM', { align: 'center' });
+    doc.fillColor(blue).fontSize(10).font('Helvetica-Bold').text('National General Benefits Solutions — Employee Enrollment Form', { align: 'center' });
+    doc.moveDown(0.3);
+    doc.fillColor(gray).fontSize(8).font('Helvetica')
+      .text(`${data.displayId}   ·   Status: ${data.status === 'submitted' ? 'Submitted' : 'Pending'}${data.submittedAt ? '   ·   Submitted ' + formatDateUS(data.submittedAt) : ''}`, { align: 'center' });
+    doc.moveDown(0.6);
+    doc.x = doc.page.margins.left;
+
+    // Section A — Employee info
+    drawReviewSectionHeading(doc, 'A — Employee (Primary Applicant)');
+    const homeAddr = a.homeAddress ?? {};
+    const mailAddr = a.mailingSameAsHome ? homeAddr : (a.mailingAddress ?? {});
+    const fmtAddr = (addr: Record<string, any>) => [addr.street, addr.city, addr.state, addr.zip].filter(Boolean).join(', ');
+    drawInfoCard(doc, [
+      ['LEGAL NAME', `${a.lastName ?? ''}, ${a.firstName ?? ''} ${a.mi ?? ''}`.trim(), 'SOCIAL SECURITY NUMBER', a.ssn ?? ''],
+      ['GENDER', a.gender ?? '', 'BIRTH DATE', a.birthDate ? formatDateUS(a.birthDate) : ''],
+      ['JOB TITLE', a.jobTitle ?? '', 'MARITAL STATUS', a.maritalStatus ?? ''],
+      ['EMPLOYEE STATUS', a.employeeStatus ?? '', 'EARNINGS BASIS', a.earningsBasis ?? ''],
+      ['HOME ADDRESS', fmtAddr(homeAddr), 'MAILING ADDRESS', fmtAddr(mailAddr)],
+      ['HOME PHONE', a.homePhone ?? '', 'CELL PHONE', a.cellPhone ?? ''],
+      ['WORK PHONE', a.workPhone ?? '', 'EMAIL', a.email ?? ''],
+      ['ENROLLMENT TYPE', a.enrollmentType ?? '', 'DATE EMPLOYED FULL-TIME', a.dateEmployedFullTime ? formatDateUS(a.dateEmployedFullTime) : ''],
+    ]);
+
+    // Section B — Waiver of coverage
+    drawReviewSectionHeading(doc, 'B — Waiver of Coverage');
+    drawInfoCard(doc, [
+      ['WAIVER REASON', b.waiverReason === 'Other' ? (b.waiverReasonOther || 'Other') : (b.waiverReason ?? '—'), 'SIGNATURE', b.signatureName ?? '—'],
+      ['SIGNATURE DATE', b.signatureDate ? formatDateUS(b.signatureDate) : '—', '', ''],
+    ]);
+
+    // Section D — Persons to be covered
+    drawReviewSectionHeading(doc, 'D — Persons to Be Covered');
+    doc.fillColor(ink).fontSize(8.5).font('Helvetica-Bold').text(`Coverage tier: ${d.coverageTier || '—'}`);
+    doc.moveDown(0.3);
+    doc.x = doc.page.margins.left;
+    drawSimpleTable(
+      doc,
+      ['Last Name', 'First Name', 'Relationship', 'Gender', 'DOB', 'Tobacco Use'],
+      (d.dependents ?? []).map((dep: any) => [
+        dep.lastName ?? '', dep.firstName ?? '', dep.relationship ?? '', dep.gender ?? '',
+        dep.dob ? formatDateUS(dep.dob) : '', yn(dep.tobaccoUse),
+      ]),
+    );
+
+    // Section E — Additional insurance coverage info
+    drawReviewSectionHeading(doc, 'E — Additional Insurance Coverage Information');
+    drawInfoCard(doc, [
+      ['CURRENT PLAN REMAINS ACTIVE?', yn(e.currentPlanActive), 'FOR WHOM', e.currentPlanFor ?? '—'],
+      ['CARRIER / ID', [e.currentPlanCarrier, e.currentPlanId].filter(Boolean).join(' / ') || '—', 'MEDICARE A / B / D', [e.medicareA && 'A', e.medicareB && 'B', e.medicareD && 'D'].filter(Boolean).join(', ') || 'None'],
+      ['MEDICARE FOR WHOM', e.medicareFor ?? '—', 'MEDICARE REMAINS ACTIVE?', yn(e.medicareRemainsActive)],
+    ]);
+
+    // Section F — Medical history
+    drawReviewSectionHeading(doc, 'F — Medical History');
+    const empH = f.employee ?? {};
+    const spH = f.spouse ?? {};
+    drawSimpleTable(
+      doc,
+      ['Person', 'Height', 'Weight', 'Motorcycle', 'Moving Violation', 'DUI/OWI'],
+      [
+        ['Employee', empH.height ?? '', empH.weight ?? '', yn(empH.motorcycle), yn(empH.movingViolation), yn(empH.dui)],
+        ['Spouse', spH.height ?? '', spH.weight ?? '', yn(spH.motorcycle), yn(spH.movingViolation), yn(spH.dui)],
+      ],
+    );
+    doc.fillColor(ink).fontSize(8.5).font('Helvetica-Bold').text('Conditions reported (past 5 years):');
+    doc.moveDown(0.2);
+    doc.x = doc.page.margins.left;
+    drawChecklistSummary(doc, Array.isArray(f.conditions) ? f.conditions : []);
+    doc.fillColor(ink).fontSize(8).font('Helvetica').text(
+      `Other undiagnosed condition: ${yn(f.otherUndiagnosed)}    ·    Advised of future treatment: ${yn(f.advisedFutureTreatment)}    ·    Medications in last 18 months: ${yn(f.medicationsLast18Months)}`,
+      { lineGap: 2 },
+    );
+    doc.x = doc.page.margins.left;
+    if (f.currentlyPregnant) {
+      doc.moveDown(0.2);
+      doc.x = doc.page.margins.left;
+      doc.text(
+        `Currently pregnant: Yes    ·    Due date: ${f.dueDate ? formatDateUS(f.dueDate) : '—'}    ·    C-section anticipated: ${yn(f.cSection)}    ·    Multiples expected: ${yn(f.multiples)}    ·    Complications: ${yn(f.pregnancyComplications)}`,
+        { lineGap: 2 },
+      );
+      doc.x = doc.page.margins.left;
+    }
+    doc.moveDown(0.4);
+    doc.x = doc.page.margins.left;
+
+    // Section G — Details
+    drawReviewSectionHeading(doc, 'G — Details (for any Section F condition reported)');
+    drawSimpleTable(
+      doc,
+      ['Person', 'Condition/Diagnosis', 'Dates Treated', 'Treatment/Medication', 'Date Last Taken', 'Prognosis'],
+      g.map((row: any) => [row.person ?? '', row.condition ?? '', row.datesTreated ?? '', row.treatment ?? '', row.dateLastTaken ?? '', row.prognosis ?? '']),
+    );
+
+    // Section H — Federal mandates notice (static)
+    if (doc.y > doc.page.height - doc.page.margins.bottom - 100) {
+      doc.addPage();
+      doc.x = doc.page.margins.left;
+      doc.y = doc.page.margins.top;
+    }
+    drawFootnoteText(doc, SECTION_H_TITLE, SECTION_H_TEXT);
+
+    // Section I — Authorization & signature
+    drawFootnoteText(doc, SECTION_I_TITLE, SECTION_I_TEXT);
+    doc.moveDown(0.6);
+    doc.x = doc.page.margins.left;
+    if (doc.y > doc.page.height - doc.page.margins.bottom - 60) {
+      doc.addPage();
+      doc.x = doc.page.margins.left;
+      doc.y = doc.page.margins.top;
+    }
+    const sigLeft = doc.page.margins.left;
+    const sigWidth = doc.page.width - doc.page.margins.left - doc.page.margins.right;
+    const lineY = doc.y;
+    doc.moveTo(sigLeft, lineY).lineTo(sigLeft + sigWidth * 0.55, lineY).lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+    doc.moveTo(sigLeft + sigWidth * 0.65, lineY).lineTo(sigLeft + sigWidth, lineY).lineWidth(0.8).strokeColor('#9CA3AF').stroke();
+    doc.fillColor(gray).fontSize(7.5).font('Helvetica')
+      .text('Employee/Primary Applicant Signature', sigLeft, lineY + 4, { width: sigWidth * 0.55 });
+    doc.text(`Date: ${i.signatureDate ? formatDateUS(i.signatureDate) : '_______________'}`, sigLeft + sigWidth * 0.65, lineY + 4, { width: sigWidth * 0.35 });
+    if (i.signatureName) {
+      doc.fillColor(ink).fontSize(9).font('Helvetica-Bold').text(i.signatureName, sigLeft, lineY - 14, { width: sigWidth * 0.55 });
+    }
 
     doc.end();
   });
