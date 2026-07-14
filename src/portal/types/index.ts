@@ -253,6 +253,7 @@ export interface Employee {
   taxFormType?: 'w4' | 'w9';
   reportingManagerId?: string;
   workEmail?: string;
+  blockPersonalEmail?: boolean;
   documents: EmployeeDocument[];
 
   // Onboarding completeness (computed server-side). Present on list + detail.

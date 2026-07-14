@@ -57,6 +57,7 @@ export default function EmployeeDetail() {
   const todayStr = new Date().toISOString().slice(0, 10);
 
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [blockEmailConfirmOpen, setBlockEmailConfirmOpen] = useState(false);
   const [changesOpen, setChangesOpen] = useState(false);
   const [changesMessage, setChangesMessage] = useState('');
   const [docRequestOpen, setDocRequestOpen] = useState(false);
@@ -413,6 +414,34 @@ export default function EmployeeDetail() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4">
             <Field label="Personal Email" value={employee.email} />
             <Field label="Work Email" value={employee.workEmail} />
+            {canManage && (
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-muted-foreground">Communication</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${employee.blockPersonalEmail ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+                    {employee.blockPersonalEmail ? 'Official Only' : 'Personal + Official'}
+                  </span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-6 px-2 text-[11px]"
+                    disabled={!employee.workEmail && !employee.blockPersonalEmail}
+                    title={!employee.workEmail && !employee.blockPersonalEmail ? 'Assign a work email first' : undefined}
+                    onClick={async () => {
+                      if (!employee.blockPersonalEmail) { setBlockEmailConfirmOpen(true); return; }
+                      try {
+                        await updateEmployee.mutateAsync({ blockPersonalEmail: false });
+                        toast.success('Personal email communications unblocked');
+                      } catch {
+                        /* failed-request toast raised centrally (queryClient.ts) */
+                      }
+                    }}
+                  >
+                    {employee.blockPersonalEmail ? 'Unblock personal email' : 'Block personal email'}
+                  </Button>
+                </div>
+              </div>
+            )}
             <Field label="Mobile Phone" value={employee.phone} />
             <Field label="Alternate Phone" value={employee.altPhone} />
             <Field label="Date of Birth" value={formatDate(employee.dob)} />
@@ -772,6 +801,24 @@ export default function EmployeeDetail() {
           </CardContent>
         </Card>
       )}
+
+      <ConfirmDialog
+        open={blockEmailConfirmOpen}
+        onOpenChange={setBlockEmailConfirmOpen}
+        title="Block personal email communications?"
+        description={`All future system emails will stop going to ${employee.email}. Only ${employee.workEmail} will receive them from now on. You can unblock this at any time.`}
+        confirmLabel="Block Personal Email"
+        loading={updateEmployee.isPending}
+        onConfirm={async () => {
+          try {
+            await updateEmployee.mutateAsync({ blockPersonalEmail: true });
+            toast.success('Personal email communications blocked');
+            setBlockEmailConfirmOpen(false);
+          } catch {
+            /* failed-request toast raised centrally (queryClient.ts) */
+          }
+        }}
+      />
 
       <EntityAuditTrail entityType="employee" entityId={employee?.id} />
 

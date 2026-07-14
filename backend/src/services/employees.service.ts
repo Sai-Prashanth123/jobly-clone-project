@@ -7,6 +7,7 @@ import { computeOnboarding } from '../lib/onboarding';
 import { todayUTC } from '../lib/dateUtils';
 import { generateTasksForEmployee } from './onboardingChecklist.service';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
+import { resolveEmployeeEmailRecipients } from '../lib/employeeCommunication';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
@@ -217,8 +218,8 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
     };
   }
 
-  // Send to personal + work (deduped). Both belong to the same employee.
-  const recipients = [...new Set([personalEmail, workEmail].filter(Boolean))];
+  // Send to personal + work (deduped), unless personal email is blocked.
+  const recipients = resolveEmployeeEmailRecipients({ email: personalEmail, work_email: workEmail, block_personal_email: emp?.block_personal_email });
   if (recipients.length === 0) {
     return {
       credentialsReady: true, emailSent: false,
@@ -434,7 +435,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
     const personalEmail = (emp.email ?? '').trim();
     const workEmail = (emp.work_email ?? '').trim();
     const loginEmail = (pu.email as string) || workEmail || personalEmail;
-    const recipients = [...new Set([personalEmail, workEmail].filter(Boolean))];
+    const recipients = resolveEmployeeEmailRecipients({ email: personalEmail, work_email: workEmail, block_personal_email: emp.block_personal_email });
     let emailSent = false;
     let warning: string | undefined;
     if (!mailerConfigured) {
@@ -509,7 +510,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, actorRole?: string) {
   const { data: existing, error: findErr } = await supabaseAdmin
     .from('employees')
-    .select('id, display_id, email, work_email, status, onboarding_completed_at')
+    .select('id, display_id, email, work_email, status, onboarding_completed_at, block_personal_email')
     .eq('id', id)
     .is('deleted_at', null)
     .single();
@@ -569,6 +570,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.taxFormType !== undefined) patch.tax_form_type  = input.taxFormType;
   if (input.reportingManagerId !== undefined) patch.reporting_manager_id = input.reportingManagerId;
   if (input.workEmail !== undefined) patch.work_email = input.workEmail;
+  if (input.blockPersonalEmail !== undefined) patch.block_personal_email = input.blockPersonalEmail;
   if (input.address !== undefined) {
     patch.address_street  = input.address.street ?? '';
     patch.address_city    = input.address.city ?? '';
@@ -624,8 +626,22 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     // `email` is intentionally NOT here — it's the employee's own contact field
     // (shown editable in self-edit) and is separate from their login
     // (portal_users.email). work_email/status/reporting_manager stay HR-only.
-    const HR_ONLY = ['status', 'reporting_manager_id', 'work_email'];
+    const HR_ONLY = ['status', 'reporting_manager_id', 'work_email', 'block_personal_email'];
     for (const k of HR_ONLY) delete patch[k];
+  }
+
+  // Guard: personal-email communication can only be blocked while a work email
+  // actually exists — check the EFFECTIVE resulting state (not just whichever
+  // field this particular request happens to touch), since an unrelated edit
+  // that blanks work_email while already blocked must not be allowed to strip
+  // the only valid recipient (and must not silently flip the login back to the
+  // personal address via the login-change logic below).
+  const effectiveBlock = input.blockPersonalEmail !== undefined ? input.blockPersonalEmail : (existing as any).block_personal_email;
+  if (effectiveBlock) {
+    const effectiveWorkEmail = input.workEmail !== undefined ? input.workEmail : existing.work_email;
+    if (!effectiveWorkEmail) {
+      throw new ValidationError('Assign a work email before blocking personal-email communications (or unblock personal email first).');
+    }
   }
 
   // Guard: email uniqueness — check both personal and work email if either is being changed
@@ -713,7 +729,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
             );
           } catch { /* notification is best-effort */ }
 
-          const recipients = [...new Set([newPersonal, newWork].filter(Boolean))];
+          const recipients = resolveEmployeeEmailRecipients({ email: newPersonal, work_email: newWork, block_personal_email: (emp as any).block_personal_email });
           if (mailerConfigured && recipients.length) {
             try {
               await sendWelcomeEmail({
@@ -736,7 +752,32 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     }
   }
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8));
+  const blockPersonalEmailChanged = input.blockPersonalEmail !== undefined && input.blockPersonalEmail !== !!(existing as any).block_personal_email;
+  logActivity(
+    actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8),
+    blockPersonalEmailChanged ? { event: input.blockPersonalEmail ? 'blocked_personal_email' : 'unblocked_personal_email' } : undefined,
+  );
+
+  // Notify the employee in-app when their personal-email communications are
+  // blocked (not on unblock — that's not something they need to be warned about).
+  if (blockPersonalEmailChanged && input.blockPersonalEmail) {
+    void (async () => {
+      try {
+        const { data: pu } = await supabaseAdmin
+          .from('portal_users').select('id').eq('employee_id', id).maybeSingle();
+        if (pu?.id) {
+          await createNotification(
+            pu.id, 'Communication preference updated',
+            `HR has restricted system emails to your work address (${emp.work_email}). Your personal email will no longer receive them.`,
+            'info', 'employee', id,
+          );
+        }
+      } catch (err) {
+        console.error('[updateEmployee] block-personal-email notification failed', err);
+      }
+    })();
+  }
+
   return serializeEmployee(emp);
 }
 

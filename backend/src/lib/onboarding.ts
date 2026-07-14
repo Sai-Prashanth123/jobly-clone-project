@@ -22,6 +22,7 @@ export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
   'Offer Letter',
   'Social Security Number',
+  'I-9 Form',
 ] as const;
 
 export interface OnboardingItem {

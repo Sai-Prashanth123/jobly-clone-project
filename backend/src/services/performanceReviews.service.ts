@@ -5,11 +5,12 @@ import { createNotification, getUserIdsByRole } from './notifications.service';
 import { sendPerformanceReviewEmail as mailPerformanceReview, mailerConfigured } from '../lib/mailer';
 import { generatePerformanceReviewPDF, type PerformanceReviewPDFData } from '../lib/pdfGenerator';
 import { RATING_CRITERIA } from '../schemas/performanceReviews.schema';
+import { resolveEmployeeEmailRecipients } from '../lib/employeeCommunication';
 import type {
   CreatePerformanceReviewInput, UpdatePerformanceReviewInput, ListPerformanceReviewsQuery,
 } from '../schemas/performanceReviews.schema';
 
-const EMP_JOIN = 'employees(first_name, last_name, display_id, job_title, department, work_email, email)';
+const EMP_JOIN = 'employees(first_name, last_name, display_id, job_title, department, work_email, email, block_personal_email)';
 
 export async function listPerformanceReviews(query: ListPerformanceReviewsQuery) {
   let q = supabaseAdmin.from('performance_reviews').select(`*, ${EMP_JOIN}`, { count: 'exact' });
@@ -163,7 +164,7 @@ export async function getPerformanceReviewPdf(id: string): Promise<string | null
 export async function sendPerformanceReviewToEmployee(id: string, recipientEmailOverride?: string) {
   const row = await getPerformanceReview(id);
   const emp = (row as any).employees ?? {};
-  const recipientEmail = recipientEmailOverride || emp.work_email || emp.email;
+  const recipientEmail = recipientEmailOverride || resolveEmployeeEmailRecipients(emp)[0];
   if (!recipientEmail) {
     throw new ValidationError('This employee has no email address on file. Add one in the employee profile and try again.');
   }

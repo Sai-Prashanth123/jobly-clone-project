@@ -24,10 +24,13 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { DOCUMENT_TYPES } from '../lib/documentTypes';
+import { DOCUMENT_TYPES, IDENTITY_OWNED_DOC_LABELS } from '../lib/documentTypes';
 import type { Employee } from '../types';
 
-const DOC_TYPES = DOCUMENT_TYPES;
+// Identity/required doc types are collected exclusively via the onboarding
+// wizard's "Identity & Documents" section — exclude them here so this page
+// only offers genuinely optional, any-time uploads.
+const DOC_TYPES = DOCUMENT_TYPES.filter(t => !IDENTITY_OWNED_DOC_LABELS.has(t));
 
 // Badge tone per document type. Keep keys exactly matching DOC_TYPES so the
 // pill colour matches what HR picked in the upload form.
@@ -166,20 +169,6 @@ function DocumentManager({ employee }: { employee: Employee }) {
                   onChange={e => setCustomName(e.target.value)}
                   placeholder="Document name (e.g. Training Certificate)…"
                 />
-              )}
-              {docType === 'I-9 Form' && (
-                <p className="text-xs text-blue-600">
-                  Need a blank copy?{' '}
-                  <a
-                    href="https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    Download the current I-9 form from USCIS
-                  </a>{' '}
-                  before uploading the signed version.
-                </p>
               )}
             </div>
             <div className="space-y-1">

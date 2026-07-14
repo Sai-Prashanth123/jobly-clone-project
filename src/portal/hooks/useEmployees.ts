@@ -44,6 +44,7 @@ function mapEmployee(raw: any): Employee {
     taxFormType: raw.tax_form_type ?? undefined,
     reportingManagerId: raw.reporting_manager_id ?? undefined,
     workEmail: raw.work_email ?? undefined,
+    blockPersonalEmail: !!raw.block_personal_email,
     documents: (raw.documents ?? []).map((d: any) => ({
       id: d.id,
       name: d.name,
@@ -421,6 +422,7 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.taxFormType !== undefined && { taxFormType: blank(e.taxFormType) }),
     ...(e.reportingManagerId !== undefined && { reportingManagerId: blank(e.reportingManagerId) }),
     ...(e.workEmail !== undefined && { workEmail: blank(e.workEmail) }),
+    ...(e.blockPersonalEmail !== undefined && { blockPersonalEmail: e.blockPersonalEmail }),
 
     // Onboarding-form extension fields. The blank() helper coerces '' → undefined
     // so optional inputs that were never filled don't get sent as empty strings

@@ -22,7 +22,7 @@ import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
-import { DOCUMENT_TYPES as DOC_TYPES } from '../lib/documentTypes';
+import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, REQUIRED_IDENTITY_TYPES, IDENTITY_OWNED_DOC_LABELS } from '../lib/documentTypes';
 import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -125,46 +125,6 @@ const BLOOD_GROUP_OPTIONS = [
   { value: 'O+',  label: 'O+'  }, { value: 'O-',  label: 'O−'  },
 ];
 
-// US-issued identity documents employees may present for I-9 / payroll.
-const IDENTITY_DOC_ROWS: Array<{
-  type: string;
-  label: string;
-  placeholder: string;
-  hint?: string;
-  hasState?: boolean;
-  hasExpiry?: boolean;
-}> = [
-  { type: 'ssn',            label: 'Social Security Number',     placeholder: 'XXX-XX-XXXX',
-    hint: 'Full SSN. Stored securely; only the last 4 are shown after save.' },
-  { type: 'driver_license', label: "Driver's License",           placeholder: 'D1234567',
-    hint: 'Primary photo ID for I-9 List B.', hasState: true },
-  { type: 'state_id',       label: 'State-Issued ID',            placeholder: 'S1234567',
-    hint: 'Alternative to driver license for non-drivers.', hasState: true },
-  { type: 'passport',       label: 'Passport',                   placeholder: '123456789',
-    hint: 'I-9 List A — proves identity AND work authorization on its own.', hasExpiry: true },
-  { type: 'green_card',     label: 'Permanent Resident Card',    placeholder: 'A12345678',
-    hint: 'Green Card — also I-9 List A.', hasExpiry: true },
-  { type: 'ead',            label: 'Employment Authorization Document', placeholder: 'EAC1234567890',
-    hint: 'I-766 / EAD for visa holders.', hasExpiry: true },
-  { type: 'opt_card',      label: 'OPT Card',                         placeholder: 'C12345678',
-    hint: 'EAD card issued during Optional Practical Training (OPT).', hasExpiry: true },
-  { type: 'stem_opt_card', label: 'STEM OPT Card',                    placeholder: 'C12345678',
-    hint: 'EAD card for STEM OPT 24-month extension.', hasExpiry: true },
-  { type: 'i983',          label: 'I-983',                            placeholder: '',
-    hint: 'For OPT / STEM OPT candidates — signed I-983 from employer and school.', hasExpiry: true },
-  { type: 'i94',           label: 'I-94',                             placeholder: '12345678901',
-    hint: 'Arrival/Departure Record — download from cbp.dhs.gov.', hasExpiry: true },
-  { type: 'us_visa',       label: 'US Visa',                          placeholder: 'A12345678',
-    hint: 'Copy of the US visa stamp in your passport (H-1B, F-1, L-1, etc.).', hasExpiry: true },
-];
-
-// Identity doc types that are mandatory uploads during onboarding.
-const REQUIRED_IDENTITY_TYPES = ['ssn', 'passport', 'i94'] as const;
-
-// Labels from IDENTITY_DOC_ROWS — used to exclude these from the Documents section dropdown
-// so employees cannot accidentally upload the same file in both sections.
-const IDENTITY_OWNED_DOC_LABELS = new Set(IDENTITY_DOC_ROWS.map(r => r.label));
-
 const SECTION_IDS = {
   personal: 'sec-personal',
   contact: 'sec-contact',
@@ -177,19 +137,10 @@ const SECTION_IDS = {
   workHistory: 'sec-work-history',
   emergency: 'sec-emergency',
   payroll: 'sec-payroll',
-  documents: 'sec-documents',
   review: 'sec-review',
 } as const;
 
 // ── Types ───────────────────────────────────────────────────────────────────
-
-interface PendingDoc {
-  id: string;          // local UUID
-  name: string;
-  type: string;
-  customName?: string; // used when type === 'Other'
-  file?: File;
-}
 
 interface FormState {
   // Personal
@@ -240,8 +191,6 @@ interface FormState {
   declarationAccepted: boolean;
   signatureName: string;
   signatureDate: string;
-  // Documents
-  documents: PendingDoc[];
 }
 
 const emptyEducation = (): EducationEntry => ({ level: '', specialization: '', institution: '', passYear: '', gradeOrGPA: '', mode: '' });
@@ -289,7 +238,6 @@ const defaultForm: FormState = {
   declarationAccepted: false,
   signatureName: '',
   signatureDate: todayIso(),
-  documents: [],
 };
 
 // Auto-compute age from DOB. Returns null when DOB is empty or invalid.
@@ -461,7 +409,6 @@ export default function NewEmployee() {
       declarationAccepted: true,                   // already-saved data
       signatureName: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim(),
       signatureDate: todayIso(),
-      documents: [],
     });
     setPrefilled(true);
   }, [isEditMode, existingEmployee, prefilled]);
@@ -516,19 +463,14 @@ export default function NewEmployee() {
   // wizard can show what's still missing in real time and highlight the relevant
   // sections (no need to submit to find out). Drives the header chips + per-section
   // red "Needs info" markers when in onboarding mode. Includes required document
-  // uploads (identity + key forms) that must be completed before onboarding can finish.
-  const ALL_REQUIRED_DOC_TYPES = [
-    'Resume',
-    'Offer Letter',
-  ];
-
+  // uploads (identity + key forms — all collected in the Identity & Documents
+  // section) that must be completed before onboarding can finish.
   const uploadedDocTypes = new Set<string>([
     ...(existingEmployee?.documents ?? []).map(d => d.type),
     ...Object.entries(form.identityDocFiles ?? {}).filter(([, v]) => v).map(([k]) => {
       const row = IDENTITY_DOC_ROWS.find(r => r.type === k);
       return row?.label ?? k;
     }),
-    ...form.documents.filter(d => d.type).map(d => d.type),
   ]);
 
   // Per-section completion — drives the green check shown on each section header.
@@ -558,7 +500,6 @@ export default function NewEmployee() {
           const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
           return fileOrUploaded && (!row.hasExpiry || !!expiry);
         }),
-        [SECTION_IDS.documents]: ALL_REQUIRED_DOC_TYPES.every(t => uploadedDocTypes.has(t)),
       } : {}),
     };
   }, [form, isEditMode, isOnboarding, uploadedDocTypes, existingEmployee]);
@@ -573,7 +514,7 @@ export default function NewEmployee() {
     const isOptHolder = form.visaType === 'opt' || form.visaType === 'stem_opt';
     const optDocs = isOptHolder
       ? [
-          { id: 'doc_opt_card', label: 'OPT Card', section: SECTION_IDS.documents, done: uploadedDocTypes.has('OPT Card') },
+          { id: 'doc_opt_card', label: 'OPT Card', section: SECTION_IDS.identity, done: uploadedDocTypes.has('OPT Card') },
         ]
       : [];
     return [
@@ -595,7 +536,8 @@ export default function NewEmployee() {
       { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim() && Number(e.passYear) > 0) },
       // Emergency — address is now required
       { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
-      // Required identity documents (SSN, Passport, I-94) — uploaded in Identity section
+      // Required identity + hiring documents (SSN, Passport, I-94, Resume, Offer
+      // Letter, I-9 Form) — all uploaded in the Identity & Documents section.
       // Also require expiry dates for docs that have hasExpiry (Passport, I-94).
       ...REQUIRED_IDENTITY_TYPES.flatMap(t => {
         const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
@@ -618,13 +560,6 @@ export default function NewEmployee() {
         }
         return items;
       }),
-      // Required documents (Resume, I-9 Form, W-4, Offer Letter) — uploaded in Documents section
-      ...ALL_REQUIRED_DOC_TYPES.map(t => ({
-        id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-        label: t,
-        section: SECTION_IDS.documents,
-        done: uploadedDocTypes.has(t),
-      })),
       // OPT/STEM OPT holders additionally need OPT Card + I-983
       ...optDocs,
       // Bank details and declaration are optional (HR collects separately if needed)
@@ -739,53 +674,9 @@ export default function NewEmployee() {
     setForm(p => ({ ...p, workHistory: p.workHistory.map((row, i) => i === idx ? { ...row, [k]: v } : row) }));
   };
 
-  // ── Documents (deferred upload) ──────────────────────────────────────────
-  // 20 MB matches the backend multer limit (see backend/src/middleware/upload.ts).
-  // Reject larger files client-side to avoid a 413 round-trip during upload.
-  const MAX_DOC_BYTES = 20 * 1024 * 1024;
-  const [docDraft, setDocDraft] = useState<{ type: string; customName: string; file: File | null }>({ type: '', customName: '', file: null });
-  const [docDragOver, setDocDragOver] = useState(false);
-
-  // Stage one or more files. If a type was preselected in the draft Select, all
-  // newly-added files inherit it; otherwise rows start unclassified and prompt
-  // the user with an inline type Select (Submit is disabled while any row is
-  // unclassified — see `unclassifiedDocs` below).
-  const stageDocumentFiles = (files: File[]) => {
-    if (files.length === 0) return;
-    const valid: { id: string; name: string; type: string; file: File }[] = [];
-    let dropped = 0;
-    for (const f of files) {
-      if (f.size > MAX_DOC_BYTES) { dropped += 1; continue; }
-      valid.push({ id: crypto.randomUUID(), name: f.name, type: docDraft.type ?? '', customName: docDraft.type === 'Other' ? docDraft.customName : undefined, file: f });
-    }
-    if (dropped > 0) {
-      toast.error(`${dropped} file${dropped === 1 ? '' : 's'} exceeded the 20 MB limit and ${dropped === 1 ? 'was' : 'were'} skipped.`);
-    }
-    if (valid.length === 0) return;
-    setForm(p => ({ ...p, documents: [...p.documents, ...valid] }));
-  };
-  const addDocumentDraft = () => {
-    if (!docDraft.file) { toast.error('Pick a file first'); return; }
-    stageDocumentFiles([docDraft.file]);
-    setDocDraft(d => ({ type: d.type, customName: d.type === 'Other' ? d.customName : '', file: null }));
-    const input = document.getElementById('new-emp-doc-file') as HTMLInputElement | null;
-    if (input) input.value = '';
-  };
-  const removeDocumentDraft = (id: string) => {
-    setForm(p => ({ ...p, documents: p.documents.filter(d => d.id !== id) }));
-  };
-  const setDocumentType = (id: string, type: string) => {
-    setForm(p => ({ ...p, documents: p.documents.map(d => d.id === id ? { ...d, type, customName: type !== 'Other' ? undefined : d.customName } : d) }));
-  };
-  const setDocumentCustomName = (id: string, customName: string) => {
-    setForm(p => ({ ...p, documents: p.documents.map(d => d.id === id ? { ...d, customName } : d) }));
-  };
-  // Exposes the unclassified-row count to the submit handler so we can block the
-  // wizard from completing onboarding with half-typed uploads.
-  const unclassifiedDocs = form.documents.filter(d => !d.type || (d.type === 'Other' && !d.customName?.trim())).length;
-
-  // Warn the user before they accidentally navigate away with staged-but-not-yet-saved files.
-  const hasStagedFiles = form.documents.some(d => !!d.file) || Object.values(form.identityDocFiles ?? {}).some(Boolean);
+  // Warn the user before they accidentally navigate away with staged-but-not-yet-saved
+  // identity/required document files (uploaded only at final submit/save-draft time).
+  const hasStagedFiles = Object.values(form.identityDocFiles ?? {}).some(Boolean);
   useEffect(() => {
     if (!hasStagedFiles) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -925,9 +816,6 @@ export default function NewEmployee() {
           uploads.push({ file, name: file.name, docType: row.label });
         }
       }
-      for (const d of form.documents) {
-        if (d.file) uploads.push({ file: d.file, name: d.file.name, docType: (d.type === 'Other' && d.customName?.trim()) ? d.customName.trim() : d.type });
-      }
       for (const u of uploads) {
         const fd = new FormData();
         fd.append('file', u.file);
@@ -1066,14 +954,10 @@ export default function NewEmployee() {
         }));
       }
       const uploadedDocTypes: string[] = [];
-      const uploadedGenericIds: string[] = [];
       const uploads: { file: File; name: string; docType: string }[] = [];
       for (const row of IDENTITY_DOC_ROWS) {
         const file = form.identityDocFiles[row.type];
         if (file) { uploads.push({ file, name: file.name, docType: row.label }); uploadedDocTypes.push(row.type); }
-      }
-      for (const d of form.documents) {
-        if (d.file) { uploads.push({ file: d.file, name: d.file.name, docType: (d.type === 'Other' && d.customName?.trim()) ? d.customName.trim() : d.type }); uploadedGenericIds.push(d.id); }
       }
       for (const u of uploads) {
         const fd = new FormData();
@@ -1112,7 +996,6 @@ export default function NewEmployee() {
             identityDocFiles: Object.fromEntries(
               Object.entries(p.identityDocFiles).map(([k, v]) => [k, uploadedDocTypes.includes(k) ? null : v]),
             ),
-            documents: p.documents.filter(d => !uploadedGenericIds.includes(d.id)),
           }));
         } catch (uploadErr: any) {
           toast.warning(
@@ -1230,8 +1113,6 @@ export default function NewEmployee() {
           onClick={handleSubmit}
           loading={submitMutation.isPending || completeOnboarding.isPending}
           loadingText={isOnboarding ? 'Finishing…' : isEditMode ? 'Saving…' : 'Creating…'}
-          disabled={unclassifiedDocs > 0}
-          title={unclassifiedDocs > 0 ? 'Set a type for each uploaded file first.' : undefined}
           className="gap-2"
         >
           <CheckCircle2 className="h-4 w-4" />
@@ -1885,7 +1766,7 @@ export default function NewEmployee() {
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description="Upload your identity documents. SSN, Passport, and I-94 are required during onboarding."
+            description="Upload your identity and hiring documents. SSN, Passport, I-94, Resume, Offer Letter, and I-9 Form are required during onboarding."
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1916,6 +1797,18 @@ export default function NewEmployee() {
                         )}
                       </p>
                       {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
+                      {row.downloadUrl && (
+                        <p className="text-[11px] mt-1">
+                          <a
+                            href={row.downloadUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 underline"
+                          >
+                            Download the current blank form
+                          </a>
+                        </p>
+                      )}
                     </div>
                     {row.hasExpiry && (
                       <div className="space-y-1">
@@ -2243,154 +2136,11 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 12 Documents — drag-and-drop multi-file upload with inline classification.
-              During onboarding, Resume / I-9 Form / W-4 / Offer Letter are required.
-              Identity documents (SSN, Passport, I-94, US Visa, etc.) are collected above. */}
-          <SectionCard
-            id={SECTION_IDS.documents}
-            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.documents) : undefined}
-            attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.documents)}
-            num="12"
-            title="Documents"
-            description={isOnboarding
-              ? 'Upload required documents: Resume, Offer Letter. I-9 and W-4 are optional at this stage.'
-              : 'Optional. Drag files in (or click to browse), then choose a type for each.'}
-            icon={<FileText className="h-4 w-4 text-[#4069FF]" />}
-          >
-            {isOnboarding && (
-              <p className="text-[11px] text-blue-600 bg-blue-50 border border-blue-100 rounded-md px-3 py-2 mb-3">
-                Identity documents (Passport, SSN, I-94, US Visa, Driver&rsquo;s License, etc.) are collected in the <strong>Identity &amp; Documents</strong> section above.
-              </p>
-            )}
-            {isOnboarding && (() => {
-              const missing = ALL_REQUIRED_DOC_TYPES.filter(t => !uploadedDocTypes.has(t));
-              return missing.length > 0 ? (
-                <p className="text-[11px] text-red-600 mb-2">
-                  Required uploads still needed: {missing.join(', ')}
-                </p>
-              ) : null;
-            })()}
-            {hasStagedFiles && (
-              <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-800 mb-3">
-                <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
-                You have unsaved files — click <strong>Save &amp; continue later</strong> to preserve them before navigating away.
-              </div>
-            )}
-            <div
-              onDragOver={e => { e.preventDefault(); setDocDragOver(true); }}
-              onDragLeave={() => setDocDragOver(false)}
-              onDrop={e => {
-                e.preventDefault();
-                setDocDragOver(false);
-                stageDocumentFiles(Array.from(e.dataTransfer.files));
-              }}
-              className={`rounded-xl border-2 border-dashed p-4 transition-colors ${
-                docDragOver ? 'border-[#4069FF] bg-blue-50/40' : 'border-gray-200'
-              }`}
-            >
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1.5">
-                  <Label className="text-xs">Default type (optional)</Label>
-                  <Select value={docDraft.type} onValueChange={v => setDocDraft(d => ({ ...d, type: v, customName: v !== 'Other' ? '' : d.customName }))}>
-                    <SelectTrigger><SelectValue placeholder="Choose for new uploads" /></SelectTrigger>
-                    <SelectContent>
-                      {DOC_TYPES.filter(t => !IDENTITY_OWNED_DOC_LABELS.has(t)).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  {docDraft.type === 'Other' && (
-                    <Input
-                      value={docDraft.customName}
-                      onChange={e => setDocDraft(d => ({ ...d, customName: e.target.value }))}
-                      placeholder="Document name (e.g. Training Certificate)…"
-                      className="text-xs h-8"
-                    />
-                  )}
-                </div>
-                <div>
-                  <Label className="text-xs">Files</Label>
-                  <input
-                    id="new-emp-doc-file"
-                    type="file"
-                    multiple
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
-                    onChange={e => {
-                      const picked = Array.from(e.target.files ?? []);
-                      if (picked.length > 0) {
-                        stageDocumentFiles(picked);
-                        e.target.value = '';
-                      }
-                    }}
-                    className="block w-full h-10 text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
-                  />
-                </div>
-                <div className="flex items-end">
-                  <Button type="button" onClick={addDocumentDraft} disabled={!docDraft.file} className="w-full gap-2" variant="outline">
-                    <Plus className="h-4 w-4" /> Stage file
-                  </Button>
-                </div>
-              </div>
-              <p className="text-[11px] text-muted-foreground mt-3 text-center">
-                Drag PDFs, images, or Office docs anywhere into this area — max 20&nbsp;MB each.
-              </p>
-            </div>
-
-            {form.documents.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {form.documents.map(d => (
-                  <div key={d.id} className="flex items-center justify-between gap-2 py-2 px-3 rounded-md bg-gray-50/60 border border-gray-100">
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <FileText className="h-4 w-4 text-gray-500 flex-shrink-0" />
-                      <p className="text-sm truncate flex-shrink min-w-0">{d.name}</p>
-                      {d.type && d.type !== 'Other' ? (
-                        <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-white border border-gray-200 flex-shrink-0">
-                          {d.type}
-                        </span>
-                      ) : d.type === 'Other' ? (
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {d.customName ? (
-                            <span className="text-[11px] text-muted-foreground px-2 py-0.5 rounded-full bg-white border border-gray-200">
-                              {d.customName}
-                            </span>
-                          ) : (
-                            <Input
-                              value={d.customName ?? ''}
-                              onChange={e => setDocumentCustomName(d.id, e.target.value)}
-                              placeholder="Document name…"
-                              className="h-7 text-[11px] w-40"
-                              onClick={e => e.stopPropagation()}
-                            />
-                          )}
-                        </div>
-                      ) : (
-                        <div className="flex-shrink-0 w-44">
-                          <Select value="" onValueChange={v => setDocumentType(d.id, v)}>
-                            <SelectTrigger className="h-7 text-[11px]"><SelectValue placeholder="Set type…" /></SelectTrigger>
-                            <SelectContent>
-                              {DOC_TYPES.filter(t => !IDENTITY_OWNED_DOC_LABELS.has(t)).map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      )}
-                    </div>
-                    <Button type="button" variant="ghost" size="sm" onClick={() => removeDocumentDraft(d.id)} className="text-red-600 hover:text-red-700 hover:bg-red-50 flex-shrink-0">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                ))}
-                {unclassifiedDocs > 0 && (
-                  <p className="text-[11px] text-amber-700 mt-2 pl-1">
-                    {unclassifiedDocs} file{unclassifiedDocs === 1 ? '' : 's'} still need{unclassifiedDocs === 1 ? 's' : ''} a type before you can submit.
-                  </p>
-                )}
-              </div>
-            )}
-          </SectionCard>
-
-          {/* 13 Review */}
+          {/* 12 Review */}
           <SectionCard
             id={SECTION_IDS.review}
             complete={sectionComplete[SECTION_IDS.review]}
-            num="13"
+            num="12"
             title="Review & Submit"
             description={isOnboarding ? 'Review your details, then finish onboarding.' : isEditMode ? 'Review and save your changes.' : 'Confirm the information is correct before creating the employee.'}
             icon={<CheckCircle2 className="h-4 w-4 text-[#4069FF]" />}

@@ -138,6 +138,9 @@ export const updateEmployeeSchema = z.object({
   taxFormType: z.enum(['w4','w9']).optional().nullable(),
   reportingManagerId: z.string().uuid().optional().nullable(),
   workEmail: z.string().email().optional().nullable(),
+  // HR-only: once true, system emails stop going to the personal `email` and
+  // only go to `workEmail` — see backend/src/lib/employeeCommunication.ts.
+  blockPersonalEmail: z.boolean().optional(),
 
   // Same extension fields, all optional + nullable for partial updates.
   middleName: z.string().optional().nullable(),
