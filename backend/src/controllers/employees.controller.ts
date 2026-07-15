@@ -81,8 +81,18 @@ export async function update(req: Request, res: Response, next: NextFunction): P
     if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
       throw new ForbiddenError('Employees may only edit their own profile');
     }
-    const data = await svc.updateEmployee(req.params.id, req.body as UpdateEmployeeInput, req.user?.id, req.user?.role);
-    res.json({ success: true, data });
+    const result = await svc.updateEmployee(req.params.id, req.body as UpdateEmployeeInput, req.user?.id, req.user?.role);
+    // Pull off the internal _credentials channel (only populated when this
+    // update changed the employee's personal/work email) before responding.
+    const { _credentials, ...data } = result as any;
+    res.json({
+      success: true,
+      data,
+      welcomeEmailSent: _credentials?.emailSent ?? false,
+      warning: _credentials?.warning,
+      tempPassword: _credentials?.emailSent ? undefined : _credentials?.tempPassword,
+      loginEmail: _credentials?.loginEmail,
+    });
   } catch (err) { next(err); }
 }
 

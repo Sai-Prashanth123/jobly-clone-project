@@ -209,6 +209,35 @@ export function useUpdateEmployee(id: string) {
   });
 }
 
+// Dedicated action for the "Send Official Email" popup: assigns/updates the
+// employee's work email via the same PUT endpoint useUpdateEmployee uses, but
+// returns the credential-send result too (kept as a separate hook rather than
+// changing useUpdateEmployee's return shape, since that hook has many other
+// callers that only care about the returned employee).
+export function useSendOfficialEmail(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (workEmail: string) => {
+      const { data } = await apiClient.put(`/employees/${id}`, { workEmail });
+      return {
+        employee: mapEmployee(data.data),
+        welcomeEmailSent: data.welcomeEmailSent as boolean,
+        warning: data.warning as string | undefined,
+        tempPassword: data.tempPassword as string | undefined,
+        loginEmail: data.loginEmail as string | undefined,
+      };
+    },
+    onSuccess: ({ employee }) => {
+      qc.setQueryData(['employees', id], (old: any) => ({
+        ...employee,
+        documents: employee.documents?.length ? employee.documents : (old?.documents ?? []),
+      }));
+      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+    },
+    meta: { silentError: true },
+  });
+}
+
 export function useDeleteEmployee() {
   const qc = useQueryClient();
   return useMutation({

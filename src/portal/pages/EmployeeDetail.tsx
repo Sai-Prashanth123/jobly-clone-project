@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, CheckSquare2, Square, ListChecks, Eye, EyeOff, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, CheckSquare2, Square, ListChecks, Eye, EyeOff, AlertCircle, Send, ShieldOff, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -14,8 +14,9 @@ import { UsDateInput } from '../components/shared/UsDateInput';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import {
-  useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials,
+  useEmployee, useUpdateEmployee, useDeleteEmployee, useEmployees, useResendEmployeeCredentials, useSendOfficialEmail,
   useRequestOnboardingChanges, useRequestEmployeeDocuments, usePlaceOnLeave, useReturnFromLeave, useTerminateEmployee, useRehireEmployee,
 } from '../hooks/useEmployees';
 import { useAssignments } from '../hooks/useAssignments';
@@ -46,6 +47,7 @@ export default function EmployeeDetail() {
   const updateEmployee = useUpdateEmployee(id!);
   const deleteEmployee = useDeleteEmployee();
   const resendCreds = useResendEmployeeCredentials();
+  const sendOfficialEmail = useSendOfficialEmail(id!);
   const requestChanges = useRequestOnboardingChanges(id!);
   const requestDocuments = useRequestEmployeeDocuments();
   const placeOnLeave = usePlaceOnLeave(id!);
@@ -58,6 +60,8 @@ export default function EmployeeDetail() {
 
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [blockEmailConfirmOpen, setBlockEmailConfirmOpen] = useState(false);
+  const [sendOfficialEmailOpen, setSendOfficialEmailOpen] = useState(false);
+  const [officialEmailInput, setOfficialEmailInput] = useState('');
   const [changesOpen, setChangesOpen] = useState(false);
   const [changesMessage, setChangesMessage] = useState('');
   const [docRequestOpen, setDocRequestOpen] = useState(false);
@@ -368,6 +372,36 @@ export default function EmployeeDetail() {
                 <Mail className="h-4 w-4" />
                 Resend Welcome Email
               </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                onClick={() => { setOfficialEmailInput(employee.workEmail ?? ''); setSendOfficialEmailOpen(true); }}
+              >
+                <Send className="h-4 w-4" />
+                Send Official Email
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-2"
+                disabled={!employee.workEmail && !employee.blockPersonalEmail}
+                title={!employee.workEmail && !employee.blockPersonalEmail ? 'Assign a work email first' : undefined}
+                loading={updateEmployee.isPending}
+                loadingText={employee.blockPersonalEmail ? 'Unblocking…' : 'Blocking…'}
+                onClick={async () => {
+                  if (!employee.blockPersonalEmail) { setBlockEmailConfirmOpen(true); return; }
+                  try {
+                    await updateEmployee.mutateAsync({ blockPersonalEmail: false });
+                    toast.success('Personal email communications unblocked');
+                  } catch {
+                    /* failed-request toast raised centrally (queryClient.ts) */
+                  }
+                }}
+              >
+                {employee.blockPersonalEmail ? <ShieldCheck className="h-4 w-4" /> : <ShieldOff className="h-4 w-4" />}
+                {employee.blockPersonalEmail ? 'Unblock Personal Email' : 'Block Personal Email'}
+              </Button>
               <Button variant="outline" size="sm" onClick={() => navigate(`/portal/employees/${employee.id}/edit`)} className="gap-2">
                 <Edit className="h-4 w-4" />
                 Edit
@@ -417,29 +451,9 @@ export default function EmployeeDetail() {
             {canManage && (
               <div className="space-y-1">
                 <p className="text-xs font-medium text-muted-foreground">Communication</p>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${employee.blockPersonalEmail ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
-                    {employee.blockPersonalEmail ? 'Official Only' : 'Personal + Official'}
-                  </span>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="h-6 px-2 text-[11px]"
-                    disabled={!employee.workEmail && !employee.blockPersonalEmail}
-                    title={!employee.workEmail && !employee.blockPersonalEmail ? 'Assign a work email first' : undefined}
-                    onClick={async () => {
-                      if (!employee.blockPersonalEmail) { setBlockEmailConfirmOpen(true); return; }
-                      try {
-                        await updateEmployee.mutateAsync({ blockPersonalEmail: false });
-                        toast.success('Personal email communications unblocked');
-                      } catch {
-                        /* failed-request toast raised centrally (queryClient.ts) */
-                      }
-                    }}
-                  >
-                    {employee.blockPersonalEmail ? 'Unblock personal email' : 'Block personal email'}
-                  </Button>
-                </div>
+                <span className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-semibold ${employee.blockPersonalEmail ? 'bg-amber-100 text-amber-700' : 'bg-gray-100 text-gray-600'}`}>
+                  {employee.blockPersonalEmail ? 'Official Only' : 'Personal + Official'}
+                </span>
               </div>
             )}
             <Field label="Mobile Phone" value={employee.phone} />
@@ -819,6 +833,57 @@ export default function EmployeeDetail() {
           }
         }}
       />
+
+      <Dialog open={sendOfficialEmailOpen} onOpenChange={(open) => !sendOfficialEmail.isPending && setSendOfficialEmailOpen(open)}>
+        <DialogContent className="w-[95vw] max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Send official email to {employee.firstName} {employee.lastName}</DialogTitle>
+            <DialogDescription>
+              This becomes their official login email. They&rsquo;ll be sent new login credentials
+              (or an updated-login notice if they&rsquo;ve already set their own password) at both
+              their personal and official addresses.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-1.5">
+            <Label>Official (work) email</Label>
+            <Input
+              type="email"
+              value={officialEmailInput}
+              onChange={e => setOfficialEmailInput(e.target.value)}
+              placeholder="name@company.com"
+            />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSendOfficialEmailOpen(false)} disabled={sendOfficialEmail.isPending}>Cancel</Button>
+            <Button
+              loading={sendOfficialEmail.isPending}
+              loadingText="Sending…"
+              disabled={!officialEmailInput.trim() || !officialEmailInput.includes('@')}
+              onClick={async () => {
+                try {
+                  const r = await sendOfficialEmail.mutateAsync(officialEmailInput.trim());
+                  setSendOfficialEmailOpen(false);
+                  if (r.welcomeEmailSent) {
+                    toast.success(`Official email sent. Credentials delivered to ${[employee.email, r.loginEmail].filter(Boolean).join(' and ')}. If not received, check spam/junk folder.`, { duration: 10000 });
+                  } else if (r.tempPassword) {
+                    toast.warning(
+                      `${r.warning ?? 'Email could not be delivered.'} Login: ${r.loginEmail} · Temp password: ${r.tempPassword}`,
+                      { duration: 30000 },
+                    );
+                  } else {
+                    toast.error(r.warning ?? 'Could not send official email.');
+                  }
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
+                }
+              }}
+            >
+              <Send className="h-4 w-4" />
+              Send
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <EntityAuditTrail entityType="employee" entityId={employee?.id} />
 

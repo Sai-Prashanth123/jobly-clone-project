@@ -644,7 +644,11 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     }
   }
 
-  // Guard: email uniqueness — check both personal and work email if either is being changed
+  // Guard: email uniqueness — check both personal and work email if either is being changed.
+  // Must exclude soft-deleted rows (deleted_at set) — a terminated/purged employee's
+  // old row sharing this email is legacy data, not a real conflict, and must never
+  // block editing a different, active employee (createEmployee's own pre-check
+  // already treats a soft-deleted duplicate the same way).
   const emailsToCheck: string[] = [patch.email, patch.work_email].filter(Boolean) as string[];
   for (const email of emailsToCheck) {
     const safeEmail = sanitizeForPostgrestFilter(email);
@@ -652,6 +656,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
       .from('employees')
       .select('id')
       .or(`email.eq.${safeEmail},work_email.eq.${safeEmail}`)
+      .is('deleted_at', null)
       .neq('id', id)
       .limit(1)
       .maybeSingle();
@@ -695,6 +700,10 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   // notifying them of the change. Best-effort; a failure must not fail the update.
   const personalChanged = input.email !== undefined && (input.email ?? '') !== (existing.email ?? '');
   const workChanged     = input.workEmail !== undefined && (input.workEmail ?? '') !== (existing.work_email ?? '');
+  // Captured so callers (e.g. the "Send Official Email" popup) can surface
+  // whether credentials were actually sent, same shape as issueCredentials'
+  // CredentialsResult — undefined when no email change happened this request.
+  let credentialResult: CredentialsResult | undefined;
   // Email is HR-owned (stripped from an employee's own patch above), so only act
   // on a real email change made by HR/admin.
   if ((personalChanged || workChanged) && actorRole !== 'employee') {
@@ -707,7 +716,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 
       if (!pu || pu.must_reset_password !== false) {
         // No login yet, or still on the temp → re-issue temp creds to the new email.
-        await resendCredentials(id, actorId);
+        credentialResult = await resendCredentials(id, actorId);
         console.log('[updateEmployee] email changed → re-issued temp credentials for', id);
       } else {
         // User has their own password → move the login email only, keep password.
@@ -730,7 +739,11 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
           } catch { /* notification is best-effort */ }
 
           const recipients = resolveEmployeeEmailRecipients({ email: newPersonal, work_email: newWork, block_personal_email: (emp as any).block_personal_email });
-          if (mailerConfigured && recipients.length) {
+          if (!mailerConfigured) {
+            credentialResult = { credentialsReady: true, emailSent: false, warning: 'Login email was updated but the notice email was not sent: mailer is not configured.', loginEmail: newLoginEmail };
+          } else if (!recipients.length) {
+            credentialResult = { credentialsReady: true, emailSent: false, warning: 'Login email was updated but there is no email address to notify.', loginEmail: newLoginEmail };
+          } else {
             try {
               await sendWelcomeEmail({
                 to: recipients,
@@ -740,8 +753,10 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
                 subject: 'Your Jobly login email has changed',
                 bodyIntro: 'Your Jobly Portal login email has been updated. Use the address below to log in next time &mdash; your password is unchanged.',
               });
-            } catch (e) {
+              credentialResult = { credentialsReady: true, emailSent: true, loginEmail: newLoginEmail };
+            } catch (e: any) {
               console.error('[updateEmployee] login-email-changed notice failed for', id, e);
+              credentialResult = { credentialsReady: true, emailSent: false, warning: `Login email was updated but the notice email could not be sent (${e?.message ?? 'send failed'}).`, loginEmail: newLoginEmail };
             }
           }
           console.log('[updateEmployee] email changed → moved login email (password kept) for', id);
@@ -749,6 +764,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
       }
     } catch (err) {
       console.error('[updateEmployee] email-change credential handling failed for', id, err);
+      credentialResult = { credentialsReady: false, emailSent: false, warning: 'Could not update login credentials for the new email.', loginEmail: input.workEmail || input.email || '' };
     }
   }
 
@@ -778,7 +794,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     })();
   }
 
-  return serializeEmployee(emp);
+  return { ...serializeEmployee(emp), _credentials: credentialResult };
 }
 
 // Notify HR + admin that an employee finished onboarding — in-app notification
