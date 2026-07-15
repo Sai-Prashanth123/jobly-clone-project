@@ -654,13 +654,18 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     const safeEmail = sanitizeForPostgrestFilter(email);
     const { data: dup } = await supabaseAdmin
       .from('employees')
-      .select('id')
+      .select('id, display_id, first_name, last_name')
       .or(`email.eq.${safeEmail},work_email.eq.${safeEmail}`)
       .is('deleted_at', null)
       .neq('id', id)
       .limit(1)
       .maybeSingle();
-    if (dup) throw new ConflictError(`Email ${email} is already in use by another employee.`);
+    if (dup) {
+      const label = dup.display_id ?? dup.id.slice(0, 8);
+      throw new ConflictError(
+        `Email ${email} is already in use by ${label} (${dup.first_name} ${dup.last_name}). Open their profile or use a different email.`,
+      );
+    }
   }
 
   const { data: emp, error } = await supabaseAdmin

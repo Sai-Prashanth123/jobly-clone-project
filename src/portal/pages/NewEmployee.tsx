@@ -905,7 +905,10 @@ export default function NewEmployee() {
       const noResponse = !err?.response;
       let msg: string;
       if (status === 409) {
-        msg = 'An employee with this personal email already exists. Use a different email, or check the Employees list to find them.';
+        // Show the backend's specific message (names the actual conflicting
+        // employee) instead of a generic one — avoids needing a DB lookup to
+        // find out who/what actually conflicts.
+        msg = serverMsg ?? 'An employee with this email already exists. Use a different email, or check the Employees list to find them.';
       } else if (noResponse) {
         msg = "Couldn't reach the server. Please check your connection and try again.";
       } else {
