@@ -125,7 +125,7 @@ export default function ClientDetail() {
         </div>
         {/* Client management is admin-only — operations/finance see read-only. */}
         {isAdmin && (
-          <div className="flex flex-wrap gap-2 flex-shrink-0">
+          <div className="flex flex-wrap justify-end gap-2 min-w-0">
             <Button variant="outline" size="sm" onClick={() => setEditOpen(true)} className="gap-2">
               <Edit className="h-4 w-4" />
               Edit

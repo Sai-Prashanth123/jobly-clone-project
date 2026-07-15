@@ -26,7 +26,7 @@ export function FormPageShell({ title, backTo, actions, children }: FormPageShel
           <span className="text-sm font-semibold text-gray-900 truncate">{title}</span>
         </Link>
         {actions && (
-          <div className="flex flex-row flex-wrap items-center gap-2 flex-shrink-0">{actions}</div>
+          <div className="flex flex-row flex-wrap items-center justify-end gap-2 min-w-0">{actions}</div>
         )}
       </div>
       {children}

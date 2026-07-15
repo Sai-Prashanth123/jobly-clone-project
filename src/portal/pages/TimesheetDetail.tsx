@@ -255,7 +255,7 @@ export default function TimesheetDetail() {
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 flex-shrink-0">
+        <div className="flex flex-wrap justify-end gap-2 min-w-0">
           {isHrAdmin && timesheet.employeeEmail && (
             <a href={`mailto:${timesheet.employeeEmail}?subject=Regarding your timesheet ${timesheet.displayId ?? ''}`}>
               <Button variant="outline" size="sm" className="gap-1.5">

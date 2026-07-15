@@ -1142,7 +1142,7 @@ export default function NewEmployee() {
             </Link>
           )}
         </div>
-        <div className="flex flex-row flex-wrap items-center gap-2 flex-shrink-0">
+        <div className="flex flex-row flex-wrap items-center justify-end gap-2 min-w-0">
           {actionButtons}
           {isOnboarding && (
             <Button variant="ghost" size="sm" onClick={logout} className="gap-1.5 text-muted-foreground">

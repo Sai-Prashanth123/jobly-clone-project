@@ -169,7 +169,7 @@ export default function EmployeeDetail() {
           <button type="button" onClick={() => setResubmittedBanner(false)} className="text-amber-700 hover:text-amber-900 text-xs font-medium flex-shrink-0">Dismiss</button>
         </div>
       )}
-      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+      <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-100 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
         <div className="flex items-center gap-3 min-w-0">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/employees')} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
@@ -217,7 +217,7 @@ export default function EmployeeDetail() {
             </div>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-end sm:flex-shrink-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-end min-w-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
           {(employee.status === 'onboarding' || isPlainInactive) && canManage && (() => {
             const onboardingComplete = isPlainInactive || (employee.onboarding?.complete === true);
             const pct = employee.onboarding?.percent ?? 0;

@@ -86,7 +86,7 @@ export default function AssignmentDetail() {
             </div>
           </div>
         </div>
-        <div className="flex flex-wrap gap-2 flex-shrink-0">
+        <div className="flex flex-wrap justify-end gap-2 min-w-0">
           {assignment.employeeEmail && (
             <a href={`mailto:${assignment.employeeEmail}?subject=Re: Assignment ${assignment.displayId ?? ''}`}>
               <Button variant="outline" size="sm" className="gap-2">
