@@ -528,8 +528,12 @@ export default function NewEmployee() {
       { id: 'permanent',   label: 'Permanent address',              section: SECTION_IDS.permanentAddr, done: permFilled },
       // Employment
       { id: 'employment',  label: 'Employment details',             section: SECTION_IDS.employment,    done: !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim() },
-      // Immigration — visa is optional; SSN (full 9 digits) is required
-      { id: 'immigration', label: 'Social Security Number (SSN)',   section: SECTION_IDS.immigration,   done: /^\d{3}-\d{2}-\d{4}$/.test(form.ssn) },
+      // Immigration — visa is optional; SSN (full 9 digits) is required.
+      // Label deliberately distinct from the Identity & Documents section's
+      // "Social Security Number" chip (that one is the uploaded proof
+      // document; this one is typing the number itself) — near-identical
+      // labels made these two separate requirements look like one duplicated.
+      { id: 'immigration', label: 'SSN Number (typed)',   section: SECTION_IDS.immigration,   done: /^\d{3}-\d{2}-\d{4}$/.test(form.ssn) },
       // Bank details — required for ACH direct deposit
       { id: 'bank',        label: 'Bank details (name, account number, routing number)', section: SECTION_IDS.payroll, done: !!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim() },
       // Education (passYear must be > 0)
@@ -546,14 +550,21 @@ export default function NewEmployee() {
         const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
         const items: { id: string; label: string; section: string; done: boolean }[] = [{
           id: `ident_${t}`,
-          label: row.label,
+          // 'ssn' gets a checklist-only display label distinct from the
+          // "SSN Number (typed)" immigration chip above — same underlying
+          // document type/row title everywhere else, just disambiguated here
+          // so the two separate SSN requirements don't look duplicated.
+          label: t === 'ssn' ? 'SSN Document (upload)' : row.label,
           section: SECTION_IDS.identity,
           done: fileOrUploaded,
         }];
         if (row.hasExpiry) {
           items.push({
             id: `ident_${t}_expiry`,
-            label: `${row.label} expiry date`,
+            // "Expiry Date — X" instead of "X expiry date" so the chip
+            // doesn't just restate the document name back-to-back with its
+            // own upload chip — same fix as the SSN disambiguation above.
+            label: `Expiry Date — ${row.label}`,
             section: SECTION_IDS.identity,
             done: fileOrUploaded && !!expiry,
           });
