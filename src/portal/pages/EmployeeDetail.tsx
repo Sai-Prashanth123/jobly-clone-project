@@ -531,11 +531,11 @@ export default function EmployeeDetail() {
             {employee.bankRoutingNumber && (
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Routing Number</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="text-sm font-mono text-gray-900">
+                <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                  <span className="text-sm font-mono text-gray-900 break-words [overflow-wrap:anywhere] min-w-0">
                     {bankDetailsVisible ? employee.bankRoutingNumber : `****${employee.bankRoutingNumber.slice(-4)}`}
                   </span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-700" onClick={() => setBankDetailsVisible(v => !v)} title={bankDetailsVisible ? 'Hide bank details' : 'Show bank details'}>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-700 flex-shrink-0" onClick={() => setBankDetailsVisible(v => !v)} title={bankDetailsVisible ? 'Hide bank details' : 'Show bank details'}>
                     {bankDetailsVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
                   </Button>
                 </div>
@@ -544,7 +544,7 @@ export default function EmployeeDetail() {
             {employee.bankAccountNumber && (
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Account Number</p>
-                <p className="text-sm font-mono text-gray-900 mt-0.5">
+                <p className="text-sm font-mono text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]">
                   {bankDetailsVisible ? employee.bankAccountNumber : `****${employee.bankAccountNumber.slice(-4)}`}
                 </p>
               </div>
