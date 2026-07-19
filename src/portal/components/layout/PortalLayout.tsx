@@ -9,24 +9,27 @@ import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { CommandPalette } from '../shared/CommandPalette';
 import '../../portal.css';
 
-// Always-visible mobile top bar (logo + hamburger). Unlike the old bare
-// floating toggle button below, this is a normal in-flow sticky header — no
-// bare `position: fixed` element depending on a scroll-triggered reflow to
-// become hit-testable, and no dependency on `isMobile` being correct yet
-// (this is pure CSS `md:hidden`, so it's correct from the very first paint).
+// Always-visible mobile top bar (logo + hamburger).
 //
 // Deliberately a <div role="banner"> and NOT a raw <header> element: the
 // legacy public-marketing-site stylesheet (src/styles/style.css, loaded
 // globally/unscoped) has a bare `header { position: fixed !important; ... }`
-// rule that silently hijacked a real <header> here — forcing it out of
-// document flow so it floated over the page instead of pushing content down,
-// which is what produced the "blank space, content hidden underneath"
-// symptom. Also uses a plain Menu (hamburger) icon via toggleSidebar()
-// instead of SidebarTrigger's default PanelLeft icon.
+// rule that silently hijacked a real <header> here.
+//
+// Deliberately `fixed`, NOT `sticky`: this app has global `overflow-x: hidden`
+// rules on `body`/`html` (src/index.css) which, per the CSS overflow-x/y
+// interdependency quirk, force those elements' computed `overflow-y` to
+// `auto` — turning them into scroll containers whose exact scrolling
+// behavior `sticky` positioning can behave inconsistently against. `fixed`
+// anchors to the viewport directly regardless of which ancestor ends up
+// owning the actual scroll, avoiding that whole class of bug. A `<div
+// className="h-14 md:hidden" />` spacer right after this (see PortalLayout
+// below) reserves the equivalent space in normal flow so fixed content
+// doesn't render underneath it.
 function MobileTopBar() {
   const { toggleSidebar } = useSidebar();
   return (
-    <div role="banner" className="sticky top-0 z-40 flex items-center gap-3 h-14 px-4 bg-white border-b border-gray-200 md:hidden">
+    <div role="banner" className="fixed top-0 inset-x-0 z-40 flex items-center gap-3 h-14 px-4 bg-white border-b border-gray-200 md:hidden">
       <button
         type="button"
         onClick={toggleSidebar}
@@ -89,6 +92,8 @@ export function PortalLayout() {
         <PortalSidebar />
         <SidebarInset className="bg-gray-50 min-w-0">
           <MobileTopBar />
+          {/* Reserves the fixed header's height in normal flow (see MobileTopBar). */}
+          <div className="h-14 md:hidden" aria-hidden="true" />
           {/* min-w-0 lets the main column shrink below its content (flex child
               default is min-width:auto); overflow-x-clip is the global safety
               net so a stray wide child can never scroll the whole page. */}
