@@ -1642,47 +1642,7 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Start Date {isOnboarding && <RequiredMark />}</Label>
-                {(() => {
-                  const parts = form.startDate ? form.startDate.split('-') : ['', '', ''];
-                  const [sy, sm, sd] = parts;
-                  const setDatePart = (y: string, m: string, d: string) => {
-                    const iso = y && m && d ? `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}` : '';
-                    set('startDate', iso);
-                  };
-                  const MONTHS = [
-                    { v: '01', l: 'January' }, { v: '02', l: 'February' }, { v: '03', l: 'March' },
-                    { v: '04', l: 'April' },   { v: '05', l: 'May' },      { v: '06', l: 'June' },
-                    { v: '07', l: 'July' },    { v: '08', l: 'August' },   { v: '09', l: 'September' },
-                    { v: '10', l: 'October' }, { v: '11', l: 'November' }, { v: '12', l: 'December' },
-                  ];
-                  return (
-                    <div className="grid grid-cols-3 gap-1.5">
-                      <Select value={sm} onValueChange={m => setDatePart(sy, m, sd)}>
-                        <SelectTrigger><SelectValue placeholder="Month" /></SelectTrigger>
-                        <SelectContent>
-                          {MONTHS.map(mo => <SelectItem key={mo.v} value={mo.v}>{mo.l}</SelectItem>)}
-                        </SelectContent>
-                      </Select>
-                      <Select value={sd} onValueChange={d => setDatePart(sy, sm, d)}>
-                        <SelectTrigger><SelectValue placeholder="Day" /></SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map(d => (
-                            <SelectItem key={d} value={d}>{Number(d)}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="number"
-                        placeholder="Year"
-                        min={2000}
-                        max={2099}
-                        value={sy}
-                        onChange={e => setDatePart(e.target.value, sm, sd)}
-                        className="text-sm"
-                      />
-                    </div>
-                  );
-                })()}
+                <UsDateInput value={form.startDate} onChange={iso => set('startDate', iso)} />
                 <FieldError msg={errors.startDate} />
               </div>
               <div className="sm:col-span-2">
