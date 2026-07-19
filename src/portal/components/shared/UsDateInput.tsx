@@ -54,7 +54,13 @@ export function UsDateInput({
   value, onChange, min, max, disabled, required, className, id, placeholder = 'MM/DD/YYYY', ...rest
 }: UsDateInputProps) {
   const [text, setText] = useState(() => isoToUs(value));
-  const [invalid, setInvalid] = useState(false);
+  // Distinguish *why* a typed date wasn't accepted — without this, the input
+  // shows something (e.g. "17/17/1771", an impossible date) while the
+  // parent form's separate "required" error still shows too, since the
+  // invalid text was never committed to `value`. That reads as "I typed
+  // something but it says I didn't" — surfacing the real reason here fixes
+  // the confusing mismatch.
+  const [invalidReason, setInvalidReason] = useState<'format' | 'range' | null>(null);
   const nativeRef = useRef<HTMLInputElement>(null);
 
   // Sync when the ISO value changes from outside (form reset, prefill, calendar pick).
@@ -64,15 +70,15 @@ export function UsDateInput({
       // Don't clobber in-progress typing unless the parsed value actually differs.
       return usToIso(prev) === (value || null) && prev !== '' ? prev : fromValue;
     });
-    if (value) setInvalid(false);
+    if (value) setInvalidReason(null);
   }, [value]);
 
   const commit = (t: string) => {
-    if (t === '') { setInvalid(false); onChange(''); return; }
+    if (t === '') { setInvalidReason(null); onChange(''); return; }
     const iso = usToIso(t);
-    if (!iso) { setInvalid(true); return; }
-    if ((min && iso < min) || (max && iso > max)) { setInvalid(true); return; }
-    setInvalid(false);
+    if (!iso) { setInvalidReason('format'); return; }
+    if ((min && iso < min) || (max && iso > max)) { setInvalidReason('range'); return; }
+    setInvalidReason(null);
     onChange(iso);
   };
 
@@ -112,7 +118,7 @@ export function UsDateInput({
           'flex h-9 w-full rounded-md border bg-transparent px-3 py-1 pr-9 text-sm shadow-sm transition-colors',
           'placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          invalid ? 'border-red-400' : 'border-input',
+          invalidReason ? 'border-red-400' : 'border-input',
         )}
       />
       <button
@@ -135,9 +141,16 @@ export function UsDateInput({
         value={value || ''}
         min={min}
         max={max}
-        onChange={e => { onChange(e.target.value); setInvalid(false); }}
+        onChange={e => { onChange(e.target.value); setInvalidReason(null); }}
         className="absolute right-0 bottom-0 h-px w-px opacity-0 pointer-events-none"
       />
+      {invalidReason && (
+        <p className="text-[11px] text-red-500 mt-1">
+          {invalidReason === 'format'
+            ? 'Enter a valid date (MM/DD/YYYY)'
+            : 'Date is outside the allowed range'}
+        </p>
+      )}
     </div>
   );
 }
