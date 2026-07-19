@@ -485,6 +485,29 @@
   background: rgba(64,105,255,0.32);
 }
 
+/* #root (src/index.css) carries overflow-x:hidden, which per the CSS
+   overflow-x/y interdependency rule forces its computed overflow-y to auto —
+   making #root, an ANCESTOR of .portal-scope, the actual page-scroll owner
+   on pages like onboarding that render full-height outside PortalLayout.
+   ".portal-scope ::-webkit-scrollbar" above can never reach an ancestor's
+   own scrollbar, so it fell back to the browser's unstyled default (thick,
+   with arrow buttons). Style #root's scrollbar to match, scoped to portal
+   routes only (via :has) so the public site — which never renders
+   .portal-scope — keeps its own native scrollbar untouched. */
+#root:has(.portal-scope)::-webkit-scrollbar {
+  width: 8px;
+}
+#root:has(.portal-scope)::-webkit-scrollbar-track {
+  background: rgba(64,105,255,0.04);
+}
+#root:has(.portal-scope)::-webkit-scrollbar-thumb {
+  background: rgba(64,105,255,0.18);
+  border-radius: 4px;
+}
+#root:has(.portal-scope)::-webkit-scrollbar-thumb:hover {
+  background: rgba(64,105,255,0.32);
+}
+
 /* ── Print styles for invoice ────────────────────────────────── */
 @media print {
   .portal-no-print {
