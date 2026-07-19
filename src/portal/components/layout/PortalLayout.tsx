@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
-import { PanelLeft } from 'lucide-react';
-import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
+import { PanelLeft, Menu } from 'lucide-react';
+import { SidebarInset, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
 import { PortalSidebar } from './PortalSidebar';
 import { PortalBrandMark } from './PortalBrandMark';
 import { MailerStatusBanner } from './MailerStatusBanner';
@@ -14,12 +14,29 @@ import '../../portal.css';
 // bare `position: fixed` element depending on a scroll-triggered reflow to
 // become hit-testable, and no dependency on `isMobile` being correct yet
 // (this is pure CSS `md:hidden`, so it's correct from the very first paint).
+//
+// Deliberately a <div role="banner"> and NOT a raw <header> element: the
+// legacy public-marketing-site stylesheet (src/styles/style.css, loaded
+// globally/unscoped) has a bare `header { position: fixed !important; ... }`
+// rule that silently hijacked a real <header> here — forcing it out of
+// document flow so it floated over the page instead of pushing content down,
+// which is what produced the "blank space, content hidden underneath"
+// symptom. Also uses a plain Menu (hamburger) icon via toggleSidebar()
+// instead of SidebarTrigger's default PanelLeft icon.
 function MobileTopBar() {
+  const { toggleSidebar } = useSidebar();
   return (
-    <header className="sticky top-0 z-40 flex items-center gap-3 h-14 px-4 bg-white border-b border-gray-200 md:hidden">
-      <SidebarTrigger className="text-gray-500 hover:text-gray-900 flex-shrink-0" />
+    <div role="banner" className="sticky top-0 z-40 flex items-center gap-3 h-14 px-4 bg-white border-b border-gray-200 md:hidden">
+      <button
+        type="button"
+        onClick={toggleSidebar}
+        aria-label="Toggle sidebar"
+        className="flex-shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+      >
+        <Menu className="h-5 w-5" />
+      </button>
       <PortalBrandMark compact />
-    </header>
+    </div>
   );
 }
 
