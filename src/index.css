@@ -15,9 +15,20 @@
    dialog instead of above it. Force the section itself high enough that it
    never loses that comparison, regardless of what other overlay is open.
    !important is deliberate here — this is a non-configurable internal
-   element of a third-party library with no other override hook. */
+   element of a third-party library with no other override hook.
+
+   It's also caught by the mobile `section { padding-top/bottom: 60px
+   !important }` rule further down (meant for the public site's content
+   sections, see "GLOBAL SECTION PADDING"). With no toasts active this
+   section has no visible content, but that padding alone still gives it a
+   real ~120px box sitting at the very top of #root (Sonner mounts before
+   <BrowserRouter> in App.tsx) — on the portal that silently pushed the
+   entire layout down and sat on top of the mobile header, swallowing taps
+   meant for it. Zero the padding out here, same exception pattern as the
+   .banner-slider__wrapper case below. */
 section[aria-label^="Notifications"] {
   z-index: 2147483647 !important;
+  padding: 0 !important;
 }
 
 @layer base {
