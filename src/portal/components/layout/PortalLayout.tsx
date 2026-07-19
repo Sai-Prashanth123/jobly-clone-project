@@ -67,19 +67,22 @@ function MobileDebugBadge() {
 
   useEffect(() => {
     if (!enabled) return;
+    const describe = (el: Element | null) => {
+      if (!el) return 'none';
+      const r = el.getBoundingClientRect();
+      const cls = (el.getAttribute('class') || '').slice(0, 60);
+      return `<${el.tagName.toLowerCase()} class="${cls}"> top:${r.top.toFixed(0)} h:${r.height.toFixed(0)}`;
+    };
     const measure = () => {
-      const ids: Record<string, string> = {
-        banner: '[role="banner"]',
-        spacer: '[data-debug-spacer]',
-        outerMain: '[data-debug-outer-main]',
-        innerMain: '[data-debug-inner-main]',
-        content: '[data-debug-content]',
-        mailerBanner: '[data-debug-content] > div:first-child',
-      };
       const out: Record<string, string> = {};
-      for (const [key, sel] of Object.entries(ids)) {
-        const el = document.querySelector(sel);
-        out[key] = el ? JSON.stringify(el.getBoundingClientRect()) : 'not found';
+      let node: Element | null = document.querySelector('[data-debug-spacer]');
+      let i = 0;
+      while (node && i < 10) {
+        const prevSib = node.previousElementSibling;
+        out[`L${i}`] = describe(node);
+        out[`L${i}-prevSib`] = prevSib ? describe(prevSib) : '(none)';
+        node = node.parentElement;
+        i++;
       }
       setRects(out);
     };
