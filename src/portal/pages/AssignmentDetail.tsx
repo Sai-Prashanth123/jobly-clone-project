@@ -9,6 +9,7 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { AssignmentForm } from '../components/assignments/AssignmentForm';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
+import { DetailField as Field } from '../components/shared/DetailField';
 import { useAssignment, useUpdateAssignment, useDeleteAssignment } from '../hooks/useAssignments';
 import { useEmployee } from '../hooks/useEmployees';
 import { useClient } from '../hooks/useClients';
@@ -62,13 +63,6 @@ export default function AssignmentDetail() {
   // compensation-side figure — hidden from employees AND operations.
   const showBillable = user?.role !== 'employee';
   const showPayRate = user?.role !== 'employee' && user?.role !== 'operations';
-
-  const Field = ({ label, value }: { label: string; value?: string | null }) => (
-    <div>
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-gray-900 mt-0.5">{value || '—'}</p>
-    </div>
-  );
 
   return (
     <div className="space-y-6">

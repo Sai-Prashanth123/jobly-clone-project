@@ -30,7 +30,7 @@ export default function CapacityReport() {
           <Button variant="outline" size="sm" onClick={() => refetch()}>Retry</Button>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+        <div className="bg-white rounded-xl border border-gray-200 overflow-x-auto shadow-sm">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b"><tr>{['Employee','Department','Billed Hrs','Utilization'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-100">

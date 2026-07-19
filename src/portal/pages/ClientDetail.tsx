@@ -16,6 +16,7 @@ import { useEmployees } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, formatCurrency } from '../lib/utils';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
+import { DetailField as Field } from '../components/shared/DetailField';
 
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
@@ -89,13 +90,6 @@ export default function ClientDetail() {
     { done: !!client.taxId, label: 'Tax ID on file' },
     { done: client.documents.length > 0, label: 'Document uploaded' },
   ] : [];
-
-  const Field = ({ label, value }: { label: string; value?: string | null }) => (
-    <div>
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-gray-900 mt-0.5">{value || '—'}</p>
-    </div>
-  );
 
   const getEmpName = (empId: string) => {
     const e = employees.find(emp => emp.id === empId);

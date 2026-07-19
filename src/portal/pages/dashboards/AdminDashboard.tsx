@@ -227,9 +227,9 @@ export function AdminDashboard() {
                 </p>
                 <ul className="space-y-1 mt-2">
                   {expiringContracts.slice(0, 4).map(client => (
-                    <li key={client.id} className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-amber-900">{client.companyName}</span>
-                      <span className="text-amber-600">Expires {formatDate(client.contractEndDate!)}</span>
+                    <li key={client.id} className="min-w-0 text-xs">
+                      <p className="font-medium text-amber-900 truncate">{client.companyName}</p>
+                      <p className="text-amber-600">Expires {formatDate(client.contractEndDate!)}</p>
                     </li>
                   ))}
                 </ul>
@@ -255,9 +255,9 @@ export function AdminDashboard() {
                 </p>
                 <ul className="space-y-1 mt-2">
                   {overdueInvoices.slice(0, 3).map(inv => (
-                    <li key={inv.id} className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-red-800">{inv.invoiceNumber}</span>
-                      <span className="text-red-600">{formatCurrency(inv.totalAmount)} — due {formatDate(inv.dueDate)}</span>
+                    <li key={inv.id} className="min-w-0 text-xs">
+                      <p className="font-medium text-red-800 truncate">{inv.invoiceNumber}</p>
+                      <p className="text-red-600">{formatCurrency(inv.totalAmount)} — due {formatDate(inv.dueDate)}</p>
                     </li>
                   ))}
                 </ul>

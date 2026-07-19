@@ -1,20 +1,38 @@
 import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { PanelLeft } from 'lucide-react';
-import { SidebarInset, SidebarProvider, useSidebar } from '@/components/ui/sidebar';
+import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { PortalSidebar } from './PortalSidebar';
+import { PortalBrandMark } from './PortalBrandMark';
 import { MailerStatusBanner } from './MailerStatusBanner';
 import { ErrorBoundary } from '../shared/ErrorBoundary';
 import { CommandPalette } from '../shared/CommandPalette';
 import '../../portal.css';
 
-// When the sidebar is collapsed/off-canvas, its built-in toggle slides away with
-// it — leaving no way to reopen it. This floating button is the always-available
-// "show sidebar" affordance (desktop collapsed + mobile when the sheet is shut).
+// Always-visible mobile top bar (logo + hamburger). Unlike the old bare
+// floating toggle button below, this is a normal in-flow sticky header — no
+// bare `position: fixed` element depending on a scroll-triggered reflow to
+// become hit-testable, and no dependency on `isMobile` being correct yet
+// (this is pure CSS `md:hidden`, so it's correct from the very first paint).
+function MobileTopBar() {
+  return (
+    <header className="sticky top-0 z-40 flex items-center gap-3 h-14 px-4 bg-white border-b border-gray-200 md:hidden">
+      <SidebarTrigger className="text-gray-500 hover:text-gray-900 flex-shrink-0" />
+      <PortalBrandMark compact />
+    </header>
+  );
+}
+
+// When the DESKTOP sidebar is collapsed, its built-in toggle slides away with
+// it — leaving no way to reopen it. This floating button is that "show
+// sidebar" affordance for desktop only; on mobile, MobileTopBar (above) is
+// always visible and owns the toggle role instead.
 function FloatingSidebarToggle() {
-  const { state, isMobile, openMobile, toggleSidebar } = useSidebar();
-  const hidden = isMobile ? !openMobile : state === 'collapsed';
-  if (!hidden) return null;
+  const { state, isMobile, toggleSidebar } = useSidebar();
+  // Never shown on mobile (MobileTopBar owns that role there); on desktop,
+  // shown only while the sidebar is collapsed — same as before.
+  const shouldShow = isMobile ? false : state === 'collapsed';
+  if (!shouldShow) return null;
   return (
     <button
       type="button"
@@ -53,6 +71,7 @@ export function PortalLayout() {
         <FloatingSidebarToggle />
         <PortalSidebar />
         <SidebarInset className="bg-gray-50 min-w-0">
+          <MobileTopBar />
           {/* min-w-0 lets the main column shrink below its content (flex child
               default is min-width:auto); overflow-x-clip is the global safety
               net so a stray wide child can never scroll the whole page. */}

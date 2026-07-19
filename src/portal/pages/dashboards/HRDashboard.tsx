@@ -245,12 +245,14 @@ export function HRDashboard() {
                 </p>
                 <ul className="space-y-1 mt-2">
                   {i9NonCompliant.slice(0, 4).map(emp => (
-                    <li key={emp.id} className="flex items-center justify-between text-xs">
-                      <div>
-                        <span className="font-medium text-red-800">{emp.firstName} {emp.lastName}</span>
-                        <span className="text-red-600 ml-2">{emp.jobTitle}</span>
+                    <li key={emp.id} className="flex items-center justify-between gap-2 text-xs">
+                      <div className="min-w-0">
+                        <p className="font-medium text-red-800 truncate">{emp.firstName} {emp.lastName}</p>
+                        <p className="text-red-600 truncate">{emp.jobTitle}</p>
                       </div>
-                      <StatusBadge status={emp.i9Status ?? 'pending'} />
+                      <div className="flex-shrink-0">
+                        <StatusBadge status={emp.i9Status ?? 'pending'} />
+                      </div>
                     </li>
                   ))}
                 </ul>
@@ -276,11 +278,11 @@ export function HRDashboard() {
                 </p>
                 <ul className="space-y-1 mt-2">
                   {expiringVisa.slice(0, 4).map(emp => (
-                    <li key={emp.id} className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-amber-900">{emp.firstName} {emp.lastName}</span>
-                      <span className="text-amber-700">
+                    <li key={emp.id} className="min-w-0 text-xs">
+                      <p className="font-medium text-amber-900 truncate">{emp.firstName} {emp.lastName}</p>
+                      <p className="text-amber-700">
                         {emp.visaType?.toUpperCase()} expires {formatDate(emp.visaExpiry)}
-                      </span>
+                      </p>
                     </li>
                   ))}
                 </ul>

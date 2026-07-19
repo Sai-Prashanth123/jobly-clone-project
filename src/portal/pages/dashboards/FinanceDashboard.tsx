@@ -280,9 +280,9 @@ export function FinanceDashboard() {
                 </p>
                 <ul className="space-y-1 mt-2">
                   {invoices.filter(i => i.status === 'overdue').slice(0, 3).map(inv => (
-                    <li key={inv.id} className="flex items-center justify-between text-xs">
-                      <span className="font-medium text-red-800">{inv.invoiceNumber}</span>
-                      <span className="text-red-600">{getClientName(inv.clientId)} • {formatCurrency(inv.totalAmount)} • Due {formatDate(inv.dueDate)}</span>
+                    <li key={inv.id} className="min-w-0 text-xs">
+                      <p className="font-medium text-red-800 truncate">{inv.invoiceNumber}</p>
+                      <p className="text-red-600">{getClientName(inv.clientId)} • {formatCurrency(inv.totalAmount)} • Due {formatDate(inv.dueDate)}</p>
                     </li>
                   ))}
                 </ul>

@@ -12,6 +12,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
+import { DetailField as Field } from '../components/shared/DetailField';
 
 // Identity-doc type codes → the labels shown on the Add Employee form.
 const ID_DOC_LABELS: Record<string, string> = {
@@ -56,13 +57,6 @@ export default function MyProfile() {
       </div>
     );
   }
-
-  const Field = ({ label, value }: { label: string; value?: string | null }) => (
-    <div className="min-w-0">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]">{value || '—'}</p>
-    </div>
-  );
 
   const hasPermAddr = !!employee.permanentAddress && (
     employee.permanentAddress.street || employee.permanentAddress.city || employee.permanentAddress.state

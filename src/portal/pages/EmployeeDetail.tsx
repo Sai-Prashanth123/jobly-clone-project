@@ -28,6 +28,7 @@ import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
+import { DetailField as Field } from '../components/shared/DetailField';
 
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
@@ -131,16 +132,6 @@ export default function EmployeeDetail() {
   const isOnLeave = employee.status === 'inactive' && !!employee.leaveReturnDate && !employee.terminatedAt;
   const isTerminated = employee.status === 'inactive' && !!employee.terminatedAt;
   const isPlainInactive = employee.status === 'inactive' && !employee.leaveReturnDate && !employee.terminatedAt;
-
-  const Field = ({ label, value }: { label: string; value?: string | null }) => (
-    // min-w-0 lets the grid cell shrink below its content; break-words +
-    // overflow-wrap:anywhere force long unbroken strings (e.g. emails) to wrap
-    // instead of bleeding into the neighbouring column.
-    <div className="min-w-0">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]">{value || '—'}</p>
-    </div>
-  );
 
   // Map identity-doc type codes to the labels HR sees on the Add Employee form.
   const ID_DOC_LABELS: Record<string, string> = {
