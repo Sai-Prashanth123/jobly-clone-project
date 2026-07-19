@@ -63,17 +63,25 @@ function MobileDebugBadge() {
   const [enabled] = useState(
     () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1',
   );
-  const [rects, setRects] = useState<{ banner: string; content: string }>({ banner: '…', content: '…' });
+  const [rects, setRects] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!enabled) return;
     const measure = () => {
-      const banner = document.querySelector('[role="banner"]');
-      const content = document.querySelector('[data-debug-content]');
-      setRects({
-        banner: banner ? JSON.stringify(banner.getBoundingClientRect()) : 'not found',
-        content: content ? JSON.stringify(content.getBoundingClientRect()) : 'not found',
-      });
+      const ids: Record<string, string> = {
+        banner: '[role="banner"]',
+        spacer: '[data-debug-spacer]',
+        outerMain: '[data-debug-outer-main]',
+        innerMain: '[data-debug-inner-main]',
+        content: '[data-debug-content]',
+        mailerBanner: '[data-debug-content] > div:first-child',
+      };
+      const out: Record<string, string> = {};
+      for (const [key, sel] of Object.entries(ids)) {
+        const el = document.querySelector(sel);
+        out[key] = el ? JSON.stringify(el.getBoundingClientRect()) : 'not found';
+      }
+      setRects(out);
     };
     measure();
     const t = setTimeout(measure, 1200);
@@ -82,12 +90,13 @@ function MobileDebugBadge() {
 
   if (!enabled) return null;
   return (
-    <div className="fixed bottom-2 left-2 right-2 z-[9999] bg-black/85 text-white text-[10px] leading-tight p-2 rounded font-mono break-all">
+    <div className="fixed bottom-2 left-2 right-2 z-[9999] bg-black/85 text-white text-[9px] leading-tight p-2 rounded font-mono break-all max-h-[45vh] overflow-y-auto">
       isMobile:{String(isMobile)} openMobile:{String(openMobile)} sidebarState:{state}<br />
       innerW:{window.innerWidth} innerH:{window.innerHeight} vvW:{window.visualViewport?.width}{' '}
       vvH:{window.visualViewport?.height} dpr:{window.devicePixelRatio}<br />
-      banner:{rects.banner}<br />
-      content:{rects.content}
+      {Object.entries(rects).map(([key, val]) => (
+        <div key={key}>{key}:{val}</div>
+      ))}
     </div>
   );
 }
@@ -139,14 +148,14 @@ export function PortalLayout() {
       <SidebarProvider>
         <FloatingSidebarToggle />
         <PortalSidebar />
-        <SidebarInset className="bg-gray-50 min-w-0">
+        <SidebarInset className="bg-gray-50 min-w-0" data-debug-outer-main>
           <MobileTopBar />
           {/* Reserves the fixed header's height in normal flow (see MobileTopBar). */}
-          <div className="h-14 md:hidden" aria-hidden="true" />
+          <div className="h-14 md:hidden" aria-hidden="true" data-debug-spacer />
           {/* min-w-0 lets the main column shrink below its content (flex child
               default is min-width:auto); overflow-x-clip is the global safety
               net so a stray wide child can never scroll the whole page. */}
-          <main className="p-3 sm:p-4 md:p-6 pb-16 min-w-0 overflow-x-clip">
+          <main className="p-3 sm:p-4 md:p-6 pb-16 min-w-0 overflow-x-clip" data-debug-inner-main>
             {/* One fluid, centered container for every page: fills all laptop
                 widths and only bounds ultra-wide monitors (max-w-screen-2xl =
                 1536px). Replaces the inconsistent per-page max-w-4xl/5xl caps. */}
