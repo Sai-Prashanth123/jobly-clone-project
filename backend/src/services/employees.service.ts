@@ -246,10 +246,32 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
     tempPassword,
   })
     .then(() => console.log('[mailer] credentials email sent to', recipients.join(', '), '(login:', portalLoginEmail, ')'))
-    .catch((err: any) => console.error('[mailer] credentials email FAILED for', recipients.join(', '), {
-      code: err?.code, responseCode: err?.responseCode, response: err?.response,
-      rejected: err?.rejected, message: err?.message,
-    }));
+    .catch(async (err: any) => {
+      console.error('[mailer] credentials email FAILED for', recipients.join(', '), {
+        code: err?.code, responseCode: err?.responseCode, response: err?.response,
+        rejected: err?.rejected, message: err?.message,
+      });
+      // Fire-and-forget means the create-employee response already said
+      // emailSent:true — without this, a failed send is invisible to
+      // everyone (the console log above is easy to miss/lose). Surface it
+      // as an in-app notification so HR/admin actually see it and know to
+      // use the "Resend Welcome Email" button.
+      try {
+        const [hrIds, adminIds] = await Promise.all([
+          getUserIdsByRole('hr'),
+          getUserIdsByRole('admin'),
+        ]);
+        const label = emp.display_id ?? `${input.firstName} ${input.lastName}`;
+        const msg = `The welcome email to ${recipients.join(', ')} for ${label} (${input.firstName} ${input.lastName}) failed to send. Use "Resend Welcome Email" on their profile.`;
+        await Promise.all(
+          [...new Set([...hrIds, ...adminIds])].map(uid =>
+            createNotification(uid, 'Welcome Email Failed', msg, 'error', 'employee', emp.id),
+          ),
+        );
+      } catch (notifyErr) {
+        console.error('[employees.service] welcome-email-failed notification failed', notifyErr);
+      }
+    });
   return { credentialsReady: true, emailSent: true, loginEmail: portalLoginEmail };
 }
 
