@@ -1105,10 +1105,30 @@ h1, h2, h3 {
 }
 
 /* ─── UTILITY: prevent horizontal overflow everywhere ────────────────────── */
-/* Guard lives on #root (not html/body) — explicit overflow on html/body is a
-   known trigger for mobile WebKit/Blink position:fixed rendering bugs (fixed
-   elements glitching/going unresponsive until a scroll-triggered reflow). */
-#root { overflow-x: hidden; }
+/* Deliberately NOT on body/html/#root. `html` already carries its own
+   explicit `overflow-y: scroll` (style.css) — adding overflow-x on body (or
+   #root) as well, with the other axis otherwise unset, forces that
+   element's computed overflow-y to `auto` per the CSS overflow-x/y
+   interdependency rule. Combined with html's own explicit overflow-y, this
+   makes body (or #root) a genuinely separate, nested scroll box instead of
+   the page's real scroll owner — confirmed via a live repro where
+   document.documentElement.scrollHeight read as just the viewport height
+   (the real ~6000px of page content was scrolling inside body's own
+   isolated box instead), and this in turn broke react-remove-scroll
+   (used internally by Radix Select/Dialog for its open-state scroll lock):
+   reopening a Select with a pre-selected item would snap the whole page to
+   scrollY 0 and never recover.
+   Applying the guard to real, non-scroll-owning CONTENT wrappers instead —
+   the inner `<div className="body-wrapper">` every public page renders
+   (PageLayout.tsx/Index.tsx) and `.portal-scope` (every portal page, see
+   portal.css) — gets the same "no horizontal overflow" protection without
+   ever making body/html/#root ambiguous about who owns the scroll.
+   Deliberately `div.body-wrapper`, NOT `.body-wrapper` — index.html's own
+   <body> tag also carries class="body-wrapper" (an unrelated legacy
+   template convention), so the bare class selector matched body directly
+   and silently recreated the exact bug this rule exists to avoid. The tag
+   qualifier excludes it, matching only the actual inner div. */
+div.body-wrapper { overflow-x: hidden; }
 .container { max-width: 100%; }
 
 /* Sonner (the toast lib mounted in App.tsx, before <BrowserRouter>) ships its

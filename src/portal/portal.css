@@ -135,6 +135,11 @@
   font-feature-settings: 'cv05' 1, 'ss01' 1;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  /* Horizontal-overflow guard lives here, not on body/html/#root — see the
+     matching comment in src/index.css for why (nested-scroll-container
+     conflict with html's own explicit overflow-y, which broke Radix
+     Select's scroll lock). */
+  overflow-x: hidden;
 }
 
 /* ── Keyframe Animations ─────────────────────────────────────── */
@@ -485,26 +490,25 @@
   background: rgba(64,105,255,0.32);
 }
 
-/* #root (src/index.css) carries overflow-x:hidden, which per the CSS
-   overflow-x/y interdependency rule forces its computed overflow-y to auto —
-   making #root, an ANCESTOR of .portal-scope, the actual page-scroll owner
-   on pages like onboarding that render full-height outside PortalLayout.
-   ".portal-scope ::-webkit-scrollbar" above can never reach an ancestor's
-   own scrollbar, so it fell back to the browser's unstyled default (thick,
-   with arrow buttons). Style #root's scrollbar to match, scoped to portal
-   routes only (via :has) so the public site — which never renders
-   .portal-scope — keeps its own native scrollbar untouched. */
-#root:has(.portal-scope)::-webkit-scrollbar {
+/* `html` (src/styles/style.css) carries an explicit overflow-y:scroll and is
+   the real page-scroll owner (neither body nor #root carry any overflow
+   override now — see src/index.css). ".portal-scope ::-webkit-scrollbar"
+   above can never reach an ancestor's own scrollbar, so html's fell back to
+   the browser's unstyled default (thick, with arrow buttons). Style it to
+   match, scoped to portal routes only (via :has) so the public site — which
+   never renders .portal-scope, and has always had this same native
+   scrollbar with no prior complaint — is untouched. */
+html:has(.portal-scope)::-webkit-scrollbar {
   width: 8px;
 }
-#root:has(.portal-scope)::-webkit-scrollbar-track {
+html:has(.portal-scope)::-webkit-scrollbar-track {
   background: rgba(64,105,255,0.04);
 }
-#root:has(.portal-scope)::-webkit-scrollbar-thumb {
+html:has(.portal-scope)::-webkit-scrollbar-thumb {
   background: rgba(64,105,255,0.18);
   border-radius: 4px;
 }
-#root:has(.portal-scope)::-webkit-scrollbar-thumb:hover {
+html:has(.portal-scope)::-webkit-scrollbar-thumb:hover {
   background: rgba(64,105,255,0.32);
 }
 
