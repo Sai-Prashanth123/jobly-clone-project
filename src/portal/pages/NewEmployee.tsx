@@ -1040,6 +1040,41 @@ export default function NewEmployee() {
     if (!isEditMode) firstNameRef.current?.focus();
   }, [isEditMode]);
 
+  // TEMPORARY diagnostic — remove once the "picking a dropdown scrolls the
+  // page to top" bug is confirmed fixed. Visit ?debug=1 to show a small log
+  // of every scrollY-hits-0 event plus whatever was last tapped/focused
+  // right before it, so the actual trigger is visible instead of guessed.
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('debug') !== '1') return;
+    let lastInteracted = '(none yet)';
+    let lastScrollY = window.scrollY;
+    const describe = (t: EventTarget | null) => {
+      const el = t as HTMLElement | null;
+      if (!el) return 'null';
+      const cls = (el.getAttribute?.('class') || '').slice(0, 40);
+      return `<${el.tagName?.toLowerCase()} class="${cls}">`;
+    };
+    const onPointerDown = (e: Event) => { lastInteracted = `pointerdown ${describe(e.target)}`; };
+    const onFocusIn = (e: Event) => { lastInteracted = `focusin ${describe(e.target)}`; };
+    const onScroll = () => {
+      const y = window.scrollY;
+      if (y === 0 && lastScrollY > 50) {
+        const msg = `[${new Date().toISOString().slice(11, 19)}] scrollY ${lastScrollY}->0 after: ${lastInteracted}`;
+        setDebugLog(p => [...p.slice(-9), msg]);
+      }
+      lastScrollY = y;
+    };
+    window.addEventListener('pointerdown', onPointerDown, true);
+    window.addEventListener('focusin', onFocusIn, true);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown, true);
+      window.removeEventListener('focusin', onFocusIn, true);
+      window.removeEventListener('scroll', onScroll);
+    };
+  }, []);
+
   // ── Render ───────────────────────────────────────────────────────────────
 
   // Edit mode: show a loading state until the employee row arrives so we
@@ -1138,6 +1173,11 @@ export default function NewEmployee() {
 
   return (
     <div className={isOnboarding ? 'portal-scope portal-wizard min-h-screen bg-gray-50 p-4 sm:p-6 md:p-8 pb-10 [overflow-x:clip] w-full' : 'portal-wizard pb-10 [overflow-x:clip] w-full'}>
+      {debugLog.length > 0 && (
+        <div className="fixed bottom-2 left-2 right-2 z-[9999] bg-black/85 text-white text-[10px] leading-tight p-2 rounded font-mono break-all max-h-[35vh] overflow-y-auto">
+          {debugLog.map((l, i) => <div key={i}>{l}</div>)}
+        </div>
+      )}
       {/* Sticky action navbar — pinned to the top of the page so the primary
           actions stay reachable while scrolling the long form. Edge-to-edge via
           negative margins that cancel the container padding (both onboarding
