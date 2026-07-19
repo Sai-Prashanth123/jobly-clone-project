@@ -1100,6 +1100,20 @@ h1, h2, h3 {
 #root { overflow-x: hidden; }
 .container { max-width: 100%; }
 
+/* Sonner (the toast lib mounted in App.tsx, before <BrowserRouter>) ships its
+   container's CSS via a zero-specificity `:where([data-sonner-toaster])`
+   selector. This stylesheet's own bare `section { position: relative;
+   z-index: 1; }` reset (see style.css) beats it on specificity, turning
+   Sonner's intended `position: fixed` toast list into a normal, in-flow
+   block sitting at the very top of the page — pushing everything after it
+   down by its own height and sitting (relatively positioned, z-index:1)
+   on top of whatever's underneath. Restore fixed positioning with real
+   (non-:where) specificity so it goes back to being an invisible,
+   viewport-anchored, zero-flow-impact overlay when there are no toasts. */
+[data-sonner-toaster] {
+  position: fixed !important;
+}
+
 /* ─── HAMBURGER / CLOSE ICON sizing ─────────────────────────────────────── */
 #hamburger { font-size: 26px; cursor: pointer; }
 @media (max-width: 575px) { #hamburger { font-size: 22px; } }
