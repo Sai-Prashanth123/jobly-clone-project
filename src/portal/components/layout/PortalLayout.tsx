@@ -51,6 +51,47 @@ function MobileTopBar() {
   );
 }
 
+// TEMPORARY diagnostic overlay — remove once the mobile header/hamburger bug
+// is confirmed fixed. Visit any portal page with ?debug=1 to show it. Reports
+// the values needed to tell apart the two remaining theories: (a) isMobile
+// (JS) disagreeing with the md: breakpoint (CSS), which would explain the
+// hamburger tap doing nothing (toggleSidebar would flip the desktop `open`
+// state instead of `openMobile`), and (b) the actual on-screen gap between
+// the header and the first page content.
+function MobileDebugBadge() {
+  const { isMobile, openMobile, state } = useSidebar();
+  const [enabled] = useState(
+    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1',
+  );
+  const [rects, setRects] = useState<{ banner: string; content: string }>({ banner: '…', content: '…' });
+
+  useEffect(() => {
+    if (!enabled) return;
+    const measure = () => {
+      const banner = document.querySelector('[role="banner"]');
+      const content = document.querySelector('[data-debug-content]');
+      setRects({
+        banner: banner ? JSON.stringify(banner.getBoundingClientRect()) : 'not found',
+        content: content ? JSON.stringify(content.getBoundingClientRect()) : 'not found',
+      });
+    };
+    measure();
+    const t = setTimeout(measure, 1200);
+    return () => clearTimeout(t);
+  }, [enabled]);
+
+  if (!enabled) return null;
+  return (
+    <div className="fixed bottom-2 left-2 right-2 z-[9999] bg-black/85 text-white text-[10px] leading-tight p-2 rounded font-mono break-all">
+      isMobile:{String(isMobile)} openMobile:{String(openMobile)} sidebarState:{state}<br />
+      innerW:{window.innerWidth} innerH:{window.innerHeight} vvW:{window.visualViewport?.width}{' '}
+      vvH:{window.visualViewport?.height} dpr:{window.devicePixelRatio}<br />
+      banner:{rects.banner}<br />
+      content:{rects.content}
+    </div>
+  );
+}
+
 // When the DESKTOP sidebar is collapsed, its built-in toggle slides away with
 // it — leaving no way to reopen it. This floating button is that "show
 // sidebar" affordance for desktop only; on mobile, MobileTopBar (above) is
@@ -109,7 +150,7 @@ export function PortalLayout() {
             {/* One fluid, centered container for every page: fills all laptop
                 widths and only bounds ultra-wide monitors (max-w-screen-2xl =
                 1536px). Replaces the inconsistent per-page max-w-4xl/5xl caps. */}
-            <div className="mx-auto w-full max-w-screen-2xl">
+            <div className="mx-auto w-full max-w-screen-2xl" data-debug-content>
               <MailerStatusBanner />
               <ErrorBoundary>
                 <Outlet />
@@ -117,6 +158,7 @@ export function PortalLayout() {
             </div>
           </main>
         </SidebarInset>
+        <MobileDebugBadge />
       </SidebarProvider>
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </div>
