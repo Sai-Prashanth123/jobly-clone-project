@@ -16,20 +16,28 @@ import '../../portal.css';
 // globally/unscoped) has a bare `header { position: fixed !important; ... }`
 // rule that silently hijacked a real <header> here.
 //
-// Deliberately `fixed`, NOT `sticky`: this app has global `overflow-x: hidden`
-// rules on `body`/`html` (src/index.css) which, per the CSS overflow-x/y
-// interdependency quirk, force those elements' computed `overflow-y` to
-// `auto` — turning them into scroll containers whose exact scrolling
-// behavior `sticky` positioning can behave inconsistently against. `fixed`
-// anchors to the viewport directly regardless of which ancestor ends up
-// owning the actual scroll, avoiding that whole class of bug. A `<div
+// Deliberately `fixed`, NOT `sticky`: anchors to the viewport directly
+// regardless of which ancestor ends up owning the actual scroll. A `<div
 // className="h-14 md:hidden" />` spacer right after this (see PortalLayout
 // below) reserves the equivalent space in normal flow so fixed content
 // doesn't render underneath it.
+//
+// `transform: translateZ(0)` forces this onto its own GPU compositing layer
+// immediately on first paint. Without it, mobile Safari/Chrome can defer
+// painting/hit-testing a fixed element until the next scroll-triggered
+// reflow — the "glitchy/unresponsive until you scroll a bit" bug this
+// component kept exhibiting under both sticky and fixed. `html`/`body` no
+// longer carry an explicit `overflow-x` (moved to `#root` in src/index.css)
+// for the same reason — explicit overflow on html/body is a known trigger
+// for this class of mobile fixed-position bug.
 function MobileTopBar() {
   const { toggleSidebar } = useSidebar();
   return (
-    <div role="banner" className="fixed top-0 inset-x-0 z-40 flex items-center gap-3 h-14 px-4 bg-white border-b border-gray-200 md:hidden">
+    <div
+      role="banner"
+      className="fixed top-0 inset-x-0 z-40 flex items-center gap-3 h-14 px-4 bg-white border-b border-gray-200 md:hidden"
+      style={{ transform: 'translateZ(0)' }}
+    >
       <button
         type="button"
         onClick={toggleSidebar}

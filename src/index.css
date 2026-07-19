@@ -120,7 +120,6 @@ section[aria-label^="Notifications"] {
 /* Prevent any element from forcing horizontal page scroll on mobile. */
 @media (max-width: 575px) {
   .overflow-hidden { overflow-x: hidden !important; }
-  body, html { overflow-x: hidden; }
 }
 
 /* ============================
@@ -1095,7 +1094,10 @@ h1, h2, h3 {
 }
 
 /* ─── UTILITY: prevent horizontal overflow everywhere ────────────────────── */
-body { overflow-x: hidden; }
+/* Guard lives on #root (not html/body) — explicit overflow on html/body is a
+   known trigger for mobile WebKit/Blink position:fixed rendering bugs (fixed
+   elements glitching/going unresponsive until a scroll-triggered reflow). */
+#root { overflow-x: hidden; }
 .container { max-width: 100%; }
 
 /* ─── HAMBURGER / CLOSE ICON sizing ─────────────────────────────────────── */
