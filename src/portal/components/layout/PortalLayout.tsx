@@ -42,64 +42,11 @@ function MobileTopBar() {
         type="button"
         onClick={toggleSidebar}
         aria-label="Toggle sidebar"
-        className="flex-shrink-0 inline-flex h-8 w-8 items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+        className="flex-shrink-0 inline-flex h-10 w-10 items-center justify-center rounded-md text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
       >
-        <Menu className="h-5 w-5" />
+        <Menu className="h-7 w-7" />
       </button>
       <PortalBrandMark compact />
-    </div>
-  );
-}
-
-// TEMPORARY diagnostic overlay — remove once the mobile header/hamburger bug
-// is confirmed fixed. Visit any portal page with ?debug=1 to show it. Reports
-// the values needed to tell apart the two remaining theories: (a) isMobile
-// (JS) disagreeing with the md: breakpoint (CSS), which would explain the
-// hamburger tap doing nothing (toggleSidebar would flip the desktop `open`
-// state instead of `openMobile`), and (b) the actual on-screen gap between
-// the header and the first page content.
-function MobileDebugBadge() {
-  const { isMobile, openMobile, state } = useSidebar();
-  const [enabled] = useState(
-    () => typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('debug') === '1',
-  );
-  const [rects, setRects] = useState<Record<string, string>>({});
-
-  useEffect(() => {
-    if (!enabled) return;
-    const describe = (el: Element | null) => {
-      if (!el) return 'none';
-      const r = el.getBoundingClientRect();
-      const cls = (el.getAttribute('class') || '').slice(0, 60);
-      return `<${el.tagName.toLowerCase()} class="${cls}"> top:${r.top.toFixed(0)} h:${r.height.toFixed(0)}`;
-    };
-    const measure = () => {
-      const out: Record<string, string> = {};
-      let node: Element | null = document.querySelector('[data-debug-spacer]');
-      let i = 0;
-      while (node && i < 10) {
-        const prevSib = node.previousElementSibling;
-        out[`L${i}`] = describe(node);
-        out[`L${i}-prevSib`] = prevSib ? describe(prevSib) : '(none)';
-        node = node.parentElement;
-        i++;
-      }
-      setRects(out);
-    };
-    measure();
-    const t = setTimeout(measure, 1200);
-    return () => clearTimeout(t);
-  }, [enabled]);
-
-  if (!enabled) return null;
-  return (
-    <div className="fixed bottom-2 left-2 right-2 z-[9999] bg-black/85 text-white text-[9px] leading-tight p-2 rounded font-mono break-all max-h-[45vh] overflow-y-auto">
-      isMobile:{String(isMobile)} openMobile:{String(openMobile)} sidebarState:{state}<br />
-      innerW:{window.innerWidth} innerH:{window.innerHeight} vvW:{window.visualViewport?.width}{' '}
-      vvH:{window.visualViewport?.height} dpr:{window.devicePixelRatio}<br />
-      {Object.entries(rects).map(([key, val]) => (
-        <div key={key}>{key}:{val}</div>
-      ))}
     </div>
   );
 }
@@ -151,18 +98,18 @@ export function PortalLayout() {
       <SidebarProvider>
         <FloatingSidebarToggle />
         <PortalSidebar />
-        <SidebarInset className="bg-gray-50 min-w-0" data-debug-outer-main>
+        <SidebarInset className="bg-gray-50 min-w-0">
           <MobileTopBar />
           {/* Reserves the fixed header's height in normal flow (see MobileTopBar). */}
-          <div className="h-14 md:hidden" aria-hidden="true" data-debug-spacer />
+          <div className="h-14 md:hidden" aria-hidden="true" />
           {/* min-w-0 lets the main column shrink below its content (flex child
               default is min-width:auto); overflow-x-clip is the global safety
               net so a stray wide child can never scroll the whole page. */}
-          <main className="p-3 sm:p-4 md:p-6 pb-16 min-w-0 overflow-x-clip" data-debug-inner-main>
+          <main className="p-3 sm:p-4 md:p-6 pb-16 min-w-0 overflow-x-clip">
             {/* One fluid, centered container for every page: fills all laptop
                 widths and only bounds ultra-wide monitors (max-w-screen-2xl =
                 1536px). Replaces the inconsistent per-page max-w-4xl/5xl caps. */}
-            <div className="mx-auto w-full max-w-screen-2xl" data-debug-content>
+            <div className="mx-auto w-full max-w-screen-2xl">
               <MailerStatusBanner />
               <ErrorBoundary>
                 <Outlet />
@@ -170,7 +117,6 @@ export function PortalLayout() {
             </div>
           </main>
         </SidebarInset>
-        <MobileDebugBadge />
       </SidebarProvider>
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
     </div>

@@ -27,7 +27,7 @@ export function PortalBrandMark({ compact = false }: PortalBrandMarkProps) {
       <img
         src="/assets/img/logo/logo-3.png"
         alt="Jobly"
-        className="h-8 w-auto object-contain flex-shrink-0"
+        className={`${compact ? 'h-11' : 'h-8'} w-auto object-contain flex-shrink-0`}
         onError={e => {
           (e.currentTarget as HTMLImageElement).style.display = 'none';
           const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
@@ -36,9 +36,9 @@ export function PortalBrandMark({ compact = false }: PortalBrandMarkProps) {
       />
       {/* Fallback icon if logo fails */}
       <div
-        className={`hidden w-8 h-8 rounded-xl bg-gradient-to-br ${roleGradient} items-center justify-center flex-shrink-0`}
+        className={`hidden ${compact ? 'w-11 h-11' : 'w-8 h-8'} rounded-xl bg-gradient-to-br ${roleGradient} items-center justify-center flex-shrink-0`}
       >
-        <span className="text-white text-xs font-bold">J</span>
+        <span className={`text-white font-bold ${compact ? 'text-base' : 'text-xs'}`}>J</span>
       </div>
       {!compact && (
         <div className="min-w-0">
