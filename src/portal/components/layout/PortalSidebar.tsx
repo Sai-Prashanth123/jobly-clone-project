@@ -216,7 +216,10 @@ export function PortalSidebar() {
                       <div
                         key={n.id}
                         className={`px-3 py-2.5 border-b last:border-0 cursor-pointer hover:bg-gray-50 transition-colors ${!n.read ? 'bg-blue-50/50' : ''}`}
-                        onClick={() => { if (!n.read) markRead.mutate(n.id); }}
+                        onClick={() => {
+                          if (!n.read) markRead.mutate(n.id);
+                          if (n.link) { setNotifOpen(false); navigate(n.link); }
+                        }}
                       >
                         <div className="flex items-start gap-2">
                           <span className={`mt-1 h-2 w-2 flex-shrink-0 rounded-full ${

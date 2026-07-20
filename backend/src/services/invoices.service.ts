@@ -293,7 +293,7 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
           uid,
           'Invoice Generated',
           `Invoice ${invoice.invoice_number} for ${clientName} — $${totalAmount.toFixed(2)} — is ready. Review and send to client.`,
-          'success', 'invoice', invoice.id,
+          'success', 'invoice', invoice.id, `/portal/invoices/${invoice.id}`,
         )
       ));
     } catch (err) {
@@ -763,7 +763,7 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string) {
         uid,
         'Invoice Sent',
         `Invoice ${inv.invoice_number} has been emailed to ${clientName} (${recipientEmail}). Status updated to Sent.`,
-        'info', 'invoice', id,
+        'info', 'invoice', id, `/portal/invoices/${id}`,
       );
     }
   } catch (err) {

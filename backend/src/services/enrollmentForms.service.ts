@@ -81,7 +81,7 @@ export async function createEnrollmentForm(input: CreateEnrollmentFormInput, act
       void createNotification(
         portalUser.id, 'Benefits Enrollment Form Assigned',
         'A benefits enrollment form has been assigned to you — please complete it in the portal.',
-        'info', 'enrollment_form', data.id,
+        'info', 'enrollment_form', data.id, `/portal/enrollment-forms/${data.id}`,
       );
     }
   } catch (err) {
@@ -146,7 +146,7 @@ export async function submitEnrollmentForm(id: string, input: SubmitEnrollmentFo
       void createNotification(
         uid, 'Benefits Enrollment Form Submitted',
         `${empName} submitted their Benefits Enrollment Form.`,
-        'info', 'enrollment_form', id,
+        'info', 'enrollment_form', id, `/portal/enrollment-forms/${id}`,
       );
     }
   } catch (err) {

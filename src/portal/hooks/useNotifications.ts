@@ -8,6 +8,7 @@ export interface Notification {
   type: 'info' | 'warning' | 'error' | 'success';
   entityType?: string;
   entityId?: string;
+  link?: string;
   read: boolean;
   createdAt: string;
 }
@@ -21,6 +22,7 @@ function mapNotification(raw: any): Notification {
     type: raw.type,
     entityType: raw.entity_type ?? undefined,
     entityId: raw.entity_id ?? undefined,
+    link: raw.link ?? undefined,
     read: raw.read,
     createdAt: raw.created_at,
   };

@@ -265,7 +265,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
         const msg = `The welcome email to ${recipients.join(', ')} for ${label} (${input.firstName} ${input.lastName}) failed to send. Use "Resend Welcome Email" on their profile.`;
         await Promise.all(
           [...new Set([...hrIds, ...adminIds])].map(uid =>
-            createNotification(uid, 'Welcome Email Failed', msg, 'error', 'employee', emp.id),
+            createNotification(uid, 'Welcome Email Failed', msg, 'error', 'employee', emp.id, `/portal/employees/${emp.id}`),
           ),
         );
       } catch (notifyErr) {
@@ -420,7 +420,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
       const msg = `${label} (${input.firstName} ${input.lastName}) has been added and is pending onboarding completion.`;
       await Promise.all(
         [...new Set([...hrIds, ...adminIds])].map(uid =>
-          createNotification(uid, 'New Employee Onboarding', msg, 'info', 'employee', emp.id),
+          createNotification(uid, 'New Employee Onboarding', msg, 'info', 'employee', emp.id, `/portal/employees/${emp.id}`),
         ),
       );
     } catch (err) {
@@ -711,7 +711,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
             pu.id,
             'Onboarding approved',
             'Your onboarding has been approved — welcome aboard! You now have full access to the portal.',
-            'success', 'employee', id,
+            'success', 'employee', id, '/portal/profile',
           );
         }
       } catch (err) {
@@ -812,7 +812,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
           await createNotification(
             pu.id, 'Communication preference updated',
             `HR has restricted system emails to your work address (${emp.work_email}). Your personal email will no longer receive them.`,
-            'info', 'employee', id,
+            'info', 'employee', id, '/portal/profile',
           );
         }
       } catch (err) {
@@ -840,7 +840,7 @@ async function notifyOnboardingCompleted(emp: any): Promise<void> {
         uid,
         'Onboarding submitted for review',
         `${label} (${fullName}) submitted their onboarding and is awaiting your review & approval.`,
-        'info', 'employee', emp.id,
+        'info', 'employee', emp.id, `/portal/employees/${emp.id}`,
       );
     }
   } catch (err) {
@@ -1006,6 +1006,7 @@ async function notifyOnboardingChangesRequested(emp: any, message: string): Prom
         'warning',
         'employee',
         emp.id,
+        '/portal/onboarding/pending',
       );
     }
     if (pu?.email && mailerConfigured) {
@@ -1054,6 +1055,7 @@ async function notifyDocumentsRequested(emp: any, message: string): Promise<void
         'warning',
         'employee',
         emp.id,
+        '/portal/profile',
       );
     }
     if (pu?.email && mailerConfigured) {
@@ -1229,7 +1231,7 @@ async function notifyEmployeeUser(empId: string, title: string, body: string, ty
   try {
     const { data: pu } = await supabaseAdmin
       .from('portal_users').select('id').eq('employee_id', empId).maybeSingle();
-    if (pu?.id) await createNotification(pu.id, title, body, type, 'employee', empId);
+    if (pu?.id) await createNotification(pu.id, title, body, type, 'employee', empId, '/portal/profile');
   } catch (err) {
     console.error('[employees.service] employee notification failed for', empId, err);
   }
@@ -1240,7 +1242,7 @@ async function notifyHrAdmin(title: string, body: string, empId: string, type: '
   try {
     const [hrIds, adminIds] = await Promise.all([getUserIdsByRole('hr'), getUserIdsByRole('admin')]);
     await Promise.all(
-      [...new Set([...hrIds, ...adminIds])].map(uid => createNotification(uid, title, body, type, 'employee', empId)),
+      [...new Set([...hrIds, ...adminIds])].map(uid => createNotification(uid, title, body, type, 'employee', empId, `/portal/employees/${empId}`)),
     );
   } catch (err) {
     console.error('[employees.service] HR/admin notification failed for', empId, err);

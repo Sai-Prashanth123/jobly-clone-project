@@ -208,12 +208,12 @@ export async function sendPerformanceReviewToEmployee(id: string, recipientEmail
         void createNotification(
           portalUser.id, 'Performance Review Available',
           `Your performance review for ${row.period_start} to ${row.period_end} is ready.`,
-          'info', 'performance_review', id,
+          'info', 'performance_review', id, '/portal/my-reviews',
         );
       }
       const hrIds = await getUserIdsByRole('hr');
       for (const uid of hrIds) {
-        void createNotification(uid, 'Performance Review Sent', `Review ${row.display_id} emailed to ${recipientEmail}.`, 'info', 'performance_review', id);
+        void createNotification(uid, 'Performance Review Sent', `Review ${row.display_id} emailed to ${recipientEmail}.`, 'info', 'performance_review', id, `/portal/reviews/${id}`);
       }
     } catch (err) {
       console.error('[performanceReviews.service] notification failed for review', id, err);

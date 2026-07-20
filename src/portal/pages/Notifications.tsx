@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { AlertCircle, Bell, Check, CheckCheck, Clock, AlertTriangle, FileText, Loader2 } from 'lucide-react';
@@ -36,12 +37,16 @@ const TYPE_CONFIG = {
   error:   { dot: 'bg-red-500',    bg: 'bg-red-50',    label: 'Alert',   icon: '🚨' },
 };
 
-function NotificationCard({ n, onRead, marking }: { n: Notification; onRead: (id: string) => void; marking: boolean }) {
+function NotificationCard({ n, onRead, marking, onNavigate }: { n: Notification; onRead: (id: string) => void; marking: boolean; onNavigate: (link: string) => void }) {
   const cfg = TYPE_CONFIG[n.type] ?? TYPE_CONFIG.info;
   return (
     <div
-      className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${!n.read ? cfg.bg + ' border-l-4 border-l-current' : 'bg-white border-gray-100'}`}
+      className={`flex items-start gap-4 p-4 rounded-lg border transition-all ${!n.read ? cfg.bg + ' border-l-4 border-l-current' : 'bg-white border-gray-100'} ${n.link ? 'cursor-pointer hover:shadow-sm' : ''}`}
       style={!n.read ? { borderLeftColor: n.type === 'error' ? '#ef4444' : n.type === 'warning' ? '#f59e0b' : n.type === 'success' ? '#22c55e' : '#3b82f6' } : undefined}
+      onClick={() => {
+        if (!n.read) onRead(n.id);
+        if (n.link) onNavigate(n.link);
+      }}
     >
       <div className={`mt-1 h-2.5 w-2.5 flex-shrink-0 rounded-full ${cfg.dot} ${n.read ? 'opacity-30' : ''}`} />
       <div className="flex-1 min-w-0">
@@ -61,7 +66,7 @@ function NotificationCard({ n, onRead, marking }: { n: Notification; onRead: (id
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => onRead(n.id)}
+              onClick={e => { e.stopPropagation(); onRead(n.id); }}
               loading={marking}
               disabled={marking}
               className="flex-shrink-0 h-auto gap-1 text-[11px] text-gray-400 hover:text-blue-600 px-1.5 py-0.5"
@@ -80,6 +85,7 @@ function NotificationCard({ n, onRead, marking }: { n: Notification; onRead: (id
 }
 
 export default function Notifications() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const { data: notifications = [], isLoading, isError, refetch } = useNotifications();
   const markRead = useMarkNotificationRead();
@@ -277,6 +283,7 @@ export default function Notifications() {
               n={n}
               onRead={handleMarkRead}
               marking={markingId === n.id}
+              onNavigate={navigate}
             />
           ))}
         </div>

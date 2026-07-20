@@ -130,7 +130,7 @@ export async function createAssignment(input: CreateAssignmentInput, actorId?: s
         empPortalId,
         'New Project Assignment',
         `You have been assigned to "${input.projectName}" at ${client?.company_name ?? 'a client'} as ${input.role}. Start date: ${input.startDate}.`,
-        'info', 'assignment', data.id,
+        'info', 'assignment', data.id, `/portal/assignments/${data.id}`,
       );
     }
     // Also notify operations/admin
@@ -144,7 +144,7 @@ export async function createAssignment(input: CreateAssignmentInput, actorId?: s
         uid,
         'Assignment Created',
         `Assignment ${label} created for "${input.projectName}" at ${client?.company_name ?? 'a client'}.`,
-        'success', 'assignment', data.id,
+        'success', 'assignment', data.id, `/portal/assignments/${data.id}`,
       )
     ));
   } catch (err) {

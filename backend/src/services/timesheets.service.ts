@@ -363,7 +363,7 @@ async function notifyTimesheetStatusChange(
           managerPortalId,
           'Timesheet Pending Your Approval',
           `Timesheet ${ts.label} from one of your direct reports is awaiting approval.`,
-          'info', 'timesheet', ts.id,
+          'info', 'timesheet', ts.id, `/portal/timesheets/${ts.id}`,
         );
       }
       // Safety-net broadcast to operations + admin, de-duped against the manager.
@@ -373,7 +373,7 @@ async function notifyTimesheetStatusChange(
       ]);
       const broadcast = [...new Set([...opIds, ...adminIds])].filter(uid => uid !== managerPortalId);
       await Promise.all(broadcast.map(uid =>
-        createNotification(uid, 'Timesheet Submitted', `Timesheet ${ts.label} is awaiting your approval.`, 'info', 'timesheet', ts.id)
+        createNotification(uid, 'Timesheet Submitted', `Timesheet ${ts.label} is awaiting your approval.`, 'info', 'timesheet', ts.id, `/portal/timesheets/${ts.id}`)
       ));
       // Someone other than the employee (e.g. admin filling in on their
       // behalf) submitted this — let the owner know it happened.
@@ -384,27 +384,27 @@ async function notifyTimesheetStatusChange(
             ownerPortalId,
             'Timesheet Submitted On Your Behalf',
             `Timesheet ${ts.label} was filled in and submitted for you.`,
-            'info', 'timesheet', ts.id,
+            'info', 'timesheet', ts.id, `/portal/timesheets/${ts.id}`,
           );
         }
       }
     } else if (newStatus === 'manager_approved') {
       const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
       if (ownerPortalId) {
-        await createNotification(ownerPortalId, 'Timesheet Approved', `Timesheet ${ts.label} has been approved.`, 'success', 'timesheet', ts.id);
+        await createNotification(ownerPortalId, 'Timesheet Approved', `Timesheet ${ts.label} has been approved.`, 'success', 'timesheet', ts.id, `/portal/timesheets/${ts.id}`);
       }
       const [financeIds, adminIds] = await Promise.all([
         getUserIdsByRole('finance'),
         getUserIdsByRole('admin'),
       ]);
       await Promise.all([...new Set([...financeIds, ...adminIds])].map(uid =>
-        createNotification(uid, 'Timesheet Ready to Invoice', `Timesheet ${ts.label} is approved and ready to be invoiced.`, 'info', 'timesheet', ts.id)
+        createNotification(uid, 'Timesheet Ready to Invoice', `Timesheet ${ts.label} is approved and ready to be invoiced.`, 'info', 'timesheet', ts.id, `/portal/timesheets/${ts.id}`)
       ));
     } else if (newStatus === 'rejected') {
       const ownerPortalId = await getPortalUserByEmployeeId(ts.employeeId);
       if (ownerPortalId) {
         const reason = rejectionReason ? `: "${rejectionReason}"` : '';
-        await createNotification(ownerPortalId, 'Timesheet Rejected', `Timesheet ${ts.label} was rejected${reason}.`, 'error', 'timesheet', ts.id);
+        await createNotification(ownerPortalId, 'Timesheet Rejected', `Timesheet ${ts.label} was rejected${reason}.`, 'error', 'timesheet', ts.id, `/portal/timesheets/${ts.id}`);
       }
     }
   } catch (err) {
@@ -664,7 +664,7 @@ export async function reopenTimesheet(
     await createNotification(
       ownerPortalId, 'Timesheet Reopened',
       `Your timesheet ${label} was reopened for corrections — please update your actual hours and resubmit.${reasonSuffix}`,
-      'warning', 'timesheet', id,
+      'warning', 'timesheet', id, `/portal/timesheets/${id}`,
     );
   }
 

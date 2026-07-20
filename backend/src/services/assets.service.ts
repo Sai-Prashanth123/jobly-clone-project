@@ -130,7 +130,7 @@ export async function assignAsset(id: string, input: AssignAssetInput, actorId: 
   // Notify employee
   const empUserId = await getPortalUserByEmployeeId(input.employeeId);
   if (empUserId) {
-    void createNotification(empUserId, 'Equipment Assigned', `${asset.name} has been assigned to you`, 'info', 'asset', id);
+    void createNotification(empUserId, 'Equipment Assigned', `${asset.name} has been assigned to you`, 'info', 'asset', id, '/portal/assets');
   }
 
   return data as any;
@@ -160,7 +160,7 @@ export async function unassignAsset(id: string, actorId: string) {
   if (prevEmployee) {
     const empUserId = await getPortalUserByEmployeeId(prevEmployee);
     if (empUserId) {
-      void createNotification(empUserId, 'Equipment Returned', `${asset.name} has been returned`, 'info', 'asset', id);
+      void createNotification(empUserId, 'Equipment Returned', `${asset.name} has been returned`, 'info', 'asset', id, '/portal/assets');
     }
   }
 

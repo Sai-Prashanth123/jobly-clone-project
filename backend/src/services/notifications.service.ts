@@ -7,6 +7,7 @@ export async function createNotification(
   type: 'info' | 'warning' | 'error' | 'success' = 'info',
   entityType?: string,
   entityId?: string,
+  link?: string,
 ) {
   const { error } = await supabaseAdmin.from('notifications').insert({
     user_id: userId,
@@ -15,6 +16,7 @@ export async function createNotification(
     type,
     entity_type: entityType ?? null,
     entity_id: entityId ?? null,
+    link: link ?? null,
   });
   // Best-effort: a failed notification must not break the calling flow, but log
   // it so silent delivery failures are visible in the server logs.
@@ -211,7 +213,7 @@ export async function triggerTimesheetReminders(): Promise<{ sent: number }> {
       portalUserId,
       'Timesheet Reminder',
       `You haven't submitted your timesheet for "${assignment.project_name}" at ${clientName} for the week of ${weekStart}. Please submit it as soon as possible.`,
-      'warning', 'timesheet', assignment.id,
+      'warning', 'timesheet', assignment.id, '/portal/timesheets',
     );
     sent++;
   }
@@ -260,7 +262,7 @@ export async function triggerContractExpiryAlerts(): Promise<{ sent: number }> {
         'Contract Expiring Soon',
         `Client contract for ${client.company_name} (${label}) expires in ${daysLeft} day${daysLeft === 1 ? '' : 's'} on ${client.contract_end_date}. Please renew or take action.`,
         urgency as 'info' | 'warning' | 'error' | 'success',
-        'client', client.id,
+        'client', client.id, `/portal/clients/${client.id}`,
       );
     }
     sent += recipients.length;
@@ -328,6 +330,7 @@ export async function triggerInvoiceReadinessReminders(): Promise<{ sent: number
         'info',
         'client',
         clientId,
+        `/portal/clients/${clientId}`,
       );
       sent++;
     }
@@ -382,12 +385,12 @@ export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number }> {
       const urgency: 'error' | 'warning' | 'info' = doc.daysLeft <= 14 ? 'error' : doc.daysLeft <= 30 ? 'warning' : 'info';
       const hrMsg = `${fullName} (${emp.display_id}): ${doc.type} expires in ${doc.daysLeft} day${doc.daysLeft === 1 ? '' : 's'} on ${doc.expiry}.`;
       for (const uid of hrAdminRecipients) {
-        await createNotification(uid, 'Document Expiring Soon', hrMsg, urgency, 'employee', emp.id);
+        await createNotification(uid, 'Document Expiring Soon', hrMsg, urgency, 'employee', emp.id, `/portal/employees/${emp.id}`);
         sent++;
       }
       const empPortalUserId = await getPortalUserByEmployeeId(emp.id);
       if (empPortalUserId) {
-        await createNotification(empPortalUserId, 'Your Document Is Expiring', `Your ${doc.type} expires in ${doc.daysLeft} day${doc.daysLeft === 1 ? '' : 's'} on ${doc.expiry}. Please renew it and upload the updated copy.`, urgency, 'employee', emp.id);
+        await createNotification(empPortalUserId, 'Your Document Is Expiring', `Your ${doc.type} expires in ${doc.daysLeft} day${doc.daysLeft === 1 ? '' : 's'} on ${doc.expiry}. Please renew it and upload the updated copy.`, urgency, 'employee', emp.id, '/portal/profile');
         sent++;
       }
     }

@@ -393,12 +393,12 @@ export async function patchMonthlyStatus(id: string, input: PatchMonthlyStatusIn
       if (input.status === 'approved') {
         await createNotification(ownerPortalId, 'Attendance Approved',
           `Your ${monthLabel(row.year, row.month)} timesheet (${label}) was approved.`,
-          'success', 'monthly_timesheet', id);
+          'success', 'monthly_timesheet', id, '/portal/attendance');
       } else {
         const reason = input.rejectionReason ? `: "${input.rejectionReason}"` : '';
         await createNotification(ownerPortalId, 'Attendance Rejected',
           `Your ${monthLabel(row.year, row.month)} timesheet (${label}) was rejected${reason}. Please correct and resubmit.`,
-          'error', 'monthly_timesheet', id);
+          'error', 'monthly_timesheet', id, '/portal/attendance');
       }
     }
   } catch (err) {
@@ -513,7 +513,7 @@ async function runSubmitSideEffects(row: any): Promise<{ emailSent: boolean; war
         uid,
         'Monthly Timesheet Submitted',
         `${employeeName} submitted their ${ml} timesheet (${label}) for review.`,
-        'info', 'monthly_timesheet', row.id,
+        'info', 'monthly_timesheet', row.id, `/portal/attendance/${row.id}`,
       );
     }
   } catch (err) {

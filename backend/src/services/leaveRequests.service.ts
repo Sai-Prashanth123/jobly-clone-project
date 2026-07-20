@@ -164,7 +164,7 @@ export async function createLeaveRequest(
         uid,
         'Leave request submitted',
         `${empName} (${emp.display_id ?? ''}) requested ${days} day${days === 1 ? '' : 's'} of leave (${window}). Review it under Leave Requests.`,
-        'info', 'leave_request', lr.id,
+        'info', 'leave_request', lr.id, '/portal/leave-requests',
       ),
     ),
   );
@@ -224,13 +224,13 @@ export async function reviewLeaveRequest(
       await createNotification(
         empUserId, 'Leave approved',
         `Your leave request ${label} (${window}) was approved.`,
-        'success', 'leave_request', id,
+        'success', 'leave_request', id, '/portal/leave-requests',
       );
     } else {
       await createNotification(
         empUserId, 'Leave rejected',
         `Your leave request ${label} (${window}) was rejected. Reason: ${input.rejectionReason}`,
-        'error', 'leave_request', id,
+        'error', 'leave_request', id, '/portal/leave-requests',
       );
     }
   }

@@ -122,7 +122,7 @@ export async function submitExpense(id: string, actorId: string, actorEmployeeId
   const hrIds = await getUserIdsByRole('hr');
   const notifyIds = [...new Set([...adminFinanceIds, ...adminIds, ...hrIds])];
   for (const uid of notifyIds) {
-    void createNotification(uid, 'New Expense Submitted', `${expense.title} submitted for review`, 'info', 'expense_report', id);
+    void createNotification(uid, 'New Expense Submitted', `${expense.title} submitted for review`, 'info', 'expense_report', id, '/portal/expenses');
   }
 
   return data as any;
@@ -154,7 +154,7 @@ export async function reviewExpense(id: string, input: ReviewExpenseInput, revie
     const msg = input.action === 'approved'
       ? `Your expense "${expense.title}" was approved`
       : `Your expense "${expense.title}" was rejected${input.rejectionReason ? `: ${input.rejectionReason}` : ''}`;
-    void createNotification(empUserId, `Expense ${input.action}`, msg, input.action === 'approved' ? 'success' : 'warning', 'expense_report', id);
+    void createNotification(empUserId, `Expense ${input.action}`, msg, input.action === 'approved' ? 'success' : 'warning', 'expense_report', id, '/portal/expenses');
   }
 
   return data as any;
@@ -177,7 +177,7 @@ export async function markPaid(id: string, actorId: string) {
   // Notify the employee
   const empUserId2 = await getPortalUserByEmployeeId(expense.employee_id);
   if (empUserId2) {
-    void createNotification(empUserId2, 'Expense Paid', `Your expense "${expense.title}" has been paid`, 'success', 'expense_report', id);
+    void createNotification(empUserId2, 'Expense Paid', `Your expense "${expense.title}" has been paid`, 'success', 'expense_report', id, '/portal/expenses');
   }
 
   return data as any;
