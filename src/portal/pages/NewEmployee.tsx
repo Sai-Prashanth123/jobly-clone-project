@@ -499,6 +499,15 @@ export default function NewEmployee() {
           const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
           const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
           return fileOrUploaded && (!row.hasExpiry || !!expiry);
+        }) && IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !(REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type)).every(row => {
+          // Non-required docs (Green Card, EAD, OPT/STEM OPT card, I-983, US
+          // Visa): fine to leave both blank, but entering an expiry date
+          // without ever uploading the document is an inconsistent partial
+          // state — don't let it count as complete.
+          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+          const fileOrUploaded = !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
+          const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
+          return !expiry || fileOrUploaded;
         }),
       } : {}),
     };
@@ -573,9 +582,28 @@ export default function NewEmployee() {
       }),
       // OPT/STEM OPT holders additionally need OPT Card + I-983
       ...optDocs,
+      // Non-required docs (Green Card, EAD, OPT/STEM OPT card, I-983, US Visa):
+      // leaving both the file and expiry blank is fine, but entering an expiry
+      // date with no file ever uploaded is an inconsistent partial state that
+      // used to slip through unblocked since these types aren't in
+      // REQUIRED_IDENTITY_TYPES. Only appears in the checklist while that
+      // inconsistency exists, so it doesn't affect the % for anyone who never
+      // touches these fields.
+      ...IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !(REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type)).flatMap(row => {
+        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+        const fileOrUploaded = !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
+        const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
+        if (!expiry || fileOrUploaded) return [];
+        return [{
+          id: `ident_${row.type}_needs_upload`,
+          label: `Upload ${row.label} (expiry date was entered)`,
+          section: SECTION_IDS.identity,
+          done: false,
+        }];
+      }),
       // Bank details and declaration are optional (HR collects separately if needed)
     ];
-  }, [form, uploadedDocTypes]);
+  }, [form, uploadedDocTypes, existingEmployee]);
 
   const onbDone = onboardingChecklist.filter(c => c.done).length;
   const onbPct = Math.round((onbDone / onboardingChecklist.length) * 100);
@@ -1799,7 +1827,12 @@ export default function NewEmployee() {
                 const fileOrUploaded = !!(file || isAlreadyUploaded);
                 const expiryVal = (doc.expiry ?? '').trim();
                 const missingExpiry = isOnboarding && isRequired && row.hasExpiry && fileOrUploaded && !expiryVal;
-                const isMissing = isOnboarding && isRequired && (!fileOrUploaded || missingExpiry);
+                // An expiry date entered with no file ever uploaded is an
+                // inconsistent partial state regardless of whether this doc
+                // type is one of the hard-required ones — you can't be
+                // tracking the expiry of a document you never provided.
+                const expiryWithoutFile = isOnboarding && row.hasExpiry && !!expiryVal && !fileOrUploaded;
+                const isMissing = isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile);
                 return (
                   <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
                     <div>
@@ -1832,10 +1865,11 @@ export default function NewEmployee() {
                         <UsDateInput
                           value={doc.expiry ?? ''}
                           onChange={iso => upsertIdentityDoc(row.type, { expiry: iso })}
-                          className={missingExpiry ? 'border-red-300' : ''}
+                          className={missingExpiry || expiryWithoutFile ? 'border-red-300' : ''}
                         />
                         {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
                         {missingExpiry && <p className="text-[11px] text-red-500 mt-0.5">Expiry date is required</p>}
+                        {expiryWithoutFile && <p className="text-[11px] text-red-500 mt-0.5">Upload the document below to save this expiry date</p>}
                       </div>
                     )}
                     <div className="flex items-center gap-2 mt-auto">
