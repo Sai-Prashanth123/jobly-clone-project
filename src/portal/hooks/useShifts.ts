@@ -8,7 +8,7 @@ export const SHIFT_COLORS: Record<ShiftType, string> = { morning:'bg-amber-100 t
 
 function map(r: any): Shift {
   const e = r.employee ?? {};
-  return { id: r.id, employeeId: r.employee_id, date: r.date, startTime: r.start_time, endTime: r.end_time, shiftType: r.shift_type, notes: r.notes ?? null, employeeName: e.first_name ? `${e.first_name} ${e.last_name}`.trim() : undefined, employeeDisplayId: e.display_id, employeeDept: e.department };
+  return { id: r.id, employeeId: r.employee_id, date: r.date, startTime: r.start_time ?? '', endTime: r.end_time ?? '', shiftType: r.shift_type, notes: r.notes ?? null, employeeName: e.first_name ? `${e.first_name} ${e.last_name}`.trim() : undefined, employeeDisplayId: e.display_id, employeeDept: e.department };
 }
 
 export function useShifts(params: { startDate?: string; endDate?: string; employeeId?: string } = {}) {

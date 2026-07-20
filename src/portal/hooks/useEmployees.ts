@@ -8,8 +8,8 @@ function mapEmployee(raw: any): Employee {
   return {
     id: raw.id,
     displayId: raw.display_id,
-    firstName: raw.first_name,
-    lastName: raw.last_name,
+    firstName: raw.first_name ?? '',
+    lastName: raw.last_name ?? '',
     email: raw.email,
     phone: raw.phone ?? '',
     dob: raw.dob ?? '',

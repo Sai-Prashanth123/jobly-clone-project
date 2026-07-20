@@ -315,7 +315,7 @@ export function HRDashboard() {
                 <li key={`${doc.displayId}-${doc.documentType}`} className="flex items-center justify-between gap-3 px-1 py-2.5">
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-[10px] font-semibold text-blue-600 flex-shrink-0">
-                      {doc.firstName[0]}{doc.lastName[0]}
+                      {doc.firstName?.[0]}{doc.lastName?.[0]}
                     </div>
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate">{doc.firstName} {doc.lastName}</p>
