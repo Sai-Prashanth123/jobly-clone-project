@@ -84,6 +84,10 @@ export default function PerformanceReviewDetail() {
 
   const handleSave = async () => {
     if (!form) return;
+    if (form.periodStart && form.periodEnd && form.periodEnd < form.periodStart) {
+      toast.error('Period End must be on or after Period Start');
+      return;
+    }
     try {
       await updateReview.mutateAsync(form);
       toast.success('Draft saved');
@@ -151,7 +155,13 @@ export default function PerformanceReviewDetail() {
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5"><Label>Period Start</Label><UsDateInput value={form.periodStart} onChange={v => set('periodStart', v)} disabled={!canEdit} /></div>
-            <div className="space-y-1.5"><Label>Period End</Label><UsDateInput value={form.periodEnd} onChange={v => set('periodEnd', v)} disabled={!canEdit} /></div>
+            <div className="space-y-1.5">
+              <Label>Period End</Label>
+              <UsDateInput value={form.periodEnd} onChange={v => set('periodEnd', v)} min={form.periodStart || undefined} disabled={!canEdit} />
+              {form.periodStart && form.periodEnd && form.periodEnd < form.periodStart && (
+                <p className="text-[11px] text-red-500">Must be on or after Period Start</p>
+              )}
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="space-y-1.5">
@@ -239,8 +249,8 @@ export default function PerformanceReviewDetail() {
         <CardHeader><CardTitle className="text-base">Job Function</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="space-y-1.5 sm:col-span-2"><Label>Job Function</Label><Input value={form.jobFunction ?? ''} onChange={e => set('jobFunction', e.target.value)} disabled={!canEdit} /></div>
-          <div className="space-y-1.5"><Label>Weight (%)</Label><Input type="number" min={0} max={100} value={form.weightPercent ?? 100} onChange={e => set('weightPercent', Number(e.target.value) || 0)} disabled={!canEdit} /></div>
-          <div className="space-y-1.5"><Label>Complete (%)</Label><Input type="number" min={0} max={100} value={form.completePercent ?? 100} onChange={e => set('completePercent', Number(e.target.value) || 0)} disabled={!canEdit} /></div>
+          <div className="space-y-1.5"><Label>Weight (%)</Label><Input type="number" min={0} max={100} value={form.weightPercent ?? 100} onChange={e => set('weightPercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))} disabled={!canEdit} /></div>
+          <div className="space-y-1.5"><Label>Complete (%)</Label><Input type="number" min={0} max={100} value={form.completePercent ?? 100} onChange={e => set('completePercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))} disabled={!canEdit} /></div>
           <div className="space-y-1.5 sm:col-span-4"><Label>Status</Label><Input value={form.statusGoal ?? ''} onChange={e => set('statusGoal', e.target.value)} disabled={!canEdit} placeholder="Goal Achieved" /></div>
         </CardContent>
       </Card>
@@ -266,6 +276,21 @@ export default function PerformanceReviewDetail() {
           <div className="space-y-1.5"><Label>Supervisor Signed Date</Label><UsDateInput value={form.supervisorSignedDate ?? ''} onChange={v => set('supervisorSignedDate', v)} disabled={!canEdit} /></div>
         </CardContent>
       </Card>
+
+      {/* Bottom action bar — mirrors the header actions so a long, multi-card
+          review always has a reachable Save control, not just at the top. */}
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+        {canEdit && (
+          <Button size="sm" onClick={handleSave} disabled={updateReview.isPending} className="gap-1.5">
+            {updateReview.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Draft
+          </Button>
+        )}
+        {isAdmin && review.status === 'draft' && (
+          <Button size="sm" variant="outline" onClick={openSend} className="gap-1.5">
+            <Send className="h-4 w-4" /> Send to Employee
+          </Button>
+        )}
+      </div>
 
       <Dialog open={sendOpen} onOpenChange={setSendOpen}>
         <DialogContent className="w-[95vw] max-w-sm" aria-describedby={undefined}>

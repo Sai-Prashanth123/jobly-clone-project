@@ -79,6 +79,34 @@ export function cn(...classes: (string | undefined | false | null)[]): string {
 // reaches its fallback for any non-standard format — it just displays the
 // raw, unmasked value. Always deriving the mask from the digits themselves
 // avoids that failure mode entirely.
+// Digits-only, capped at 10, live-formatted as a US phone number as the user
+// types — e.g. "5551234567" -> "(555) 123-4567".
+export function formatUsPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// Mirrors backend ALLOWED_MIME_TYPES (backend/src/middleware/upload.ts) for
+// instant client-side feedback — the accept="..." attribute on a file input
+// is only a picker *hint*; it does not stop drag-and-drop or "All Files" in
+// the OS dialog, so every upload needs this check in its onChange too.
+export const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
+  'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/plain', 'text/csv',
+]);
+const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+
+/** Returns an error message if the file should be rejected, or null if it's fine. */
+export function validateUploadFile(file: File, maxBytes = MAX_DOCUMENT_BYTES): string | null {
+  if (file.size > maxBytes) return `${file.name} is larger than ${Math.round(maxBytes / (1024 * 1024))}MB.`;
+  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(file.type)) return `${file.name}: that file type isn't allowed.`;
+  return null;
+}
+
 export function maskSsn(ssn: string): string {
   const digits = ssn.replace(/\D/g, '');
   const last4 = digits.length >= 4 ? digits.slice(-4) : (digits || ssn.slice(-4));

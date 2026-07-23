@@ -138,7 +138,7 @@ export default function ShiftSchedule() {
             <div className="space-y-1"><Label>Date *</Label><UsDateInput value={form.date} onChange={iso => setForm(p => ({ ...p, date: iso }))} /></div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1"><Label>Start Time</Label><Input type="time" value={form.startTime} onChange={e => setForm(p => ({ ...p, startTime: e.target.value }))} /></div>
-              <div className="space-y-1"><Label>End Time</Label><Input type="time" value={form.endTime} onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} /></div>
+              <div className="space-y-1"><Label>End Time</Label><Input type="time" min={form.startTime || undefined} value={form.endTime} onChange={e => setForm(p => ({ ...p, endTime: e.target.value }))} /></div>
             </div>
             <div className="space-y-1"><Label>Shift Type</Label>
               <Select value={form.shiftType} onValueChange={v => setForm(p => ({ ...p, shiftType: v as ShiftType }))}>

@@ -20,7 +20,7 @@ import { UsDateInput } from '../components/shared/UsDateInput';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
-import { parseNumberInput } from '../lib/utils';
+import { parseNumberInput, formatUsPhone } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
 import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
@@ -243,15 +243,6 @@ const defaultForm: FormState = {
   signatureName: '',
   signatureDate: todayIso(),
 };
-
-// Digits-only, capped at 10, live-formatted as a US phone number as the user
-// types — same approach as the SSN field below.
-function formatUsPhone(raw: string): string {
-  const digits = raw.replace(/\D/g, '').slice(0, 10);
-  if (digits.length <= 3) return digits;
-  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
-  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
-}
 
 // "Education complete" requires EVERY row present to be fully filled in —
 // previously this used some(), which only needed ONE row to be complete, so
@@ -1945,7 +1936,15 @@ export default function NewEmployee() {
                         type="file"
                         accept=".pdf,.jpg,.jpeg,.png"
                         className="hidden"
-                        onChange={e => setIdentityDocFile(row.type, e.target.files?.[0] ?? null)}
+                        onChange={e => {
+                          const f = e.target.files?.[0] ?? null;
+                          if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
+                            toast.error('Please upload a PDF, JPEG, or PNG file.');
+                            e.target.value = '';
+                            return;
+                          }
+                          setIdentityDocFile(row.type, f);
+                        }}
                       />
                       {fileOrUploaded && (
                         <>

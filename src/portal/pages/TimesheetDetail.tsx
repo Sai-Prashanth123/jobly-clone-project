@@ -18,7 +18,7 @@ import { useClient } from '../hooks/useClients';
 import { useAssignment } from '../hooks/useAssignments';
 import { useAuth } from '../hooks/useAuth';
 import { useHolidaysInRange } from '../hooks/useHolidays';
-import { formatDate, formatDateTime, formatCurrency } from '../lib/utils';
+import { formatDate, formatDateTime, formatCurrency, validateUploadFile } from '../lib/utils';
 import type { TimesheetEntry } from '../types';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
@@ -446,7 +446,7 @@ export default function TimesheetDetail() {
                       <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
                         onChange={async e => {
                           const f = e.target.files?.[0]; if (!f) return;
-                          if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                          { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
                           try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
                           catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                           e.target.value = '';
@@ -471,7 +471,7 @@ export default function TimesheetDetail() {
                     <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
                       onChange={async e => {
                         const f = e.target.files?.[0]; if (!f) return;
-                        if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                        { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
                         try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
                         catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                         e.target.value = '';
@@ -531,7 +531,7 @@ export default function TimesheetDetail() {
                     <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
                       onChange={async e => {
                         const f = e.target.files?.[0]; if (!f) return;
-                        if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                        { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
                         try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet replaced.'); }
                         catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                         e.target.value = '';
@@ -557,7 +557,7 @@ export default function TimesheetDetail() {
                 <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
                   onChange={async e => {
                     const f = e.target.files?.[0]; if (!f) return;
-                    if (f.size > 20 * 1024 * 1024) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                    { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
                     try { await uploadProof.mutateAsync(f); toast.success('Client-signed timesheet uploaded.'); }
                     catch { /* failed-request toast raised centrally (queryClient.ts) */ }
                     e.target.value = '';

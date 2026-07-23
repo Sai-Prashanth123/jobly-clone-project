@@ -14,6 +14,8 @@ import { PageHeader } from '../components/shared/PageHeader';
 import { UsDateInput } from '../components/shared/UsDateInput';
 import { useAuth } from '../hooks/useAuth';
 import { getApiErrorMessage } from '../lib/apiError';
+import { formatUsPhone } from '../lib/utils';
+import { US_STATES } from '../lib/usStates';
 import {
   useEnrollmentForm, useUpdateEnrollmentForm, useSubmitEnrollmentForm, useGenerateEnrollmentFormPdf,
   CONDITION_CHECKLIST, WAIVER_REASONS, RELATIONSHIP_OPTIONS, COVERAGE_TIERS, ENROLLMENT_TYPES, EMPLOYEE_STATUS_OPTIONS,
@@ -191,8 +193,13 @@ export default function EnrollmentFormDetail() {
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
             <div className="space-y-1.5"><Label>Home Street</Label><Input value={form.sectionA?.homeAddress?.street ?? ''} onChange={e => setAAddr('homeAddress', { street: e.target.value })} disabled={!canEdit} /></div>
             <div className="space-y-1.5"><Label>City</Label><Input value={form.sectionA?.homeAddress?.city ?? ''} onChange={e => setAAddr('homeAddress', { city: e.target.value })} disabled={!canEdit} /></div>
-            <div className="space-y-1.5"><Label>State</Label><Input value={form.sectionA?.homeAddress?.state ?? ''} onChange={e => setAAddr('homeAddress', { state: e.target.value })} disabled={!canEdit} /></div>
-            <div className="space-y-1.5"><Label>Zip</Label><Input value={form.sectionA?.homeAddress?.zip ?? ''} onChange={e => setAAddr('homeAddress', { zip: e.target.value })} disabled={!canEdit} /></div>
+            <div className="space-y-1.5"><Label>State</Label>
+              <Select value={form.sectionA?.homeAddress?.state ?? ''} onValueChange={v => setAAddr('homeAddress', { state: v })} disabled={!canEdit}>
+                <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                <SelectContent className="max-h-[280px]">{US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code} — {s.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5"><Label>Zip</Label><Input value={form.sectionA?.homeAddress?.zip ?? ''} onChange={e => setAAddr('homeAddress', { zip: e.target.value.replace(/\D/g, '').slice(0, 5) })} inputMode="numeric" maxLength={5} disabled={!canEdit} /></div>
           </div>
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={!!form.sectionA?.mailingSameAsHome} onCheckedChange={v => setA({ mailingSameAsHome: !!v })} disabled={!canEdit} />
@@ -202,15 +209,20 @@ export default function EnrollmentFormDetail() {
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               <div className="space-y-1.5"><Label>Mailing Street</Label><Input value={form.sectionA?.mailingAddress?.street ?? ''} onChange={e => setAAddr('mailingAddress', { street: e.target.value })} disabled={!canEdit} /></div>
               <div className="space-y-1.5"><Label>City</Label><Input value={form.sectionA?.mailingAddress?.city ?? ''} onChange={e => setAAddr('mailingAddress', { city: e.target.value })} disabled={!canEdit} /></div>
-              <div className="space-y-1.5"><Label>State</Label><Input value={form.sectionA?.mailingAddress?.state ?? ''} onChange={e => setAAddr('mailingAddress', { state: e.target.value })} disabled={!canEdit} /></div>
-              <div className="space-y-1.5"><Label>Zip</Label><Input value={form.sectionA?.mailingAddress?.zip ?? ''} onChange={e => setAAddr('mailingAddress', { zip: e.target.value })} disabled={!canEdit} /></div>
+              <div className="space-y-1.5"><Label>State</Label>
+                <Select value={form.sectionA?.mailingAddress?.state ?? ''} onValueChange={v => setAAddr('mailingAddress', { state: v })} disabled={!canEdit}>
+                  <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                  <SelectContent className="max-h-[280px]">{US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code} — {s.name}</SelectItem>)}</SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5"><Label>Zip</Label><Input value={form.sectionA?.mailingAddress?.zip ?? ''} onChange={e => setAAddr('mailingAddress', { zip: e.target.value.replace(/\D/g, '').slice(0, 5) })} inputMode="numeric" maxLength={5} disabled={!canEdit} /></div>
             </div>
           )}
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="space-y-1.5"><Label>Home Phone</Label><Input value={form.sectionA?.homePhone ?? ''} onChange={e => setA({ homePhone: e.target.value })} disabled={!canEdit} /></div>
-            <div className="space-y-1.5"><Label>Cell Phone</Label><Input value={form.sectionA?.cellPhone ?? ''} onChange={e => setA({ cellPhone: e.target.value })} disabled={!canEdit} /></div>
-            <div className="space-y-1.5"><Label>Work Phone</Label><Input value={form.sectionA?.workPhone ?? ''} onChange={e => setA({ workPhone: e.target.value })} disabled={!canEdit} /></div>
+            <div className="space-y-1.5"><Label>Home Phone</Label><Input value={form.sectionA?.homePhone ?? ''} onChange={e => setA({ homePhone: formatUsPhone(e.target.value) })} inputMode="numeric" maxLength={14} disabled={!canEdit} /></div>
+            <div className="space-y-1.5"><Label>Cell Phone</Label><Input value={form.sectionA?.cellPhone ?? ''} onChange={e => setA({ cellPhone: formatUsPhone(e.target.value) })} inputMode="numeric" maxLength={14} disabled={!canEdit} /></div>
+            <div className="space-y-1.5"><Label>Work Phone</Label><Input value={form.sectionA?.workPhone ?? ''} onChange={e => setA({ workPhone: formatUsPhone(e.target.value) })} inputMode="numeric" maxLength={14} disabled={!canEdit} /></div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-1.5"><Label>Email</Label><Input type="email" value={form.sectionA?.email ?? ''} onChange={e => setA({ email: e.target.value })} disabled={!canEdit} /></div>
@@ -511,6 +523,21 @@ export default function EnrollmentFormDetail() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Bottom action bar — mirrors the header actions so a long, 9-section
+          form always has a reachable submit control, not just at the top. */}
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-gray-200">
+        {canEdit && (
+          <Button size="sm" variant="outline" onClick={handleSave} disabled={updateForm.isPending} className="gap-1.5">
+            {updateForm.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Draft
+          </Button>
+        )}
+        {canEdit && (
+          <Button size="sm" onClick={() => setSubmitOpen(true)} className="gap-1.5">
+            <CheckCircle2 className="h-4 w-4" /> Submit
+          </Button>
+        )}
+      </div>
 
       <Dialog open={submitOpen} onOpenChange={setSubmitOpen}>
         <DialogContent className="w-[95vw] max-w-sm" aria-describedby={undefined}>

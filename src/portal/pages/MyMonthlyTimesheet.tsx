@@ -26,7 +26,7 @@ import { useHolidays } from '../hooks/useHolidays';
 import { useAssignments } from '../hooks/useAssignments';
 import { apiClient } from '../lib/apiClient';
 import { exportToCsv } from '../lib/exportCsv';
-import { formatDateUS } from '../lib/utils';
+import { formatDateUS, validateUploadFile } from '../lib/utils';
 import {
   buildMonthSkeleton, computeHours, computeMonthlySummary,
   currentMonth, monthInputValue, parseMonthInput, monthLabel, daysInMonth,
@@ -968,7 +968,7 @@ export default function MyMonthlyTimesheet() {
                       onChange={async e => {
                         const f = e.target.files?.[0];
                         if (!f) return;
-                        if (f.size > MAX_PROOF_BYTES) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                        { const err = validateUploadFile(f, MAX_PROOF_BYTES); if (err) { toast.error(err); e.target.value = ''; return; } }
                         const saved = await ensureSaved();
                         if (!saved) { toast.warning('Add some hours before attaching a client-signed proof.'); return; }
                         try {
@@ -1017,7 +1017,7 @@ export default function MyMonthlyTimesheet() {
                     onChange={async e => {
                       const f = e.target.files?.[0];
                       if (!f) return;
-                      if (f.size > MAX_PROOF_BYTES) { toast.error('File exceeds 20 MB limit.'); e.target.value = ''; return; }
+                      { const err = validateUploadFile(f, MAX_PROOF_BYTES); if (err) { toast.error(err); e.target.value = ''; return; } }
                       const saved = await ensureSaved();
                       if (!saved) { toast.warning('Add some hours before attaching a client-signed proof.'); return; }
                       try {

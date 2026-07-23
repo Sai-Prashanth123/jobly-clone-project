@@ -28,9 +28,15 @@
 }
 
 /* Edge/IE inject their own native password-reveal control, which sits right on
-   top of our custom Eye/EyeOff toggle button and looks like a duplicate icon. */
-.portal-scope input[type="password"]::-ms-reveal,
-.portal-scope input[type="password"]::-ms-clear {
+   top of our custom Eye/EyeOff toggle button and looks like a duplicate icon.
+   Deliberately NOT scoped to .portal-scope: password fields inside dialogs
+   (e.g. ChangePasswordDialog) render via a Radix Portal straight onto
+   document.body, outside the .portal-scope DOM subtree — a scoped selector
+   can't reach them even though they're a React descendant of the portal.
+   type="password" inputs only exist in the portal anywhere in this app, so a
+   global rule is safe. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
   display: none;
 }
 

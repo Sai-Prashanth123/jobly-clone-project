@@ -22,7 +22,7 @@ import {
   useDeleteEmployeeDocument,
 } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
-import { formatDate } from '../lib/utils';
+import { formatDate, validateUploadFile } from '../lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { DOCUMENT_TYPES, IDENTITY_OWNED_DOC_LABELS } from '../lib/documentTypes';
 import type { Employee } from '../types';
@@ -177,7 +177,14 @@ function DocumentManager({ employee }: { employee: Employee }) {
                 id="doc-file"
                 type="file"
                 accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.csv"
-                onChange={e => setFile(e.target.files?.[0] ?? null)}
+                onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (f) {
+                    const err = validateUploadFile(f);
+                    if (err) { toast.error(err); e.target.value = ''; return; }
+                  }
+                  setFile(f);
+                }}
                 className="block w-full h-10 text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
               />
             </div>

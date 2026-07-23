@@ -463,8 +463,13 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                         <button type="button" onClick={() => setDiscountMode('fixed')}
                           className={`px-2 py-1 text-xs font-medium rounded ${discountMode === 'fixed' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500'}`}>{currency}</button>
                       </div>
-                      <Input type="number" min={0} step="any" inputMode="decimal"
-                        value={discountValueStr} onChange={e => setDiscountValueStr(e.target.value)}
+                      <Input type="number" min={0} max={discountMode === 'percentage' ? 100 : undefined} step="any" inputMode="decimal"
+                        value={discountValueStr}
+                        onChange={e => {
+                          const raw = e.target.value;
+                          if (discountMode === 'percentage' && raw !== '' && Number(raw) > 100) { setDiscountValueStr('100'); return; }
+                          setDiscountValueStr(raw);
+                        }}
                         placeholder={discountMode === 'percentage' ? '10' : '0.00'} className="h-8 w-24" />
                       <button type="button" onClick={() => { setDiscountMode('none'); setDiscountValueStr(''); }}
                         className="text-gray-400 hover:text-red-600" aria-label="Remove discount">
@@ -639,6 +644,15 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
           )}
         </>
       )}
+
+      {/* Bottom submit — the only save control otherwise lives in the sticky
+          top navbar (FormPageShell), and this form is long enough to scroll
+          well past it. */}
+      <div className="flex items-center justify-end pt-2 border-t border-gray-200">
+        <Button type="button" onClick={handleSubmit} className="gap-1.5">
+          {isEdit ? `Save ${docLabel}` : `Create ${docLabel}`}
+        </Button>
+      </div>
     </div>
   );
 });

@@ -11,7 +11,9 @@ import type { Client, BillingType } from '../../types';
 import { useClient, useUploadClientDocument } from '../../hooks/useClients';
 import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
 import { UsDateInput } from '../shared/UsDateInput';
-import { formatDate, parseNumberInput } from '../../lib/utils';
+import { formatDate, parseNumberInput, formatUsPhone, validateUploadFile } from '../../lib/utils';
+import { US_STATES } from '../../lib/usStates';
+import { COUNTRIES } from '../../lib/countries';
 import { toast } from 'sonner';
 
 type ClientFormData = Omit<Client, 'id' | 'createdAt' | 'updatedAt'>;
@@ -80,7 +82,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
 
   const tabFields: Record<string, string[]> = {
     basic:    ['companyName', 'contactName', 'contactEmail'],
-    contract: ['contractStartDate'],
+    contract: ['contractStartDate', 'contractEndDate'],
     billing:  [],
     docs:     [],
   };
@@ -91,6 +93,9 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
     if (!form.contactName.trim())    errs.contactName    = 'Contact name is required';
     if (!form.contactEmail.trim())   errs.contactEmail   = 'Contact email is required';
     if (!form.contractStartDate)     errs.contractStartDate = 'Contract start date is required';
+    if (form.contractEndDate && form.contractStartDate && form.contractEndDate < form.contractStartDate) {
+      errs.contractEndDate = 'Contract end date must be on or after the start date';
+    }
     setErrors(errs);
 
     if (Object.keys(errs).length > 0) {
@@ -210,7 +215,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
             </div>
             <div className="space-y-2">
               <Label>Contact Phone</Label>
-              <Input value={form.contactPhone ?? ''} onChange={e => set('contactPhone', e.target.value)} />
+              <Input value={form.contactPhone ?? ''} onChange={e => set('contactPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 123-4567" />
             </div>
             <div className="space-y-2">
               <Label>Industry</Label>
@@ -243,15 +248,25 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
             </div>
             <div className="space-y-2">
               <Label>State</Label>
-              <Input value={form.address?.state ?? ''} onChange={e => setAddr('state', e.target.value)} />
+              <Select value={form.address?.state ?? ''} onValueChange={v => setAddr('state', v)}>
+                <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                <SelectContent className="max-h-[280px]">
+                  {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code} — {s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-2">
               <Label>ZIP Code</Label>
-              <Input value={form.address?.zip ?? ''} onChange={e => setAddr('zip', e.target.value)} />
+              <Input value={form.address?.zip ?? ''} onChange={e => setAddr('zip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} />
             </div>
             <div className="space-y-2">
               <Label>Country</Label>
-              <Input value={form.address?.country ?? ''} onChange={e => setAddr('country', e.target.value)} />
+              <Select value={form.address?.country ?? ''} onValueChange={v => setAddr('country', v)}>
+                <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+                <SelectContent className="max-h-[280px]">
+                  {COUNTRIES.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
           </CardContent></Card>
         </TabsContent>
@@ -266,7 +281,8 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
             </div>
             <div className="space-y-2">
               <Label>Contract End Date</Label>
-              <UsDateInput value={form.contractEndDate ?? ''} onChange={iso => set('contractEndDate', iso || null)} />
+              <UsDateInput value={form.contractEndDate ?? ''} onChange={iso => set('contractEndDate', iso || null)} min={form.contractStartDate || undefined} />
+              {errors.contractEndDate && <p className="text-xs text-red-500">{errors.contractEndDate}</p>}
             </div>
             <div className="space-y-2">
               <Label>Billing Type</Label>
@@ -333,7 +349,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
                 </div>
                 <div className="space-y-2">
                   <Label>Billing Contact Phone</Label>
-                  <Input value={form.billingContactPhone ?? ''} onChange={e => set('billingContactPhone', e.target.value)} />
+                  <Input value={form.billingContactPhone ?? ''} onChange={e => set('billingContactPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 123-4567" />
                 </div>
               </div>
             </div>
@@ -352,15 +368,25 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
                 </div>
                 <div className="space-y-2">
                   <Label>State</Label>
-                  <Input value={form.billingState ?? ''} onChange={e => set('billingState', e.target.value)} />
+                  <Select value={form.billingState ?? ''} onValueChange={v => set('billingState', v)}>
+                    <SelectTrigger><SelectValue placeholder="Select state" /></SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code} — {s.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-2">
                   <Label>ZIP</Label>
-                  <Input value={form.billingZip ?? ''} onChange={e => set('billingZip', e.target.value)} />
+                  <Input value={form.billingZip ?? ''} onChange={e => set('billingZip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} />
                 </div>
                 <div className="space-y-2">
                   <Label>Country</Label>
-                  <Input value={form.billingCountry ?? ''} onChange={e => set('billingCountry', e.target.value)} />
+                  <Select value={form.billingCountry ?? ''} onValueChange={v => set('billingCountry', v)}>
+                    <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      {COUNTRIES.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>
@@ -404,9 +430,16 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
                   <Label className="text-xs">File *</Label>
                   <input
                     type="file"
-                    accept="*/*"
+                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv"
                     className="block w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300"
-                    onChange={e => setNewDocFile(e.target.files?.[0] ?? null)}
+                    onChange={e => {
+                      const file = e.target.files?.[0] ?? null;
+                      if (file) {
+                        const err = validateUploadFile(file);
+                        if (err) { toast.error(err); e.target.value = ''; return; }
+                      }
+                      setNewDocFile(file);
+                    }}
                   />
                 </div>
                 <Button

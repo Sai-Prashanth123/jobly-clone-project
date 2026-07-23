@@ -175,7 +175,7 @@ export function AssignmentForm({ initial, onSubmit, onCancel, isEdit = false, is
             <Input
               type="number" min={1} max={168} inputMode="numeric" placeholder="40"
               value={form.maxHoursPerWeek || ''}
-              onChange={e => set('maxHoursPerWeek', parseNumberInput(e.target.value) ?? 40)}
+              onChange={e => set('maxHoursPerWeek', Math.max(1, Math.min(168, parseNumberInput(e.target.value) ?? 40)))}
             />
           </div>
 

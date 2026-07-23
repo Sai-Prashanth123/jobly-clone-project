@@ -122,10 +122,14 @@ export function DateRangePresetPicker({
                 setPreset('custom');
                 onEndDateChange(iso);
               }}
+              min={startDate || undefined}
               className="w-full"
             />
           </div>
         </div>
+        {startDate && endDate && endDate < startDate && (
+          <p className="text-[11px] text-red-500">End date must be on or after the start date</p>
+        )}
       </CardContent>
     </Card>
   );
