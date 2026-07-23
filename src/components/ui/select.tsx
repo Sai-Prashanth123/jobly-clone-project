@@ -121,7 +121,15 @@ function Select({ value, onValueChange, defaultValue, disabled, children }: Sele
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") { setOpen(false); triggerRef.current?.focus({ preventScroll: true }); }
     };
-    const handleScroll = () => setOpen(false);
+    const handleScroll = (e: Event) => {
+      // Ignore scrolls originating from inside the listbox itself (mouse
+      // wheel, scrollbar drag, scrollbar arrow click) — capture-phase
+      // listeners see these too even though `scroll` doesn't bubble, so
+      // without this guard the popup closes the instant its own list tries
+      // to scroll instead of actually scrolling.
+      if (contentRef.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
     document.addEventListener("pointerdown", handlePointerDown, true);
     document.addEventListener("keydown", handleKeyDown, true);
     window.addEventListener("scroll", handleScroll, true);

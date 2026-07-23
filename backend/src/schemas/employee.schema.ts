@@ -44,6 +44,9 @@ const emergencyContactSchema = z.object({
   phone: z.string().optional().default(''),
   altPhone: z.string().optional().default(''),
   address: z.string().optional().default(''),
+  city: z.string().optional().default(''),
+  state: z.string().optional().default(''),
+  zip: z.string().optional().default(''),
 }).optional().nullable();
 
 export const createEmployeeSchema = z.object({

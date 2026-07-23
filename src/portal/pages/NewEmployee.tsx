@@ -22,7 +22,11 @@ import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
-import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, REQUIRED_IDENTITY_TYPES, IDENTITY_OWNED_DOC_LABELS } from '../lib/documentTypes';
+import { COUNTRIES } from '../lib/countries';
+import { NATIONALITIES } from '../lib/nationalities';
+import { LANGUAGES } from '../lib/languages';
+import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, REQUIRED_IDENTITY_TYPES, IDENTITY_OWNED_DOC_LABELS, docMatchesRow } from '../lib/documentTypes';
+import { LanguagesMultiSelect } from '../components/shared/LanguagesMultiSelect';
 import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
 
 // ── Constants ───────────────────────────────────────────────────────────────
@@ -180,7 +184,7 @@ interface FormState {
   totalExperienceYears: string;
   experienceLevel: string;
   // Emergency
-  emergencyContact: { name: string; relationship: string; phone: string; altPhone: string; address: string };
+  emergencyContact: { name: string; relationship: string; phone: string; altPhone: string; address: string; city: string; state: string; zip: string };
   // Payroll
   payRate: string;
   payType: Employee['payType'];
@@ -229,7 +233,7 @@ const defaultForm: FormState = {
   workHistory: [],
   totalExperienceYears: '',
   experienceLevel: '',
-  emergencyContact: { name: '', relationship: '', phone: '', altPhone: '', address: '' },
+  emergencyContact: { name: '', relationship: '', phone: '', altPhone: '', address: '', city: '', state: '', zip: '' },
   payRate: '',
   payType: 'hourly',
   paymentType: '',
@@ -239,6 +243,27 @@ const defaultForm: FormState = {
   signatureName: '',
   signatureDate: todayIso(),
 };
+
+// Digits-only, capped at 10, live-formatted as a US phone number as the user
+// types — same approach as the SSN field below.
+function formatUsPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`;
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+}
+
+// "Education complete" requires EVERY row present to be fully filled in —
+// previously this used some(), which only needed ONE row to be complete, so
+// adding a second row via "+ Add Education" and leaving it blank/partial
+// still showed the whole section as "Complete" even though there was
+// visibly more to fill in.
+function isEduRowComplete(e: EducationEntry): boolean {
+  return !!(e.level ?? '').trim() && !!(e.institution ?? '').trim() && !!String(e.passYear ?? '').trim() && Number(e.passYear) > 0;
+}
+function isEducationSectionDone(education: EducationEntry[]): boolean {
+  return education.length > 0 && education.every(isEduRowComplete);
+}
 
 // Auto-compute age from DOB. Returns null when DOB is empty or invalid.
 function ageFromDob(dob: string): number | null {
@@ -398,6 +423,9 @@ export default function NewEmployee() {
         phone: e.emergencyContact?.phone ?? '',
         altPhone: e.emergencyContact?.altPhone ?? '',
         address: e.emergencyContact?.address ?? '',
+        city: e.emergencyContact?.city ?? '',
+        state: e.emergencyContact?.state ?? '',
+        zip: e.emergencyContact?.zip ?? '',
       },
       payRate: e.payRate ? String(e.payRate) : '',
       payType: e.payType ?? 'hourly',
@@ -480,7 +508,7 @@ export default function NewEmployee() {
     const presentFilled = !!form.address.street.trim() && !!form.address.city.trim() && !!form.address.state.trim() && !!form.address.zip.trim();
     const permFilled = form.permanentSameAsPresent ? presentFilled
       : (!!form.permanentAddress.street.trim() && !!form.permanentAddress.city.trim() && !!form.permanentAddress.state.trim() && !!form.permanentAddress.zip.trim());
-    const educationDone = form.education.some(e => !!(e.level ?? '').trim() && !!(e.institution ?? '').trim() && !!String(e.passYear ?? '').trim() && Number(e.passYear) > 0);
+    const educationDone = isEducationSectionDone(form.education);
     return {
       [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality.trim() && !!form.preferredLanguage.trim(),
       [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim() && (isOnboarding ? !!form.linkedinUrl.trim() : true),
@@ -489,13 +517,13 @@ export default function NewEmployee() {
       [SECTION_IDS.employment]:   !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim(),
       [SECTION_IDS.immigration]:  /^\d{3}-\d{2}-\d{4}$/.test(form.ssn),
       [SECTION_IDS.education]:    educationDone,
-      [SECTION_IDS.emergency]:    !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && (isOnboarding ? !!form.emergencyContact.address.trim() : true),
+      [SECTION_IDS.emergency]:    !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && (isOnboarding ? (!!form.emergencyContact.address.trim() && !!form.emergencyContact.city.trim() && !!form.emergencyContact.state.trim() && !!form.emergencyContact.zip.trim()) : true),
       [SECTION_IDS.payroll]:      isOnboarding ? (!!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim()) : (parseNumberInput(form.payRate) ?? 0) > 0,
       [SECTION_IDS.review]:       isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
       ...(isOnboarding ? {
         [SECTION_IDS.identity]: REQUIRED_IDENTITY_TYPES.every(t => {
           const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
-          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
           const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
           const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
           return fileOrUploaded && (!row.hasExpiry || !!expiry);
@@ -504,7 +532,7 @@ export default function NewEmployee() {
           // Visa): fine to leave both blank, but entering an expiry date
           // without ever uploading the document is an inconsistent partial
           // state — don't let it count as complete.
-          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
           const fileOrUploaded = !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
           const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
           return !expiry || fileOrUploaded;
@@ -546,15 +574,15 @@ export default function NewEmployee() {
       // Bank details — required for ACH direct deposit
       { id: 'bank',        label: 'Bank details (name, account number, routing number)', section: SECTION_IDS.payroll, done: !!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim() },
       // Education (passYear must be > 0)
-      { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: form.education.some(e => (e.institution ?? '').trim() && (e.level ?? '').trim() && String(e.passYear ?? '').trim() && Number(e.passYear) > 0) },
+      { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: isEducationSectionDone(form.education) },
       // Emergency — address is now required
-      { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() },
+      { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() && !!form.emergencyContact.city.trim() && !!form.emergencyContact.state.trim() && !!form.emergencyContact.zip.trim() },
       // Required identity + hiring documents (SSN, Passport, I-94, Resume, Offer
       // Letter, I-9 Form) — all uploaded in the Identity & Documents section.
       // Also require expiry dates for docs that have hasExpiry (Passport, I-94).
       ...REQUIRED_IDENTITY_TYPES.flatMap(t => {
         const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
-        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
         const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
         const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
         const items: { id: string; label: string; section: string; done: boolean }[] = [{
@@ -590,7 +618,7 @@ export default function NewEmployee() {
       // inconsistency exists, so it doesn't affect the % for anyone who never
       // touches these fields.
       ...IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !(REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type)).flatMap(row => {
-        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
         const fileOrUploaded = !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
         const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
         if (!expiry || fileOrUploaded) return [];
@@ -640,6 +668,11 @@ export default function NewEmployee() {
     if (isOnboarding && !form.linkedinUrl.trim()) flag('linkedinUrl', 'LinkedIn URL is required', SECTION_IDS.contact);
 
     if (form.ssn && !/^\d{3}-\d{2}-\d{4}$/.test(form.ssn)) flag('ssn', 'Enter SSN in format XXX-XX-XXXX (e.g. 123-45-6789)', SECTION_IDS.immigration);
+
+    // A work-history end date before its start date is never valid, regardless of mode.
+    if (form.workHistory.some(w => w.fromDate && w.toDate && w.toDate < w.fromDate)) {
+      flag('workHistory', 'One or more work history entries has an end date before its start date', SECTION_IDS.workHistory);
+    }
 
     // Admin/HR create needs only first/last name + email (above). The full
     // profile is the EMPLOYEE's responsibility to complete during onboarding —
@@ -1218,9 +1251,8 @@ export default function NewEmployee() {
               <h1 className="text-base font-semibold text-gray-900 truncate leading-tight">Complete your profile</h1>
             </div>
           ) : (
-            <Link to={backTo} className="inline-flex items-center gap-1.5 min-w-0">
+            <Link to={backTo} className="inline-flex items-center gap-1.5 min-w-0" title="Back" aria-label="Back">
               <ArrowLeft className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              <span className="text-sm font-semibold text-gray-900 truncate">{pageTitle}</span>
             </Link>
           )}
         </div>
@@ -1421,17 +1453,23 @@ export default function NewEmployee() {
                     )}
                   </div>
                   <p className="text-[11px] font-medium text-gray-700 mt-2">{form.profilePhotoFile ? 'Change Photo' : 'Upload Photo'}</p>
-                  <p className="text-[10px] text-gray-400 mt-0.5">JPG / PNG, max 2 MB</p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">JPEG / PNG / WebP, max 2 MB</p>
                 </label>
                 <input
                   id="profile-photo"
                   type="file"
-                  accept="image/png,image/jpeg"
+                  accept="image/png,image/jpeg,image/webp"
                   className="hidden"
                   onChange={e => {
                     const file = e.target.files?.[0] ?? null;
+                    if (file && !['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+                      toast.error('Please upload a JPEG, PNG, or WebP image.');
+                      e.target.value = '';
+                      return;
+                    }
                     if (file && file.size > 2 * 1024 * 1024) {
                       toast.error('Photo is larger than 2 MB — please pick a smaller image.');
+                      e.target.value = '';
                       return;
                     }
                     handleProfilePhotoChange(file);
@@ -1507,18 +1545,28 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Nationality {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.nationality} onChange={e => set('nationality', e.target.value)} placeholder="e.g. American, Indian, British" onBlur={() => { if (isOnboarding && !form.nationality.trim()) setErrors(p => ({ ...p, nationality: 'Nationality is required' })); }} />
+                <Select value={form.nationality} onValueChange={v => { set('nationality', v); setErrors(p => ({ ...p, nationality: '' })); }}>
+                  <SelectTrigger><SelectValue placeholder="Select nationality" /></SelectTrigger>
+                  <SelectContent className="max-h-[280px]">
+                    {NATIONALITIES.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <FieldError msg={errors.nationality} />
               </div>
               <div>
                 <Label>Preferred Language {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.preferredLanguage} onChange={e => set('preferredLanguage', e.target.value)} placeholder="English" onBlur={() => { if (isOnboarding && !form.preferredLanguage.trim()) setErrors(p => ({ ...p, preferredLanguage: 'Preferred language is required' })); }} />
+                <Select value={form.preferredLanguage} onValueChange={v => { set('preferredLanguage', v); setErrors(p => ({ ...p, preferredLanguage: '' })); }}>
+                  <SelectTrigger><SelectValue placeholder="Select language" /></SelectTrigger>
+                  <SelectContent className="max-h-[280px]">
+                    {LANGUAGES.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                  </SelectContent>
+                </Select>
                 <FieldError msg={errors.preferredLanguage} />
               </div>
 
               <div className="sm:col-span-4">
                 <Label>Languages Known</Label>
-                <Input value={form.languagesKnown} onChange={e => set('languagesKnown', e.target.value)} placeholder="English, Spanish, Mandarin…" />
+                <LanguagesMultiSelect value={form.languagesKnown} onChange={v => set('languagesKnown', v)} />
               </div>
             </div>
           </SectionCard>
@@ -1551,12 +1599,12 @@ export default function NewEmployee() {
 
               <div>
                 <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="+1 (555) 123-4567" onBlur={() => { if (!form.phone.trim()) setErrors(p => ({ ...p, phone: 'Phone number is required' })); }} />
+                <Input value={form.phone} onChange={e => set('phone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 123-4567" onBlur={() => { if (!form.phone.trim()) setErrors(p => ({ ...p, phone: 'Phone number is required' })); }} />
                 <FieldError msg={errors.phone} />
               </div>
               <div>
                 <Label>Alternate Phone</Label>
-                <Input value={form.altPhone} onChange={e => set('altPhone', e.target.value)} placeholder="+1 (555) 987-6543" />
+                <Input value={form.altPhone} onChange={e => set('altPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 987-6543" />
               </div>
 
               <div>
@@ -1609,12 +1657,17 @@ export default function NewEmployee() {
               </div>
               <div className="sm:col-span-1">
                 <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.address.zip} onChange={e => setAddress('zip', e.target.value)} placeholder="94103" />
+                <Input value={form.address.zip} onChange={e => setAddress('zip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} placeholder="94103" />
                 <FieldError msg={errors.addressZip} />
               </div>
               <div className="sm:col-span-6">
                 <Label>Country</Label>
-                <Input value={form.address.country} onChange={e => setAddress('country', e.target.value)} placeholder="US" />
+                <Select value={form.address.country} onValueChange={v => setAddress('country', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+                  <SelectContent className="max-h-[280px]">
+                    {COUNTRIES.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </SectionCard>
@@ -1658,11 +1711,16 @@ export default function NewEmployee() {
                 </div>
                 <div className="sm:col-span-1">
                   <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
-                  <Input value={form.permanentAddress.zip} onChange={e => setPermanentAddress('zip', e.target.value)} />
+                  <Input value={form.permanentAddress.zip} onChange={e => setPermanentAddress('zip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} />
                 </div>
                 <div className="sm:col-span-6">
                   <Label>Country</Label>
-                  <Input value={form.permanentAddress.country} onChange={e => setPermanentAddress('country', e.target.value)} />
+                  <Select value={form.permanentAddress.country} onValueChange={v => setPermanentAddress('country', v)}>
+                    <SelectTrigger><SelectValue placeholder="Select country" /></SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      {COUNTRIES.map(c => <SelectItem key={c.code} value={c.code}>{c.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             )}
@@ -1823,8 +1881,10 @@ export default function NewEmployee() {
                 const doc = getIdentityDoc(row.type);
                 const inputId = `id-doc-file-${row.type}`;
                 const isRequired = (REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type);
-                const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => d.type === row.label));
+                const existingDoc = existingEmployee?.documents?.find((d: any) => docMatchesRow(d, row));
+                const isAlreadyUploaded = !!existingDoc;
                 const fileOrUploaded = !!(file || isAlreadyUploaded);
+                const displayFileName = file?.name ?? (!file ? existingDoc?.name : undefined);
                 const expiryVal = (doc.expiry ?? '').trim();
                 const missingExpiry = isOnboarding && isRequired && row.hasExpiry && fileOrUploaded && !expiryVal;
                 // An expiry date entered with no file ever uploaded is an
@@ -1904,6 +1964,9 @@ export default function NewEmployee() {
                         </>
                       )}
                     </div>
+                    {fileOrUploaded && displayFileName && (
+                      <p className="text-[11px] text-gray-500 truncate" title={displayFileName}>{displayFileName}</p>
+                    )}
                   </div>
                 );
               })}
@@ -1948,8 +2011,17 @@ export default function NewEmployee() {
                       <Input value={row.passYear ?? ''} onChange={e => updateEducation(idx, 'passYear', e.target.value)} placeholder="e.g. 2024" />
                     </div>
                     <div>
-                      <Label className="text-[11px]">GPA / Grade</Label>
-                      <Input value={row.gradeOrGPA ?? ''} onChange={e => updateEducation(idx, 'gradeOrGPA', e.target.value)} placeholder="e.g. 3.8" />
+                      <Label className="text-[11px]">GPA / Grade (0.0–4.0)</Label>
+                      <Input
+                        type="number" min={0} max={4} step={0.01}
+                        value={row.gradeOrGPA ?? ''}
+                        onChange={e => {
+                          const v = e.target.value;
+                          if (v !== '' && (Number(v) < 0 || Number(v) > 4)) return;
+                          updateEducation(idx, 'gradeOrGPA', v);
+                        }}
+                        placeholder="e.g. 3.8"
+                      />
                     </div>
                     <div>
                       <Label className="text-[11px]">Mode</Label>
@@ -1997,12 +2069,19 @@ export default function NewEmployee() {
                       <Input value={row.jobTitle ?? ''} onChange={e => updateWorkHistory(idx, 'jobTitle', e.target.value)} />
                     </div>
                     <div>
-                      <Label className="text-[11px]">From</Label>
+                      <Label className="text-[11px]">Start Date</Label>
                       <UsDateInput value={row.fromDate ?? ''} onChange={iso => updateWorkHistory(idx, 'fromDate', iso)} />
                     </div>
                     <div>
-                      <Label className="text-[11px]">To</Label>
-                      <UsDateInput value={row.toDate ?? ''} onChange={iso => updateWorkHistory(idx, 'toDate', iso)} />
+                      <Label className="text-[11px]">End Date</Label>
+                      <UsDateInput
+                        value={row.toDate ?? ''}
+                        onChange={iso => updateWorkHistory(idx, 'toDate', iso)}
+                        className={row.fromDate && row.toDate && row.toDate < row.fromDate ? 'border-red-400' : ''}
+                      />
+                      {row.fromDate && row.toDate && row.toDate < row.fromDate && (
+                        <p className="text-[11px] text-red-500 mt-0.5">End date can't be before the start date</p>
+                      )}
                     </div>
                     <div className="sm:col-span-3">
                       <Label className="text-[11px]">Reason for Leaving</Label>
@@ -2085,16 +2164,33 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.emergencyContact.phone} onChange={e => setEmergency('phone', e.target.value)} placeholder="+1 (555) 123-4567" />
+                <Input value={form.emergencyContact.phone} onChange={e => setEmergency('phone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 123-4567" />
                 <FieldError msg={errors.emergencyPhone} />
               </div>
               <div>
                 <Label>Alternate Phone</Label>
-                <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', e.target.value)} />
+                <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 987-6543" />
               </div>
-              <div className="sm:col-span-2">
-                <Label>Address {isOnboarding && <RequiredMark />}</Label>
+              <div>
+                <Label>Address Line 1 {isOnboarding && <RequiredMark />}</Label>
                 <Input value={form.emergencyContact.address} onChange={e => setEmergency('address', e.target.value)} />
+              </div>
+              <div>
+                <Label>City {isOnboarding && <RequiredMark />}</Label>
+                <Input value={form.emergencyContact.city} onChange={e => setEmergency('city', e.target.value)} />
+              </div>
+              <div>
+                <Label>State {isOnboarding && <RequiredMark />}</Label>
+                <Select value={form.emergencyContact.state} onValueChange={v => setEmergency('state', v)}>
+                  <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                  <SelectContent className="max-h-[280px]">
+                    {US_STATES.map(s => <SelectItem key={s.code} value={s.code}>{s.code} — {s.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
+                <Input value={form.emergencyContact.zip} onChange={e => setEmergency('zip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} placeholder="94103" />
               </div>
             </div>
           </SectionCard>
@@ -2226,6 +2322,13 @@ export default function NewEmployee() {
               </div>
             </div>
           </SectionCard>
+
+          {/* Bottom submit bar — the sticky top navbar already carries the same
+              actions, but a long 12-section form needs an explicit end-of-form
+              submit too so it's never ambiguous that there's more to do. */}
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-gray-200">
+            {actionButtons}
+          </div>
         </div>
 
       </div>

@@ -27,6 +27,13 @@
   box-sizing: border-box;
 }
 
+/* Edge/IE inject their own native password-reveal control, which sits right on
+   top of our custom Eye/EyeOff toggle button and looks like a duplicate icon. */
+.portal-scope input[type="password"]::-ms-reveal,
+.portal-scope input[type="password"]::-ms-clear {
+  display: none;
+}
+
 /* Visible scrollbar affordance for tables that overflow horizontally on mobile */
 .portal-scope .portal-scroll-x::-webkit-scrollbar {
   height: 8px;

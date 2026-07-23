@@ -81,6 +81,9 @@ function mapEmployee(raw: any): Employee {
           phone: raw.emergency_contact_phone ?? '',
           altPhone: raw.emergency_contact_alt_phone ?? '',
           address: raw.emergency_contact_address ?? '',
+          city: raw.emergency_contact_city ?? '',
+          state: raw.emergency_contact_state ?? '',
+          zip: raw.emergency_contact_zip ?? '',
         }
       : undefined,
     education: Array.isArray(raw.education) ? raw.education : [],

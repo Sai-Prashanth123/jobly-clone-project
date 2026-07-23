@@ -192,6 +192,9 @@ export interface EmergencyContact {
   phone?: string;
   altPhone?: string;
   address?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
 }
 
 // US-issued identity documents (driver's license, passport, EAD, etc.).

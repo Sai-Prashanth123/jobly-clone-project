@@ -18,7 +18,7 @@ export const DOCUMENT_TYPES: string[] = [
   'I-9 Form',
   'W-4',
   'W-9',
-  'Social Security Number',
+  'Social Security Card',
   "Driver's License",
   'State-Issued ID',
   'Passport',
@@ -48,7 +48,7 @@ export interface IdentityDocRow {
 }
 
 export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
-  { type: 'ssn',            label: 'Social Security Number',     placeholder: 'XXX-XX-XXXX',
+  { type: 'ssn',            label: 'Social Security Card',       placeholder: 'XXX-XX-XXXX',
     hint: 'Full SSN. Stored securely; only the last 4 are shown after save.' },
   { type: 'driver_license', label: "Driver's License",           placeholder: 'D1234567',
     hint: 'Primary photo ID for I-9 List B.', hasState: true },
@@ -86,3 +86,16 @@ export const REQUIRED_IDENTITY_TYPES = ['ssn', 'passport', 'i94', 'resume', 'off
 // Documents page's type dropdown so the same document can't be uploaded via
 // two different places.
 export const IDENTITY_OWNED_DOC_LABELS = new Set(IDENTITY_DOC_ROWS.map(r => r.label));
+
+// Documents already uploaded under a row's PREVIOUS label — keeps them
+// recognized as "on file" after a label rename, without needing to rewrite
+// historical rows in the documents table.
+const LEGACY_LABEL_ALIASES: Record<string, string[]> = {
+  'Social Security Card': ['Social Security Number'],
+};
+
+/** Does an uploaded document (by its stored `type`) belong to this identity row? */
+export function docMatchesRow(doc: { type?: string }, row: { label: string }): boolean {
+  if (doc.type === row.label) return true;
+  return (LEGACY_LABEL_ALIASES[row.label] ?? []).includes(doc.type ?? '');
+}

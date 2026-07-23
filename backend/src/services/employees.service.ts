@@ -365,6 +365,9 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
         emergency_contact_phone:        input.emergencyContact?.phone ?? null,
         emergency_contact_alt_phone:    input.emergencyContact?.altPhone ?? null,
         emergency_contact_address:      input.emergencyContact?.address ?? null,
+        emergency_contact_city:         input.emergencyContact?.city ?? null,
+        emergency_contact_state:        input.emergencyContact?.state ?? null,
+        emergency_contact_zip:          input.emergencyContact?.zip ?? null,
         education:                 input.education ?? [],
         work_history:              input.workHistory ?? [],
         total_experience_years:    input.totalExperienceYears ?? null,
@@ -626,6 +629,9 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     patch.emergency_contact_phone        = input.emergencyContact?.phone ?? null;
     patch.emergency_contact_alt_phone    = input.emergencyContact?.altPhone ?? null;
     patch.emergency_contact_address      = input.emergencyContact?.address ?? null;
+    patch.emergency_contact_city         = input.emergencyContact?.city ?? null;
+    patch.emergency_contact_state        = input.emergencyContact?.state ?? null;
+    patch.emergency_contact_zip          = input.emergencyContact?.zip ?? null;
   }
   if (input.education !== undefined)            patch.education             = input.education;
   if (input.workHistory !== undefined)          patch.work_history          = input.workHistory;
@@ -1135,6 +1141,9 @@ async function purgeEmployeeData(empId: string, currentEmail: string | null): Pr
       emergency_contact_phone: null,
       emergency_contact_alt_phone: null,
       emergency_contact_address: null,
+      emergency_contact_city: null,
+      emergency_contact_state: null,
+      emergency_contact_zip: null,
       profile_photo_url: null,
       ssn: null,
       bank_name: null,

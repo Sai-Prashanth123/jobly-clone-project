@@ -21,9 +21,13 @@ export const COMPLIANCE_REQUIRED_DOC_TYPES = [
 export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
   'Offer Letter',
-  'Social Security Number',
+  'Social Security Card',
   'I-9 Form',
 ] as const;
+
+const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
+  'Social Security Card': ['Social Security Number'],
+};
 
 export interface OnboardingItem {
   id: string;
@@ -91,19 +95,25 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
       done: education.some(e => nonEmpty(e?.institution) && nonEmpty(e?.level) && (nonEmpty(e?.passYear) || numPositive(e?.passYear))),
     },
 
-    // Emergency contact (address now required)
+    // Emergency contact (full address now required)
     {
       id: 'emergency',          label: 'Emergency contact (name, relationship, phone, address)',
       done: nonEmpty(emp.emergency_contact_name)
         && nonEmpty(emp.emergency_contact_relationship)
         && nonEmpty(emp.emergency_contact_phone)
-        && nonEmpty(emp.emergency_contact_address),
+        && nonEmpty(emp.emergency_contact_address)
+        && nonEmpty(emp.emergency_contact_city)
+        && nonEmpty(emp.emergency_contact_state)
+        && nonEmpty(emp.emergency_contact_zip),
     },
 
     ...ONBOARDING_REQUIRED_DOCS.map(t => ({
       id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
       label: `${t} (upload required)`,
-      done: docTypes.has(t),
+      // Also accept a doc's previous type string, so records uploaded before
+      // a required-doc label was renamed (e.g. "Social Security Number" ->
+      // "Social Security Card") still count as satisfied.
+      done: docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias)),
     })),
   ];
 
