@@ -9,10 +9,10 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
   } catch (err) { next(err); }
 }
 
-export async function unreadCount(req: Request, res: Response, next: NextFunction): Promise<void> {
+export async function counts(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const count = await svc.getUnreadCount(req.user!.id, req.user!.role);
-    res.json({ success: true, data: { count } });
+    const data = await svc.getNotificationCounts(req.user!.id, req.user!.role);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 }
 

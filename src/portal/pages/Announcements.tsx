@@ -72,6 +72,7 @@ const EMPTY_FORM: FormState = {
 export default function Announcements() {
   const { user } = useAuth();
   const canManage = user?.role === 'admin' || user?.role === 'hr';
+  const todayIso = new Date().toISOString().slice(0, 10);
 
   const [typeFilter, setTypeFilter] = useState<AnnouncementType | 'all'>('all');
   const [page, setPage] = useState(1);
@@ -324,6 +325,7 @@ export default function Announcements() {
                 <UsDateInput
                   value={form.expiresAt}
                   onChange={iso => setForm(f => ({ ...f, expiresAt: iso }))}
+                  min={todayIso}
                 />
               </div>
             </div>

@@ -24,7 +24,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmployee } from '../../hooks/useEmployees';
-import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../../hooks/useNotifications';
+import { useNotifications, useNotificationCounts, useMarkNotificationRead, useMarkAllNotificationsRead } from '../../hooks/useNotifications';
 import { useNavBadges } from '../../hooks/useNavBadges';
 import { ChangePasswordDialog } from '../auth/ChangePasswordDialog';
 import { PortalBrandMark, ROLE_GRADIENTS } from './PortalBrandMark';
@@ -45,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   // ── Core features ─────────────────────────────────────────────────────────
   { label: 'Dashboard',           path: '/portal/dashboard',           icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee'], group: 'Core' },
   { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee'], badgeKey: 'announcements', group: 'Core' },
-  { label: 'People',              path: '/portal/people',              icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance','employee'], group: 'Core' },
+  { label: 'People',              path: '/portal/people',              icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance'], group: 'Core' },
   { label: 'Employees',           path: '/portal/employees',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'], group: 'Core' },
   { label: 'Add Employee',        path: '/portal/employees/new',       icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'], group: 'Core' },
   { label: 'Expiring Documents',  path: '/portal/expiring-documents',  icon: <FileWarning className="h-4 w-4" />,     roles: ['admin','hr'], badgeKey: 'expiringDocs', group: 'Core' },
@@ -120,6 +120,7 @@ export function PortalSidebar() {
   const bellRef = useRef<HTMLButtonElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const { data: notifications = [] } = useNotifications();
+  const { data: notifCounts } = useNotificationCounts();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
   // The logged-in user's own employee record (when they have one) drives the
@@ -127,7 +128,7 @@ export function PortalSidebar() {
   const { data: selfEmployee } = useEmployee(user?.employeeId);
   const selfPhotoUrl = selfEmployee?.profilePhotoUrl;
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = notifCounts?.unread ?? 0;
   const navBadges = useNavBadges(user?.role ?? '');
 
   const openNotif = () => {

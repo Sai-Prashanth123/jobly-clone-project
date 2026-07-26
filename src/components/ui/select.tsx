@@ -334,7 +334,15 @@ function SelectContent({ children, className }: SelectContentProps) {
       id={`${baseId}-listbox`}
       role="listbox"
       className={cn(
-        "fixed z-50 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md p-1",
+        // Explicit pointer-events-auto: this listbox is portaled straight to
+        // document.body as a DOM sibling of any Radix Dialog it's logically
+        // nested inside. Radix Dialog sets `body.style.pointerEvents = 'none'`
+        // while modal and only re-enables `auto` on its own DialogContent
+        // subtree — a plain CSS-inherited `none` on body would otherwise make
+        // this listbox fully unclickable (confirmed via live repro: it renders
+        // on top but every click silently passes through to whatever's behind
+        // it) while looking completely normal, so it must opt back in itself.
+        "fixed z-50 overflow-y-auto rounded-md border bg-popover text-popover-foreground shadow-md p-1 pointer-events-auto",
         className,
       )}
       style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}

@@ -300,7 +300,14 @@ export default function PortalApp() {
             />
 
             <Route path="announcements" element={<Announcements />} />
-            <Route path="people" element={<People />} />
+            <Route
+              path="people"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'finance']}>
+                  <People />
+                </ProtectedRoute>
+              }
+            />
 
             <Route path="expenses" element={<Expenses />} />
             <Route

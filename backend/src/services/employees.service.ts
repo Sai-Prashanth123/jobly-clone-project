@@ -1463,9 +1463,9 @@ export async function listDirectory(search?: string, department?: string) {
 
   if (search) {
     const s = sanitizeForPostgrestFilter(search);
-    q = q.or(`first_name.ilike.%${s}%,last_name.ilike.%${s}%,job_title.ilike.%${s}%,department.ilike.%${s}%`);
+    q = q.or(`first_name.ilike.%${s}%,last_name.ilike.%${s}%,job_title.ilike.%${s}%,department.ilike.%${s}%,work_email.ilike.%${s}%`);
   }
-  if (department) q = q.eq('department', department);
+  if (department) q = q.eq('department', department.trim());
 
   const { data, error } = await q;
   if (error) throw error;

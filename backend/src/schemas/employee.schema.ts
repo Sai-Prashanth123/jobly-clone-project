@@ -65,7 +65,7 @@ export const createEmployeeSchema = z.object({
     zip: z.string().optional().default(''),
     country: z.string().optional().default('US'),
   }).optional(),
-  department: z.string().optional().default(''),
+  department: z.string().optional().default('').transform(v => v.trim()),
   jobTitle: z.string().optional().default(''),
   employmentType: z.enum(['full_time','part_time','contract','w2','1099','c2c','vendor']).optional(),
   startDate: z.string().optional(),
@@ -122,7 +122,7 @@ export const updateEmployeeSchema = z.object({
     zip: z.string().optional().default(''),
     country: z.string().optional().default('US'),
   }).optional(),
-  department: z.string().optional(),
+  department: z.string().optional().transform(v => v?.trim()),
   jobTitle: z.string().optional(),
   employmentType: z.enum(['full_time','part_time','contract','w2','1099','c2c','vendor']).optional(),
   startDate: z.string().optional(),
@@ -188,7 +188,7 @@ export const terminateEmployeeSchema = z.object({
 
 export const listEmployeesQuerySchema = z.object({
   status: z.enum(['active','inactive','onboarding']).optional(),
-  department: z.string().optional(),
+  department: z.string().optional().transform(v => v?.trim()),
   search: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(1000).default(50),

@@ -26,14 +26,20 @@ export async function createNotification(
 // A notification "event" can exist as several per-recipient rows (a role
 // fan-out creates one per user). For the admin all-notifications view we collapse
 // those copies into one by this content key so admin doesn't see duplicates.
-function eventKey(n: { title: string; message: string; entity_type: string | null; entity_id: string | null }): string {
-  return [n.title, n.message, n.entity_type ?? '', n.entity_id ?? ''].join('|');
+// `type` is included so two distinct events that happen to share the same
+// title/message/entity (e.g. a re-triggered check reusing the same wording)
+// can never silently swap the type/link an admin sees displayed for the card.
+function eventKey(n: { title: string; message: string; entity_type: string | null; entity_id: string | null; type: string }): string {
+  return [n.title, n.message, n.entity_type ?? '', n.entity_id ?? '', n.type].join('|');
 }
 
 // Constrain an admin update to all rows that share a notification's content
 // (so marking one copy read marks the whole event read for the admin).
-function matchEvent(query: any, n: { title: string; message: string; entity_type: string | null; entity_id: string | null }) {
-  let q = query.eq('title', n.title).eq('message', n.message);
+// Scoped by `type` too, matching eventKey — otherwise marking one event read
+// could incorrectly also mark a different-typed event read purely because it
+// happens to share the same title/message/entity.
+function matchEvent(query: any, n: { title: string; message: string; entity_type: string | null; entity_id: string | null; type: string }) {
+  let q = query.eq('title', n.title).eq('message', n.message).eq('type', n.type);
   q = n.entity_type === null ? q.is('entity_type', null) : q.eq('entity_type', n.entity_type);
   q = n.entity_id === null ? q.is('entity_id', null) : q.eq('entity_id', n.entity_id);
   return q;
@@ -78,7 +84,7 @@ export async function listNotifications(userId: string, role?: string) {
 export async function markRead(notificationId: string, userId: string, role?: string) {
   if (role === 'admin') {
     const { data: n } = await supabaseAdmin
-      .from('notifications').select('title, message, entity_type, entity_id').eq('id', notificationId).maybeSingle();
+      .from('notifications').select('title, message, entity_type, entity_id, type').eq('id', notificationId).maybeSingle();
     if (!n) return;
     const { error } = await matchEvent(supabaseAdmin.from('notifications').update({ admin_read: true }), n);
     if (error) throw error;
@@ -109,31 +115,64 @@ export async function markAllRead(userId: string, role?: string) {
   if (error) throw error;
 }
 
-export async function getUnreadCount(userId: string, role?: string) {
+export interface NotificationCounts {
+  total: number;
+  unread: number;
+  read: number;
+  byType: { info: number; success: number; warning: number; error: number };
+}
+
+function emptyByType() {
+  return { info: 0, success: 0, warning: 0, error: 0 };
+}
+
+/**
+ * Accurate unread/read/total/by-type counts — deliberately NOT derived from
+ * listNotifications()'s capped, display-oriented result set (that list is
+ * capped at 50 rows for rendering; using its length for counts meant the
+ * unread badge got permanently stuck at 50 once a user crossed that many
+ * unread notifications, since marking one read just let another take its
+ * place in the capped window).
+ */
+export async function getNotificationCounts(userId: string, role?: string): Promise<NotificationCounts> {
   if (role === 'admin') {
-    // Count DISTINCT unread events (collapse fan-out copies). Mirror the exact
-    // fetch shape that listNotifications uses (recent rows, then filter in JS) so
-    // the badge always matches the list.
+    // Mirror listNotifications' event de-dup so the counts always match what
+    // the admin list actually shows (collapse fan-out copies by event key,
+    // keeping the most-recently-inserted row's type/read-state per event).
     const { data, error } = await supabaseAdmin
       .from('notifications')
-      .select('title, message, entity_type, entity_id, admin_read')
+      .select('title, message, entity_type, entity_id, type, admin_read')
       .order('created_at', { ascending: false })
       .limit(400);
     if (error) throw error;
-    const seen = new Set<string>();
+    const seen = new Map<string, { type: string; read: boolean }>();
     for (const n of data ?? []) {
-      if (!n.admin_read) seen.add(eventKey(n));
+      const key = eventKey(n);
+      if (seen.has(key)) continue;
+      seen.set(key, { type: n.type, read: !!n.admin_read });
     }
-    return seen.size;
+    const byType = emptyByType();
+    let unread = 0;
+    for (const { type, read } of seen.values()) {
+      if (type in byType) byType[type as keyof typeof byType]++;
+      if (!read) unread++;
+    }
+    return { total: seen.size, unread, read: seen.size - unread, byType };
   }
-  const { count, error } = await supabaseAdmin
-    .from('notifications')
-    .select('*', { count: 'exact', head: true })
-    .eq('user_id', userId)
-    .eq('read', false);
 
+  const { data, error } = await supabaseAdmin
+    .from('notifications')
+    .select('type, read')
+    .eq('user_id', userId);
   if (error) throw error;
-  return count ?? 0;
+  const rows = data ?? [];
+  const byType = emptyByType();
+  let unread = 0;
+  for (const n of rows) {
+    if (n.type in byType) byType[n.type as keyof typeof byType]++;
+    if (!n.read) unread++;
+  }
+  return { total: rows.length, unread, read: rows.length - unread, byType };
 }
 
 /** Find portal_users by role — used to notify groups (e.g. all finance users) */
@@ -184,10 +223,16 @@ export async function triggerTimesheetReminders(): Promise<{ sent: number }> {
     .select('id, employee_id, project_name, client_id, display_id')
     .eq('status', 'active');
 
+  // Only a genuinely submitted-or-later timesheet counts as "handled" — a
+  // 'draft' row is created the moment an employee opens the week, well before
+  // they actually submit, so counting drafts here wrongly excluded people who
+  // hadn't submitted yet (and let the "missing" set drift as others saved
+  // drafts between repeated clicks of this button).
   const { data: submittedThisWeek } = await supabaseAdmin
     .from('timesheets')
     .select('employee_id, assignment_id')
-    .eq('week_start_date', weekStart);
+    .eq('week_start_date', weekStart)
+    .neq('status', 'draft');
 
   const submittedSet = new Set(
     (submittedThisWeek ?? []).map(t => `${t.employee_id}:${t.assignment_id}`)
@@ -197,15 +242,30 @@ export async function triggerTimesheetReminders(): Promise<{ sent: number }> {
     a => !submittedSet.has(`${a.employee_id}:${a.id}`)
   );
 
+  // Idempotency guard — without this, clicking the button twice re-notified
+  // the exact same people with brand-new duplicate rows every time.
+  const missingIds = missing.map(a => a.id);
+  const { data: alreadyReminded } = missingIds.length > 0
+    ? await supabaseAdmin
+        .from('notifications')
+        .select('entity_id')
+        .eq('title', 'Timesheet Reminder')
+        .eq('entity_type', 'timesheet')
+        .in('entity_id', missingIds)
+        .gte('created_at', `${weekStart}T00:00:00.000Z`)
+    : { data: [] };
+  const remindedSet = new Set((alreadyReminded ?? []).map(r => r.entity_id));
+  const toRemind = missing.filter(a => !remindedSet.has(a.id));
+
   // Fetch client names
-  const clientIds = [...new Set(missing.map(a => a.client_id))];
+  const clientIds = [...new Set(toRemind.map(a => a.client_id))];
   const { data: clients } = clientIds.length > 0
     ? await supabaseAdmin.from('clients').select('id, company_name').in('id', clientIds)
     : { data: [] };
   const clientMap = new Map((clients ?? []).map(c => [c.id, c.company_name]));
 
   let sent = 0;
-  for (const assignment of missing) {
+  for (const assignment of toRemind) {
     const portalUserId = await getPortalUserByEmployeeId(assignment.employee_id);
     if (!portalUserId) continue;
     const clientName = clientMap.get(assignment.client_id) ?? 'your client';

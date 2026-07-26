@@ -43,12 +43,19 @@ export function useNotifications() {
   });
 }
 
-export function useUnreadNotificationCount() {
+export interface NotificationCounts {
+  total: number;
+  unread: number;
+  read: number;
+  byType: { info: number; success: number; warning: number; error: number };
+}
+
+export function useNotificationCounts() {
   return useQuery({
-    queryKey: ['notifications', 'unread-count'],
+    queryKey: ['notifications', 'counts'],
     queryFn: async () => {
-      const { data } = await apiClient.get('/notifications/unread-count');
-      return data.data.count as number;
+      const { data } = await apiClient.get('/notifications/counts');
+      return data.data as NotificationCounts;
     },
     refetchInterval: 120_000,
     staleTime: 115_000,

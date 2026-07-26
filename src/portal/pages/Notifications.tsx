@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
 import {
   useNotifications,
+  useNotificationCounts,
   useMarkNotificationRead,
   useMarkAllNotificationsRead,
   useTriggerTimesheetReminders,
@@ -88,6 +89,7 @@ export default function Notifications() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: notifications = [], isLoading, isError, refetch } = useNotifications();
+  const { data: counts } = useNotificationCounts();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
   const triggerReminders = useTriggerTimesheetReminders();
@@ -112,18 +114,18 @@ export default function Notifications() {
     return true;
   });
 
-  const unreadCount = notifications.filter(n => !n.read).length;
+  const unreadCount = counts?.unread ?? 0;
 
-  const readCount = notifications.filter(n => n.read).length;
+  const readCount = counts?.read ?? 0;
 
   const filters: { key: FilterType; label: string; count?: number }[] = [
-    { key: 'all',     label: 'All',     count: notifications.length },
+    { key: 'all',     label: 'All',     count: counts?.total ?? 0 },
     { key: 'unread',  label: 'Unread',  count: unreadCount },
     { key: 'read',    label: 'Read',    count: readCount },
-    { key: 'info',    label: 'Info',    count: notifications.filter(n => n.type === 'info').length },
-    { key: 'success', label: 'Success', count: notifications.filter(n => n.type === 'success').length },
-    { key: 'warning', label: 'Warning', count: notifications.filter(n => n.type === 'warning').length },
-    { key: 'error',   label: 'Alerts',  count: notifications.filter(n => n.type === 'error').length },
+    { key: 'info',    label: 'Info',    count: counts?.byType.info ?? 0 },
+    { key: 'success', label: 'Success', count: counts?.byType.success ?? 0 },
+    { key: 'warning', label: 'Warning', count: counts?.byType.warning ?? 0 },
+    { key: 'error',   label: 'Alerts',  count: counts?.byType.error ?? 0 },
   ];
 
   return (

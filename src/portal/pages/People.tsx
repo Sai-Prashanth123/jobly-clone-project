@@ -37,7 +37,7 @@ export default function People() {
 
   const { data: allEmployees = [], isLoading: allLoading } = useEmployeeDirectory();
   const departments = useMemo(
-    () => [...new Set(allEmployees.map(e => e.department).filter(Boolean) as string[])].sort(),
+    () => [...new Set(allEmployees.map(e => e.department?.trim()).filter(Boolean) as string[])].sort(),
     [allEmployees],
   );
 
@@ -58,9 +58,9 @@ export default function People() {
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            className="pl-9"
+            className="!pl-10"
             placeholder="Search by name, title, or email…"
             value={search}
             onChange={e => setSearch(e.target.value)}
