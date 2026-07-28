@@ -16,8 +16,22 @@ import { formatDate } from '../../lib/utils';
 import { useEmployees, useExpiringDocuments } from '../../hooks/useEmployees';
 import { AnnouncementsWidget } from '../../components/widgets/AnnouncementsWidget';
 import {
-  isActive, isOnboarding, isInactive, isVisaExpiringSoon, isI9Issue,
+  isActive, isOnboarding, isInactive, isVisaExpiringSoon, isI9Issue, daysUntilVisaExpiry,
 } from '../../lib/employeeSegments';
+
+function urgencyTier(daysRemaining: number): 'overdue' | 'red' | 'amber' | 'gray' {
+  if (daysRemaining <= 0) return 'overdue';
+  if (daysRemaining <= 14) return 'red';
+  if (daysRemaining <= 30) return 'amber';
+  return 'gray';
+}
+
+const URGENCY_CLASSES: Record<ReturnType<typeof urgencyTier>, string> = {
+  overdue: 'bg-red-600 text-white border-red-700',
+  red: 'bg-red-100 text-red-700 border-red-200',
+  amber: 'bg-amber-100 text-amber-700 border-amber-200',
+  gray: 'bg-gray-100 text-gray-600 border-gray-200',
+};
 
 const MONTH_LABELS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const DEPT_COLORS = ['#4069FF', '#32CDDC', '#10b981', '#f59e0b', '#7c3aed', '#ef4444', '#06b6d4', '#84cc16'];
@@ -277,14 +291,25 @@ export function HRDashboard() {
                   Visa / Work Authorization Expiring Soon
                 </p>
                 <ul className="space-y-1 mt-2">
-                  {expiringVisa.slice(0, 4).map(emp => (
-                    <li key={emp.id} className="min-w-0 text-xs">
-                      <p className="font-medium text-amber-900 truncate">{emp.firstName} {emp.lastName}</p>
-                      <p className="text-amber-700">
-                        {emp.visaType?.toUpperCase()} expires {formatDate(emp.visaExpiry)}
-                      </p>
-                    </li>
-                  ))}
+                  {expiringVisa.slice(0, 4).map(emp => {
+                    const daysRemaining = daysUntilVisaExpiry(emp) ?? 999;
+                    const tier = urgencyTier(daysRemaining);
+                    return (
+                      <li key={emp.id} className="flex items-center justify-between gap-2 min-w-0 text-xs">
+                        <div className="min-w-0">
+                          <p className="font-medium text-amber-900 truncate">{emp.firstName} {emp.lastName}</p>
+                          <p className="text-amber-700">
+                            {emp.visaType?.toUpperCase()} expires {formatDate(emp.visaExpiry)}
+                          </p>
+                        </div>
+                        {tier === 'overdue' && (
+                          <span className={`flex-shrink-0 text-[11px] px-2 py-0.5 rounded-full border font-semibold ${URGENCY_CLASSES.overdue}`}>
+                            {daysRemaining === 0 ? 'Expires today' : 'Overdue'}
+                          </span>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               </div>
             </div>
@@ -305,12 +330,8 @@ export function HRDashboard() {
         >
           <ul className="divide-y divide-gray-50">
             {expiringDocs.slice(0, 8).map(doc => {
-              const urgency = doc.daysRemaining <= 14 ? 'red' : doc.daysRemaining <= 30 ? 'amber' : 'gray';
-              const urgencyClasses = urgency === 'red'
-                ? 'bg-red-100 text-red-700 border-red-200'
-                : urgency === 'amber'
-                ? 'bg-amber-100 text-amber-700 border-amber-200'
-                : 'bg-gray-100 text-gray-600 border-gray-200';
+              const urgency = urgencyTier(doc.daysRemaining);
+              const urgencyClasses = URGENCY_CLASSES[urgency];
               return (
                 <li key={`${doc.displayId}-${doc.documentType}`} className="flex items-center justify-between gap-3 px-1 py-2.5">
                   <div className="flex items-center gap-3 min-w-0">
@@ -323,7 +344,7 @@ export function HRDashboard() {
                     </div>
                   </div>
                   <span className={`flex-shrink-0 text-[11px] px-2 py-0.5 rounded-full border font-medium ${urgencyClasses}`}>
-                    {doc.daysRemaining <= 0 ? 'Expired' : `${doc.daysRemaining}d`}
+                    {doc.daysRemaining === 0 ? 'Today' : doc.daysRemaining < 0 ? 'Overdue' : `${doc.daysRemaining}d`}
                   </span>
                 </li>
               );
@@ -353,7 +374,7 @@ export function HRDashboard() {
                   </div>
                   <div>
                     <p className="text-sm font-medium">{emp.firstName} {emp.lastName}</p>
-                    <p className="text-xs text-muted-foreground">{emp.jobTitle} • {emp.department}</p>
+                    <p className="text-xs text-muted-foreground">{emp.jobTitle || '—'} • {emp.department || '—'}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-right">
@@ -399,7 +420,7 @@ export function HRDashboard() {
                     </div>
                     <div>
                       <p className="text-sm font-medium">{emp.firstName} {emp.lastName}</p>
-                      <p className="text-xs text-muted-foreground">{emp.jobTitle} • {emp.department}</p>
+                      <p className="text-xs text-muted-foreground">{emp.jobTitle || '—'} • {emp.department || '—'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3 text-right">

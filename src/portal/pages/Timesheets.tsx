@@ -208,17 +208,29 @@ export default function Timesheets() {
   });
   const { data: employeesData } = useEmployees({ limit: 200 });
   const { data: clientsData } = useClients({ limit: 100 });
+  const { data: assignmentsData } = useAssignments({ limit: 200 });
   const createTimesheet = useCreateTimesheet();
 
   const timesheets = data?.data ?? [];
   const employees = employeesData?.data ?? [];
   const clients = clientsData?.data ?? [];
+  const assignments = assignmentsData?.data ?? [];
+
+  // Total Pay must be keyed off the ASSIGNMENT's pay rate, not the employee's —
+  // Assignment.payRate is mandatory/always positive, while Employee.payRate is
+  // optional and commonly left unset during self-service onboarding, which is
+  // why this column used to read blank for nearly every row.
+  const getAssignmentPay = (t: Timesheet): number | null => {
+    const asg = assignments.find(a => a.id === t.assignmentId);
+    if (!asg?.payRate) return null;
+    return asg.payRate * t.totalHours;
+  };
 
   const getEmpName = (id: string) => {
     const e = employees.find(emp => emp.id === id);
-    return e ? `${e.firstName} ${e.lastName}` : id.slice(0, 8);
+    return e ? `${e.firstName} ${e.lastName}` : 'Unknown employee';
   };
-  const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? id.slice(0, 8);
+  const getClientName = (id: string) => clients.find(c => c.id === id)?.companyName ?? 'Unknown client';
 
   const timesheetsWithLookup = useMemo(
     () => timesheets.map(t => ({
@@ -278,25 +290,21 @@ export default function Timesheets() {
       key: 'totalHours',
       header: 'Hours',
       hideOnMobile: true,
-      render: t => <span className="font-semibold">{t.totalHours}</span>,
+      render: t => t.totalHours === 0
+        ? <span className="text-muted-foreground text-xs italic">0 (empty)</span>
+        : <span className="font-semibold">{t.totalHours}</span>,
       getValue: t => String(t.totalHours),
     },
-    ...(user?.role === 'admin' || user?.role === 'hr' ? [{
+    ...(user?.role === 'admin' || user?.role === 'hr' || user?.role === 'finance' ? [{
       key: 'totalPay',
       header: 'Total Pay',
       hideOnMobile: true,
       render: (t: Timesheet) => {
-        const emp = employees.find(e => e.id === t.employeeId);
-        if (!emp?.payRate) return <span className="text-muted-foreground text-xs">—</span>;
-        if (emp.payType === 'salary') return <span className="text-muted-foreground text-xs">Salary</span>;
-        const pay = emp.payRate * t.totalHours;
+        const pay = getAssignmentPay(t);
+        if (pay === null) return <span className="text-muted-foreground text-xs">—</span>;
         return <span className="font-semibold text-emerald-700">${pay.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>;
       },
-      getValue: (t: Timesheet) => {
-        const emp = employees.find(e => e.id === t.employeeId);
-        if (!emp?.payRate || emp.payType === 'salary') return '0';
-        return String(emp.payRate * t.totalHours);
-      },
+      getValue: (t: Timesheet) => String(getAssignmentPay(t) ?? '0'),
     }] : []),
     {
       key: 'status',
@@ -422,7 +430,7 @@ export default function Timesheets() {
         />
       )}
 
-      {(user?.role === 'admin' || user?.role === 'hr') && timesheets.length > 0 && !isLoading && (
+      {(user?.role === 'admin' || user?.role === 'hr' || user?.role === 'finance') && timesheets.length > 0 && !isLoading && (
         <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1.5 px-3 py-2.5 rounded-lg bg-gray-50 border border-gray-200 text-sm">
           <span className="text-muted-foreground">
             <strong>{timesheets.reduce((s, t) => s + t.totalHours, 0).toFixed(1)}</strong> total hours
@@ -430,10 +438,7 @@ export default function Timesheets() {
           <span className="text-muted-foreground">
             Estimated pay (hourly):{' '}
             <strong className="text-emerald-700">
-              ${timesheets.reduce((s, t) => {
-                const emp = employees.find(e => e.id === t.employeeId);
-                return s + (emp?.payRate && emp.payType === 'hourly' ? emp.payRate * t.totalHours : 0);
-              }, 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              ${timesheets.reduce((s, t) => s + (getAssignmentPay(t) ?? 0), 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </strong>
           </span>
         </div>

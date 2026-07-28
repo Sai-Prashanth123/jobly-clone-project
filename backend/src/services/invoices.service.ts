@@ -474,7 +474,12 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   if (input.emailTemplateId !== undefined) updateData.email_template_id = input.emailTemplateId;
 
   if (input.invoiceNumber !== undefined && input.invoiceNumber !== inv.invoice_number) {
-    if (input.invoiceNumber) updateData.invoice_number = input.invoiceNumber;
+    if (input.invoiceNumber) {
+      if (inv.status !== 'draft') {
+        throw new ForbiddenError('The invoice number is locked once an invoice is sent, viewed, paid, or overdue.');
+      }
+      updateData.invoice_number = input.invoiceNumber;
+    }
   }
 
   // The discount type/value in effect for this update: explicit input wins,

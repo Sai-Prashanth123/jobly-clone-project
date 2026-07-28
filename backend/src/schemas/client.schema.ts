@@ -16,7 +16,7 @@ export const createClientSchema = z.object({
   contractStartDate: z.string().min(1),
   contractEndDate: z.string().optional().nullable().transform(v => v || null),
   netPaymentDays: z.number().int().min(0).default(30),
-  defaultBillRate: z.number().min(0).default(0),
+  defaultBillRate: z.number().positive('Bill rate must be greater than 0'),
   currency: z.string().default('USD'),
   billingType: z.enum(['hourly','monthly','milestone']).optional().nullable(),
   billingContactName: z.string().optional().nullable().transform(v => v || null),

@@ -32,8 +32,8 @@ export function ApprovedTimesheetsReport() {
       const asgn = assignments.find(a => a.id === t.assignmentId);
       return {
         ...t,
-        empName: emp ? `${emp.firstName} ${emp.lastName}` : t.employeeId.slice(0, 8),
-        clientName: client?.companyName ?? t.clientId.slice(0, 8),
+        empName: emp ? `${emp.firstName} ${emp.lastName}` : 'Unknown employee',
+        clientName: client?.companyName ?? 'Unknown client',
         projectName: asgn?.projectName ?? '—',
         billRate: asgn?.billRate ?? 0,
         amount: t.totalHours * (asgn?.billRate ?? 0),

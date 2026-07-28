@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isWeekBeforeJoiningUTC } from '../lib/dateUtils';
+import { isWeekBeforeJoiningUTC, isFutureWeekUTC } from '../lib/dateUtils';
 import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
@@ -282,9 +282,16 @@ export async function patchTimesheetStatus(
     throw new ForbiddenError(`Role '${userRole}' cannot set status to '${action}'`);
   }
 
+  // A week that hasn't started yet can be drafted ahead of time (see the
+  // comment in createTimesheet), but it can't actually be submitted or
+  // approved — you can't attest to or sign off on hours for days that
+  // haven't happened yet. Applies to every role, including admin.
+  if ((action === 'submitted' || action === 'manager_approved') && isFutureWeekUTC(ts.week_start_date)) {
+    throw new ValidationError(`This timesheet is for the week of ${ts.week_start_date}, which hasn't started yet — it can't be ${action === 'submitted' ? 'submitted' : 'approved'} until that week begins.`);
+  }
+
   // Submit-time gates (only checked when transitioning into `submitted`).
-  // Timesheets are active from the joining date → future, so there is no
-  // past/future week lockout here — only the content gates below:
+  // The future-week lockout is handled above; these are the content gates:
   //  - Zero-hour weeks require leave_reason.
   //  - Client-signed proof is OPTIONAL (can be attached before or after submit).
   //  - No hours on a day the employee is on approved leave.

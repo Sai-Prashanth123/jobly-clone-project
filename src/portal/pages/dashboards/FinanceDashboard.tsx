@@ -82,7 +82,9 @@ export function FinanceDashboard() {
 
   // Cash flow series — invoiced vs collected per month
   const cashFlow = useMemo(() => months.map(({ key, label }) => {
-    const issued = invoices.filter(inv => inv.issueDate?.startsWith(key));
+    // Exclude drafts — a draft hasn't actually been billed to the client yet,
+    // so counting it here made "Invoiced" diverge from the Revenue chart.
+    const issued = invoices.filter(inv => inv.status !== 'draft' && inv.issueDate?.startsWith(key));
     const invoiced = issued.reduce((s, inv) => s + inv.totalAmount, 0);
     const collected = invoices
       .filter(inv => inv.paidAt?.startsWith(key))

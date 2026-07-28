@@ -2,6 +2,14 @@ import { z } from 'zod';
 
 const ymdDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be a YYYY-MM-DD date');
 
+// Blank = auto-numbered by the service; otherwise must match the standard
+// INV/EST-YYYY-#### format so free-text numbers can't slip in going forward.
+const invoiceNumberField = z.string().trim().max(60)
+  .refine(v => v === '' || /^(INV|EST)-\d{4}-\d{4,}$/.test(v), {
+    message: 'Invoice number must be in the format INV-YYYY-#### (or EST-YYYY-#### for estimates), or left blank to auto-number.',
+  })
+  .optional();
+
 export const PAYMENT_TERMS = ['on_receipt', 'net_7', 'net_14', 'net_30', 'net_45', 'net_60', 'custom'] as const;
 export const INVOICE_STATUSES = ['draft', 'sent', 'viewed', 'partially_paid', 'paid', 'overdue'] as const;
 
@@ -41,7 +49,7 @@ export const createInvoiceSchema = z.object({
   clientId: z.string().uuid(),
   docType: z.enum(['invoice', 'estimate']).default('invoice'),
   // Optional custom number; blank → the service auto-allocates INV/EST-YYYY-####.
-  invoiceNumber: z.string().trim().max(60).optional(),
+  invoiceNumber: invoiceNumberField,
   poNumber: z.string().max(100).optional().nullable(),
   paymentTerms: z.enum(PAYMENT_TERMS).default('net_30'),
   issueDate: ymdDate,
@@ -68,7 +76,7 @@ export const updateInvoiceSchema = z.object({
   poNumber: z.string().optional().nullable(),
   taxRate: z.number().min(0).max(100).optional(),
   // Editable invoice number — service applies it on drafts only (locked once issued).
-  invoiceNumber: z.string().trim().max(60).optional(),
+  invoiceNumber: invoiceNumberField,
   invoiceTemplateId: z.string().uuid().optional().nullable(),
   emailTemplateId: z.string().uuid().optional().nullable(),
   ...discountFields,

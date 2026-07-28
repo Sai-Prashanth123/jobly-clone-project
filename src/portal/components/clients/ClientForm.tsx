@@ -83,7 +83,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
   const tabFields: Record<string, string[]> = {
     basic:    ['companyName', 'contactName', 'contactEmail'],
     contract: ['contractStartDate', 'contractEndDate'],
-    billing:  [],
+    billing:  ['defaultBillRate'],
     docs:     [],
   };
 
@@ -93,6 +93,7 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
     if (!form.contactName.trim())    errs.contactName    = 'Contact name is required';
     if (!form.contactEmail.trim())   errs.contactEmail   = 'Contact email is required';
     if (!form.contractStartDate)     errs.contractStartDate = 'Contract start date is required';
+    if (!isEdit && !(form.defaultBillRate > 0)) errs.defaultBillRate = 'Default bill rate must be greater than 0';
     if (form.contractEndDate && form.contractStartDate && form.contractEndDate < form.contractStartDate) {
       errs.contractEndDate = 'Contract end date must be on or after the start date';
     }
@@ -314,10 +315,11 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
               </Select>
             </div>
             <div className="space-y-2">
-              <Label>Default Bill Rate ($/hr)</Label>
+              <Label>Default Bill Rate ($/hr){!isEdit && ' *'}</Label>
               <Input type="number" min={0} step={0.01} inputMode="decimal" placeholder="0.00"
                 value={form.defaultBillRate || ''}
                 onChange={e => set('defaultBillRate', parseNumberInput(e.target.value) ?? 0)} />
+              {errors.defaultBillRate && <p className="text-xs text-red-500">{errors.defaultBillRate}</p>}
             </div>
             <div className="space-y-2">
               <Label>Currency</Label>
