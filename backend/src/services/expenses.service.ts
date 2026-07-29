@@ -6,6 +6,41 @@ import { NotFoundError, ForbiddenError } from '../lib/errors';
 import { bustNavBadgeCache } from './navBadges.service';
 import type { CreateExpenseInput, UpdateExpenseInput, ReviewExpenseInput, ListExpensesQuery } from '../schemas/expenses.schema';
 
+const RECEIPT_BUCKET = 'expense-receipts';
+
+// receipt_url holds either a legacy pasted external link (from the old
+// "Receipt URL" text field — starts with http(s)://, returned as-is) or an
+// internal storage path from an uploaded file (resolved to a fresh signed
+// URL on every read, same download-forcing pattern as documents).
+async function resolveReceiptUrl(row: any): Promise<any> {
+  if (!row?.receipt_url || /^https?:\/\//i.test(row.receipt_url)) return row;
+  const { data } = await supabaseAdmin.storage
+    .from(RECEIPT_BUCKET)
+    .createSignedUrl(row.receipt_url, 3600, { download: true });
+  return { ...row, receipt_url: data?.signedUrl ?? null };
+}
+
+export async function uploadReceipt(id: string, file: Express.Multer.File, actorId: string, actorRole: string, actorEmployeeId?: string | null) {
+  const expense = await getExpense(id, actorRole, actorEmployeeId);
+  const storagePath = `${id}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+
+  const { error: uploadError } = await supabaseAdmin
+    .storage
+    .from(RECEIPT_BUCKET)
+    .upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
+  if (uploadError) throw uploadError;
+
+  const { data, error } = await supabaseAdmin
+    .from('expense_reports')
+    .update({ receipt_url: storagePath })
+    .eq('id', id)
+    .select(SELECT)
+    .single();
+  if (error || !data) throw error ?? new Error('Update returned no data');
+  void logActivity(actorId, 'updated', 'expense_report', id, `Attached receipt to expense: ${expense.title}`);
+  return resolveReceiptUrl(data);
+}
+
 const SELECT = `
   id, display_id, employee_id, title, category, amount, currency,
   expense_date, notes, receipt_url, status, reviewed_by, reviewed_at,
@@ -34,7 +69,8 @@ export async function listExpenses(query: ListExpensesQuery, viewerRole: string,
 
   const { data, error, count } = await q;
   if (error) throw error;
-  return { data: data ?? [], total: count ?? 0 };
+  const resolved = await Promise.all((data ?? []).map(resolveReceiptUrl));
+  return { data: resolved, total: count ?? 0 };
 }
 
 export async function getExpense(id: string, actorRole?: string, actorEmployeeId?: string | null): Promise<any> {
@@ -48,7 +84,7 @@ export async function getExpense(id: string, actorRole?: string, actorEmployeeId
   if (actorRole === 'employee' && (data as any).employee_id !== actorEmployeeId) {
     throw new ForbiddenError('You can only view your own expenses');
   }
-  return data as any;
+  return resolveReceiptUrl(data);
 }
 
 export async function createExpense(input: CreateExpenseInput, employeeId: string, actorId: string) {
@@ -69,7 +105,7 @@ export async function createExpense(input: CreateExpenseInput, employeeId: strin
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
   void logActivity(actorId, 'created', 'expense_report', row.id, `Created expense: ${row.title}`);
-  return row;
+  return resolveReceiptUrl(row);
 }
 
 export async function updateExpense(id: string, input: UpdateExpenseInput, actorId: string, actorRole: string, actorEmployeeId?: string | null) {
@@ -96,7 +132,7 @@ export async function updateExpense(id: string, input: UpdateExpenseInput, actor
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
   void logActivity(actorId, 'updated', 'expense_report', id, `Updated expense: ${expense.title}`);
-  return data as any;
+  return resolveReceiptUrl(data);
 }
 
 export async function submitExpense(id: string, actorId: string, actorEmployeeId?: string | null) {

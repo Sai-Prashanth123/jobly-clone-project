@@ -21,7 +21,7 @@ const STATUS_CLASS: Record<string, string> = {
 
 export default function PerformanceReviews() {
   const navigate = useNavigate();
-  const { data, isLoading, isError, refetch } = usePerformanceReviews();
+  const { data, isLoading, isError, isFetching, refetch } = usePerformanceReviews();
   const { data: empData } = useEmployees({ limit: 500, status: 'active' });
   const createReview = useCreatePerformanceReview();
 
@@ -95,6 +95,7 @@ export default function PerformanceReviews() {
         description={isLoading ? 'Loading…' : `${rows.length} review${rows.length === 1 ? '' : 's'}`}
         action={<Button onClick={openCreate} className="gap-1.5"><Plus className="h-4 w-4" /> New Review</Button>}
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {isLoading ? (

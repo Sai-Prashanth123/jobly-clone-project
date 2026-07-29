@@ -84,7 +84,11 @@ export default function PerformanceReviewDetail() {
 
   const handleSave = async () => {
     if (!form) return;
-    if (form.periodStart && form.periodEnd && form.periodEnd < form.periodStart) {
+    if (!form.periodStart || !form.periodEnd) {
+      toast.error('Period Start and Period End are required');
+      return;
+    }
+    if (form.periodEnd < form.periodStart) {
       toast.error('Period End must be on or after Period Start');
       return;
     }
@@ -92,7 +96,9 @@ export default function PerformanceReviewDetail() {
       await updateReview.mutateAsync(form);
       toast.success('Draft saved');
     } catch {
-      toast.error('Could not save draft');
+      // The mutation cache's global onError already surfaces the real
+      // backend message (see queryClient.ts) — a second, generic toast here
+      // would just contradict it.
     }
   };
 

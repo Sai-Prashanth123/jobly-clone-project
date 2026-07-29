@@ -24,7 +24,7 @@ export default function EnrollmentForms() {
   const { user } = useAuth();
   const isStaff = user?.role === 'admin' || user?.role === 'hr';
 
-  const { data, isLoading, isError, refetch } = useEnrollmentForms();
+  const { data, isLoading, isError, isFetching, refetch } = useEnrollmentForms();
   const { data: empData } = useEmployees({ limit: 500, status: 'active' });
   const createForm = useCreateEnrollmentForm();
 
@@ -88,6 +88,7 @@ export default function EnrollmentForms() {
         description={isLoading ? 'Loading…' : `${rows.length} form${rows.length === 1 ? '' : 's'}`}
         action={isStaff ? <Button onClick={openCreate} className="gap-1.5"><Plus className="h-4 w-4" /> New</Button> : undefined}
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {isLoading ? (

@@ -41,7 +41,7 @@ export default function People() {
     [allEmployees],
   );
 
-  const { data: employees = [], isLoading, isError, refetch } = useEmployeeDirectory(
+  const { data: employees = [], isLoading, isError, isFetching, refetch } = useEmployeeDirectory(
     search || undefined,
     department !== 'all' ? department : undefined,
   );
@@ -53,6 +53,7 @@ export default function People() {
         title="People"
         description="Find and connect with your colleagues."
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {/* Filters */}

@@ -4,6 +4,12 @@ const CATEGORIES = ['travel','meals','accommodation','office_supplies','equipmen
 const STATUSES   = ['draft','submitted','approved','rejected','paid'] as const;
 
 export const createExpenseSchema = z.object({
+  // Only meaningful when an admin/hr/finance/operations user (none of whom
+  // are linked to an employee record — portal_users.employee_id is NULL
+  // for every non-employee role) creates an expense on someone else's
+  // behalf; an employee creating their own always falls back to their own
+  // employeeId in the controller.
+  employeeId:  z.string().uuid().optional(),
   title:       z.string().min(1).max(200),
   category:    z.enum(CATEGORIES),
   amount:      z.number().positive(),

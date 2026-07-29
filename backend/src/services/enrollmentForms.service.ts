@@ -116,6 +116,16 @@ export async function submitEnrollmentForm(id: string, input: SubmitEnrollmentFo
   }
 
   const formData = input.formData ?? existing.form_data;
+
+  const missing: string[] = [];
+  if (!formData?.sectionA?.firstName?.trim()) missing.push('First Name');
+  if (!formData?.sectionA?.lastName?.trim()) missing.push('Last Name');
+  if (!formData?.sectionI?.signatureName?.trim()) missing.push('Signature Name');
+  if (!formData?.sectionI?.signatureDate?.trim()) missing.push('Signature Date');
+  if (missing.length > 0) {
+    throw new ValidationError(`Please fill in before submitting: ${missing.join(', ')}`);
+  }
+
   const { data, error } = await supabaseAdmin
     .from('enrollment_forms')
     .update({

@@ -181,7 +181,7 @@ export function DataTable<T>({
 
   // CSV export
   const handleExport = useCallback(() => {
-    const exportCols = columns.filter(col => col.getValue || !col.hideOnMobile);
+    const exportCols = columns.filter(col => col.key !== 'actions' && (col.getValue || !col.hideOnMobile));
     const header = exportCols.map(c => escapeCsvCell(c.header)).join(',');
     const rows = sorted.map(item =>
       exportCols.map(col => {
@@ -276,8 +276,11 @@ export function DataTable<T>({
               >
                 <div className="space-y-2">
                   {selectable && (
+                    // toggleRow lives on this wrapper's onClick alone — the Checkbox's
+                    // own onCheckedChange would ALSO fire on the same click (event
+                    // bubbles through both), double-toggling and canceling itself out.
                     <div className="flex justify-end" onClick={e => { e.stopPropagation(); toggleRow(rowKey); }}>
-                      <Checkbox checked={isSelected} onCheckedChange={() => toggleRow(rowKey)} aria-label="Select row" />
+                      <Checkbox checked={isSelected} aria-label="Select row" />
                     </div>
                   )}
                   {labeledCols.map(col => (
@@ -352,7 +355,6 @@ export function DataTable<T>({
                       <TableCell className="w-10" onClick={e => { e.stopPropagation(); toggleRow(rowKey); }}>
                         <Checkbox
                           checked={isSelected}
-                          onCheckedChange={() => toggleRow(rowKey)}
                           aria-label="Select row"
                         />
                       </TableCell>

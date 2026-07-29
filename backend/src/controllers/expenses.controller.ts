@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/expenses.service';
+import { ValidationError } from '../lib/errors';
 import type { ListExpensesQuery, CreateExpenseInput, UpdateExpenseInput, ReviewExpenseInput } from '../schemas/expenses.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -22,9 +23,25 @@ export async function getOne(req: Request, res: Response, next: NextFunction): P
 
 export async function create(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const employeeId = req.body.employeeId ?? req.user!.employeeId;
+    const employeeId = (req.body as CreateExpenseInput).employeeId ?? req.user!.employeeId;
+    // admin/hr/finance/operations accounts have no linked employee record
+    // (portal_users.employee_id is NULL for every non-employee role) — for
+    // them, employeeId must come from the request body. Without this check
+    // a missing employeeId reached the DB as NULL and violated the
+    // expense_reports.employee_id NOT NULL/FK constraint as an opaque 500.
+    if (!employeeId) {
+      throw new ValidationError('Select which employee this expense is for.');
+    }
     const data = await svc.createExpense(req.body as CreateExpenseInput, employeeId, req.user!.id);
     res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function uploadReceipt(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (!req.file) { throw new ValidationError('No file uploaded.'); }
+    const data = await svc.uploadReceipt(req.params.id, req.file, req.user!.id, req.user!.role, req.user!.employeeId);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 }
 

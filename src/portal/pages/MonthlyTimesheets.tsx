@@ -35,7 +35,7 @@ export default function MonthlyTimesheets() {
   // happens to be in the most recent 200 records.
   const [year, setYear] = useState(CURRENT_YEAR);
   const [month, setMonth] = useState<number | 'all'>(CURRENT_MONTH);
-  const { data, isLoading, isError, refetch } = useMonthlyTimesheets({
+  const { data, isLoading, isError, isFetching, refetch } = useMonthlyTimesheets({
     ...(status !== 'all' ? { status } : {}),
     year,
     ...(month !== 'all' ? { month } : {}),
@@ -209,6 +209,7 @@ export default function MonthlyTimesheets() {
           </div>
         }
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {isLoading ? (

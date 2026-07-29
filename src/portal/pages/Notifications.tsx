@@ -88,7 +88,7 @@ function NotificationCard({ n, onRead, marking, onNavigate }: { n: Notification;
 export default function Notifications() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: notifications = [], isLoading, isError, refetch } = useNotifications();
+  const { data: notifications = [], isLoading, isError, isFetching, refetch } = useNotifications();
   const { data: counts } = useNotificationCounts();
   const markRead = useMarkNotificationRead();
   const markAllRead = useMarkAllNotificationsRead();
@@ -153,6 +153,7 @@ export default function Notifications() {
           </div>
         }
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {/* Admin trigger panel */}

@@ -77,7 +77,7 @@ export default function Announcements() {
   const [typeFilter, setTypeFilter] = useState<AnnouncementType | 'all'>('all');
   const [page, setPage] = useState(1);
 
-  const { data, isLoading, isError, refetch } = useAnnouncements({
+  const { data, isLoading, isError, isFetching, refetch } = useAnnouncements({
     type: typeFilter === 'all' ? undefined : typeFilter,
     page,
     limit: 20,
@@ -180,6 +180,7 @@ export default function Announcements() {
           ) : undefined
         }
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {/* Filter chips */}

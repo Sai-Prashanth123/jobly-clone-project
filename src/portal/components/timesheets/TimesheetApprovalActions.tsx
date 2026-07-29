@@ -77,9 +77,12 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading,
   const role = user.role;
 
   const isOwnerEmployee = role === 'employee' && user.employeeId === timesheet.employeeId;
-  const isAdminOnBehalf = role === 'admin' && user.employeeId !== timesheet.employeeId;
+  // Operations can edit hours on a draft/rejected timesheet just like admin
+  // (see Timesheets.tsx's isEditable() and the backend's own submit-role
+  // allowlist) — it must get the same submit control, not just admin.
+  const isAdminOnBehalf = (role === 'admin' || role === 'operations') && user.employeeId !== timesheet.employeeId;
 
-  if ((status === 'draft' || status === 'rejected') && (isOwnerEmployee || role === 'admin')) {
+  if ((status === 'draft' || status === 'rejected') && (isOwnerEmployee || role === 'admin' || role === 'operations')) {
     // A draft with a submittedAt already set was previously submitted and then
     // Reopened (Reopen clears the approval timestamps but not submittedAt) —
     // show "Resubmit" so it's clearly distinguished from a first-time submit,

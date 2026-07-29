@@ -8,16 +8,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogD
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { UsDateInput } from '../components/shared/UsDateInput';
-import { Loader2, Plus, Receipt, Send, Check, X, DollarSign, FileText, RefreshCw } from 'lucide-react';
+import { PageHeader } from '../components/shared/PageHeader';
+import { Loader2, Plus, Receipt, Send, Check, X, DollarSign, FileText } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../hooks/useAuth';
 import {
   useExpenses, useCreateExpense, useUpdateExpense, useSubmitExpense,
-  useReviewExpense, useMarkExpensePaid, useDeleteExpense,
+  useReviewExpense, useMarkExpensePaid, useDeleteExpense, useUploadExpenseReceipt,
   type Expense, type ExpenseCategory, type ExpenseStatus,
   EXPENSE_CATEGORY_LABELS,
 } from '../hooks/useExpenses';
-import { formatDate } from '../lib/utils';
+import { useEmployees } from '../hooks/useEmployees';
+import { formatDate, validateUploadFile } from '../lib/utils';
 
 const STATUS_COLORS: Record<ExpenseStatus, string> = {
   draft:     'bg-gray-100 text-gray-600 border-gray-200',
@@ -43,18 +45,18 @@ const STATUS_TABS: Array<{ key: ExpenseStatus | 'all'; label: string }> = [
 const CATEGORIES = Object.entries(EXPENSE_CATEGORY_LABELS) as [ExpenseCategory, string][];
 
 interface ExpenseFormData {
+  employeeId: string;
   title: string;
   category: ExpenseCategory;
   amount: string;
   currency: string;
   expenseDate: string;
   notes: string;
-  receiptUrl: string;
 }
 
 const EMPTY_FORM: ExpenseFormData = {
-  title: '', category: 'travel', amount: '', currency: 'USD',
-  expenseDate: new Date().toISOString().slice(0, 10), notes: '', receiptUrl: '',
+  employeeId: '', title: '', category: 'travel', amount: '', currency: 'USD',
+  expenseDate: new Date().toISOString().slice(0, 10), notes: '',
 };
 
 export default function Expenses() {
@@ -72,9 +74,18 @@ export default function Expenses() {
   const [reviewOpen, setReviewOpen] = useState<{ expense: Expense; action: 'approved' | 'rejected' } | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<Expense | null>(null);
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
 
-  const { data, isLoading, isError, refetch } = useExpenses({ status: statusFilter === 'all' ? undefined : statusFilter, limit: 50 });
+  const { data, isLoading, isError, isFetching, refetch } = useExpenses({ status: statusFilter === 'all' ? undefined : statusFilter, limit: 50 });
   const expenses = data?.data ?? [];
+
+  // Admin/hr/finance/operations accounts aren't linked to an employee record
+  // (portal_users.employee_id is NULL for every non-employee role) — they
+  // must explicitly pick who an expense is for; an employee just uses their
+  // own account implicitly.
+  const needsEmployeePicker = role !== 'employee';
+  const { data: employeesData } = useEmployees({ limit: 500, status: 'active' }, { enabled: needsEmployeePicker });
+  const employees = employeesData?.data ?? [];
 
   const createMut = useCreateExpense();
   const updateMut = useUpdateExpense();
@@ -82,20 +93,23 @@ export default function Expenses() {
   const reviewMut = useReviewExpense();
   const paidMut   = useMarkExpensePaid();
   const deleteMut = useDeleteExpense();
+  const receiptMut = useUploadExpenseReceipt();
 
   function openCreate() {
     setEditing(null);
     setForm(EMPTY_FORM);
+    setReceiptFile(null);
     setFormOpen(true);
   }
 
   function openEdit(e: Expense) {
     setEditing(e);
     setForm({
-      title: e.title, category: e.category, amount: String(e.amount),
+      employeeId: e.employeeId, title: e.title, category: e.category, amount: String(e.amount),
       currency: e.currency, expenseDate: e.expenseDate,
-      notes: e.notes ?? '', receiptUrl: e.receiptUrl ?? '',
+      notes: e.notes ?? '',
     });
+    setReceiptFile(null);
     setFormOpen(true);
   }
 
@@ -105,21 +119,32 @@ export default function Expenses() {
       toast.error('Title, date and a positive amount are required');
       return;
     }
+    if (needsEmployeePicker && !form.employeeId) {
+      toast.error('Select which employee this expense is for');
+      return;
+    }
     try {
+      let savedId = editing?.id;
       if (editing) {
         await updateMut.mutateAsync({
           id: editing.id, title: form.title, category: form.category,
           amount, currency: form.currency, expenseDate: form.expenseDate,
-          notes: form.notes || null, receiptUrl: form.receiptUrl || null,
+          notes: form.notes || null,
         });
         toast.success('Expense updated');
       } else {
-        await createMut.mutateAsync({
+        const created = await createMut.mutateAsync({
           title: form.title, category: form.category, amount,
           currency: form.currency, expenseDate: form.expenseDate,
-          notes: form.notes || null, receiptUrl: form.receiptUrl || null,
+          notes: form.notes || null,
+          employeeId: needsEmployeePicker ? form.employeeId : undefined,
         });
+        savedId = created.id;
         toast.success('Expense created');
+      }
+      if (receiptFile && savedId) {
+        try { await receiptMut.mutateAsync({ id: savedId, file: receiptFile }); }
+        catch { toast.error('Expense saved, but the receipt upload failed — try attaching it again from Edit.'); }
       }
       setFormOpen(false);
     } catch { /* handled centrally */ }
@@ -129,22 +154,19 @@ export default function Expenses() {
 
   return (
     <div className="space-y-4 sm:space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">Expense Reports</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Submit and track expense reimbursements</p>
-        </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
-          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-400 hover:text-gray-700" onClick={() => refetch()} title="Refresh">
-            <RefreshCw className="h-4 w-4" />
-          </Button>
-          {(role === 'employee' || role === 'admin' || role === 'hr' || role === 'finance') && (
+      <PageHeader
+        title="Expense Reports"
+        description="Submit and track expense reimbursements"
+        onRefresh={refetch}
+        isRefreshing={isFetching}
+        action={
+          (role === 'employee' || role === 'admin' || role === 'hr' || role === 'finance') ? (
             <Button onClick={openCreate} className="gap-2">
               <Plus className="h-4 w-4" /> New Expense
             </Button>
-          )}
-        </div>
-      </div>
+          ) : undefined
+        }
+      />
 
       {/* Status tabs */}
       <div className="flex gap-1 overflow-x-auto pb-1">
@@ -297,6 +319,19 @@ export default function Expenses() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {!editing && needsEmployeePicker && (
+              <div className="space-y-1.5">
+                <Label>Employee *</Label>
+                <Select value={form.employeeId} onValueChange={v => setForm(p => ({ ...p, employeeId: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                  <SelectContent>
+                    {employees.map(e => (
+                      <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="space-y-1.5">
               <Label htmlFor="exp-title">Title *</Label>
               <Input id="exp-title" value={form.title} onChange={e => setForm(p => ({ ...p, title: e.target.value }))}
@@ -334,10 +369,26 @@ export default function Expenses() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="exp-receipt">Receipt URL <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <Input id="exp-receipt" type="url" value={form.receiptUrl}
-                onChange={e => setForm(p => ({ ...p, receiptUrl: e.target.value }))}
-                placeholder="https://drive.google.com/..." />
+              <Label htmlFor="exp-receipt">Receipt <span className="text-muted-foreground font-normal">(optional)</span></Label>
+              <input
+                id="exp-receipt"
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (f) {
+                    const err = validateUploadFile(f);
+                    if (err) { toast.error(err); e.target.value = ''; return; }
+                  }
+                  setReceiptFile(f);
+                }}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent text-sm shadow-sm file:mr-3 file:h-full file:border-0 file:bg-gray-100 file:px-3 file:text-sm file:font-medium file:text-gray-700 cursor-pointer"
+              />
+              {editing?.receiptUrl && !receiptFile && (
+                <a href={editing.receiptUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-600 hover:underline">
+                  View current receipt
+                </a>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="exp-notes">Notes <span className="text-muted-foreground font-normal">(optional)</span></Label>

@@ -261,7 +261,17 @@ export default function ClientDetail() {
               {item.done
                 ? <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
                 : <Circle className="h-4 w-4 text-gray-300 flex-shrink-0" />}
-              <span className={`text-sm ${item.done ? 'text-gray-700' : 'text-gray-400'}`}>{item.label}</span>
+              {!item.done && isHrAdmin ? (
+                <button
+                  type="button"
+                  onClick={() => setEditOpen(true)}
+                  className="text-sm text-gray-400 hover:text-[#4069FF] hover:underline text-left"
+                >
+                  {item.label}
+                </button>
+              ) : (
+                <span className={`text-sm ${item.done ? 'text-gray-700' : 'text-gray-400'}`}>{item.label}</span>
+              )}
             </div>
           ))}
           <div className="pt-2 border-t mt-3">
@@ -277,13 +287,22 @@ export default function ClientDetail() {
             <div className="flex gap-2 pt-1 flex-wrap">
               {client.onboardingStatus === 'not_started' && (
                 <Button size="sm" variant="outline" loading={patchOnboarding.isPending}
-                  onClick={async () => { try { await patchOnboarding.mutateAsync('in_progress'); toast.success('Onboarding started'); } catch {} }}>
+                  onClick={async () => {
+                    // No local error toast — the mutation cache's global onError
+                    // already surfaces the backend's message (see queryClient.ts);
+                    // a second generic toast here would just contradict it.
+                    try { await patchOnboarding.mutateAsync('in_progress'); toast.success('Onboarding started'); }
+                    catch { /* handled centrally */ }
+                  }}>
                   Start Onboarding
                 </Button>
               )}
               <Button size="sm" variant="outline" className="text-emerald-700 border-emerald-200 hover:bg-emerald-50"
                 loading={patchOnboarding.isPending}
-                onClick={async () => { try { await patchOnboarding.mutateAsync('completed'); toast.success('Onboarding marked complete'); } catch {} }}>
+                onClick={async () => {
+                  try { await patchOnboarding.mutateAsync('completed'); toast.success('Onboarding marked complete'); }
+                  catch { /* handled centrally */ }
+                }}>
                 Mark Complete
               </Button>
             </div>

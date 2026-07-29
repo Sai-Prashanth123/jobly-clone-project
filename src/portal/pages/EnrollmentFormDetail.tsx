@@ -115,6 +115,25 @@ export default function EnrollmentFormDetail() {
     }
   };
 
+  const missingRequiredFields = (): string[] => {
+    if (!form) return [];
+    const missing: string[] = [];
+    if (!form.sectionA?.firstName?.trim()) missing.push('First Name');
+    if (!form.sectionA?.lastName?.trim()) missing.push('Last Name');
+    if (!form.sectionI?.signatureName?.trim()) missing.push('Signature Name');
+    if (!form.sectionI?.signatureDate?.trim()) missing.push('Signature Date');
+    return missing;
+  };
+
+  const openSubmitConfirm = () => {
+    const missing = missingRequiredFields();
+    if (missing.length > 0) {
+      toast.error(`Please fill in before submitting: ${missing.join(', ')}`);
+      return;
+    }
+    setSubmitOpen(true);
+  };
+
   const handleSubmit = async () => {
     if (!form) return;
     try {
@@ -156,13 +175,20 @@ export default function EnrollmentFormDetail() {
               {generatePdf.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Download PDF
             </Button>
             {canEdit && (
-              <Button size="sm" onClick={() => setSubmitOpen(true)} className="gap-1.5">
+              <Button size="sm" onClick={openSubmitConfirm} className="gap-1.5">
                 <CheckCircle2 className="h-4 w-4" /> Submit
               </Button>
             )}
           </div>
         }
       />
+
+      {!canEdit && enrollmentForm.status === 'pending' && (
+        <div className="flex items-start gap-2.5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+          <p>This form is read-only for you — only {enrollmentForm.employeeName ?? 'the assigned employee'} can fill it in and submit it.</p>
+        </div>
+      )}
 
       {/* Section A — Employee info */}
       <Card>
@@ -533,7 +559,7 @@ export default function EnrollmentFormDetail() {
           </Button>
         )}
         {canEdit && (
-          <Button size="sm" onClick={() => setSubmitOpen(true)} className="gap-1.5">
+          <Button size="sm" onClick={openSubmitConfirm} className="gap-1.5">
             <CheckCircle2 className="h-4 w-4" /> Submit
           </Button>
         )}

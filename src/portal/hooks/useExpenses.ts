@@ -169,6 +169,24 @@ export function useMarkExpensePaid() {
   });
 }
 
+export function useUploadExpenseReceipt() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, file }: { id: string; file: File }) => {
+      const fd = new FormData();
+      fd.append('file', file);
+      const { data } = await apiClient.post(`/expenses/${id}/receipt`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      return mapExpense(data.data);
+    },
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ['expenses'] });
+      qc.invalidateQueries({ queryKey: ['expenses', v.id] });
+    },
+  });
+}
+
 export function useDeleteExpense() {
   const qc = useQueryClient();
   return useMutation({

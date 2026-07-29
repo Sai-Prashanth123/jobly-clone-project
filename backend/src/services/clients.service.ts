@@ -1,5 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError, ConflictError } from '../lib/errors';
+import { NotFoundError, ConflictError, ValidationError } from '../lib/errors';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import type { CreateClientInput, UpdateClientInput, ListClientsQuery } from '../schemas/client.schema';
 
@@ -141,6 +141,36 @@ export async function updateClient(id: string, input: UpdateClientInput) {
 }
 
 export async function patchOnboardingStatus(id: string, status: string, actorId?: string) {
+  // Mirrors employees' completeOnboarding() gate — "Mark Complete" must
+  // actually require the same checklist shown to the user in the UI, not
+  // just flip a status flag.
+  if (status === 'completed') {
+    const { data: client, error: fetchError } = await supabaseAdmin
+      .from('clients')
+      .select('company_name, contact_email, contract_start_date, billing_type, billing_contact_email, tax_id')
+      .eq('id', id)
+      .is('deleted_at', null)
+      .single();
+    if (fetchError || !client) throw new NotFoundError('Client not found');
+
+    const { count: docCount } = await supabaseAdmin
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('entity_type', 'client')
+      .eq('entity_id', id);
+
+    const missing: string[] = [];
+    if (!client.company_name || !client.contact_email) missing.push('Basic info');
+    if (!client.contract_start_date) missing.push('Contract dates');
+    if (!client.billing_type) missing.push('Billing type');
+    if (!client.billing_contact_email) missing.push('Billing contact');
+    if (!client.tax_id) missing.push('Tax ID');
+    if (!docCount) missing.push('A document');
+    if (missing.length > 0) {
+      throw new ValidationError(`Onboarding isn't complete yet — still missing: ${missing.join(', ')}.`);
+    }
+  }
+
   const { data, error } = await supabaseAdmin
     .from('clients')
     .update({ onboarding_status: status })

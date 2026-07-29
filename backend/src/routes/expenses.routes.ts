@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
+import { documentUpload } from '../middleware/upload';
 import {
   createExpenseSchema,
   updateExpenseSchema,
@@ -17,6 +18,7 @@ router.get('/',    requireRole('admin','hr','finance','operations','employee'), 
 router.post('/',   requireRole('admin','hr','employee'),                        validateBody(createExpenseSchema),     ctrl.create);
 router.get('/:id', requireRole('admin','hr','finance','operations','employee'),                                        ctrl.getOne);
 router.put('/:id', requireRole('admin','hr','employee'),                        validateBody(updateExpenseSchema),     ctrl.update);
+router.post('/:id/receipt', requireRole('admin','hr','employee'),               documentUpload.single('file'),         ctrl.uploadReceipt);
 router.post('/:id/submit', requireRole('admin','hr','employee'),                                                       ctrl.submit);
 router.post('/:id/review', requireRole('admin','hr','finance'),                 validateBody(reviewExpenseSchema),     ctrl.review);
 router.post('/:id/paid',   requireRole('admin','finance'),                                                             ctrl.markPaid);

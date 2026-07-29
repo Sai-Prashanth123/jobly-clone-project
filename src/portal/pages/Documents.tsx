@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, useIsFetching } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -463,6 +463,10 @@ export default function Documents() {
   const isHr = user?.role === 'admin' || user?.role === 'hr';
   const queryClient = useQueryClient();
   const handleRefresh = () => queryClient.invalidateQueries({ queryKey: ['employees'] });
+  // The actual query lives in a child component (HrDocumentsView /
+  // EmployeeDocumentsView), so useIsFetching (which watches by key rather
+  // than needing local access to that query's own result) is the right tool.
+  const isRefreshing = useIsFetching({ queryKey: ['employees'] }) > 0;
 
   return (
     <div>
@@ -474,6 +478,7 @@ export default function Documents() {
             : 'Upload, view, or remove your own documents. Keep your resume, ID proof, and compliance paperwork up to date.'
         }
         onRefresh={handleRefresh}
+        isRefreshing={isRefreshing}
       />
       {isHr ? <HrDocumentsView /> : <EmployeeDocumentsView />}
     </div>

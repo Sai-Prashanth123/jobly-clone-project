@@ -16,7 +16,7 @@ import type { Invoice } from '../types';
 export default function Invoices() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data, isLoading, isError, refetch } = useInvoices({ limit: 100 });
+  const { data, isLoading, isError, isFetching, refetch } = useInvoices({ limit: 100 });
   const { data: clientsData } = useClients({ limit: 100 });
   const deleteInvoice = useDeleteInvoice();
   const bulkSend = useSendBulkInvoices();
@@ -114,21 +114,22 @@ export default function Invoices() {
         <div className="flex items-center justify-end gap-1">
           <Button
             variant="ghost"
-            size="sm"
-            className="h-8 gap-1 px-2 sm:px-3 text-muted-foreground hover:text-foreground"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground hover:text-foreground"
             onClick={(e) => { e.stopPropagation(); navigate(`/portal/invoices/${i.id}/edit`); }}
             aria-label="Edit invoice"
+            title="Edit"
           >
             <Pencil className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">Edit</span>
           </Button>
           {canDelete && i.status === 'draft' && (
             <Button
               variant="ghost"
-              size="sm"
-              className="h-8 w-8 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+              size="icon"
+              className="h-7 w-7 text-red-500 hover:text-red-700 hover:bg-red-50"
               onClick={(e) => { e.stopPropagation(); setDeleteTarget(i); }}
               aria-label="Delete invoice"
+              title="Delete"
             >
               <Trash2 className="h-3.5 w-3.5" />
             </Button>
@@ -150,6 +151,7 @@ export default function Invoices() {
           </Button>
         }
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {/* Status legend — answers "what does Draft mean?" without forcing the

@@ -30,7 +30,7 @@ function docTypeBadge(type: string) {
 export function ExpiringDocuments() {
   const navigate = useNavigate();
   const [days, setDays] = useState(90);
-  const { data: docs = [], isLoading, isError, refetch } = useExpiringDocuments(days);
+  const { data: docs = [], isLoading, isError, isFetching, refetch } = useExpiringDocuments(days);
   const requestDocuments = useRequestEmployeeDocuments();
   const [notifyTarget, setNotifyTarget] = useState<ExpiringDocEntry | null>(null);
   const [notifyMessage, setNotifyMessage] = useState('');
@@ -105,6 +105,7 @@ export function ExpiringDocuments() {
           </Select>
         }
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       {isLoading ? (

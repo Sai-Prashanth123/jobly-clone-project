@@ -65,7 +65,7 @@ export default function LeaveRequests() {
   const canApply = !!user?.employeeId;
 
   const [statusFilter, setStatusFilter] = useState<string>(isReviewer ? 'pending' : 'all');
-  const { data, isLoading, isError, refetch } = useLeaveRequests({
+  const { data, isLoading, isError, isFetching, refetch } = useLeaveRequests({
     status: statusFilter !== 'all' ? statusFilter : undefined,
     limit: 200,
   });
@@ -210,6 +210,7 @@ export default function LeaveRequests() {
           <Button onClick={() => setApplyOpen(true)} className="gap-2"><Plus className="h-4 w-4" /> Apply for Leave</Button>
         ) : undefined}
         onRefresh={refetch}
+        isRefreshing={isFetching}
       />
 
       <div className="mb-4 flex items-center gap-2">
