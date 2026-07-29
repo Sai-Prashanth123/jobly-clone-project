@@ -225,7 +225,7 @@ export function FinanceDashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <Panel
           eyebrow="Last 6 months"
-          title="Revenue"
+          title="Revenue (Collected)"
           icon={<TrendingUp className="text-emerald-500" />}
           action={{ label: 'Reports', to: '/portal/reports' }}
         >
@@ -234,7 +234,7 @@ export function FinanceDashboard() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#eef1f6" vertical={false} />
                 <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={v => `$${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
-                <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [formatCurrency(v), 'Revenue']} />
+                <Tooltip wrapperClassName="portal-recharts-tooltip" formatter={(v: number) => [formatCurrency(v), 'Collected']} />
                 <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={48} />
               </BarChart>
             </ResponsiveContainer>
