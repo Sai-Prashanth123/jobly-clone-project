@@ -79,8 +79,22 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
     downloadUrl: 'https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf' },
 ];
 
-// Identity doc types that are mandatory uploads during onboarding.
-export const REQUIRED_IDENTITY_TYPES = ['ssn', 'passport', 'i94', 'resume', 'offer_letter', 'i9_form'] as const;
+// Identity doc types mandatory for every employee during onboarding, regardless
+// of visa/citizenship status.
+export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'offer_letter', 'i9_form'] as const;
+
+// Passport and I-94 are only relevant to non-immigrant work-visa holders — an
+// I-94 is an arrival/departure record issued at US entry to visa entrants, and
+// many employees (US citizens, green card holders) legitimately have neither
+// document. These used to be unconditionally required for everyone, which
+// permanently blocked "Finish onboarding" for anyone who could never provide
+// them. Combine with REQUIRED_IDENTITY_TYPES via getRequiredIdentityTypes().
+const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
+
+export function getRequiredIdentityTypes(visaType?: string | null): string[] {
+  const conditional = visaType && VISA_TYPES_REQUIRING_PASSPORT_I94.has(visaType) ? ['passport', 'i94'] : [];
+  return [...REQUIRED_IDENTITY_TYPES, ...conditional];
+}
 
 // Labels from IDENTITY_DOC_ROWS — used to exclude these from the standalone
 // Documents page's type dropdown so the same document can't be uploaded via

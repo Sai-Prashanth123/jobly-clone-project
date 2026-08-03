@@ -25,6 +25,15 @@ export const ONBOARDING_REQUIRED_DOCS = [
   'I-9 Form',
 ] as const;
 
+// Passport and I-94 are only relevant to non-immigrant work-visa holders — an
+// I-94 is an arrival/departure record issued at US entry to visa entrants, and
+// many employees (US citizens, green card holders) legitimately have neither
+// document. Mirrors getRequiredIdentityTypes() in
+// src/portal/lib/documentTypes.ts on the frontend — keep the visa-type list
+// in sync between the two.
+const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
+const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'I-94'] as const;
+
 const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
 };
@@ -89,10 +98,12 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
       done: nonEmpty(emp.bank_name) && nonEmpty(emp.bank_account_number) && nonEmpty(emp.bank_routing_number),
     },
 
-    // Education
+    // Education — every entry must be complete, not just one (matches the
+    // frontend wizard's isEducationSectionDone(); a single incomplete row
+    // used to still count as "done" here, disagreeing with the wizard).
     {
-      id: 'education',          label: 'Education (at least one entry with institution, level, year)',
-      done: education.some(e => nonEmpty(e?.institution) && nonEmpty(e?.level) && (nonEmpty(e?.passYear) || numPositive(e?.passYear))),
+      id: 'education',          label: 'Education (every entry has institution, level, and year)',
+      done: education.length > 0 && education.every(e => nonEmpty(e?.institution) && nonEmpty(e?.level) && (nonEmpty(e?.passYear) || numPositive(e?.passYear))),
     },
 
     // Emergency contact (full address now required)
@@ -115,6 +126,14 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
       // "Social Security Card") still count as satisfied.
       done: docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias)),
     })),
+
+    // Passport + I-94 — only required for visa types that would actually hold
+    // them (see VISA_TYPES_REQUIRING_PASSPORT_I94 above).
+    ...(VISA_TYPES_REQUIRING_PASSPORT_I94.has(String(emp.visa_type ?? '')) ? VISA_CONDITIONAL_REQUIRED_DOCS.map(t => ({
+      id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+      label: `${t} (upload required)`,
+      done: docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias)),
+    })) : []),
   ];
 
   const done = checks.filter(c => c.done).length;

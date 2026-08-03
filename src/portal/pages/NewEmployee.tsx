@@ -25,7 +25,7 @@ import { US_STATES } from '../lib/usStates';
 import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
 import { LANGUAGES } from '../lib/languages';
-import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, REQUIRED_IDENTITY_TYPES, IDENTITY_OWNED_DOC_LABELS, docMatchesRow } from '../lib/documentTypes';
+import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, getRequiredIdentityTypes, IDENTITY_OWNED_DOC_LABELS, docMatchesRow } from '../lib/documentTypes';
 import { LanguagesMultiSelect } from '../components/shared/LanguagesMultiSelect';
 import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
 
@@ -500,6 +500,7 @@ export default function NewEmployee() {
     const permFilled = form.permanentSameAsPresent ? presentFilled
       : (!!form.permanentAddress.street.trim() && !!form.permanentAddress.city.trim() && !!form.permanentAddress.state.trim() && !!form.permanentAddress.zip.trim());
     const educationDone = isEducationSectionDone(form.education);
+    const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
     return {
       [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality.trim() && !!form.preferredLanguage.trim(),
       [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim() && (isOnboarding ? !!form.linkedinUrl.trim() : true),
@@ -512,13 +513,13 @@ export default function NewEmployee() {
       [SECTION_IDS.payroll]:      isOnboarding ? (!!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim()) : (parseNumberInput(form.payRate) ?? 0) > 0,
       [SECTION_IDS.review]:       isEditMode ? true : (form.declarationAccepted && !!form.signatureName.trim()),
       ...(isOnboarding ? {
-        [SECTION_IDS.identity]: REQUIRED_IDENTITY_TYPES.every(t => {
+        [SECTION_IDS.identity]: requiredIdentityTypes.every(t => {
           const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
           const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
           const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
           const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
           return fileOrUploaded && (!row.hasExpiry || !!expiry);
-        }) && IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !(REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type)).every(row => {
+        }) && IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !requiredIdentityTypes.includes(row.type)).every(row => {
           // Non-required docs (Green Card, EAD, OPT/STEM OPT card, I-983, US
           // Visa): fine to leave both blank, but entering an expiry date
           // without ever uploading the document is an inconsistent partial
@@ -545,6 +546,7 @@ export default function NewEmployee() {
           { id: 'doc_opt_card', label: 'OPT Card', section: SECTION_IDS.identity, done: uploadedDocTypes.has('OPT Card') },
         ]
       : [];
+    const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
     return [
       // Personal — photo is optional (not required by backend)
       { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
@@ -568,10 +570,10 @@ export default function NewEmployee() {
       { id: 'education',   label: 'Education',                      section: SECTION_IDS.education,     done: isEducationSectionDone(form.education) },
       // Emergency — address is now required
       { id: 'emergency',   label: 'Emergency contact',              section: SECTION_IDS.emergency,     done: !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && !!form.emergencyContact.address.trim() && !!form.emergencyContact.city.trim() && !!form.emergencyContact.state.trim() && !!form.emergencyContact.zip.trim() },
-      // Required identity + hiring documents (SSN, Passport, I-94, Resume, Offer
-      // Letter, I-9 Form) — all uploaded in the Identity & Documents section.
-      // Also require expiry dates for docs that have hasExpiry (Passport, I-94).
-      ...REQUIRED_IDENTITY_TYPES.flatMap(t => {
+      // Required identity + hiring documents — SSN, Resume, Offer Letter, and
+      // I-9 Form for everyone; Passport + I-94 (with expiry dates) only for
+      // visa types that would actually hold them (see getRequiredIdentityTypes).
+      ...requiredIdentityTypes.flatMap(t => {
         const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
         const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
         const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
@@ -601,14 +603,13 @@ export default function NewEmployee() {
       }),
       // OPT/STEM OPT holders additionally need OPT Card + I-983
       ...optDocs,
-      // Non-required docs (Green Card, EAD, OPT/STEM OPT card, I-983, US Visa):
-      // leaving both the file and expiry blank is fine, but entering an expiry
-      // date with no file ever uploaded is an inconsistent partial state that
-      // used to slip through unblocked since these types aren't in
-      // REQUIRED_IDENTITY_TYPES. Only appears in the checklist while that
-      // inconsistency exists, so it doesn't affect the % for anyone who never
-      // touches these fields.
-      ...IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !(REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type)).flatMap(row => {
+      // Non-required docs for THIS employee (e.g. Green Card, EAD, US Visa
+      // always; Passport/I-94 too if this employee's visa type doesn't need
+      // them): leaving both the file and expiry blank is fine, but entering an
+      // expiry date with no file ever uploaded is an inconsistent partial
+      // state. Only appears in the checklist while that inconsistency exists,
+      // so it doesn't affect the % for anyone who never touches these fields.
+      ...IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !requiredIdentityTypes.includes(row.type)).flatMap(row => {
         const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
         const fileOrUploaded = !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
         const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
@@ -1857,7 +1858,7 @@ export default function NewEmployee() {
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description="Upload your identity and hiring documents. SSN, Passport, I-94, Resume, Offer Letter, and I-9 Form are required during onboarding."
+            description={`Upload your identity and hiring documents. SSN, Resume, Offer Letter, and I-9 Form are required during onboarding${form.visaType && ['h1b', 'l1', 'opt', 'stem_opt', 'tn'].includes(form.visaType) ? ', along with Passport and I-94 for your visa type' : ''}.`}
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -1871,7 +1872,7 @@ export default function NewEmployee() {
                 const file = form.identityDocFiles[row.type];
                 const doc = getIdentityDoc(row.type);
                 const inputId = `id-doc-file-${row.type}`;
-                const isRequired = (REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type);
+                const isRequired = getRequiredIdentityTypes(form.visaType).includes(row.type);
                 const existingDoc = existingEmployee?.documents?.find((d: any) => docMatchesRow(d, row));
                 const isAlreadyUploaded = !!existingDoc;
                 const fileOrUploaded = !!(file || isAlreadyUploaded);
@@ -2146,6 +2147,11 @@ export default function NewEmployee() {
             description="Used only if HR can't reach the employee in an emergency."
             icon={<HeartHandshake className="h-4 w-4 text-[#4069FF]" />}
           >
+            {isOnboarding && !!form.emergencyContact.address.trim() && !form.emergencyContact.city.trim() && !form.emergencyContact.state.trim() && !form.emergencyContact.zip.trim() && (
+              <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                We added separate City, State, and ZIP fields below — please fill these in too to complete this section.
+              </div>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Contact Name {isOnboarding && <RequiredMark />}</Label>
