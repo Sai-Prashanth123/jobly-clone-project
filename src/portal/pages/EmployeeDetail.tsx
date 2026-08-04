@@ -431,7 +431,7 @@ export default function EmployeeDetail() {
       {employee.onboarding && (employee.status === 'onboarding' || !employee.onboarding.complete) && (
         <Card>
           <CardHeader><CardTitle className="text-base">Onboarding</CardTitle></CardHeader>
-          <CardContent><OnboardingChecklist onboarding={employee.onboarding} /></CardContent>
+          <CardContent><OnboardingChecklist onboarding={employee.onboarding} employee={employee} /></CardContent>
         </Card>
       )}
 
