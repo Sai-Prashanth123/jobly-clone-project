@@ -263,7 +263,7 @@ export default function Login() {
           <DialogHeader>
             <DialogTitle style={{ color: TEXT }}>Reset your password</DialogTitle>
             <DialogDescription>
-              Enter your account email and we'll send reset instructions.
+              Enter your personal or work email and we'll send reset instructions.
             </DialogDescription>
           </DialogHeader>
           {fpSent ? (

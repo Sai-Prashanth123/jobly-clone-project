@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import { MultiFileUploadSlot } from '../components/employees/MultiFileUploadSlot';
 import { PageHeader } from '../components/shared/PageHeader';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { UsDateInput } from '../components/shared/UsDateInput';
@@ -25,7 +26,7 @@ import { US_STATES } from '../lib/usStates';
 import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
 import { LANGUAGES } from '../lib/languages';
-import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, getRequiredIdentityTypes, IDENTITY_OWNED_DOC_LABELS, docMatchesRow } from '../lib/documentTypes';
+import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, getRequiredIdentityTypes, IDENTITY_OWNED_DOC_LABELS, docMatchesRow, docsMatchingRow } from '../lib/documentTypes';
 import { LanguagesMultiSelect } from '../components/shared/LanguagesMultiSelect';
 import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
 
@@ -178,6 +179,10 @@ interface FormState {
   identityDocuments: IdentityDocumentEntry[];
   // Map of identity-doc type → File staged for upload, keyed by `type`.
   identityDocFiles: Record<string, File | null>;
+  // Map of multi-file identity-doc type (I-983, I-20, Other) → staged files
+  // array, capped client-side by the row's maxFiles. Kept separate from
+  // identityDocFiles so every other row's single-file logic stays untouched.
+  multiIdentityDocFiles: Record<string, File[]>;
   // Education + work
   education: EducationEntry[];
   workHistory: WorkHistoryEntry[];
@@ -229,6 +234,7 @@ const defaultForm: FormState = {
   ssn: '',
   identityDocuments: [],
   identityDocFiles: {},
+  multiIdentityDocFiles: {},
   education: [],
   workHistory: [],
   totalExperienceYears: '',
@@ -404,6 +410,7 @@ export default function NewEmployee() {
       ssn: e.ssn ?? '',
       identityDocuments: e.identityDocuments ?? [],
       identityDocFiles: {},
+      multiIdentityDocFiles: {},
       education: e.education ?? [],
       workHistory: e.workHistory ?? [],
       totalExperienceYears: e.totalExperienceYears ? String(e.totalExperienceYears) : '',
@@ -525,7 +532,9 @@ export default function NewEmployee() {
           // without ever uploading the document is an inconsistent partial
           // state — don't let it count as complete.
           const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
-          const fileOrUploaded = !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
+          const fileOrUploaded = row.multi
+            ? (form.multiIdentityDocFiles[row.type]?.length ?? 0) > 0 || docsMatchingRow(existingEmployee?.documents ?? [], row).length > 0
+            : !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
           const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
           return !expiry || fileOrUploaded;
         }),
@@ -611,7 +620,9 @@ export default function NewEmployee() {
       // so it doesn't affect the % for anyone who never touches these fields.
       ...IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !requiredIdentityTypes.includes(row.type)).flatMap(row => {
         const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
-        const fileOrUploaded = !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
+        const fileOrUploaded = row.multi
+          ? (form.multiIdentityDocFiles[row.type]?.length ?? 0) > 0 || docsMatchingRow(existingEmployee?.documents ?? [], row).length > 0
+          : !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
         const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
         if (!expiry || fileOrUploaded) return [];
         return [{
@@ -724,6 +735,18 @@ export default function NewEmployee() {
   const setIdentityDocFile = (type: string, file: File | null) => {
     setForm(p => ({ ...p, identityDocFiles: { ...p.identityDocFiles, [type]: file } }));
   };
+  const addMultiIdentityDocFile = (type: string, file: File) => {
+    setForm(p => ({
+      ...p,
+      multiIdentityDocFiles: { ...p.multiIdentityDocFiles, [type]: [...(p.multiIdentityDocFiles[type] ?? []), file] },
+    }));
+  };
+  const removeMultiIdentityDocFile = (type: string, idx: number) => {
+    setForm(p => ({
+      ...p,
+      multiIdentityDocFiles: { ...p.multiIdentityDocFiles, [type]: (p.multiIdentityDocFiles[type] ?? []).filter((_, i) => i !== idx) },
+    }));
+  };
 
   // ── Education + work-history row mutations ────────────────────────────────
   const addEducation = () => setForm(p => ({ ...p, education: [...(p.education ?? []), emptyEducation()] }));
@@ -740,7 +763,8 @@ export default function NewEmployee() {
 
   // Warn the user before they accidentally navigate away with staged-but-not-yet-saved
   // identity/required document files (uploaded only at final submit/save-draft time).
-  const hasStagedFiles = Object.values(form.identityDocFiles ?? {}).some(Boolean);
+  const hasStagedFiles = Object.values(form.identityDocFiles ?? {}).some(Boolean)
+    || Object.values(form.multiIdentityDocFiles ?? {}).some(arr => arr.length > 0);
   useEffect(() => {
     if (!hasStagedFiles) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); };
@@ -875,6 +899,12 @@ export default function NewEmployee() {
 
       const uploads: { file: File; name: string; docType: string }[] = [];
       for (const row of IDENTITY_DOC_ROWS) {
+        if (row.multi) {
+          for (const file of (form.multiIdentityDocFiles[row.type] ?? [])) {
+            uploads.push({ file, name: file.name, docType: row.label });
+          }
+          continue;
+        }
         const file = form.identityDocFiles[row.type];
         if (file) {
           uploads.push({ file, name: file.name, docType: row.label });
@@ -1021,8 +1051,17 @@ export default function NewEmployee() {
         }));
       }
       const uploadedDocTypes: string[] = [];
+      const uploadedMultiDocTypes: string[] = [];
       const uploads: { file: File; name: string; docType: string }[] = [];
       for (const row of IDENTITY_DOC_ROWS) {
+        if (row.multi) {
+          const files = form.multiIdentityDocFiles[row.type] ?? [];
+          if (files.length > 0) {
+            for (const file of files) uploads.push({ file, name: file.name, docType: row.label });
+            uploadedMultiDocTypes.push(row.type);
+          }
+          continue;
+        }
         const file = form.identityDocFiles[row.type];
         if (file) { uploads.push({ file, name: file.name, docType: row.label }); uploadedDocTypes.push(row.type); }
       }
@@ -1062,6 +1101,9 @@ export default function NewEmployee() {
             profilePhotoFile: null,
             identityDocFiles: Object.fromEntries(
               Object.entries(p.identityDocFiles).map(([k, v]) => [k, uploadedDocTypes.includes(k) ? null : v]),
+            ),
+            multiIdentityDocFiles: Object.fromEntries(
+              Object.entries(p.multiIdentityDocFiles).map(([k, v]) => [k, uploadedMultiDocTypes.includes(k) ? [] : v]),
             ),
           }));
         } catch (uploadErr: any) {
@@ -1798,7 +1840,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.visaType} />
               </div>
               <div>
-                <Label>Work Authorization Expiry</Label>
+                <Label>Visa Expiry</Label>
                 <UsDateInput value={form.visaExpiry} onChange={iso => set('visaExpiry', iso)} />
                 {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />
@@ -1864,7 +1906,7 @@ export default function NewEmployee() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {IDENTITY_DOC_ROWS.filter(row => {
                 // OPT-specific documents only apply to OPT / STEM OPT candidates.
-                if (['i983', 'opt_card', 'stem_opt_card'].includes(row.type)) {
+                if (['i983', 'i20', 'opt_card', 'stem_opt_card'].includes(row.type)) {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
                 return true;
@@ -1875,7 +1917,11 @@ export default function NewEmployee() {
                 const isRequired = getRequiredIdentityTypes(form.visaType).includes(row.type);
                 const existingDoc = existingEmployee?.documents?.find((d: any) => docMatchesRow(d, row));
                 const isAlreadyUploaded = !!existingDoc;
-                const fileOrUploaded = !!(file || isAlreadyUploaded);
+                const multiExistingDocs = row.multi ? docsMatchingRow(existingEmployee?.documents ?? [], row) : [];
+                const multiStagedFiles = row.multi ? (form.multiIdentityDocFiles[row.type] ?? []) : [];
+                const fileOrUploaded = row.multi
+                  ? (multiExistingDocs.length > 0 || multiStagedFiles.length > 0)
+                  : !!(file || isAlreadyUploaded);
                 const displayFileName = file?.name ?? (!file ? existingDoc?.name : undefined);
                 const expiryVal = (doc.expiry ?? '').trim();
                 const missingExpiry = isOnboarding && isRequired && row.hasExpiry && fileOrUploaded && !expiryVal;
@@ -1924,48 +1970,61 @@ export default function NewEmployee() {
                         {expiryWithoutFile && <p className="text-[11px] text-red-500 mt-0.5">Upload the document below to save this expiry date</p>}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 mt-auto">
-                      <label
-                        htmlFor={inputId}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
-                      >
-                        <Upload className="h-3.5 w-3.5" />
-                        {fileOrUploaded ? 'Replace' : 'Upload'}
-                      </label>
-                      <input
-                        id={inputId}
-                        type="file"
-                        accept=".pdf,.jpg,.jpeg,.png"
-                        className="hidden"
-                        onChange={e => {
-                          const f = e.target.files?.[0] ?? null;
-                          if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
-                            toast.error('Please upload a PDF, JPEG, or PNG file.');
-                            e.target.value = '';
-                            return;
-                          }
-                          setIdentityDocFile(row.type, f);
-                        }}
+                    {row.multi ? (
+                      <MultiFileUploadSlot
+                        inputId={inputId}
+                        existingDocs={multiExistingDocs}
+                        stagedFiles={multiStagedFiles}
+                        maxFiles={row.maxFiles ?? 3}
+                        onAdd={f => addMultiIdentityDocFile(row.type, f)}
+                        onRemoveStaged={idx => removeMultiIdentityDocFile(row.type, idx)}
                       />
-                      {fileOrUploaded && (
-                        <>
-                          <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
-                            {isAlreadyUploaded && !file ? 'On file' : 'Uploaded'}
-                          </span>
-                          {file && (
-                            <button
-                              type="button"
-                              onClick={() => setIdentityDocFile(row.type, null)}
-                              className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
-                            >
-                              Remove
-                            </button>
+                    ) : (
+                      <>
+                        <div className="flex items-center gap-2 mt-auto">
+                          <label
+                            htmlFor={inputId}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
+                          >
+                            <Upload className="h-3.5 w-3.5" />
+                            {fileOrUploaded ? 'Replace' : 'Upload'}
+                          </label>
+                          <input
+                            id={inputId}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            className="hidden"
+                            onChange={e => {
+                              const f = e.target.files?.[0] ?? null;
+                              if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
+                                toast.error('Please upload a PDF, JPEG, or PNG file.');
+                                e.target.value = '';
+                                return;
+                              }
+                              setIdentityDocFile(row.type, f);
+                            }}
+                          />
+                          {fileOrUploaded && (
+                            <>
+                              <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
+                                {isAlreadyUploaded && !file ? 'On file' : 'Uploaded'}
+                              </span>
+                              {file && (
+                                <button
+                                  type="button"
+                                  onClick={() => setIdentityDocFile(row.type, null)}
+                                  className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </>
                           )}
-                        </>
-                      )}
-                    </div>
-                    {fileOrUploaded && displayFileName && (
-                      <p className="text-[11px] text-gray-500 truncate" title={displayFileName}>{displayFileName}</p>
+                        </div>
+                        {fileOrUploaded && displayFileName && (
+                          <p className="text-[11px] text-gray-500 truncate" title={displayFileName}>{displayFileName}</p>
+                        )}
+                      </>
                     )}
                   </div>
                 );

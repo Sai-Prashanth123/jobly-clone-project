@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { supabaseAnon, supabaseAdmin, fetchPortalUser, fetchPortalUserByEmail, patchPortalUser } from '../config/supabase';
 import { UnauthorizedError } from '../lib/errors';
 import { resetUserPassword } from '../services/admin.service';
+import * as employeesSvc from '../services/employees.service';
 import type { ChangePasswordInput, ForgotPasswordInput } from '../schemas/auth.schema';
 
 export type OnboardingStatus = 'in_progress' | 'pending_review' | 'changes_requested' | 'approved';
@@ -222,14 +223,27 @@ export async function forgotPassword(req: Request, res: Response, next: NextFunc
     const { email } = req.body as ForgotPasswordInput;
     const normalized = email.trim().toLowerCase();
 
-    const pu = await fetchPortalUserByEmail(normalized);
+    // Fast path: portal_users.email is the actual login identity (admin/hr/ops/
+    // finance accounts, or an employee whose typed address already matches it).
+    let pu = await fetchPortalUserByEmail(normalized);
+    if (!pu?.id) {
+      // Fallback: employees can log in via a work email that differs from the
+      // personal/work address they typed here — resolve through whichever of
+      // employees.email / employees.work_email matches, then find that
+      // employee's actual login account.
+      const portalUserId = await employeesSvc.findPortalUserIdByEmployeeEmail(normalized);
+      if (portalUserId) pu = { id: portalUserId };
+    }
     // Log the match result server-side (never to the client — the response stays
     // generic to avoid account enumeration). A "NO MATCH" here is the usual
-    // reason a user reports "I requested a reset but got no email": the address
-    // they typed isn't the one on their portal account.
+    // reason a user reports "I requested a reset but got no email": neither
+    // address on file for them matches what they typed.
     console.log(`[auth.forgotPassword] reset requested for "${normalized}" — ${pu?.id ? 'matched, sending email' : 'NO MATCH, nothing sent'}`);
     if (pu?.id) {
       try {
+        // resetUserPassword looks up and emails the account's real login email
+        // internally — the reset always lands in the actual login inbox,
+        // regardless of which address (personal or work) was typed above.
         await resetUserPassword(pu.id);
       } catch (e) {
         console.error('[auth.forgotPassword] reset failed for', normalized, e);

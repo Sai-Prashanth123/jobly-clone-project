@@ -204,6 +204,7 @@ export async function uploadDoc(req: Request, res: Response, next: NextFunction)
     }
     const { name, docType, expiryDate } = req.body as { name?: string; docType?: string; expiryDate?: string };
     const data = await storageSvc.uploadDocument('employee', req.params.id, file, req.user!.id, name, docType, expiryDate);
+    void svc.notifyDocumentUploadedDuringOnboarding(req.params.id, data); // fire-and-forget, never blocks the response
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 }

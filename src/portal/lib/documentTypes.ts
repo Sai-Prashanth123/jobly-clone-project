@@ -27,6 +27,7 @@ export const DOCUMENT_TYPES: string[] = [
   'OPT Card',
   'STEM OPT Card',
   'I-983 Form',
+  'I-20',
   'I-94',
   'ID Proof',
   'Compliance Document',
@@ -45,6 +46,8 @@ export interface IdentityDocRow {
   hasState?: boolean;
   hasExpiry?: boolean;
   downloadUrl?: string; // shown as a "download the blank form" link next to the upload control
+  multi?: boolean;      // allows uploading more than one file of this type (up to maxFiles)
+  maxFiles?: number;    // only meaningful when multi is true
 }
 
 export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
@@ -65,7 +68,11 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'stem_opt_card', label: 'STEM OPT Card',                    placeholder: 'C12345678',
     hint: 'EAD card for STEM OPT 24-month extension.', hasExpiry: true },
   { type: 'i983',          label: 'I-983',                            placeholder: '',
-    hint: 'For OPT / STEM OPT candidates — signed I-983 from employer and school.', hasExpiry: true },
+    hint: 'For OPT / STEM OPT candidates — signed I-983 from employer and school. Up to 3 files.',
+    hasExpiry: true, multi: true, maxFiles: 3 },
+  { type: 'i20',           label: 'I-20',                             placeholder: '',
+    hint: 'Certificate of Eligibility for F-1 status — issued each time a new I-20 is generated (initial, OPT, extension, etc). Up to 3 files.',
+    hasExpiry: true, multi: true, maxFiles: 3 },
   { type: 'i94',           label: 'I-94',                             placeholder: '12345678901',
     hint: 'Arrival/Departure Record — download from cbp.dhs.gov.', hasExpiry: true },
   { type: 'us_visa',       label: 'US Visa',                          placeholder: 'A12345678',
@@ -77,6 +84,9 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'i9_form',       label: 'I-9 Form',                         placeholder: '',
     hint: 'Employment Eligibility Verification. Download the current blank form, sign it, then upload it here.',
     downloadUrl: 'https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf' },
+  { type: 'other',         label: 'Other Documents',                  placeholder: '',
+    hint: 'Any additional supporting document not covered above. Up to 5 files.',
+    multi: true, maxFiles: 5 },
 ];
 
 // Identity doc types mandatory for every employee during onboarding, regardless
@@ -112,4 +122,9 @@ const LEGACY_LABEL_ALIASES: Record<string, string[]> = {
 export function docMatchesRow(doc: { type?: string }, row: { label: string }): boolean {
   if (doc.type === row.label) return true;
   return (LEGACY_LABEL_ALIASES[row.label] ?? []).includes(doc.type ?? '');
+}
+
+/** All uploaded documents belonging to this identity row (for multi-file rows, which can have more than one). */
+export function docsMatchingRow<T extends { type?: string }>(docs: T[], row: { label: string }): T[] {
+  return (docs ?? []).filter(d => docMatchesRow(d, row));
 }

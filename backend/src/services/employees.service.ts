@@ -2,7 +2,7 @@ import { supabaseAdmin } from '../config/supabase';
 import { ConflictError, NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRequestedEmail, sendDocumentRequestEmail, mailerConfigured } from '../lib/mailer';
-import { createNotification, getUserIdsByRole } from './notifications.service';
+import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId } from './notifications.service';
 import { computeOnboarding } from '../lib/onboarding';
 import { todayUTC } from '../lib/dateUtils';
 import { generateTasksForEmployee } from './onboardingChecklist.service';
@@ -1246,6 +1246,23 @@ async function notifyEmployeeUser(empId: string, title: string, body: string, ty
   }
 }
 
+// Resolves a portal_users.id from either an employee's personal (`email`) or
+// work (`work_email`) address — used by forgotPassword() so a reset request
+// typed against either address resolves to the employee's actual login
+// account, not just whichever address happens to equal portal_users.email.
+export async function findPortalUserIdByEmployeeEmail(email: string): Promise<string | null> {
+  const safeEmail = sanitizeForPostgrestFilter(email);
+  const { data: emp } = await supabaseAdmin
+    .from('employees')
+    .select('id')
+    .or(`email.eq.${safeEmail},work_email.eq.${safeEmail}`)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+  if (!emp) return null;
+  return getPortalUserByEmployeeId(emp.id);
+}
+
 // Fire-and-forget: notify all HR + admin users in-app.
 async function notifyHrAdmin(title: string, body: string, empId: string, type: 'info' | 'success' | 'warning' = 'info'): Promise<void> {
   try {
@@ -1255,6 +1272,27 @@ async function notifyHrAdmin(title: string, body: string, empId: string, type: '
     );
   } catch (err) {
     console.error('[employees.service] HR/admin notification failed for', empId, err);
+  }
+}
+
+// Fire-and-forget: notify HR + admin whenever a document is uploaded while an
+// employee is still onboarding, so HR gets incremental signal instead of only
+// learning about documents once onboarding hits 100% and is submitted. Purely
+// additive — does NOT touch completeOnboarding()'s existing 100%-gated notify.
+export async function notifyDocumentUploadedDuringOnboarding(employeeId: string, doc: { name?: string; type?: string }): Promise<void> {
+  try {
+    const { data: emp } = await supabaseAdmin
+      .from('employees')
+      .select('id, display_id, first_name, last_name, status')
+      .eq('id', employeeId)
+      .maybeSingle();
+    if (!emp || emp.status !== 'onboarding') return;
+    const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
+    const label = emp.display_id ?? fullName;
+    const docLabel = doc.type ?? doc.name ?? 'A document';
+    await notifyHrAdmin('Onboarding document uploaded', `${label} (${fullName}) uploaded "${docLabel}" during onboarding.`, employeeId);
+  } catch (err) {
+    console.error('[employees.service] onboarding-document-upload notification failed', err);
   }
 }
 
