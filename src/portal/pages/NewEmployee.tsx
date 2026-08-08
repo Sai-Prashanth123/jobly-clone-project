@@ -80,6 +80,14 @@ const I9_OPTIONS = [
   { value: 'expired',  label: 'Expired' },
 ];
 
+const E_VERIFY_OPTIONS = [
+  { value: 'not_started',               label: 'Not Started' },
+  { value: 'pending',                   label: 'Pending' },
+  { value: 'employment_authorized',     label: 'Employment Authorized' },
+  { value: 'tentative_nonconfirmation', label: 'Tentative Nonconfirmation' },
+  { value: 'case_closed',               label: 'Case Closed' },
+];
+
 const PAY_TYPE_OPTIONS = [
   { value: 'hourly', label: 'Hourly' },
   { value: 'salary', label: 'Salary' },
@@ -174,6 +182,8 @@ interface FormState {
   visaType: Employee['visaType'] | '';
   visaExpiry: string;
   i9Status: Employee['i9Status'] | '';
+  eVerifyStatus: Employee['eVerifyStatus'] | '';
+  eVerifyCaseNumber: string;
   ssn: string;
   // Identity & Documents — numbers per US doc type
   identityDocuments: IdentityDocumentEntry[];
@@ -231,6 +241,8 @@ const defaultForm: FormState = {
   visaType: '',
   visaExpiry: '',
   i9Status: '',
+  eVerifyStatus: '',
+  eVerifyCaseNumber: '',
   ssn: '',
   identityDocuments: [],
   identityDocFiles: {},
@@ -407,6 +419,8 @@ export default function NewEmployee() {
       visaType: (e.visaType ?? '') as FormState['visaType'],
       visaExpiry: e.visaExpiry ?? '',
       i9Status: (e.i9Status ?? '') as FormState['i9Status'],
+      eVerifyStatus: (e.eVerifyStatus ?? '') as FormState['eVerifyStatus'],
+      eVerifyCaseNumber: e.eVerifyCaseNumber ?? '',
       ssn: e.ssn ?? '',
       identityDocuments: e.identityDocuments ?? [],
       identityDocFiles: {},
@@ -807,6 +821,8 @@ export default function NewEmployee() {
       visaType: form.visaType || undefined,
       visaExpiry: form.visaExpiry,
       i9Status: form.i9Status || undefined,
+      eVerifyStatus: form.eVerifyStatus || undefined,
+      eVerifyCaseNumber: form.eVerifyCaseNumber.trim() || undefined,
       ssn: form.ssn,
       payRate: parseNumberInput(form.payRate) ?? 0,
       payType: form.payType,
@@ -1855,6 +1871,25 @@ export default function NewEmployee() {
                     </SelectContent>
                   </Select>
                   <FieldError msg={errors.i9Status} />
+                </div>
+              )}
+              {!isOnboarding && (
+                <div>
+                  <Label>E-Verify Status</Label>
+                  <Select value={form.eVerifyStatus || ''} onValueChange={v => set('eVerifyStatus', v as FormState['eVerifyStatus'])}>
+                    <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
+                    <SelectContent>
+                      {E_VERIFY_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <FieldError msg={errors.eVerifyStatus} />
+                </div>
+              )}
+              {!isOnboarding && (
+                <div>
+                  <Label>E-Verify Case Number</Label>
+                  <Input value={form.eVerifyCaseNumber} onChange={e => set('eVerifyCaseNumber', e.target.value)} placeholder="e.g. 2026123456789" />
+                  <FieldError msg={errors.eVerifyCaseNumber} />
                 </div>
               )}
               <div>

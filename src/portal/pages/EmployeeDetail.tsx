@@ -30,6 +30,14 @@ import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 import { DetailField as Field } from '../components/shared/DetailField';
 
+const E_VERIFY_STATUS_LABELS: Record<string, string> = {
+  not_started: 'Not Started',
+  pending: 'Pending',
+  employment_authorized: 'Employment Authorized',
+  tentative_nonconfirmation: 'Tentative Nonconfirmation',
+  case_closed: 'Case Closed',
+};
+
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -556,6 +564,8 @@ export default function EmployeeDetail() {
                 </p>
               </div>
               <Field label="I-9 Status" value={employee.i9Status} />
+              <Field label="E-Verify Status" value={employee.eVerifyStatus ? E_VERIFY_STATUS_LABELS[employee.eVerifyStatus] : undefined} />
+              <Field label="E-Verify Case Number" value={employee.eVerifyCaseNumber} />
               {employee.ssn ? (
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Social Security Number</p>

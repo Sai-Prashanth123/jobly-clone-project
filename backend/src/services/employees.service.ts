@@ -332,6 +332,8 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
         visa_type:         input.visaType ?? null,
         visa_expiry:       input.visaExpiry || null,
         i9_status:         input.i9Status ?? null,
+        e_verify_status:      input.eVerifyStatus ?? null,
+        e_verify_case_number: input.eVerifyCaseNumber ?? null,
         pay_rate:          input.payRate ?? 0,
         pay_type:          input.payType ?? 'hourly',
         work_location:     input.workLocation ?? null,
@@ -508,6 +510,8 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
     visaType: emp.visa_type,
     visaExpiry: emp.visa_expiry ?? '',
     i9Status: emp.i9_status,
+    eVerifyStatus: emp.e_verify_status,
+    eVerifyCaseNumber: emp.e_verify_case_number,
     payRate: Number(emp.pay_rate),
     payType: emp.pay_type,
     workLocation: emp.work_location ?? null,
@@ -584,6 +588,8 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.visaType !== undefined)   patch.visa_type       = input.visaType;
   if (input.visaExpiry !== undefined) patch.visa_expiry     = input.visaExpiry || null;
   if (input.i9Status !== undefined)   patch.i9_status       = input.i9Status;
+  if (input.eVerifyStatus !== undefined)     patch.e_verify_status      = input.eVerifyStatus;
+  if (input.eVerifyCaseNumber !== undefined) patch.e_verify_case_number = input.eVerifyCaseNumber || null;
   if (input.payRate !== undefined)    patch.pay_rate        = input.payRate;
   if (input.payType !== undefined)    patch.pay_type        = input.payType;
   if (input.workLocation !== undefined) patch.work_location = input.workLocation;

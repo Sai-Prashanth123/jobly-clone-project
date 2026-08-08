@@ -42,6 +42,7 @@ export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'w2' | '10
 export type BillingType = 'hourly' | 'monthly' | 'milestone';
 export type VisaType = 'h1b' | 'l1' | 'opt' | 'stem_opt' | 'tn' | 'gc' | 'citizen' | 'other';
 export type I9Status = 'pending' | 'complete' | 'expired';
+export type EVerifyStatus = 'not_started' | 'pending' | 'employment_authorized' | 'tentative_nonconfirmation' | 'case_closed';
 
 // ── Monthly attendance timesheet (separate from the weekly billing Timesheet) ──
 export type MonthlyTimesheetStatus = 'draft' | 'submitted' | 'approved' | 'rejected';
@@ -245,6 +246,8 @@ export interface Employee {
   visaType?: VisaType;
   visaExpiry?: string;
   i9Status?: I9Status;
+  eVerifyStatus?: EVerifyStatus;
+  eVerifyCaseNumber?: string;
   payRate: number;
   payType: PayType;
   workLocation?: string;
