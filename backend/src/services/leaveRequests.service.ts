@@ -177,12 +177,18 @@ export async function reviewLeaveRequest(
   input: ReviewLeaveRequestInput,
   reviewerUserId?: string,
   reviewerRole?: string,
+  reviewerEmployeeId?: string | null,
 ) {
   const { data: lr, error: findErr } = await supabaseAdmin
     .from('leave_requests').select(SELECT).eq('id', id).single();
   if (findErr || !lr) throw new NotFoundError('Leave request not found');
   if (lr.status !== 'pending') {
     throw new ValidationError(`This request has already been ${lr.status}.`);
+  }
+  // Conflict-of-interest guard: no role (including admin) may review its own
+  // leave request — self-approval defeats the point of an approval gate.
+  if (reviewerEmployeeId && reviewerEmployeeId === lr.employee_id) {
+    throw new ForbiddenError('You cannot review your own leave request.');
   }
   if (input.status === 'rejected' && !input.rejectionReason) {
     throw new ValidationError('Add a reason when rejecting a leave request.');

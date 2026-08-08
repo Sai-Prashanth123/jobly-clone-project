@@ -361,7 +361,12 @@ export default function NewEmployee() {
   // Populated only on onboarding-submit validation failure (one entry per
   // incomplete checklist item). Cleared whenever submitError is cleared.
   const [submitMissing, setSubmitMissing] = useState<{ label: string; section: string }[]>([]);
-  const [prefilled, setPrefilled] = useState(false);
+  // Tracks the employee id the form was last prefilled for (not a plain
+  // boolean) — the edit route has no `key={id}`, so React Router can keep
+  // this component mounted across two different :id values; a boolean would
+  // never re-prefill for the new id, silently saving employee A's data over
+  // employee B's record.
+  const [prefilledForId, setPrefilledForId] = useState<string | undefined>(undefined);
   const submittingRef = useRef(false);
   const [submitStep, setSubmitStep] = useState<'idle' | 'creating' | 'uploading' | 'finishing'>('idle');
   const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
@@ -373,7 +378,7 @@ export default function NewEmployee() {
   // Edit mode: prefill the whole form once the employee data lands. Skip the
   // declaration prompt — for an edit, the data is already "owned" by HR.
   useEffect(() => {
-    if (!isEditMode || !existingEmployee || prefilled) return;
+    if (!isEditMode || !existingEmployee || prefilledForId === editId) return;
     const e = existingEmployee;
     setForm({
       firstName: e.firstName ?? '',
@@ -450,8 +455,8 @@ export default function NewEmployee() {
       signatureName: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim(),
       signatureDate: todayIso(),
     });
-    setPrefilled(true);
-  }, [isEditMode, existingEmployee, prefilled]);
+    setPrefilledForId(editId);
+  }, [isEditMode, existingEmployee, prefilledForId, editId]);
 
   const set = <K extends keyof FormState>(k: K, v: FormState[K]) => {
     setForm(p => ({ ...p, [k]: v }));

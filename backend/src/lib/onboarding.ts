@@ -33,6 +33,10 @@ export const ONBOARDING_REQUIRED_DOCS = [
 // in sync between the two.
 const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
 const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'I-94'] as const;
+// Maps the doc label above to its identity_documents[].type key (lowercase,
+// matches IDENTITY_DOC_ROWS in src/portal/lib/documentTypes.ts) so the
+// expiry-date check below can look up the right entry.
+const CONDITIONAL_DOC_IDENTITY_KEYS: Record<string, string> = { Passport: 'passport', 'I-94': 'i94' };
 
 const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
@@ -128,12 +132,20 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
     })),
 
     // Passport + I-94 — only required for visa types that would actually hold
-    // them (see VISA_TYPES_REQUIRING_PASSPORT_I94 above).
-    ...(VISA_TYPES_REQUIRING_PASSPORT_I94.has(String(emp.visa_type ?? '')) ? VISA_CONDITIONAL_REQUIRED_DOCS.map(t => ({
-      id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-      label: `${t} (upload required)`,
-      done: docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias)),
-    })) : []),
+    // them (see VISA_TYPES_REQUIRING_PASSPORT_I94 above). Also requires an
+    // expiry date, matching the frontend wizard's equivalent check — without
+    // this the backend gate disagreed with what the wizard itself demanded,
+    // letting "Finish onboarding" pass with a doc on file but no expiry.
+    ...(VISA_TYPES_REQUIRING_PASSPORT_I94.has(String(emp.visa_type ?? '')) ? VISA_CONDITIONAL_REQUIRED_DOCS.map(t => {
+      const uploaded = docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias));
+      const identityDocs: any[] = Array.isArray(emp.identity_documents) ? emp.identity_documents : [];
+      const expiry = identityDocs.find((d: any) => d?.type === CONDITIONAL_DOC_IDENTITY_KEYS[t])?.expiry;
+      return {
+        id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        label: `${t} (upload required)`,
+        done: uploaded && nonEmpty(expiry),
+      };
+    }) : []),
   ];
 
   const done = checks.filter(c => c.done).length;

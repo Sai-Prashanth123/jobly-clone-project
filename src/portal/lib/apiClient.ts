@@ -57,6 +57,28 @@ apiClient.interceptors.request.use(config => {
 // On 401 → clear session and redirect to login, preserving the current path
 // so the user lands back where they were after re-authenticating.
 let redirecting = false;
+
+// Shared in-flight refresh call. Supabase refresh tokens rotate on use, so
+// when several requests 401 at once (e.g. a dashboard firing parallel
+// queries right as the token expires), each independently calling
+// /auth/refresh meant only the first succeeded and the rest failed and
+// logged the user out — even though the session was still perfectly valid.
+// Concurrent 401s now await the same promise instead of racing.
+let refreshPromise: Promise<string | null> | null = null;
+async function refreshAccessToken(refreshToken: string): Promise<string | null> {
+  if (refreshPromise) return refreshPromise;
+  refreshPromise = (async () => {
+    try {
+      const { data: refreshData } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
+      return refreshData?.data?.token ?? refreshData?.data?.accessToken ?? refreshData?.token ?? null;
+    } catch {
+      return null;
+    } finally {
+      refreshPromise = null;
+    }
+  })();
+  return refreshPromise;
+}
 apiClient.interceptors.response.use(
   res => {
     touchActivity();
@@ -88,8 +110,7 @@ apiClient.interceptors.response.use(
       if (refreshToken) {
         err.config._retry = true;
         try {
-          const { data: refreshData } = await axios.post(`${API_URL}/auth/refresh`, { refreshToken });
-          const newToken: string = refreshData?.data?.token ?? refreshData?.data?.accessToken ?? refreshData?.token;
+          const newToken = await refreshAccessToken(refreshToken);
           if (newToken) {
             sessionStorage.setItem('access_token', newToken);
             // Merge new token into stored session

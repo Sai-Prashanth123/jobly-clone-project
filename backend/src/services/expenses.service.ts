@@ -164,9 +164,13 @@ export async function submitExpense(id: string, actorId: string, actorEmployeeId
   return data as any;
 }
 
-export async function reviewExpense(id: string, input: ReviewExpenseInput, reviewerId: string) {
+export async function reviewExpense(id: string, input: ReviewExpenseInput, reviewerId: string, reviewerEmployeeId?: string | null) {
   const expense = await getExpense(id);
   if (expense.status !== 'submitted') throw new ForbiddenError('Only submitted expenses can be reviewed');
+  // Conflict-of-interest guard: no role may approve or reject its own expense report.
+  if (reviewerEmployeeId && reviewerEmployeeId === expense.employee_id) {
+    throw new ForbiddenError('You cannot review your own expense report.');
+  }
 
   const { data, error } = await supabaseAdmin
     .from('expense_reports')

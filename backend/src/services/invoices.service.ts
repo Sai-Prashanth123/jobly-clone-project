@@ -7,7 +7,7 @@ import { createNotification, getUserIdsByRole } from './notifications.service';
 import { uploadDocument, deleteDocument, downloadDocumentBuffer } from './storage.service';
 import { getInvoiceTheme } from './invoiceTemplates.service';
 import { getEmailTemplate } from './emailTemplates.service';
-import { addDaysToDate, todayUTC } from '../lib/dateUtils';
+import { addDaysToDate, daysBetween, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
 import { paymentTermsDays } from '../schemas/invoice.schema';
 
@@ -269,12 +269,21 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
   const itemsWithInvoiceId = lineItems.map(li => ({ ...li, invoice_id: invoice.id }));
   await supabaseAdmin.from('invoice_line_items').insert(itemsWithInvoiceId);
 
-  // Link timesheets
+  // Link timesheets. The app-level pre-check above has a race window; the
+  // DB-level unique constraint on timesheet_id (migration 031) is the real
+  // guard against the same timesheet landing on two invoices — translate a
+  // violation into a friendly conflict instead of a generic 500.
   const junctionRows = input.timesheetIds.map(tsId => ({
     invoice_id: invoice.id,
     timesheet_id: tsId,
   }));
-  await supabaseAdmin.from('invoice_timesheets').insert(junctionRows);
+  const { error: junctionErr } = await supabaseAdmin.from('invoice_timesheets').insert(junctionRows);
+  if (junctionErr) {
+    if ((junctionErr as any).code === '23505') {
+      throw new ConflictError('One of these timesheets was just invoiced by someone else — reload and try again.');
+    }
+    throw junctionErr;
+  }
 
   logActivity(actorId ?? null, 'created', 'invoice', invoice.id, invoice.invoice_number ?? invoice.id.slice(0, 8));
 
@@ -381,8 +390,13 @@ export async function convertEstimate(estimateId: string, actorId?: string) {
   if (est.converted_invoice_id) throw new ConflictError('This estimate has already been converted to an invoice.');
 
   const issueDate = todayUTC();
+  // A custom due date has no fixed "days" term to reapply — preserve the
+  // offset the estimate's original due date represented (e.g. "due 15 days
+  // after issue") relative to TODAY, instead of copying the stale absolute
+  // date verbatim (which could already be months in the past by the time the
+  // estimate is accepted and converted).
   const dueDate = est.payment_terms === 'custom'
-    ? est.due_date
+    ? addDaysToDate(issueDate, daysBetween(est.issue_date, est.due_date))
     : addDaysToDate(issueDate, paymentTermsDays(est.payment_terms ?? 'net_30'));
 
   const invoice = await insertInvoiceWithNumber('INV', {
@@ -822,32 +836,57 @@ export async function exportInvoicesCSV(query: { status?: string; clientId?: str
 
 // ── Bulk status update ────────────────────────────────────────────────────────
 
+// Forward-only, matching the invariants the single-invoice paths rely on
+// (e.g. updateInvoice locks the invoice number once non-draft; amount_paid is
+// only ever meaningful once). No reversals — a bulk action shouldn't be able
+// to unlock a paid/sent invoice back to draft and desync amount_paid/balance.
+const BULK_STATUS_TRANSITIONS: Record<string, string[]> = {
+  draft:   ['sent'],
+  sent:    ['paid', 'overdue'],
+  overdue: ['paid'],
+  paid:    [],
+};
+
 export async function bulkUpdateInvoiceStatus(ids: string[], status: string) {
   const validStatuses = ['draft', 'sent', 'paid', 'overdue'];
   if (!validStatuses.includes(status)) throw new Error('Invalid status');
+
+  // Bulk status changes only ever apply to real invoices — estimates have
+  // their own accept/convert flow and must never get amount_paid populated
+  // (payments.service.ts explicitly forbids recording payments against them).
+  const { data: candidates, error: fetchErr } = await supabaseAdmin
+    .from('invoices').select('id, status, doc_type, total_amount').in('id', ids);
+  if (fetchErr) throw fetchErr;
+
+  const eligible = (candidates ?? []).filter(r =>
+    r.doc_type !== 'estimate' && (BULK_STATUS_TRANSITIONS[r.status] ?? []).includes(status),
+  );
+  const skipped = (candidates ?? [])
+    .filter(r => !eligible.includes(r))
+    .map(r => ({ id: r.id, reason: r.doc_type === 'estimate' ? 'is an estimate' : `cannot go from '${r.status}' to '${status}'` }));
+
+  if (eligible.length === 0) return { updated: 0, skipped };
 
   if (status === 'paid') {
     // Marking paid must also settle the balance — the UI computes
     // balanceDue = total_amount - amount_paid, so leaving amount_paid at 0
     // shows a "Paid" badge with a full balance due and a live Record Payment
     // button. amount_paid = total_amount needs per-row values.
-    const { data: rows, error: fetchErr } = await supabaseAdmin
-      .from('invoices').select('id, total_amount').in('id', ids);
-    if (fetchErr) throw fetchErr;
     const paidAt = new Date().toISOString();
-    const results = await Promise.all((rows ?? []).map(r =>
+    const results = await Promise.all(eligible.map(r =>
       supabaseAdmin.from('invoices')
         .update({ status, paid_at: paidAt, amount_paid: r.total_amount })
         .eq('id', r.id),
     ));
     const failed = results.find(r => r.error);
     if (failed?.error) throw failed.error;
-    return { updated: (rows ?? []).length };
+    return { updated: eligible.length, skipped };
   }
 
-  const { error } = await supabaseAdmin.from('invoices').update({ status }).in('id', ids);
+  const eligibleIds = eligible.map(r => r.id);
+  const { error } = await supabaseAdmin.from('invoices').update({ status }).in('id', eligibleIds);
   if (error) throw error;
-  return { updated: ids.length };
+  return { updated: eligibleIds.length, skipped };
 }
 
 // Human label for a payment-terms code (used on the PDF/email).

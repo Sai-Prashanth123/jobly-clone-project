@@ -67,7 +67,7 @@ export async function submit(req: Request, res: Response, next: NextFunction): P
 
 export async function review(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const data = await svc.reviewExpense(req.params.id, req.body as ReviewExpenseInput, req.user!.id);
+    const data = await svc.reviewExpense(req.params.id, req.body as ReviewExpenseInput, req.user!.id, req.user?.employeeId);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

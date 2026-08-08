@@ -255,7 +255,7 @@ export default function Expenses() {
                           </Button>
                         </>
                       )}
-                      {expense.status === 'submitted' && canReview && (
+                      {expense.status === 'submitted' && canReview && expense.employeeId !== user?.employeeId && (
                         <>
                           <Button
                             size="sm"

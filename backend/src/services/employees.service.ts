@@ -91,7 +91,7 @@ export async function listEmployees(query: ListEmployeesQuery, opts?: { restrict
 export async function getEmployee(id: string) {
   const { data: emp, error } = await supabaseAdmin
     .from('employees')
-    .select('*')
+    .select('*, portal_users!created_by(name, role)')
     .eq('id', id)
     .is('deleted_at', null)
     .single();
@@ -1000,7 +1000,7 @@ export async function requestOnboardingChanges(
   // Fire-and-forget: notify the employee in-app + by email.
   void notifyOnboardingChangesRequested(updated, message);
 
-  return { employee: updated };
+  return updated;
 }
 
 // Internal helper — mirrors notifyOnboardingCompleted but for the changes-requested case.
@@ -1094,7 +1094,7 @@ export async function reopenOnboarding(
   id: string,
   actorRole?: string,
   actorEmployeeId?: string,
-): Promise<{ employee: any }> {
+): Promise<any> {
   if (actorRole === 'employee' && actorEmployeeId !== id) {
     throw new ForbiddenError('You may only reopen your own onboarding.');
   }
@@ -1110,7 +1110,7 @@ export async function reopenOnboarding(
   logActivity(actorEmployeeId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8), {
     event: 'onboarding_reopened',
   });
-  return { employee: updated };
+  return updated;
 }
 
 // ── delete ───────────────────────────────────────────────────────────────────

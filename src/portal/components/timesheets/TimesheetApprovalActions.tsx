@@ -100,7 +100,7 @@ export function TimesheetApprovalActions({ timesheet, onStatusChange, isLoading,
     );
   }
 
-  if ((role === 'operations' || role === 'admin' || role === 'hr') && status === 'submitted') {
+  if ((role === 'operations' || role === 'admin' || role === 'hr') && status === 'submitted' && timesheet.employeeId !== user.employeeId) {
     return (
       <>
         <div className="flex gap-2">

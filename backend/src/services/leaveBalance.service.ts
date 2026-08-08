@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { logActivity } from '../lib/activityLogger';
 import { NotFoundError, ConflictError } from '../lib/errors';
+import { daysBetween } from '../lib/dateUtils';
 import type {
   CreateLeaveTypeInput,
   UpdateLeaveTypeInput,
@@ -105,21 +106,35 @@ export async function getEmployeeBalances(employeeId: string, year?: number) {
     .single();
   if (empErr) throw empErr;
 
-  // Sum of approved leave days for this employee in the target year, by leave_type code
+  // Sum of approved leave days for this employee in the target year, by leave_type code.
+  // A request that SPANS the year boundary (e.g. Dec 29–Jan 3) must only count
+  // the portion that actually falls in the target year — filtering by
+  // start_date alone (the old behavior) attributed the FULL day count to
+  // whichever year the request started in, letting the other year's portion
+  // go uncounted (double-spendable) in that year's balance.
   const yearStart = `${targetYear}-01-01`;
   const yearEnd   = `${targetYear}-12-31`;
   const { data: usedRows, error: usedErr } = await supabaseAdmin
     .from('leave_requests')
-    .select('leave_type, days_requested')
+    .select('leave_type, days_requested, start_date, end_date')
     .eq('employee_id', employeeId)
     .eq('status', 'approved')
-    .gte('start_date', yearStart)
-    .lte('start_date', yearEnd);
+    .lte('start_date', yearEnd)
+    .gte('end_date', yearStart);
   if (usedErr) throw usedErr;
 
   const usedByCode = new Map<string, number>();
   for (const row of usedRows ?? []) {
-    usedByCode.set(row.leave_type, (usedByCode.get(row.leave_type) ?? 0) + Number(row.days_requested));
+    const totalSpanDays = daysBetween(row.start_date, row.end_date) + 1;
+    const overlapStart = row.start_date < yearStart ? yearStart : row.start_date;
+    const overlapEnd = row.end_date > yearEnd ? yearEnd : row.end_date;
+    const overlapDays = daysBetween(overlapStart, overlapEnd) + 1;
+    // Calendar-day proration — days_requested was likely computed with
+    // business-day/holiday logic this service doesn't have access to, so this
+    // is an approximation, not an exact business-day recount. Still closes
+    // the double-count/double-spend at year boundaries the old logic had.
+    const proratedDays = totalSpanDays > 0 ? Number(row.days_requested) * (overlapDays / totalSpanDays) : 0;
+    usedByCode.set(row.leave_type, (usedByCode.get(row.leave_type) ?? 0) + proratedDays);
   }
 
   // Build balance per leave type
@@ -132,10 +147,18 @@ export async function getEmployeeBalances(employeeId: string, year?: number) {
       // Accrue from hire date or year start, whichever is later
       const hireDate  = emp?.start_date ? new Date(emp.start_date) : new Date(yearStart);
       const accrualStart = hireDate > new Date(yearStart) ? hireDate : new Date(yearStart);
+      // Reference point must be relative to the YEAR BEING QUERIED, not
+      // always "today" — otherwise a past year's accrual keeps growing after
+      // the year ended, and a future year (not yet started) wrongly accrues
+      // as if it were already underway.
+      const now = new Date();
+      const referenceDate = targetYear < now.getFullYear() ? new Date(yearEnd)
+        : targetYear > now.getFullYear() ? accrualStart // clamps monthsElapsed to 0 below
+        : now;
       const monthsElapsed = Math.max(
         0,
-        (new Date().getFullYear() - accrualStart.getFullYear()) * 12 +
-        (new Date().getMonth() - accrualStart.getMonth()),
+        (referenceDate.getFullYear() - accrualStart.getFullYear()) * 12 +
+        (referenceDate.getMonth() - accrualStart.getMonth()),
       );
       const rate    = lt.accrual_rate ?? 0;
       const accrued = Math.min(monthsElapsed * rate, lt.default_days);

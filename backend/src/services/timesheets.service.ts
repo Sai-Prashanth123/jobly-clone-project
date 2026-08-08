@@ -270,6 +270,12 @@ export async function patchTimesheetStatus(
     throw new ForbiddenError(`Cannot transition from '${ts.status}' to '${input.status}'`);
   }
 
+  // Conflict-of-interest guard: no role may approve or reject its own
+  // timesheet, even if that role is otherwise allowed to review timesheets.
+  if ((input.status === 'manager_approved' || input.status === 'rejected') && actorEmployeeId && actorEmployeeId === ts.employee_id) {
+    throw new ForbiddenError('You cannot approve or reject your own timesheet.');
+  }
+
   // Role-based status transition rules
   const allowed: Record<string, string[]> = {
     submitted:         ['employee', 'admin', 'operations'],
@@ -321,6 +327,10 @@ export async function patchTimesheetStatus(
   if (input.status === 'manager_approved') updateData.manager_approved_at = new Date().toISOString();
   if (input.status === 'rejected') {
     updateData.rejection_reason = input.rejectionReason ?? null;
+    // Clear a stale approval timestamp — manager_approved → rejected is a
+    // valid transition, and leaving manager_approved_at set made the Status
+    // Timeline show contradictory "Approved" + "Rejected" times at once.
+    updateData.manager_approved_at = null;
   } else {
     updateData.rejection_reason = null;
   }
