@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
   User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
-  AlertTriangle, X, LogOut, Eye, EyeOff,
+  AlertTriangle, X, LogOut, Eye, EyeOff, Download,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -918,17 +918,22 @@ export default function NewEmployee() {
         }));
       }
 
+      const uploadedDocTypes: string[] = [];
+      const uploadedMultiDocTypes: string[] = [];
       const uploads: { file: File; name: string; docType: string }[] = [];
       for (const row of IDENTITY_DOC_ROWS) {
         if (row.multi) {
-          for (const file of (form.multiIdentityDocFiles[row.type] ?? [])) {
-            uploads.push({ file, name: file.name, docType: row.label });
+          const files = form.multiIdentityDocFiles[row.type] ?? [];
+          if (files.length > 0) {
+            for (const file of files) uploads.push({ file, name: file.name, docType: row.label });
+            uploadedMultiDocTypes.push(row.type);
           }
           continue;
         }
         const file = form.identityDocFiles[row.type];
         if (file) {
           uploads.push({ file, name: file.name, docType: row.label });
+          uploadedDocTypes.push(row.type);
         }
       }
       for (const u of uploads) {
@@ -947,6 +952,19 @@ export default function NewEmployee() {
         const tracked = tasks.map(t => t.then(r => { setUploadProgress(p => ({ ...p, done: p.done + 1 })); return r; }));
         try {
           await Promise.all(tracked);
+          // Clear staged file refs so a retry after a failed completeOnboarding()
+          // call below (e.g. some other section still incomplete) won't re-upload
+          // the same files again and create duplicate document rows.
+          setForm(p => ({
+            ...p,
+            profilePhotoFile: null,
+            identityDocFiles: Object.fromEntries(
+              Object.entries(p.identityDocFiles).map(([k, v]) => [k, uploadedDocTypes.includes(k) ? null : v]),
+            ),
+            multiIdentityDocFiles: Object.fromEntries(
+              Object.entries(p.multiIdentityDocFiles).map(([k, v]) => [k, uploadedMultiDocTypes.includes(k) ? [] : v]),
+            ),
+          }));
         } catch (uploadErr: any) {
           // Don't fail the whole create just because an upload failed —
           // HR can re-upload on the detail page.
@@ -1983,16 +2001,15 @@ export default function NewEmployee() {
                       </p>
                       {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
                       {row.downloadUrl && (
-                        <p className="text-[11px] mt-1">
-                          <a
-                            href={row.downloadUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 underline"
-                          >
-                            Download the current blank form
-                          </a>
-                        </p>
+                        <a
+                          href={row.downloadUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[#4069FF] bg-[#4069FF]/5 text-xs font-semibold text-[#4069FF] hover:bg-[#4069FF]/10 transition-colors"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Download the current blank form
+                        </a>
                       )}
                     </div>
                     {row.hasExpiry && (

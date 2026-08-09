@@ -22,7 +22,6 @@ export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
   'Offer Letter',
   'Social Security Card',
-  'I-9 Form',
 ] as const;
 
 // Passport and I-94 are only relevant to non-immigrant work-visa holders — an

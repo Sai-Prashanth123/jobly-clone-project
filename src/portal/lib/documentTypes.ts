@@ -31,6 +31,9 @@ export const DOCUMENT_TYPES: string[] = [
   'I-94',
   'ID Proof',
   'Compliance Document',
+  'I-140 Beneficiary Questionnaire (EB2&3)',
+  'PERM Questionnaire - Employee',
+  'I-797',
   'Other',
 ];
 
@@ -84,6 +87,9 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'i9_form',       label: 'I-9 Form',                         placeholder: '',
     hint: 'Employment Eligibility Verification. Download the current blank form, sign it, then upload it here.',
     downloadUrl: 'https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf' },
+  { type: 'insurance_waiver', label: 'Insurance Waiver Form',         placeholder: '',
+    hint: 'Download the blank waiver form, sign it, then upload it here.',
+    downloadUrl: 'https://ufkrfrmqangydrjbzljo.supabase.co/storage/v1/object/public/document-templates/insurance-waiver-form.pdf' },
   { type: 'other',         label: 'Other Documents',                  placeholder: '',
     hint: 'Any additional supporting document not covered above. Up to 5 files.',
     multi: true, maxFiles: 5 },
@@ -91,7 +97,7 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
 
 // Identity doc types mandatory for every employee during onboarding, regardless
 // of visa/citizenship status.
-export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'offer_letter', 'i9_form'] as const;
+export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'offer_letter'] as const;
 
 // Passport and I-94 are only relevant to non-immigrant work-visa holders — an
 // I-94 is an arrival/departure record issued at US entry to visa entrants, and
