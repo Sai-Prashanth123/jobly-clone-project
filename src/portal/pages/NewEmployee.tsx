@@ -566,14 +566,9 @@ export default function NewEmployee() {
     const permFilled = form.permanentSameAsPresent
       ? presentFilled
       : [form.permanentAddress.street, form.permanentAddress.city, form.permanentAddress.state, form.permanentAddress.zip].every(v => !!v.trim());
-    // OPT/STEM OPT holders need the OPT card upload. I-983 is OPTIONAL (shown
-    // only to OPT candidates in the Identity section, never required).
-    const isOptHolder = form.visaType === 'opt' || form.visaType === 'stem_opt';
-    const optDocs = isOptHolder
-      ? [
-          { id: 'doc_opt_card', label: 'OPT Card', section: SECTION_IDS.identity, done: uploadedDocTypes.has('OPT Card') },
-        ]
-      : [];
+    // OPT Card is shown to OPT/STEM OPT candidates in the Identity section
+    // (like I-983) but is NOT required to finish onboarding — it used to block
+    // submission for every OPT/STEM-OPT visa type, which HR flagged as wrong.
     const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
     return [
       // Personal — photo is optional (not required by backend)
@@ -629,8 +624,6 @@ export default function NewEmployee() {
         }
         return items;
       }),
-      // OPT/STEM OPT holders additionally need OPT Card + I-983
-      ...optDocs,
       // Non-required docs for THIS employee (e.g. Green Card, EAD, US Visa
       // always; Passport/I-94 too if this employee's visa type doesn't need
       // them): leaving both the file and expiry blank is fine, but entering an
@@ -2127,16 +2120,16 @@ export default function NewEmployee() {
                       <Input value={row.passYear ?? ''} onChange={e => updateEducation(idx, 'passYear', e.target.value)} placeholder="e.g. 2024" />
                     </div>
                     <div>
-                      <Label className="text-[11px]">GPA / Grade (0.0–4.0)</Label>
+                      <Label className="text-[11px]">GPA / Grade (0–10)</Label>
                       <Input
-                        type="number" min={0} max={4} step={0.01}
+                        type="number" min={0} max={10} step={0.01}
                         value={row.gradeOrGPA ?? ''}
                         onChange={e => {
                           const v = e.target.value;
-                          if (v !== '' && (Number(v) < 0 || Number(v) > 4)) return;
+                          if (v !== '' && (Number(v) < 0 || Number(v) > 10)) return;
                           updateEducation(idx, 'gradeOrGPA', v);
                         }}
-                        placeholder="e.g. 3.8"
+                        placeholder="e.g. 3.8 or 4.3"
                       />
                     </div>
                     <div>
