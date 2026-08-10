@@ -725,7 +725,12 @@ export default function EmployeeDetail() {
         const complianceItems = [
           { label: "Driver's License / State ID", satisfiedBy: ["Driver's License", "State-Issued ID"] },
           { label: 'Passport', satisfiedBy: ['Passport'] },
-          { label: 'Visa / Work Authorization', satisfiedBy: ['Visa / Work Authorization'] },
+          // No uploaded document is ever literally typed "Visa / Work Authorization" —
+          // that's not a real IDENTITY_DOC_ROWS label, so this item could never be
+          // satisfied by any upload. The actual documents that prove visa/work
+          // authorization are the visa stamp, the EAD card, or (for green card
+          // holders) the Permanent Resident Card.
+          { label: 'Visa / Work Authorization', satisfiedBy: ['US Visa', 'Employment Authorization Document', 'Permanent Resident Card'] },
           { label: 'I-94', satisfiedBy: ['I-94'] },
           { label: 'Offer Letter', satisfiedBy: ['Offer Letter'] },
           { label: 'Resume', satisfiedBy: ['Resume'] },
