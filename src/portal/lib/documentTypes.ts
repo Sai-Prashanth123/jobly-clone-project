@@ -94,6 +94,8 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'perm_questionnaire', label: 'PERM Questionnaire - Employee', placeholder: '',
     hint: 'Download the blank questionnaire, fill it out, then upload it here.',
     downloadUrl: 'https://ufkrfrmqangydrjbzljo.supabase.co/storage/v1/object/public/document-templates/perm-questionnaire-employee.doc' },
+  { type: 'i797',           label: 'I-797',                            placeholder: '',
+    hint: 'Notice of Action / approval notice (e.g., H-1B, I-140, extension approvals), if you have one.', hasExpiry: true },
   { type: 'other',         label: 'Other Documents',                  placeholder: '',
     hint: 'Any additional supporting document not covered above. Up to 5 files.',
     multi: true, maxFiles: 5 },
