@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Check, X, Ban } from 'lucide-react';
+import { Plus, Check, X, Ban, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -226,7 +226,9 @@ export default function LeaveRequests() {
         </Select>
       </div>
 
-      {isError ? (
+      {isLoading ? (
+        <div className="flex items-center justify-center py-20"><Loader2 className="h-6 w-6 animate-spin text-muted-foreground" /></div>
+      ) : isError ? (
         <div className="flex flex-col items-center justify-center py-16 gap-2 text-red-500">
           <p className="text-sm">Failed to load leave requests. Please refresh.</p>
         </div>

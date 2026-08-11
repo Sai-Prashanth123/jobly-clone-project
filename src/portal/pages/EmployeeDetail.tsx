@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, CheckSquare2, Square, ListChecks, Eye, EyeOff, AlertCircle, Send, ShieldOff, ShieldCheck } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, Eye, EyeOff, AlertCircle, Send, ShieldOff, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -22,7 +22,6 @@ import {
 import { useAssignments } from '../hooks/useAssignments';
 import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
-import { useEmployeeOnboardingTasks, useToggleOnboardingTask } from '../hooks/useOnboardingChecklist';
 import { OnboardingChecklist } from '../components/employees/OnboardingProgress';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
@@ -51,8 +50,6 @@ export default function EmployeeDetail() {
   const { data: assignmentsData } = useAssignments({ employeeId: id, limit: 100 });
   const { data: timesheetsData } = useTimesheets({ employeeId: id, limit: 100 });
   const { data: allEmployeesData } = useEmployees({ limit: 500 });
-  const { data: checklistTasks = [] } = useEmployeeOnboardingTasks(id);
-  const toggleTask = useToggleOnboardingTask();
   const updateEmployee = useUpdateEmployee(id!);
   const deleteEmployee = useDeleteEmployee();
   const resendCreds = useResendEmployeeCredentials();
@@ -720,109 +717,12 @@ export default function EmployeeDetail() {
         </Card>
       )}
 
-      {isReviewer && (() => {
-        const uploadedDocTypes = new Set(employee.documents.map(d => d.type));
-        const complianceItems = [
-          { label: "Driver's License / State ID", satisfiedBy: ["Driver's License", "State-Issued ID"] },
-          { label: 'Passport', satisfiedBy: ['Passport'] },
-          // No uploaded document is ever literally typed "Visa / Work Authorization" —
-          // that's not a real IDENTITY_DOC_ROWS label, so this item could never be
-          // satisfied by any upload. The actual documents that prove visa/work
-          // authorization are the visa stamp, the EAD card, or (for green card
-          // holders) the Permanent Resident Card.
-          { label: 'Visa / Work Authorization', satisfiedBy: ['US Visa', 'Employment Authorization Document', 'Permanent Resident Card'] },
-          { label: 'I-94', satisfiedBy: ['I-94'] },
-          { label: 'Offer Letter', satisfiedBy: ['Offer Letter'] },
-          { label: 'Resume', satisfiedBy: ['Resume'] },
-        ];
-        const statuses = complianceItems.map(item => ({
-          ...item,
-          done: item.satisfiedBy.some(t => uploadedDocTypes.has(t)),
-        }));
-        const doneCount = statuses.filter(s => s.done).length;
-        return (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base flex items-center gap-2">
-                <CheckSquare2 className="h-4 w-4 text-blue-500" />
-                Required Documents
-                <span className="text-xs font-normal text-muted-foreground">{doneCount}/{statuses.length} uploaded</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-1.5">
-                {statuses.map(s => (
-                  <li key={s.label} className="flex items-center gap-2.5 text-sm">
-                    {s.done
-                      ? <CheckCircle2 className="h-4 w-4 text-emerald-500 flex-shrink-0" />
-                      : <Square className="h-4 w-4 text-red-400 flex-shrink-0" />}
-                    <span className={s.done ? 'text-gray-700' : 'text-red-600 font-medium'}>{s.label}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        );
-      })()}
-
       <DocumentPreviewDialog
         open={!!previewDoc}
         onOpenChange={open => { if (!open) setPreviewDoc(null); }}
         docId={previewDoc?.id ?? ''}
         fileName={previewDoc?.name ?? ''}
       />
-
-      {/* Onboarding Checklist — HR/admin only */}
-      {canManage && checklistTasks.length > 0 && (
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base flex items-center gap-2">
-                <ListChecks className="h-4 w-4 text-blue-500" />
-                Onboarding Checklist
-                <span className="text-xs font-normal text-muted-foreground">
-                  {checklistTasks.filter(t => t.isCompleted).length}/{checklistTasks.length} completed
-                </span>
-              </CardTitle>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-1.5">
-              {checklistTasks.map(task => (
-                <div key={task.id} className={`flex items-start gap-3 py-2 px-2 rounded-lg transition-colors cursor-pointer ${task.isCompleted ? 'bg-emerald-50' : 'hover:bg-gray-50'}`}
-                  onClick={async () => {
-                    try {
-                      await toggleTask.mutateAsync({ taskId: task.id, employeeId: id! });
-                    } catch { /* centrally handled */ }
-                  }}
-                >
-                  <span className="mt-0.5 flex-shrink-0">
-                    {task.isCompleted
-                      ? <CheckSquare2 className="h-4 w-4 text-emerald-600" />
-                      : <Square className="h-4 w-4 text-gray-300" />
-                    }
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${task.isCompleted ? 'line-through text-gray-400' : 'text-gray-900'}`}>
-                      {task.title}
-                      {task.isRequired && <span className="ml-1 text-[10px] text-red-500">*</span>}
-                    </p>
-                    {task.description && !task.isCompleted && (
-                      <p className="text-xs text-muted-foreground mt-0.5">{task.description}</p>
-                    )}
-                    {task.isCompleted && task.completedByName && (
-                      <p className="text-xs text-emerald-600 mt-0.5">✓ {task.completedByName}</p>
-                    )}
-                  </div>
-                  <span className="text-[11px] bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded capitalize flex-shrink-0">
-                    {task.category}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {empAssignments.length > 0 && (
         <Card>

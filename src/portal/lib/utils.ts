@@ -88,6 +88,14 @@ export function formatUsPhone(raw: string): string {
   return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+// Digits-only, capped at 9, live-formatted as a US ZIP code as the user
+// types — e.g. "946011234" -> "94601-1234". A plain 5-digit ZIP passes
+// through unchanged.
+export function formatZip(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 9);
+  return digits.length <= 5 ? digits : `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
 // Mirrors backend ALLOWED_MIME_TYPES (backend/src/middleware/upload.ts) for
 // instant client-side feedback — the accept="..." attribute on a file input
 // is only a picker *hint*; it does not stop drag-and-drop or "All Files" in

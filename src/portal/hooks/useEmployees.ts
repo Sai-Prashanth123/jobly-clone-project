@@ -172,7 +172,7 @@ export function useCreateEmployee() {
     },
     onSuccess: ({ employee }) => {
       qc.setQueryData(['employees', employee.id], employee);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 }
@@ -207,7 +207,7 @@ export function useUpdateEmployee(id: string) {
         ...updated,
         documents: updated.documents?.length ? updated.documents : (old?.documents ?? []),
       }));
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
       qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
     meta: { silentError: true },
@@ -237,7 +237,7 @@ export function useSendOfficialEmail(id: string) {
         ...employee,
         documents: employee.documents?.length ? employee.documents : (old?.documents ?? []),
       }));
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
     },
     meta: { silentError: true },
   });
@@ -266,7 +266,7 @@ export function usePlaceOnLeave(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
       qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
@@ -282,7 +282,7 @@ export function useReturnFromLeave(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
       qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
@@ -299,7 +299,7 @@ export function useTerminateEmployee(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
       qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
@@ -322,7 +322,7 @@ export function useRehireEmployee(id: string) {
     },
     onSuccess: ({ employee }) => {
       qc.setQueryData(['employees', id], employee);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
       qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
     },
   });
@@ -339,7 +339,7 @@ export function useCompleteOnboarding(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 }
@@ -357,7 +357,7 @@ export function useRequestOnboardingChanges(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
     },
     meta: { silentError: true },
   });
@@ -388,7 +388,7 @@ export function useReopenOnboarding(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
-      qc.invalidateQueries({ queryKey: ['employees'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 }

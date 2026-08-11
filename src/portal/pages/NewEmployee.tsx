@@ -21,7 +21,7 @@ import { UsDateInput } from '../components/shared/UsDateInput';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
-import { parseNumberInput, formatUsPhone } from '../lib/utils';
+import { parseNumberInput, formatUsPhone, formatZip } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
 import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
@@ -681,6 +681,15 @@ export default function NewEmployee() {
     else if (!/^\S+@\S+\.\S+$/.test(form.email)) flag('email', 'Enter a valid email', SECTION_IDS.contact);
     if (form.workEmail && !/^\S+@\S+\.\S+$/.test(form.workEmail)) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
     if (isOnboarding && !form.linkedinUrl.trim()) flag('linkedinUrl', 'LinkedIn URL is required', SECTION_IDS.contact);
+
+    if (form.phone && !/^\(\d{3}\) \d{3}-\d{4}$/.test(form.phone)) flag('phone', 'Enter a valid 10-digit phone number', SECTION_IDS.contact);
+    if (form.altPhone && !/^\(\d{3}\) \d{3}-\d{4}$/.test(form.altPhone)) flag('altPhone', 'Enter a valid 10-digit phone number', SECTION_IDS.contact);
+    if (form.emergencyContact.phone && !/^\(\d{3}\) \d{3}-\d{4}$/.test(form.emergencyContact.phone)) flag('emergencyPhone', 'Enter a valid 10-digit phone number', SECTION_IDS.emergency);
+    if (form.emergencyContact.altPhone && !/^\(\d{3}\) \d{3}-\d{4}$/.test(form.emergencyContact.altPhone)) flag('emergencyAltPhone', 'Enter a valid 10-digit phone number', SECTION_IDS.emergency);
+
+    if (form.address.zip && !/^\d{5}(-\d{4})?$/.test(form.address.zip)) flag('addressZip', 'Enter a valid ZIP code', SECTION_IDS.presentAddr);
+    if (form.permanentAddress.zip && !/^\d{5}(-\d{4})?$/.test(form.permanentAddress.zip)) flag('permanentZip', 'Enter a valid ZIP code', SECTION_IDS.permanentAddr);
+    if (form.emergencyContact.zip && !/^\d{5}(-\d{4})?$/.test(form.emergencyContact.zip)) flag('emergencyZip', 'Enter a valid ZIP code', SECTION_IDS.emergency);
 
     if (form.ssn && !/^\d{3}-\d{2}-\d{4}$/.test(form.ssn)) flag('ssn', 'Enter SSN in format XXX-XX-XXXX (e.g. 123-45-6789)', SECTION_IDS.immigration);
 
@@ -1665,12 +1674,16 @@ export default function NewEmployee() {
 
               <div>
                 <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.phone} onChange={e => set('phone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 123-4567" onBlur={() => { if (!form.phone.trim()) setErrors(p => ({ ...p, phone: 'Phone number is required' })); }} />
+                <Input value={form.phone} onChange={e => set('phone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(000) 000-0000" onBlur={() => {
+                  if (!form.phone.trim()) setErrors(p => ({ ...p, phone: 'Phone number is required' }));
+                  else if (!/^\(\d{3}\) \d{3}-\d{4}$/.test(form.phone)) setErrors(p => ({ ...p, phone: 'Enter a valid 10-digit phone number' }));
+                }} />
                 <FieldError msg={errors.phone} />
               </div>
               <div>
                 <Label>Alternate Phone</Label>
-                <Input value={form.altPhone} onChange={e => set('altPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 987-6543" />
+                <Input value={form.altPhone} onChange={e => set('altPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(000) 000-0000" />
+                <FieldError msg={errors.altPhone} />
               </div>
 
               <div>
@@ -1723,7 +1736,7 @@ export default function NewEmployee() {
               </div>
               <div className="sm:col-span-1">
                 <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.address.zip} onChange={e => setAddress('zip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} placeholder="94103" />
+                <Input value={form.address.zip} onChange={e => setAddress('zip', formatZip(e.target.value))} inputMode="numeric" maxLength={10} placeholder="94103" />
                 <FieldError msg={errors.addressZip} />
               </div>
               <div className="sm:col-span-6">
@@ -1777,7 +1790,8 @@ export default function NewEmployee() {
                 </div>
                 <div className="sm:col-span-1">
                   <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
-                  <Input value={form.permanentAddress.zip} onChange={e => setPermanentAddress('zip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} />
+                  <Input value={form.permanentAddress.zip} onChange={e => setPermanentAddress('zip', formatZip(e.target.value))} inputMode="numeric" maxLength={10} />
+                  <FieldError msg={errors.permanentZip} />
                 </div>
                 <div className="sm:col-span-6">
                   <Label>Country</Label>
@@ -2278,12 +2292,16 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>Mobile Phone {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.emergencyContact.phone} onChange={e => setEmergency('phone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 123-4567" />
+                <Input value={form.emergencyContact.phone} onChange={e => setEmergency('phone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(000) 000-0000" onBlur={() => {
+                  if (!form.emergencyContact.phone.trim()) setErrors(p => ({ ...p, emergencyPhone: 'Phone number is required' }));
+                  else if (!/^\(\d{3}\) \d{3}-\d{4}$/.test(form.emergencyContact.phone)) setErrors(p => ({ ...p, emergencyPhone: 'Enter a valid 10-digit phone number' }));
+                }} />
                 <FieldError msg={errors.emergencyPhone} />
               </div>
               <div>
                 <Label>Alternate Phone</Label>
-                <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(555) 987-6543" />
+                <Input value={form.emergencyContact.altPhone} onChange={e => setEmergency('altPhone', formatUsPhone(e.target.value))} inputMode="numeric" maxLength={14} placeholder="(000) 000-0000" />
+                <FieldError msg={errors.emergencyAltPhone} />
               </div>
               <div>
                 <Label>Address Line 1 {isOnboarding && <RequiredMark />}</Label>
@@ -2304,7 +2322,8 @@ export default function NewEmployee() {
               </div>
               <div>
                 <Label>ZIP {isOnboarding && <RequiredMark />}</Label>
-                <Input value={form.emergencyContact.zip} onChange={e => setEmergency('zip', e.target.value.replace(/\D/g, '').slice(0, 5))} inputMode="numeric" maxLength={5} placeholder="94103" />
+                <Input value={form.emergencyContact.zip} onChange={e => setEmergency('zip', formatZip(e.target.value))} inputMode="numeric" maxLength={10} placeholder="94103" />
+                <FieldError msg={errors.emergencyZip} />
               </div>
             </div>
           </SectionCard>
