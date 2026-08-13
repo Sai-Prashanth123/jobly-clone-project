@@ -26,7 +26,11 @@ import { US_STATES } from '../lib/usStates';
 import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
 import { LANGUAGES } from '../lib/languages';
-import { DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, getRequiredIdentityTypes, IDENTITY_OWNED_DOC_LABELS, docMatchesRow, docsMatchingRow } from '../lib/documentTypes';
+import {
+  DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, EMPLOYER_DOC_ROWS, ROW_VISA_GATE, EMPLOYER_ROW_VISA_GATE,
+  getRequiredIdentityTypes, getMinFiles, IDENTITY_OWNED_DOC_LABELS, docMatchesRow, docsMatchingRow,
+  type IdentityDocRow,
+} from '../lib/documentTypes';
 import { LanguagesMultiSelect } from '../components/shared/LanguagesMultiSelect';
 import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
 
@@ -274,6 +278,26 @@ function isEducationSectionDone(education: EducationEntry[]): boolean {
   return education.length > 0 && education.every(isEduRowComplete);
 }
 
+// Single source of truth for "has this identity/employer doc row been
+// satisfied" — used by the Section 07 render, sectionComplete, and
+// onboardingChecklist so all three always agree. Multi-file rows need at
+// least getMinFiles(row.type, visaType) files (existing + staged) to count;
+// single-file rows need just one.
+function isRowSatisfied(
+  row: { type: string; label: string; multi?: boolean },
+  form: { identityDocFiles: Record<string, File | undefined>; multiIdentityDocFiles: Record<string, File[] | undefined> },
+  visaType: string | undefined | null,
+  existingDocuments: { type?: string }[] | undefined,
+): boolean {
+  if (row.multi) {
+    const existingCount = docsMatchingRow(existingDocuments ?? [], row).length;
+    const stagedCount = form.multiIdentityDocFiles[row.type]?.length ?? 0;
+    return existingCount + stagedCount >= getMinFiles(row.type, visaType);
+  }
+  const isAlreadyUploaded = (existingDocuments ?? []).some(d => docMatchesRow(d, row));
+  return !!(form.identityDocFiles[row.type] || isAlreadyUploaded);
+}
+
 // Auto-compute age from DOB. Returns null when DOB is empty or invalid.
 function ageFromDob(dob: string): number | null {
   if (!dob) return null;
@@ -513,7 +537,7 @@ export default function NewEmployee() {
   const uploadedDocTypes = new Set<string>([
     ...(existingEmployee?.documents ?? []).map(d => d.type),
     ...Object.entries(form.identityDocFiles ?? {}).filter(([, v]) => v).map(([k]) => {
-      const row = IDENTITY_DOC_ROWS.find(r => r.type === k);
+      const row = [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS].find(r => r.type === k);
       return row?.label ?? k;
     }),
   ]);
@@ -541,8 +565,7 @@ export default function NewEmployee() {
       ...(isOnboarding ? {
         [SECTION_IDS.identity]: requiredIdentityTypes.every(t => {
           const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
-          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
-          const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
+          const fileOrUploaded = isRowSatisfied(row, form, form.visaType, existingEmployee?.documents);
           const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
           return fileOrUploaded && (!row.hasExpiry || !!expiry);
         }) && IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !requiredIdentityTypes.includes(row.type)).every(row => {
@@ -550,10 +573,7 @@ export default function NewEmployee() {
           // Visa): fine to leave both blank, but entering an expiry date
           // without ever uploading the document is an inconsistent partial
           // state — don't let it count as complete.
-          const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
-          const fileOrUploaded = row.multi
-            ? (form.multiIdentityDocFiles[row.type]?.length ?? 0) > 0 || docsMatchingRow(existingEmployee?.documents ?? [], row).length > 0
-            : !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
+          const fileOrUploaded = isRowSatisfied(row, form, form.visaType, existingEmployee?.documents);
           const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
           return !expiry || fileOrUploaded;
         }),
@@ -598,8 +618,7 @@ export default function NewEmployee() {
       // visa types that would actually hold them (see getRequiredIdentityTypes).
       ...requiredIdentityTypes.flatMap(t => {
         const row = IDENTITY_DOC_ROWS.find(r => r.type === t)!;
-        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
-        const fileOrUploaded = !!(form.identityDocFiles?.[t] || isAlreadyUploaded);
+        const fileOrUploaded = isRowSatisfied(row, form, form.visaType, existingEmployee?.documents);
         const expiry = (form.identityDocuments.find(d => d.type === t)?.expiry ?? '').trim();
         const items: { id: string; label: string; section: string; done: boolean }[] = [{
           id: `ident_${t}`,
@@ -631,10 +650,7 @@ export default function NewEmployee() {
       // state. Only appears in the checklist while that inconsistency exists,
       // so it doesn't affect the % for anyone who never touches these fields.
       ...IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !requiredIdentityTypes.includes(row.type)).flatMap(row => {
-        const isAlreadyUploaded = !!(existingEmployee?.documents?.some((d: any) => docMatchesRow(d, row)));
-        const fileOrUploaded = row.multi
-          ? (form.multiIdentityDocFiles[row.type]?.length ?? 0) > 0 || docsMatchingRow(existingEmployee?.documents ?? [], row).length > 0
-          : !!(form.identityDocFiles?.[row.type] || isAlreadyUploaded);
+        const fileOrUploaded = isRowSatisfied(row, form, form.visaType, existingEmployee?.documents);
         const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
         if (!expiry || fileOrUploaded) return [];
         return [{
@@ -768,6 +784,142 @@ export default function NewEmployee() {
       multiIdentityDocFiles: { ...p.multiIdentityDocFiles, [type]: (p.multiIdentityDocFiles[type] ?? []).filter((_, i) => i !== idx) },
     }));
   };
+
+  // Shared per-row upload card — used by both the Section 07 "Identity &
+  // Documents" grid (IDENTITY_DOC_ROWS) and the "Employer / Admin Documents"
+  // card (EMPLOYER_DOC_ROWS, admin/hr view only) so the upload UI/logic
+  // exists in exactly one place.
+  const renderIdentityDocRow = (row: IdentityDocRow) => {
+    const file = form.identityDocFiles[row.type];
+    const doc = getIdentityDoc(row.type);
+    const inputId = `id-doc-file-${row.type}`;
+    const isRequired = getRequiredIdentityTypes(form.visaType).includes(row.type)
+      || EMPLOYER_DOC_ROWS.some(r => r.type === row.type);
+    const existingDoc = existingEmployee?.documents?.find((d: any) => docMatchesRow(d, row));
+    const isAlreadyUploaded = !!existingDoc;
+    const multiExistingDocs = row.multi ? docsMatchingRow(existingEmployee?.documents ?? [], row) : [];
+    const multiStagedFiles = row.multi ? (form.multiIdentityDocFiles[row.type] ?? []) : [];
+    const fileOrUploaded = isRowSatisfied(row, form, form.visaType, existingEmployee?.documents);
+    const displayFileName = file?.name ?? (!file ? existingDoc?.name : undefined);
+    const expiryVal = (doc.expiry ?? '').trim();
+    const missingExpiry = isOnboarding && isRequired && row.hasExpiry && fileOrUploaded && !expiryVal;
+    // An expiry date entered with no file ever uploaded is an inconsistent
+    // partial state regardless of whether this doc type is one of the
+    // hard-required ones — you can't be tracking the expiry of a document
+    // you never provided.
+    const expiryWithoutFile = isOnboarding && row.hasExpiry && !!expiryVal && !fileOrUploaded;
+    const isMissing = isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile);
+    return (
+      <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
+        <div>
+          <p className="text-sm font-semibold text-gray-800">
+            {row.label}
+            {isRequired && <span className="text-red-500 ml-0.5">*</span>}
+            {isRequired && !fileOrUploaded && isOnboarding && (
+              <span className="ml-2 text-[10px] font-semibold text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Required</span>
+            )}
+          </p>
+          {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
+          {row.downloadUrl && (
+            <a
+              href={row.downloadUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[#4069FF] bg-[#4069FF]/5 text-xs font-semibold text-[#4069FF] hover:bg-[#4069FF]/10 transition-colors"
+            >
+              <Download className="h-3.5 w-3.5" />
+              Download the current blank form
+            </a>
+          )}
+        </div>
+        {row.hasExpiry && (
+          <div className="space-y-1">
+            <Label className="text-[11px] font-medium text-gray-500">
+              Expiry Date {isOnboarding && isRequired && <RequiredMark />}
+            </Label>
+            <UsDateInput
+              value={doc.expiry ?? ''}
+              onChange={iso => upsertIdentityDoc(row.type, { expiry: iso })}
+              className={missingExpiry || expiryWithoutFile ? 'border-red-300' : ''}
+            />
+            {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
+            {missingExpiry && <p className="text-[11px] text-red-500 mt-0.5">Expiry date is required</p>}
+            {expiryWithoutFile && <p className="text-[11px] text-red-500 mt-0.5">Upload the document below to save this expiry date</p>}
+          </div>
+        )}
+        {row.multi ? (
+          <MultiFileUploadSlot
+            inputId={inputId}
+            existingDocs={multiExistingDocs}
+            stagedFiles={multiStagedFiles}
+            maxFiles={row.maxFiles ?? 3}
+            onAdd={f => addMultiIdentityDocFile(row.type, f)}
+            onRemoveStaged={idx => removeMultiIdentityDocFile(row.type, idx)}
+          />
+        ) : (
+          <>
+            <div className="flex items-center gap-2 mt-auto">
+              <label
+                htmlFor={inputId}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
+              >
+                <Upload className="h-3.5 w-3.5" />
+                {fileOrUploaded ? 'Replace' : 'Upload'}
+              </label>
+              <input
+                id={inputId}
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="hidden"
+                onChange={e => {
+                  const f = e.target.files?.[0] ?? null;
+                  if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
+                    toast.error('Please upload a PDF, JPEG, or PNG file.');
+                    e.target.value = '';
+                    return;
+                  }
+                  setIdentityDocFile(row.type, f);
+                }}
+              />
+              {fileOrUploaded && (
+                <>
+                  <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
+                    {isAlreadyUploaded && !file ? 'On file' : 'Uploaded'}
+                  </span>
+                  {file && (
+                    <button
+                      type="button"
+                      onClick={() => setIdentityDocFile(row.type, null)}
+                      className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </>
+              )}
+            </div>
+            {fileOrUploaded && displayFileName && (
+              <p className="text-[11px] text-gray-500 truncate" title={displayFileName}>{displayFileName}</p>
+            )}
+          </>
+        )}
+      </div>
+    );
+  };
+
+  // Employer/Admin Documents — visible only to admin/hr (never the employee,
+  // not even during their own onboarding); gated per visa type via
+  // EMPLOYER_ROW_VISA_GATE (currently H-1B sponsorship paperwork + the
+  // OPT/STEM-OPT E-Verify letter). Role-based, not route-based — see the
+  // dedicated card below for the intentional self-edit edge case this implies.
+  const applicableEmployerRows = EMPLOYER_DOC_ROWS.filter(row => (EMPLOYER_ROW_VISA_GATE[row.type] ?? []).includes(form.visaType));
+  const isDocsAdmin = user?.role === 'admin' || user?.role === 'hr';
+  const employerDocsSatisfiedCount = applicableEmployerRows.filter(row =>
+    (existingEmployee?.documents ?? []).some(d => docMatchesRow(d, row)),
+  ).length;
+  const requiredIdentityLabels = getRequiredIdentityTypes(form.visaType)
+    .map(t => IDENTITY_DOC_ROWS.find(r => r.type === t)?.label)
+    .filter((l): l is string => !!l);
 
   // ── Education + work-history row mutations ────────────────────────────────
   const addEducation = () => setForm(p => ({ ...p, education: [...(p.education ?? []), emptyEducation()] }));
@@ -923,7 +1075,7 @@ export default function NewEmployee() {
       const uploadedDocTypes: string[] = [];
       const uploadedMultiDocTypes: string[] = [];
       const uploads: { file: File; name: string; docType: string }[] = [];
-      for (const row of IDENTITY_DOC_ROWS) {
+      for (const row of [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS]) {
         if (row.multi) {
           const files = form.multiIdentityDocFiles[row.type] ?? [];
           if (files.length > 0) {
@@ -1094,7 +1246,7 @@ export default function NewEmployee() {
       const uploadedDocTypes: string[] = [];
       const uploadedMultiDocTypes: string[] = [];
       const uploads: { file: File; name: string; docType: string }[] = [];
-      for (const row of IDENTITY_DOC_ROWS) {
+      for (const row of [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS]) {
         if (row.multi) {
           const files = form.multiIdentityDocFiles[row.type] ?? [];
           if (files.length > 0) {
@@ -1965,136 +2117,53 @@ export default function NewEmployee() {
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
-            description={`Upload your identity and hiring documents. SSN, Resume, Offer Letter, and I-9 Form are required during onboarding${form.visaType && ['h1b', 'l1', 'opt', 'stem_opt', 'tn'].includes(form.visaType) ? ', along with Passport and I-94 for your visa type' : ''}.`}
+            description={`Upload your identity and hiring documents. Required: ${requiredIdentityLabels.join(', ')}.${applicableEmployerRows.length > 0 && !isDocsAdmin ? ' Some sponsorship documents for your visa type are managed by HR — see below.' : ''}`}
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {IDENTITY_DOC_ROWS.filter(row => {
-                // OPT-specific documents only apply to OPT / STEM OPT candidates.
-                if (['i983', 'i20', 'opt_card', 'stem_opt_card'].includes(row.type)) {
+                // I-983 / STEM OPT Card apply only to OPT / STEM OPT candidates.
+                if (['i983', 'stem_opt_card'].includes(row.type)) {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
+                // I-20 / OPT Card also apply (optionally) to H-1B holders who
+                // recently transitioned from F-1/OPT status.
+                if (['i20', 'opt_card'].includes(row.type)) {
+                  return form.visaType === 'opt' || form.visaType === 'stem_opt' || form.visaType === 'h1b';
+                }
+                // Newer visa-specific rows (H-1B / Green Card checklists) —
+                // shown only for the visa types they were sourced from; a row
+                // absent from ROW_VISA_GATE is shown for every visa type.
+                const gate = ROW_VISA_GATE[row.type];
+                if (gate) return gate.includes(form.visaType);
                 return true;
-              }).map(row => {
-                const file = form.identityDocFiles[row.type];
-                const doc = getIdentityDoc(row.type);
-                const inputId = `id-doc-file-${row.type}`;
-                const isRequired = getRequiredIdentityTypes(form.visaType).includes(row.type);
-                const existingDoc = existingEmployee?.documents?.find((d: any) => docMatchesRow(d, row));
-                const isAlreadyUploaded = !!existingDoc;
-                const multiExistingDocs = row.multi ? docsMatchingRow(existingEmployee?.documents ?? [], row) : [];
-                const multiStagedFiles = row.multi ? (form.multiIdentityDocFiles[row.type] ?? []) : [];
-                const fileOrUploaded = row.multi
-                  ? (multiExistingDocs.length > 0 || multiStagedFiles.length > 0)
-                  : !!(file || isAlreadyUploaded);
-                const displayFileName = file?.name ?? (!file ? existingDoc?.name : undefined);
-                const expiryVal = (doc.expiry ?? '').trim();
-                const missingExpiry = isOnboarding && isRequired && row.hasExpiry && fileOrUploaded && !expiryVal;
-                // An expiry date entered with no file ever uploaded is an
-                // inconsistent partial state regardless of whether this doc
-                // type is one of the hard-required ones — you can't be
-                // tracking the expiry of a document you never provided.
-                const expiryWithoutFile = isOnboarding && row.hasExpiry && !!expiryVal && !fileOrUploaded;
-                const isMissing = isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile);
-                return (
-                  <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-800">
-                        {row.label}
-                        {isRequired && <span className="text-red-500 ml-0.5">*</span>}
-                        {isRequired && !fileOrUploaded && isOnboarding && (
-                          <span className="ml-2 text-[10px] font-semibold text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Required</span>
-                        )}
-                      </p>
-                      {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
-                      {row.downloadUrl && (
-                        <a
-                          href={row.downloadUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-2 inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-[#4069FF] bg-[#4069FF]/5 text-xs font-semibold text-[#4069FF] hover:bg-[#4069FF]/10 transition-colors"
-                        >
-                          <Download className="h-3.5 w-3.5" />
-                          Download the current blank form
-                        </a>
-                      )}
-                    </div>
-                    {row.hasExpiry && (
-                      <div className="space-y-1">
-                        <Label className="text-[11px] font-medium text-gray-500">
-                          Expiry Date {isOnboarding && isRequired && <RequiredMark />}
-                        </Label>
-                        <UsDateInput
-                          value={doc.expiry ?? ''}
-                          onChange={iso => upsertIdentityDoc(row.type, { expiry: iso })}
-                          className={missingExpiry || expiryWithoutFile ? 'border-red-300' : ''}
-                        />
-                        {doc.expiry && <div className="mt-1"><ExpiryBadge date={doc.expiry} /></div>}
-                        {missingExpiry && <p className="text-[11px] text-red-500 mt-0.5">Expiry date is required</p>}
-                        {expiryWithoutFile && <p className="text-[11px] text-red-500 mt-0.5">Upload the document below to save this expiry date</p>}
-                      </div>
-                    )}
-                    {row.multi ? (
-                      <MultiFileUploadSlot
-                        inputId={inputId}
-                        existingDocs={multiExistingDocs}
-                        stagedFiles={multiStagedFiles}
-                        maxFiles={row.maxFiles ?? 3}
-                        onAdd={f => addMultiIdentityDocFile(row.type, f)}
-                        onRemoveStaged={idx => removeMultiIdentityDocFile(row.type, idx)}
-                      />
-                    ) : (
-                      <>
-                        <div className="flex items-center gap-2 mt-auto">
-                          <label
-                            htmlFor={inputId}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
-                          >
-                            <Upload className="h-3.5 w-3.5" />
-                            {fileOrUploaded ? 'Replace' : 'Upload'}
-                          </label>
-                          <input
-                            id={inputId}
-                            type="file"
-                            accept=".pdf,.jpg,.jpeg,.png"
-                            className="hidden"
-                            onChange={e => {
-                              const f = e.target.files?.[0] ?? null;
-                              if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
-                                toast.error('Please upload a PDF, JPEG, or PNG file.');
-                                e.target.value = '';
-                                return;
-                              }
-                              setIdentityDocFile(row.type, f);
-                            }}
-                          />
-                          {fileOrUploaded && (
-                            <>
-                              <span className="inline-flex items-center text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 font-medium">
-                                {isAlreadyUploaded && !file ? 'On file' : 'Uploaded'}
-                              </span>
-                              {file && (
-                                <button
-                                  type="button"
-                                  onClick={() => setIdentityDocFile(row.type, null)}
-                                  className="text-[11px] text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto"
-                                >
-                                  Remove
-                                </button>
-                              )}
-                            </>
-                          )}
-                        </div>
-                        {fileOrUploaded && displayFileName && (
-                          <p className="text-[11px] text-gray-500 truncate" title={displayFileName}>{displayFileName}</p>
-                        )}
-                      </>
-                    )}
-                  </div>
-                );
-              })}
+              }).map(row => renderIdentityDocRow(row))}
             </div>
           </SectionCard>
+
+          {/* Employer / Admin Documents — sponsorship paperwork HR/immigration
+              manages. Never shown to the employee; role-gated (not route-gated,
+              see renderIdentityDocRow's comment above for why), and only
+              rendered at all when the current visa type has any applicable rows. */}
+          {applicableEmployerRows.length > 0 && (
+            <SectionCard
+              id="employer_docs"
+              num="07b"
+              title="Employer / Admin Documents"
+              description="Sponsorship paperwork managed by HR/Admin — not part of the employee's own onboarding."
+              icon={<ShieldCheck className="h-4 w-4 text-[#4069FF]" />}
+            >
+              {isDocsAdmin ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {applicableEmployerRows.map(row => renderIdentityDocRow(row))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Employer-provided documents: {employerDocsSatisfiedCount} of {applicableEmployerRows.length} on file — contact HR for details.
+                </p>
+              )}
+            </SectionCard>
+          )}
 
           {/* 08 Education */}
           <SectionCard

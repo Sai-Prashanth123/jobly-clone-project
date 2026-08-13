@@ -49,6 +49,7 @@ export interface IdentityDocRow {
   downloadUrl?: string; // shown as a "download the blank form" link next to the upload control
   multi?: boolean;      // allows uploading more than one file of this type (up to maxFiles)
   maxFiles?: number;    // only meaningful when multi is true
+  minFiles?: number;    // minimum files needed to satisfy this row when required (multi rows only); defaults to 1, may be overridden per visa type — see getMinFiles()
 }
 
 export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
@@ -59,7 +60,8 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'state_id',       label: 'State-Issued ID',            placeholder: 'S1234567',
     hint: 'Alternative to driver license for non-drivers.', hasState: true },
   { type: 'passport',       label: 'Passport',                   placeholder: '123456789',
-    hint: 'I-9 List A — proves identity AND work authorization on its own.', hasExpiry: true },
+    hint: 'I-9 List A — proves identity AND work authorization on its own. Upload all pages (except blank ones). Up to 10 files.',
+    hasExpiry: true, multi: true, maxFiles: 10 },
   { type: 'green_card',     label: 'Permanent Resident Card',    placeholder: 'A12345678',
     hint: 'Green Card — also I-9 List A.', hasExpiry: true },
   { type: 'ead',            label: 'Employment Authorization Document', placeholder: 'EAC1234567890',
@@ -95,11 +97,72 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
     hint: 'Download the blank questionnaire, fill it out, then upload it here.',
     downloadUrl: 'https://ufkrfrmqangydrjbzljo.supabase.co/storage/v1/object/public/document-templates/perm-questionnaire-employee.doc' },
   { type: 'i797',           label: 'I-797',                            placeholder: '',
-    hint: 'Notice of Action / approval notice (e.g., H-1B, I-140, extension approvals), if you have one.', hasExpiry: true },
+    hint: 'Notice of Action / approval notice (e.g., H-1B, I-140, extension approvals), if you have one. Up to 10 files.',
+    hasExpiry: true, multi: true, maxFiles: 10 },
+  { type: 'ds160',          label: 'DS-160 Confirmation Page',         placeholder: '',
+    hint: 'DS-160 confirmation page (barcode printout) from your visa application.' },
+  { type: 'interview_appointment_letter', label: 'Interview Appointment Letter', placeholder: '',
+    hint: 'Original visa interview appointment letter.' },
+  { type: 'pay_stubs_w2_tax_returns', label: 'Pay Stubs, W-2s & Tax Returns', placeholder: '',
+    hint: 'Pay stubs, W-2s, and tax returns covering your entire stay in the USA. Up to 10 files.',
+    multi: true, maxFiles: 10 },
+  { type: 'client_letter',  label: 'Client Letter',                    placeholder: '',
+    hint: "Client letter — must mention the petitioner's name." },
+  { type: 'vendor_letter',  label: 'Vendor Letter',                    placeholder: '',
+    hint: "Vendor letter — must mention the petitioner's name." },
+  { type: 'project_documents', label: 'Project-Related Documents',     placeholder: '',
+    hint: 'Project / design documents, if available. Up to 5 files.',
+    multi: true, maxFiles: 5 },
+  { type: 'bank_statements', label: 'Bank Statements (Last 6 Months)', placeholder: '',
+    hint: 'Optional — bank statements highlighting direct deposits, for the last 6 months. Up to 6 files.',
+    multi: true, maxFiles: 6 },
+  { type: 'previous_i797a_lca', label: 'Previous I-797A & LCA',        placeholder: '',
+    hint: 'Previous I-797A approval notice(s) and LCA, if any. Up to 5 files.',
+    multi: true, maxFiles: 5 },
+  { type: 'client_employer_badge', label: 'Client ID / Employer ID Badge', placeholder: '',
+    hint: 'Client ID/Badge and Employer ID/Badge.', multi: true, maxFiles: 2 },
+  { type: 'passport_photos', label: 'Passport-Size Photographs',       placeholder: '',
+    hint: 'Two passport-sized photographs, per specification.' },
+  { type: 'experience_letters', label: 'Experience / Reference Letters', placeholder: '',
+    hint: 'Work experience certificates, reference letters, and appreciation certificates from previous employers, from the start of your career. Up to 10 files.',
+    multi: true, maxFiles: 10 },
+  { type: 'education_documents', label: 'Education Documents & Academic Credentials', placeholder: '',
+    hint: 'All original academic credentials and mark sheets (e.g. MS, BTech, Intermediate, 10th). Up to 10 files.',
+    multi: true, maxFiles: 10 },
+  { type: 'certificates',   label: 'Certificates',                     placeholder: '',
+    hint: 'Any additional professional certificates, if any. Up to 5 files.',
+    multi: true, maxFiles: 5 },
+  { type: 'i140',           label: 'I-140',                            placeholder: '',
+    hint: 'I-140 immigrant petition.' },
+  { type: 'i140_approval_notice', label: 'I-140 Approval Notice',      placeholder: '' },
+  { type: 'labor_certificate', label: 'Labor Certificate (PERM)',      placeholder: '',
+    hint: 'PERM labor certification.' },
   { type: 'other',         label: 'Other Documents',                  placeholder: '',
     hint: 'Any additional supporting document not covered above. Up to 5 files.',
     multi: true, maxFiles: 5 },
 ];
+
+// Rows only shown for specific visa types — a narrower, additive layer on top
+// of the always-visible baseline rows above. A row type absent from this map
+// is shown for every visa type, matching pre-existing behavior.
+export const ROW_VISA_GATE: Record<string, string[]> = {
+  ds160: ['h1b'],
+  interview_appointment_letter: ['h1b'],
+  pay_stubs_w2_tax_returns: ['h1b'],
+  client_letter: ['h1b'],
+  vendor_letter: ['h1b'],
+  project_documents: ['h1b'],
+  bank_statements: ['h1b'],
+  previous_i797a_lca: ['h1b'],
+  client_employer_badge: ['h1b'],
+  passport_photos: ['h1b'],
+  experience_letters: ['h1b', 'gc'],
+  education_documents: ['h1b', 'gc'],
+  certificates: ['gc'],
+  i140: ['gc'],
+  i140_approval_notice: ['gc'],
+  labor_certificate: ['gc'],
+};
 
 // Identity doc types mandatory for every employee during onboarding, regardless
 // of visa/citizenship status.
@@ -113,15 +176,74 @@ export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'offer_letter'] as cons
 // them. Combine with REQUIRED_IDENTITY_TYPES via getRequiredIdentityTypes().
 const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
 
+// Additional identity-doc types required for specific visa types, on top of
+// REQUIRED_IDENTITY_TYPES and the passport/I-94 conditional above. Sourced
+// directly from the per-visa-type document checklists (items without an
+// "(if any)" / "(Optional)" hedge become required).
+const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
+  opt: ['i9_form', 'i20', 'ead', 'driver_license', 'us_visa'],
+  stem_opt: ['i9_form', 'i20', 'ead', 'driver_license', 'us_visa'],
+  h1b: ['ds160', 'interview_appointment_letter', 'pay_stubs_w2_tax_returns', 'client_letter', 'vendor_letter',
+        'client_employer_badge', 'passport_photos', 'experience_letters', 'education_documents'],
+  gc: ['passport', 'education_documents', 'experience_letters', 'i140', 'i140_approval_notice', 'labor_certificate', 'i797'],
+};
+
 export function getRequiredIdentityTypes(visaType?: string | null): string[] {
   const conditional = visaType && VISA_TYPES_REQUIRING_PASSPORT_I94.has(visaType) ? ['passport', 'i94'] : [];
-  return [...REQUIRED_IDENTITY_TYPES, ...conditional];
+  const extra = visaType ? (VISA_REQUIRED_EXTRA[visaType] ?? []) : [];
+  return [...new Set([...REQUIRED_IDENTITY_TYPES, ...conditional, ...extra])];
 }
 
-// Labels from IDENTITY_DOC_ROWS — used to exclude these from the standalone
-// Documents page's type dropdown so the same document can't be uploaded via
-// two different places.
-export const IDENTITY_OWNED_DOC_LABELS = new Set(IDENTITY_DOC_ROWS.map(r => r.label));
+// Per-visa-type minimum file-count overrides for specific multi-file rows
+// (e.g. Green Card requires at least 4 I-797 documents). A row/visa pair
+// absent from this table defaults to the row's own `minFiles` (or 1 if unset).
+const VISA_MIN_FILES: Record<string, Record<string, number>> = {
+  gc: { i797: 4 },
+};
+
+export function getMinFiles(rowType: string, visaType?: string | null): number {
+  const row = IDENTITY_DOC_ROWS.find(r => r.type === rowType);
+  const override = visaType ? VISA_MIN_FILES[visaType]?.[rowType] : undefined;
+  return override ?? row?.minFiles ?? 1;
+}
+
+// Employer/HR-managed sponsorship documents (H-1B petition paperwork, the
+// OPT/STEM-OPT E-Verify letter). These are never shown to the employee —
+// only to admin/hr, via the "Employer / Admin Documents" section in
+// NewEmployee.tsx. Kept as a separate array (not merged into
+// IDENTITY_DOC_ROWS) so role-based visibility never touches the
+// employee-facing rendering path.
+export const EMPLOYER_DOC_ROWS: IdentityDocRow[] = [
+  { type: 'e_verify_letter', label: 'E-Verify Letter', placeholder: '',
+    hint: 'E-Verify letter (admin access).' },
+  { type: 'i797_original_employer', label: 'I-797 – Original (Employer)', placeholder: '' },
+  { type: 'i129',           label: 'Form I-129',        placeholder: '' },
+  { type: 'lca_copy',       label: 'Copy of LCA',        placeholder: '' },
+  { type: 'employer_verification_letter', label: 'Employer Letter / Employment Verification Letter', placeholder: '',
+    hint: 'Also known as the consulate letter.' },
+  { type: 'employer_offer_contract', label: 'Employer-Countersigned Offer / Contract Letter', placeholder: '',
+    hint: 'Offer letter / employment contract letter signed by both the employee and the employer.' },
+  { type: 'vendor_msa',     label: 'Contract / MSA (Petitioner & Vendor)', placeholder: '',
+    hint: 'Contract or Master Services Agreement between the petitioner and the vendor.' },
+];
+
+// Visa types each employer/admin row applies to. A row not shown here is
+// never shown, for any visa type — unlike ROW_VISA_GATE above, there's no
+// "always visible" default for employer-managed documents.
+export const EMPLOYER_ROW_VISA_GATE: Record<string, string[]> = {
+  e_verify_letter: ['opt', 'stem_opt'],
+  i797_original_employer: ['h1b'],
+  i129: ['h1b'],
+  lca_copy: ['h1b'],
+  employer_verification_letter: ['h1b'],
+  employer_offer_contract: ['h1b'],
+  vendor_msa: ['h1b'],
+};
+
+// Labels from IDENTITY_DOC_ROWS and EMPLOYER_DOC_ROWS — used to exclude these
+// from the standalone Documents page's type dropdown so the same document
+// can't be uploaded via two different places.
+export const IDENTITY_OWNED_DOC_LABELS = new Set([...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS].map(r => r.label));
 
 // Documents already uploaded under a row's PREVIOUS label — keeps them
 // recognized as "on file" after a label rename, without needing to rewrite
