@@ -116,9 +116,12 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'bank_statements', label: 'Bank Statements (Last 6 Months)', placeholder: '',
     hint: 'Optional — bank statements highlighting direct deposits, for the last 6 months. Up to 6 files.',
     multi: true, maxFiles: 6 },
-  { type: 'previous_i797a_lca', label: 'Previous I-797A & LCA',        placeholder: '',
-    hint: 'Previous I-797A approval notice(s) and LCA, if any. Up to 5 files.',
+  { type: 'previous_i797a', label: 'Previous I-797A',                 placeholder: '',
+    hint: 'Previous I-797A approval notice(s), if any. Up to 5 files.',
     multi: true, maxFiles: 5 },
+  { type: 'lca',            label: 'LCA',                             placeholder: '',
+    hint: 'Labor Condition Application, if any. Up to 3 files.',
+    multi: true, maxFiles: 3 },
   { type: 'client_employer_badge', label: 'Client ID / Employer ID Badge', placeholder: '',
     hint: 'Client ID/Badge and Employer ID/Badge.', multi: true, maxFiles: 2 },
   { type: 'passport_photos', label: 'Passport-Size Photographs',       placeholder: '',
@@ -153,7 +156,8 @@ export const ROW_VISA_GATE: Record<string, string[]> = {
   vendor_letter: ['h1b'],
   project_documents: ['h1b'],
   bank_statements: ['h1b'],
-  previous_i797a_lca: ['h1b'],
+  previous_i797a: ['h1b'],
+  lca: ['h1b'],
   client_employer_badge: ['h1b'],
   passport_photos: ['h1b'],
   experience_letters: ['h1b', 'gc'],
@@ -162,6 +166,16 @@ export const ROW_VISA_GATE: Record<string, string[]> = {
   i140: ['gc'],
   i140_approval_notice: ['gc'],
   labor_certificate: ['gc'],
+};
+
+// Rows normally shown for every visa type (per ROW_VISA_GATE's "absent =
+// shown everywhere" default), but explicitly hidden for specific ones.
+// Checked before ROW_VISA_GATE in the Section 07 filter — an exclude always
+// wins.
+export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
+  green_card: ['h1b', 'opt'],
+  i140_questionnaire: ['opt'],
+  perm_questionnaire: ['opt'],
 };
 
 // Identity doc types mandatory for every employee during onboarding, regardless
@@ -181,7 +195,7 @@ const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt
 // directly from the per-visa-type document checklists (items without an
 // "(if any)" / "(Optional)" hedge become required).
 const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
-  opt: ['i9_form', 'i20', 'ead', 'driver_license', 'us_visa'],
+  opt: ['i9_form', 'i20', 'ead', 'us_visa'],
   stem_opt: ['i9_form', 'i20', 'ead', 'driver_license', 'us_visa'],
   h1b: ['ds160', 'interview_appointment_letter', 'pay_stubs_w2_tax_returns', 'client_letter', 'vendor_letter',
         'client_employer_badge', 'passport_photos', 'experience_letters', 'education_documents'],

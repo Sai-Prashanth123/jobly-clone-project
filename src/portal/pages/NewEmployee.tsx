@@ -27,7 +27,7 @@ import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
 import { LANGUAGES } from '../lib/languages';
 import {
-  DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, EMPLOYER_DOC_ROWS, ROW_VISA_GATE, EMPLOYER_ROW_VISA_GATE,
+  DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, EMPLOYER_DOC_ROWS, ROW_VISA_GATE, ROW_VISA_EXCLUDE, EMPLOYER_ROW_VISA_GATE,
   getRequiredIdentityTypes, getMinFiles, IDENTITY_OWNED_DOC_LABELS, docMatchesRow, docsMatchingRow,
   type IdentityDocRow,
 } from '../lib/documentTypes';
@@ -2131,6 +2131,11 @@ export default function NewEmployee() {
                 if (['i20', 'opt_card'].includes(row.type)) {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt' || form.visaType === 'h1b';
                 }
+                // Rows explicitly hidden for specific visa types (e.g.
+                // Permanent Resident Card is irrelevant for H-1B/OPT) — an
+                // exclude always wins, checked before the allow-list below.
+                const exclude = ROW_VISA_EXCLUDE[row.type];
+                if (exclude && exclude.includes(form.visaType)) return false;
                 // Newer visa-specific rows (H-1B / Green Card checklists) —
                 // shown only for the visa types they were sourced from; a row
                 // absent from ROW_VISA_GATE is shown for every visa type.
