@@ -174,8 +174,8 @@ export const ROW_VISA_GATE: Record<string, string[]> = {
 // wins.
 export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
   green_card: ['h1b', 'opt'],
-  i140_questionnaire: ['opt'],
-  perm_questionnaire: ['opt'],
+  i140_questionnaire: ['opt', 'h1b'],
+  perm_questionnaire: ['opt', 'h1b'],
 };
 
 // Identity doc types mandatory for every employee during onboarding, regardless
@@ -208,12 +208,12 @@ export function getRequiredIdentityTypes(visaType?: string | null): string[] {
   return [...new Set([...REQUIRED_IDENTITY_TYPES, ...conditional, ...extra])];
 }
 
-// Per-visa-type minimum file-count overrides for specific multi-file rows
-// (e.g. Green Card requires at least 4 I-797 documents). A row/visa pair
-// absent from this table defaults to the row's own `minFiles` (or 1 if unset).
-const VISA_MIN_FILES: Record<string, Record<string, number>> = {
-  gc: { i797: 4 },
-};
+// Per-visa-type minimum file-count overrides for specific multi-file rows.
+// A row/visa pair absent from this table defaults to the row's own
+// `minFiles` (or 1 if unset). Previously had a GC/I-797 override requiring 4
+// files, which blocked real onboarding after just 1 upload — removed per HR
+// feedback; I-797 stays required for GC, just no longer needs 4 copies.
+const VISA_MIN_FILES: Record<string, Record<string, number>> = {};
 
 export function getMinFiles(rowType: string, visaType?: string | null): number {
   const row = IDENTITY_DOC_ROWS.find(r => r.type === rowType);
