@@ -552,7 +552,7 @@ export default function NewEmployee() {
     const educationDone = isEducationSectionDone(form.education);
     const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
     return {
-      [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality.trim() && !!form.preferredLanguage.trim(),
+      [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality.trim() && !!form.preferredLanguage.trim() && (!!form.profilePhotoFile || !!form.profilePhotoPreview),
       [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim() && (isOnboarding ? !!form.linkedinUrl.trim() : true),
       [SECTION_IDS.presentAddr]:  presentFilled,
       [SECTION_IDS.permanentAddr]: permFilled,
@@ -591,8 +591,8 @@ export default function NewEmployee() {
     // submission for every OPT/STEM-OPT visa type, which HR flagged as wrong.
     const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
     return [
-      // Personal — photo is optional (not required by backend)
-      { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage },
+      // Personal — profile photo is required to finish onboarding
+      { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage && (!!form.profilePhotoFile || !!form.profilePhotoPreview) },
       // Contact — all three are required during onboarding
       { id: 'email',       label: 'Personal email',                 section: SECTION_IDS.contact,       done: !!form.email.trim() },
       { id: 'phone',       label: 'Phone',                          section: SECTION_IDS.contact,       done: !!form.phone.trim() },
@@ -1659,14 +1659,16 @@ export default function NewEmployee() {
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.personal)}
             num="01"
             title="Personal Information"
-            description="The basics. Profile photo is optional but recommended for the directory."
+            description="The basics, including a profile photo."
             icon={<User className="h-4 w-4 text-[#4069FF]" />}
           >
             {/* Two-column: profile photo on the left, name + DOB block on the right */}
             <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-4 mb-4">
               {/* Profile Photo upload tile (matches reference HTML) */}
               <div>
-                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">Profile Photo</p>
+                <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em] mb-1.5">
+                  Profile Photo {isOnboarding && <RequiredMark />}
+                </p>
                 <label
                   htmlFor="profile-photo"
                   className="block border-2 border-dashed border-gray-200 rounded-lg p-3 hover:border-[#4069FF] hover:bg-blue-50/40 transition-colors cursor-pointer text-center"
@@ -2126,10 +2128,15 @@ export default function NewEmployee() {
                 if (['i983', 'stem_opt_card'].includes(row.type)) {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
-                // I-20 / OPT Card also apply (optionally) to H-1B holders who
-                // recently transitioned from F-1/OPT status.
-                if (['i20', 'opt_card'].includes(row.type)) {
+                // I-20 also applies (optionally) to H-1B holders who recently
+                // transitioned from F-1/OPT status.
+                if (row.type === 'i20') {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt' || form.visaType === 'h1b';
+                }
+                // OPT Card stays OPT/STEM-OPT only — H-1B holders use the
+                // generic I-797/employer paperwork instead.
+                if (row.type === 'opt_card') {
+                  return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
                 // Rows explicitly hidden for specific visa types (e.g.
                 // Permanent Resident Card is irrelevant for H-1B/OPT) — an
