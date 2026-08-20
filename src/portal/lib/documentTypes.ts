@@ -173,6 +173,7 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
   i140_questionnaire: ['opt', 'h1b', 'stem_opt'],
   perm_questionnaire: ['opt', 'h1b', 'stem_opt'],
   us_visa: ['opt'],
+  i797: ['h1b'],
 };
 
 // Identity doc types mandatory for every employee during onboarding, regardless
