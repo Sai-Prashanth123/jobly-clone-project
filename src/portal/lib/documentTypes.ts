@@ -228,7 +228,6 @@ export function getMinFiles(rowType: string, visaType?: string | null): number {
 export const EMPLOYER_DOC_ROWS: IdentityDocRow[] = [
   { type: 'e_verify_letter', label: 'E-Verify Letter', placeholder: '',
     hint: 'E-Verify letter (admin access).' },
-  { type: 'i797_original_employer', label: 'I-797 – Original (Employer)', placeholder: '' },
   { type: 'i129',           label: 'Form I-129',        placeholder: '' },
   { type: 'lca_copy',       label: 'Copy of LCA',        placeholder: '' },
   { type: 'employer_verification_letter', label: 'Employer Letter / Employment Verification Letter', placeholder: '',
@@ -244,7 +243,6 @@ export const EMPLOYER_DOC_ROWS: IdentityDocRow[] = [
 // "always visible" default for employer-managed documents.
 export const EMPLOYER_ROW_VISA_GATE: Record<string, string[]> = {
   e_verify_letter: ['opt', 'stem_opt'],
-  i797_original_employer: ['h1b'],
   i129: ['h1b'],
   lca_copy: ['h1b'],
   employer_verification_letter: ['h1b'],
