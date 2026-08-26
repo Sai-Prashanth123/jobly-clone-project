@@ -158,8 +158,10 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
 };
 
 // Identity doc types mandatory for every employee during onboarding, regardless
-// of visa/citizenship status.
-export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'offer_letter'] as const;
+// of visa/citizenship status. Offer Letter was removed from this list per HR
+// feedback — it's still a normal (optional) row, just no longer blocks
+// Finish Onboarding for anyone.
+export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume'] as const;
 
 // Passport and I-94 are only relevant to non-immigrant work-visa holders — an
 // I-94 is an arrival/departure record issued at US entry to visa entrants, and
