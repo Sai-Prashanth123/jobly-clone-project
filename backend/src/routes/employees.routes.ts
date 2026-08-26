@@ -33,6 +33,8 @@ router.post('/:id/rehire', requireRole('admin','hr'), ctrl.rehire);
 router.get('/:id/assignments', requireRole('admin','hr','operations'), ctrl.assignments);
 router.get('/:id/timesheets', requireRole('admin','hr','operations'), ctrl.timesheets);
 router.post('/:id/photo', requireRole('admin','hr','employee'), upload.single('file'), ctrl.uploadPhoto);
+router.post('/:id/dependents/:dependentId/passport', requireRole('admin','hr','employee'), upload.single('file'), ctrl.uploadDependentPassport);
+router.get('/:id/dependents/:dependentId/passport-url', requireRole('admin','hr','employee'), ctrl.getDependentPassportUrl);
 router.post('/:id/documents', requireRole('admin','hr','employee'), upload.single('file'), ctrl.uploadDoc);
 router.delete('/:id/documents/:docId', requireRole('admin','hr','employee'), ctrl.deleteDoc);
 // Finalize self-onboarding (re-validates the checklist server-side, auto-activates).

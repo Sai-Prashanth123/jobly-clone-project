@@ -101,6 +101,84 @@ export async function uploadEmployeePhoto(employeeId: string, file: Express.Mult
   return publicUrl;
 }
 
+// H-4 dependent passports live in the private `employee-docs` bucket (same one
+// uploadDocument uses) rather than the public `employee-photos` bucket — these
+// are sensitive PII, not a profile picture. Unlike a normal document, the file
+// isn't a row in `documents`; it's tracked inline on the matching entry inside
+// employees.dependents (JSONB), addressed by the dependent's client-generated id.
+export async function uploadDependentPassport(
+  employeeId: string,
+  dependentId: string,
+  file: Express.Multer.File,
+) {
+  const bucket = 'employee-docs';
+
+  // Always read the CURRENT server-side array — never trust a copy carried in
+  // the request body. This endpoint is only ever called (from NewEmployee.tsx)
+  // strictly AFTER the main employee create/update PATCH has resolved, so this
+  // read always sees that PATCH's result, not a stale pre-save array. That
+  // ordering — never Promise.all'd against the main PATCH — is what prevents
+  // the main save from clobbering the passportStoragePath this endpoint is
+  // about to write (the main save's `dependents` payload was built from the
+  // same server state this read just re-fetched, so splicing in one field here
+  // and writing the whole array back cannot lose the other fields).
+  const { data: emp, error: findErr } = await supabaseAdmin
+    .from('employees')
+    .select('dependents')
+    .eq('id', employeeId)
+    .single();
+  if (findErr || !emp) throw new NotFoundError('Employee not found');
+
+  const dependents = (emp.dependents ?? []) as Array<Record<string, unknown>>;
+  const idx = dependents.findIndex(d => d.id === dependentId);
+  if (idx === -1) throw new NotFoundError('Dependent not found');
+
+  const storagePath = `${employeeId}/dependents/${dependentId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const { error: uploadError } = await supabaseAdmin
+    .storage
+    .from(bucket)
+    .upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
+  if (uploadError) throw uploadError;
+
+  const nextDependents = dependents.map((d, i) =>
+    i === idx ? { ...d, passportStoragePath: storagePath, passportFileName: file.originalname } : d,
+  );
+  const { error: updErr } = await supabaseAdmin
+    .from('employees')
+    .update({ dependents: nextDependents })
+    .eq('id', employeeId);
+  if (updErr) throw updErr;
+
+  const { data: urlData } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600, { download: file.originalname });
+  return { passportStoragePath: storagePath, passportFileName: file.originalname, signedUrl: urlData?.signedUrl ?? null };
+}
+
+export async function getDependentPassportSignedUrl(
+  employeeId: string,
+  dependentId: string,
+  user: { role: string; employeeId?: string | null },
+) {
+  if (user.role === 'employee' && user.employeeId !== employeeId) {
+    throw new ForbiddenError('You may only access your own dependents\' documents');
+  }
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees')
+    .select('dependents')
+    .eq('id', employeeId)
+    .single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+
+  const dependents = (emp.dependents ?? []) as Array<{ id: string; passportStoragePath?: string; passportFileName?: string }>;
+  const dep = dependents.find(d => d.id === dependentId);
+  if (!dep?.passportStoragePath) throw new NotFoundError('No passport on file for this dependent');
+
+  const { data } = await supabaseAdmin
+    .storage
+    .from('employee-docs')
+    .createSignedUrl(dep.passportStoragePath, 3600, { download: dep.passportFileName ?? 'passport' });
+  return data?.signedUrl ?? null;
+}
+
 export async function getDocumentSignedUrl(
   docId: string,
   user: { role: string; employeeId?: string | null },

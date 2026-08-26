@@ -222,6 +222,26 @@ export async function uploadPhoto(req: Request, res: Response, next: NextFunctio
   } catch (err) { next(err); }
 }
 
+export async function uploadDependentPassport(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const file = req.file;
+    if (!file) { res.status(400).json({ success: false, error: 'No file provided' }); return; }
+    // Employees may only manage their own dependents.
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only manage their own dependents\' documents');
+    }
+    const data = await storageSvc.uploadDependentPassport(req.params.id, req.params.dependentId, file);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function getDependentPassportUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const url = await storageSvc.getDependentPassportSignedUrl(req.params.id, req.params.dependentId, req.user!);
+    res.json({ success: true, url });
+  } catch (err) { next(err); }
+}
+
 export async function deleteDoc(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     // Employees may only delete docs that belong to their own employee record.

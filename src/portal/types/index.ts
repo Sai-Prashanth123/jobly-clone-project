@@ -208,6 +208,22 @@ export interface IdentityDocumentEntry {
   expiry?: string;     // expiry for passport / EAD / green card
 }
 
+// H-4 dependents (H1B holder's spouse/children). Stored as a JSONB array on
+// the employee row, same as IdentityDocumentEntry above — but unlike that
+// array, each entry has its own stable client-generated `id` since the
+// dedicated passport-upload endpoint addresses one entry directly, and its
+// own file (a private storage path, minted into a signed URL on demand) since
+// there's no shared `documents` row to tag it against.
+export interface Dependent {
+  id: string;
+  relationship: 'spouse' | 'child';
+  firstName?: string;
+  lastName?: string;
+  passportExpiry?: string;
+  passportStoragePath?: string | null;
+  passportFileName?: string | null;
+}
+
 export interface ClientDocument {
   id: string;
   name: string;
@@ -292,6 +308,7 @@ export interface Employee {
   experienceLevel?: string;
   bloodGroup?: string;
   identityDocuments?: IdentityDocumentEntry[];
+  dependents?: Dependent[];
 
   createdByName?: string;
   createdByRole?: string;

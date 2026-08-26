@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
   User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
-  AlertTriangle, X, LogOut, Eye, EyeOff, Download,
+  AlertTriangle, X, LogOut, Eye, EyeOff, Download, Users,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -32,7 +32,7 @@ import {
   type IdentityDocRow,
 } from '../lib/documentTypes';
 import { LanguagesMultiSelect } from '../components/shared/LanguagesMultiSelect';
-import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry } from '../types';
+import type { Employee, EducationEntry, WorkHistoryEntry, IdentityDocumentEntry, Dependent } from '../types';
 
 // ── Constants ───────────────────────────────────────────────────────────────
 
@@ -202,6 +202,11 @@ interface FormState {
   workHistory: WorkHistoryEntry[];
   totalExperienceYears: string;
   experienceLevel: string;
+  // H-4 dependents (H1B only) — one spouse max, unlimited children.
+  dependents: Dependent[];
+  // Map of dependent id → passport File staged for upload, mirrors profilePhotoFile's
+  // deferred-until-employee-exists pattern but keyed since there can be several.
+  dependentFiles: Record<string, File | undefined>;
   // Emergency
   emergencyContact: { name: string; relationship: string; phone: string; altPhone: string; address: string; city: string; state: string; zip: string };
   // Payroll
@@ -218,6 +223,9 @@ interface FormState {
 
 const emptyEducation = (): EducationEntry => ({ level: '', specialization: '', institution: '', passYear: '', gradeOrGPA: '', mode: '' });
 const emptyWorkHistory = (): WorkHistoryEntry => ({ company: '', jobTitle: '', fromDate: '', toDate: '', reasonForLeaving: '', lastAnnualSalary: null });
+const emptyDependent = (relationship: Dependent['relationship']): Dependent => ({
+  id: crypto.randomUUID(), relationship, firstName: '', lastName: '', passportExpiry: '',
+});
 
 function todayIso(): string {
   return new Date().toISOString().split('T')[0];
@@ -255,6 +263,8 @@ const defaultForm: FormState = {
   workHistory: [],
   totalExperienceYears: '',
   experienceLevel: '',
+  dependents: [],
+  dependentFiles: {},
   emergencyContact: { name: '', relationship: '', phone: '', altPhone: '', address: '', city: '', state: '', zip: '' },
   payRate: '',
   payType: 'hourly',
@@ -458,6 +468,8 @@ export default function NewEmployee() {
       workHistory: e.workHistory ?? [],
       totalExperienceYears: e.totalExperienceYears ? String(e.totalExperienceYears) : '',
       experienceLevel: e.experienceLevel ?? '',
+      dependents: e.dependents ?? [],
+      dependentFiles: {},
       emergencyContact: {
         name: e.emergencyContact?.name ?? '',
         relationship: e.emergencyContact?.relationship ?? '',
@@ -934,6 +946,26 @@ export default function NewEmployee() {
     setForm(p => ({ ...p, workHistory: p.workHistory.map((row, i) => i === idx ? { ...row, [k]: v } : row) }));
   };
 
+  // H-4 dependents — addressed by `id` (not array index) since the passport
+  // upload endpoint needs a stable reference that survives removing an
+  // earlier entry.
+  const addDependent = (relationship: Dependent['relationship']) => {
+    setForm(p => ({ ...p, dependents: [...(p.dependents ?? []), emptyDependent(relationship)] }));
+  };
+  const removeDependent = (id: string) => {
+    setForm(p => ({
+      ...p,
+      dependents: p.dependents.filter(d => d.id !== id),
+      dependentFiles: Object.fromEntries(Object.entries(p.dependentFiles).filter(([k]) => k !== id)),
+    }));
+  };
+  const updateDependent = (id: string, k: keyof Dependent, v: string) => {
+    setForm(p => ({ ...p, dependents: p.dependents.map(d => d.id === id ? { ...d, [k]: v } : d) }));
+  };
+  const setDependentFile = (id: string, file: File | null) => {
+    setForm(p => ({ ...p, dependentFiles: { ...p.dependentFiles, [id]: file ?? undefined } }));
+  };
+
   // Warn the user before they accidentally navigate away with staged-but-not-yet-saved
   // identity/required document files (uploaded only at final submit/save-draft time).
   const hasStagedFiles = Object.values(form.identityDocFiles ?? {}).some(Boolean)
@@ -1002,6 +1034,11 @@ export default function NewEmployee() {
       identityDocuments: form.identityDocuments.filter(d =>
         (d.expiry ?? '').trim() !== '' || (d.number ?? '').trim() !== '' || (d.state ?? '').trim() !== '',
       ),
+      // Sent through in full (not filtered like identityDocuments above) —
+      // each entry may already carry a passportStoragePath from a prior
+      // upload, and this array fully overwrites the DB column on every save,
+      // so dropping an entry here would silently lose that file reference.
+      dependents: form.dependents,
     };
   };
 
@@ -1072,6 +1109,24 @@ export default function NewEmployee() {
         }));
       }
 
+      // H-4 dependent passports — same deferred-until-employee-exists pattern
+      // as the photo above, one request per dependent with a staged file.
+      // Each writes only its own entry inside employees.dependents server-side
+      // (never trusting a client copy), so this can safely run alongside the
+      // other uploads in the same tasks array below.
+      const uploadedDependentIds: string[] = [];
+      for (const dep of form.dependents) {
+        const file = form.dependentFiles[dep.id];
+        if (file) {
+          const fd = new FormData();
+          fd.append('file', file);
+          tasks.push(apiClient.post(`/employees/${emp.id}/dependents/${dep.id}/passport`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          }));
+          uploadedDependentIds.push(dep.id);
+        }
+      }
+
       const uploadedDocTypes: string[] = [];
       const uploadedMultiDocTypes: string[] = [];
       const uploads: { file: File; name: string; docType: string }[] = [];
@@ -1112,6 +1167,9 @@ export default function NewEmployee() {
           setForm(p => ({
             ...p,
             profilePhotoFile: null,
+            dependentFiles: Object.fromEntries(
+              Object.entries(p.dependentFiles).map(([k, v]) => [k, uploadedDependentIds.includes(k) ? undefined : v]),
+            ),
             identityDocFiles: Object.fromEntries(
               Object.entries(p.identityDocFiles).map(([k, v]) => [k, uploadedDocTypes.includes(k) ? null : v]),
             ),
@@ -1243,6 +1301,20 @@ export default function NewEmployee() {
           headers: { 'Content-Type': 'multipart/form-data' },
         }));
       }
+
+      const uploadedDependentIds: string[] = [];
+      for (const dep of form.dependents) {
+        const file = form.dependentFiles[dep.id];
+        if (file) {
+          const fd = new FormData();
+          fd.append('file', file);
+          tasks.push(apiClient.post(`/employees/${emp.id}/dependents/${dep.id}/passport`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          }));
+          uploadedDependentIds.push(dep.id);
+        }
+      }
+
       const uploadedDocTypes: string[] = [];
       const uploadedMultiDocTypes: string[] = [];
       const uploads: { file: File; name: string; docType: string }[] = [];
@@ -1292,6 +1364,9 @@ export default function NewEmployee() {
           setForm(p => ({
             ...p,
             profilePhotoFile: null,
+            dependentFiles: Object.fromEntries(
+              Object.entries(p.dependentFiles).map(([k, v]) => [k, uploadedDependentIds.includes(k) ? undefined : v]),
+            ),
             identityDocFiles: Object.fromEntries(
               Object.entries(p.identityDocFiles).map(([k, v]) => [k, uploadedDocTypes.includes(k) ? null : v]),
             ),
@@ -2174,6 +2249,99 @@ export default function NewEmployee() {
                   Employer-provided documents: {employerDocsSatisfiedCount} of {applicableEmployerRows.length} on file — contact HR for details.
                 </p>
               )}
+            </SectionCard>
+          )}
+
+          {/* H-4 Dependent Documents — H1B only. Employee-facing (unlike the
+              Employer/Admin card above): the employee is the one who knows
+              their own family's names and can upload the passport copies.
+              Entirely optional — an H1B holder may have zero dependents. */}
+          {form.visaType === 'h1b' && (
+            <SectionCard
+              id="h4_dependents"
+              num="07c"
+              title="H4 Dependent Documents"
+              description="Spouse and children on H4 status — name and passport, with expiry."
+              icon={<Users className="h-4 w-4 text-[#4069FF]" />}
+            >
+              {form.dependents.length === 0 && (
+                <p className="text-sm text-muted-foreground italic mb-3">No dependents added yet.</p>
+              )}
+              <div className="space-y-3">
+                {form.dependents.map(dep => {
+                  const file = form.dependentFiles[dep.id];
+                  const fileOrUploaded = !!(file || dep.passportStoragePath);
+                  const inputId = `dependent-passport-${dep.id}`;
+                  return (
+                    <div key={dep.id} className="p-3 bg-gray-50/60 rounded-md border border-gray-100">
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em]">
+                          {dep.relationship === 'spouse' ? 'Spouse' : 'Child'}
+                        </p>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeDependent(dep.id)} className="h-7 text-red-600 hover:text-red-700 hover:bg-red-50">
+                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-4 gap-2 items-end">
+                        <div>
+                          <Label className="text-[11px]">First Name</Label>
+                          <Input value={dep.firstName ?? ''} onChange={e => updateDependent(dep.id, 'firstName', e.target.value)} />
+                        </div>
+                        <div>
+                          <Label className="text-[11px]">Last Name</Label>
+                          <Input value={dep.lastName ?? ''} onChange={e => updateDependent(dep.id, 'lastName', e.target.value)} />
+                        </div>
+                        <div>
+                          <Label className="text-[11px]">Passport Expiry</Label>
+                          <UsDateInput value={dep.passportExpiry ?? ''} onChange={iso => updateDependent(dep.id, 'passportExpiry', iso)} />
+                        </div>
+                        <div>
+                          <Label className="text-[11px]">Passport</Label>
+                          <div className="flex items-center gap-2">
+                            <label
+                              htmlFor={inputId}
+                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-md border border-gray-200 bg-white text-xs font-medium text-gray-700 hover:border-[#4069FF] hover:text-[#4069FF] cursor-pointer transition-colors"
+                            >
+                              <Upload className="h-3.5 w-3.5" />
+                              {fileOrUploaded ? 'Replace' : 'Upload'}
+                            </label>
+                            <input
+                              id={inputId}
+                              type="file"
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              className="hidden"
+                              onChange={e => {
+                                const f = e.target.files?.[0] ?? null;
+                                if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
+                                  toast.error('Please upload a PDF, JPEG, or PNG file.');
+                                  e.target.value = '';
+                                  return;
+                                }
+                                setDependentFile(dep.id, f);
+                              }}
+                            />
+                          </div>
+                          {fileOrUploaded && (
+                            <p className="text-[11px] text-gray-500 truncate mt-1" title={file?.name ?? dep.passportFileName ?? ''}>
+                              {file ? file.name : (dep.passportFileName ?? 'On file')}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {!form.dependents.some(d => d.relationship === 'spouse') && (
+                  <Button type="button" variant="outline" size="sm" onClick={() => addDependent('spouse')} className="gap-2">
+                    <Plus className="h-4 w-4" /> Add Spouse
+                  </Button>
+                )}
+                <Button type="button" variant="outline" size="sm" onClick={() => addDependent('child')} className="gap-2">
+                  <Plus className="h-4 w-4" /> Add Child
+                </Button>
+              </div>
             </SectionCard>
           )}
 

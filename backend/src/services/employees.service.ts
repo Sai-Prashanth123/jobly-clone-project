@@ -376,6 +376,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
         experience_level:          input.experienceLevel ?? null,
         blood_group:               input.bloodGroup ?? null,
         identity_documents:        input.identityDocuments ?? [],
+        dependents:                input.dependents ?? [],
       })
       .select()
       .single();
@@ -527,6 +528,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
     education: [],
     workHistory: [],
     identityDocuments: [],
+    dependents: [],
   };
 
   const result = await issueCredentials(emp.id, emp, input);
@@ -645,6 +647,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (input.experienceLevel !== undefined)      patch.experience_level      = input.experienceLevel;
   if (input.bloodGroup !== undefined)           patch.blood_group           = input.bloodGroup;
   if (input.identityDocuments !== undefined)    patch.identity_documents    = input.identityDocuments;
+  if (input.dependents !== undefined)           patch.dependents            = input.dependents;
 
   // When an EMPLOYEE edits their own record (self-onboarding / profile edit),
   // a small set of truly sensitive fields stays HR-owned: account status (the
@@ -1140,6 +1143,7 @@ async function purgeEmployeeData(empId: string, currentEmail: string | null): Pr
       email: mangledEmail,
       work_email: null,
       identity_documents: [],
+      dependents: [],
       education: [],
       work_history: [],
       emergency_contact_name: null,

@@ -94,6 +94,7 @@ function mapEmployee(raw: any): Employee {
     experienceLevel: raw.experience_level ?? undefined,
     bloodGroup: raw.blood_group ?? undefined,
     identityDocuments: Array.isArray(raw.identity_documents) ? raw.identity_documents : [],
+    dependents: Array.isArray(raw.dependents) ? raw.dependents : [],
 
     onboarding: raw.onboarding ?? undefined,
     onboardingCompletedAt: raw.onboarding_completed_at ?? undefined,
@@ -481,6 +482,7 @@ function toSnake(e: Partial<Employee>): Record<string, any> {
     ...(e.experienceLevel !== undefined && { experienceLevel: blank(e.experienceLevel) }),
     ...(e.bloodGroup !== undefined && { bloodGroup: blank(e.bloodGroup) }),
     ...(e.identityDocuments !== undefined && { identityDocuments: e.identityDocuments }),
+    ...(e.dependents !== undefined && { dependents: e.dependents }),
   };
 }
 

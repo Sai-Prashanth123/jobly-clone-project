@@ -30,6 +30,20 @@ export const identityDocumentEntrySchema = z.object({
   expiry: z.string().optional().default(''),   // for passport / EAD
 });
 
+// H-4 dependents (H1B holder's spouse/children). Unlike its sibling JSONB
+// arrays above, entries need a stable client-generated `id` — the dedicated
+// passport-upload endpoint (POST /employees/:id/dependents/:dependentId/passport)
+// addresses one entry by id rather than by array position or type.
+export const dependentEntrySchema = z.object({
+  id: z.string(),
+  relationship: z.enum(['spouse', 'child']),
+  firstName: z.string().optional().default(''),
+  lastName: z.string().optional().default(''),
+  passportExpiry: z.string().optional().default(''),
+  passportStoragePath: z.string().optional().nullable(),
+  passportFileName: z.string().optional().nullable(),
+});
+
 const permanentAddressSchema = z.object({
   street: z.string().optional().default(''),
   city: z.string().optional().default(''),
@@ -106,6 +120,7 @@ export const createEmployeeSchema = z.object({
   experienceLevel: z.string().optional().nullable(),
   bloodGroup: z.string().optional().nullable(),
   identityDocuments: z.array(identityDocumentEntrySchema).optional().default([]),
+  dependents: z.array(dependentEntrySchema).optional().default([]),
 });
 
 // Update keeps every field optional and lenient — pre-existing employees
@@ -168,6 +183,7 @@ export const updateEmployeeSchema = z.object({
   experienceLevel: z.string().optional().nullable(),
   bloodGroup: z.string().optional().nullable(),
   identityDocuments: z.array(identityDocumentEntrySchema).optional(),
+  dependents: z.array(dependentEntrySchema).optional(),
   // Optimistic-concurrency guard for onboarding approval — NOT persisted.
   // The onboarding_completed_at the approver reviewed; updateEmployee rejects
   // the approval with 409 if the employee re-submitted/reopened since.
@@ -206,3 +222,4 @@ export type ListEmployeesQuery = z.infer<typeof listEmployeesQuerySchema>;
 export type EducationEntryInput = z.infer<typeof educationEntrySchema>;
 export type WorkHistoryEntryInput = z.infer<typeof workHistoryEntrySchema>;
 export type IdentityDocumentEntryInput = z.infer<typeof identityDocumentEntrySchema>;
+export type DependentEntryInput = z.infer<typeof dependentEntrySchema>;
