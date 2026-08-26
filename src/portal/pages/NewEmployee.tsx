@@ -805,8 +805,13 @@ export default function NewEmployee() {
     const file = form.identityDocFiles[row.type];
     const doc = getIdentityDoc(row.type);
     const inputId = `id-doc-file-${row.type}`;
-    const isRequired = getRequiredIdentityTypes(form.visaType).includes(row.type)
-      || EMPLOYER_DOC_ROWS.some(r => r.type === row.type);
+    // Employer/Admin rows (EMPLOYER_DOC_ROWS) are never in
+    // getRequiredIdentityTypes(), so they're always optional here — per HR
+    // feedback, the sponsorship paperwork in that card shouldn't show as
+    // mandatory (it never blocked Finish Onboarding either way, since that
+    // gate only runs on the employee's own onboarding route, not HR's edit
+    // route this card renders on).
+    const isRequired = getRequiredIdentityTypes(form.visaType).includes(row.type);
     const existingDoc = existingEmployee?.documents?.find((d: any) => docMatchesRow(d, row));
     const isAlreadyUploaded = !!existingDoc;
     const multiExistingDocs = row.multi ? docsMatchingRow(existingEmployee?.documents ?? [], row) : [];
