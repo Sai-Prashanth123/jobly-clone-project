@@ -2272,11 +2272,18 @@ export default function NewEmployee() {
                   const file = form.dependentFiles[dep.id];
                   const fileOrUploaded = !!(file || dep.passportStoragePath);
                   const inputId = `dependent-passport-${dep.id}`;
+                  // Number children in the order they were added (Child 1, Child
+                  // 2, ...) — the spouse is a separate relationship and doesn't
+                  // count toward this, so use position among children only, not
+                  // the overall dependents array index.
+                  const childNumber = dep.relationship === 'child'
+                    ? form.dependents.filter(d => d.relationship === 'child').findIndex(d => d.id === dep.id) + 1
+                    : null;
                   return (
                     <div key={dep.id} className="p-3 bg-gray-50/60 rounded-md border border-gray-100">
                       <div className="flex items-center justify-between mb-2">
                         <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-[0.06em]">
-                          {dep.relationship === 'spouse' ? 'Spouse' : 'Child'}
+                          {dep.relationship === 'spouse' ? 'Spouse' : `Child ${childNumber}`}
                         </p>
                         <Button type="button" variant="ghost" size="sm" onClick={() => removeDependent(dep.id)} className="h-7 text-red-600 hover:text-red-700 hover:bg-red-50">
                           <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove
