@@ -358,6 +358,84 @@ export interface Client {
   updatedAt: string;
 }
 
+export type CaseType = 'h1b_new' | 'h1b_extension' | 'h1b_transfer' | 'perm_green_card' | 'opt_stem_extension' | 'tn_renewal' | 'l1_extension' | 'other';
+export type CaseStatus = 'open' | 'pending_uscis' | 'rfe_received' | 'case_approved' | 'denied' | 'closed';
+export type FilingType = 'cap_registration' | 'pwd';
+export type FilingStatus = 'draft' | 'filed' | 'certified' | 'selected' | 'not_selected' | 'denied' | 'withdrawn';
+export type TicketStatus = 'new' | 'in_progress' | 'resolved';
+
+export interface CaseFiling {
+  id: string;
+  displayId?: string; // FIL-XXXX
+  filingType: FilingType;
+  status: FilingStatus;
+  referenceNumber?: string;
+  filedDate?: string;
+  decisionDate?: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  details: Record<string, any>;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CaseNote {
+  id: string;
+  body: string;
+  authorId?: string;
+  authorName?: string;
+  editedAt?: string;
+  createdAt: string;
+}
+
+// A Case is Legal's tracked immigration matter for one Employee — the
+// umbrella record CAP Registration/PWD filings and Notes attach to.
+export interface LegalCase {
+  id: string; // UUID
+  displayId?: string; // CASE-XXXX
+  employeeId: string;
+  employeeFirstName?: string;
+  employeeLastName?: string;
+  employeeDisplayId?: string;
+  employeeVisaType?: VisaType;
+  employeeVisaExpiry?: string;
+  caseType: CaseType;
+  status: CaseStatus;
+  receiptNumber?: string;
+  priorityDate?: string;
+  filedDate?: string;
+  decisionDate?: string;
+  attorneyName?: string;
+  description: string;
+  filings: CaseFiling[];
+  notes: CaseNote[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// A request HR/Admin raises to Legal about a specific Case or Employee — a
+// single-resolution queue, not a back-and-forth message thread.
+export interface SupportTicket {
+  id: string; // UUID
+  displayId?: string; // TCKT-XXXX
+  caseId?: string;
+  caseDisplayId?: string;
+  employeeId?: string;
+  employeeFirstName?: string;
+  employeeLastName?: string;
+  employeeDisplayId?: string;
+  subject: string;
+  message: string;
+  status: TicketStatus;
+  resolution?: string;
+  createdById: string;
+  createdByName?: string;
+  resolvedByName?: string;
+  resolvedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Assignment {
   id: string; // UUID
   displayId?: string; // ASN-XXXX

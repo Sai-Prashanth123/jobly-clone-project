@@ -1,6 +1,6 @@
-import type { TimesheetStatus, InvoiceStatus, AssignmentStatus, EmployeeStatus } from '../../types';
+import type { TimesheetStatus, InvoiceStatus, AssignmentStatus, EmployeeStatus, CaseStatus, FilingStatus, TicketStatus } from '../../types';
 
-type AnyStatus = TimesheetStatus | InvoiceStatus | AssignmentStatus | EmployeeStatus | string;
+type AnyStatus = TimesheetStatus | InvoiceStatus | AssignmentStatus | EmployeeStatus | CaseStatus | FilingStatus | TicketStatus | string;
 
 const STATUS_MAP: Record<string, { label: string; className: string; meaning: string }> = {
   // Employee
@@ -44,6 +44,40 @@ const STATUS_MAP: Record<string, { label: string; className: string; meaning: st
                       meaning: 'I-9 verification complete — employment eligibility confirmed.' },
   expired:          { label: 'Expired',     className: 'bg-red-100    text-red-700     border border-red-200',
                       meaning: 'Work authorization expired. Needs renewal before further timesheets.' },
+
+  // Legal case
+  open:             { label: 'Open',            className: 'bg-blue-100    text-blue-700    border border-blue-200',
+                      meaning: 'Case created — Legal has not yet filed anything with USCIS/DOL.' },
+  pending_uscis:    { label: 'Pending USCIS',    className: 'bg-amber-100   text-amber-700   border border-amber-200',
+                      meaning: 'Filed and awaiting a decision from USCIS or DOL.' },
+  rfe_received:     { label: 'RFE Received',     className: 'bg-amber-100   text-amber-700   border border-amber-200',
+                      meaning: 'USCIS issued a Request for Evidence — a response is due.' },
+  case_approved:    { label: 'Approved',         className: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+                      meaning: 'USCIS approved this immigration case.' },
+  denied:           { label: 'Denied',           className: 'bg-red-100     text-red-700     border border-red-200',
+                      meaning: 'USCIS/DOL denied this case or filing.' },
+  closed:           { label: 'Closed',           className: 'bg-gray-100    text-gray-600    border border-gray-200',
+                      meaning: 'Case closed — no further action expected.' },
+
+  // Case filing (CAP registration / PWD)
+  filed:            { label: 'Filed',            className: 'bg-blue-100    text-blue-700    border border-blue-200',
+                      meaning: 'Submitted to USCIS/DOL — awaiting a result.' },
+  certified:        { label: 'Certified',        className: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+                      meaning: 'DOL certified this PWD filing.' },
+  selected:         { label: 'Selected',         className: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+                      meaning: 'Selected in the H-1B cap lottery.' },
+  not_selected:     { label: 'Not Selected',     className: 'bg-gray-100    text-gray-600    border border-gray-200',
+                      meaning: 'Not selected in the H-1B cap lottery this cycle.' },
+  withdrawn:        { label: 'Withdrawn',        className: 'bg-gray-100    text-gray-600    border border-gray-200',
+                      meaning: 'Filing withdrawn before a decision was issued.' },
+
+  // Support ticket
+  new:              { label: 'New',              className: 'bg-blue-100    text-blue-700    border border-blue-200',
+                      meaning: 'Submitted to Legal — not yet reviewed.' },
+  in_progress:      { label: 'In Progress',      className: 'bg-amber-100   text-amber-700   border border-amber-200',
+                      meaning: 'Legal is working on this request.' },
+  resolved:         { label: 'Resolved',         className: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+                      meaning: 'Legal has answered and closed this request.' },
 };
 
 export function StatusBadge({ status }: { status: AnyStatus }) {

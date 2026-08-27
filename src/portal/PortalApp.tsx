@@ -64,6 +64,10 @@ const People = lazy(() => import('./pages/People'));
 // Legal role — document/immigration review only
 const LegalReview = lazy(() => import('./pages/LegalReview'));
 const LegalReviewDetail = lazy(() => import('./pages/LegalReviewDetail'));
+const Cases = lazy(() => import('./pages/Cases'));
+const CaseDetail = lazy(() => import('./pages/CaseDetail'));
+const SupportTickets = lazy(() => import('./pages/SupportTickets'));
+const SupportTicketDetail = lazy(() => import('./pages/SupportTicketDetail'));
 
 // Phase 2 — Expense Reports
 const Expenses = lazy(() => import('./pages/Expenses'));
@@ -326,6 +330,39 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'legal']}>
                   <LegalReviewDetail />
+                </ProtectedRoute>
+              }
+            />
+
+            <Route
+              path="cases"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                  <Cases />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="cases/:id"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                  <CaseDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="support-tickets"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'legal']}>
+                  <SupportTickets />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="support-tickets/:id"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'legal']}>
+                  <SupportTicketDetail />
                 </ProtectedRoute>
               }
             />

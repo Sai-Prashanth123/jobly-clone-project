@@ -1,0 +1,202 @@
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent } from '@/components/ui/card';
+import { toast } from 'sonner';
+import type { LegalCase, CaseType, CaseStatus } from '../../types';
+import { useEmployees } from '../../hooks/useEmployees';
+import { UsDateInput } from '../shared/UsDateInput';
+
+export const CASE_TYPE_LABELS: Record<CaseType, string> = {
+  h1b_new: 'H-1B — New',
+  h1b_extension: 'H-1B — Extension',
+  h1b_transfer: 'H-1B — Transfer',
+  perm_green_card: 'PERM / Green Card',
+  opt_stem_extension: 'OPT STEM Extension',
+  tn_renewal: 'TN — Renewal',
+  l1_extension: 'L-1 — Extension',
+  other: 'Other',
+};
+
+export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
+  open: 'Open',
+  pending_uscis: 'Pending USCIS',
+  rfe_received: 'RFE Received',
+  case_approved: 'Approved',
+  denied: 'Denied',
+  closed: 'Closed',
+};
+
+type CaseFormData = {
+  employeeId: string;
+  caseType: CaseType | '';
+  status: CaseStatus;
+  receiptNumber: string;
+  priorityDate: string;
+  filedDate: string;
+  decisionDate: string;
+  attorneyName: string;
+  description: string;
+};
+
+const defaultForm: CaseFormData = {
+  employeeId: '', caseType: '', status: 'open',
+  receiptNumber: '', priorityDate: '', filedDate: '', decisionDate: '', attorneyName: '', description: '',
+};
+
+interface CaseFormProps {
+  initial?: Partial<LegalCase>;
+  onSubmit: (data: CaseFormData) => void;
+  onCancel: () => void;
+  isEdit?: boolean;
+  isPending?: boolean;
+}
+
+export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: CaseFormProps) {
+  const { data: empData } = useEmployees({ limit: 500 });
+  const employees = empData?.data ?? [];
+
+  const seed = (src?: Partial<LegalCase>): CaseFormData => ({
+    employeeId: src?.employeeId ?? defaultForm.employeeId,
+    caseType: src?.caseType ?? defaultForm.caseType,
+    status: src?.status ?? defaultForm.status,
+    receiptNumber: src?.receiptNumber ?? '',
+    priorityDate: src?.priorityDate ?? '',
+    filedDate: src?.filedDate ?? '',
+    decisionDate: src?.decisionDate ?? '',
+    attorneyName: src?.attorneyName ?? '',
+    description: src?.description ?? '',
+  });
+
+  const [form, setForm] = useState<CaseFormData>(seed(initial));
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    setForm(seed(initial));
+    setErrors({});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initial?.id]);
+
+  const set = <K extends keyof CaseFormData>(field: K, value: CaseFormData[K]) => {
+    setForm(prev => ({ ...prev, [field]: value }));
+    setErrors(prev => ({ ...prev, [field]: '' }));
+  };
+
+  const validate = (): Record<string, string> => {
+    const errs: Record<string, string> = {};
+    if (!form.employeeId) errs.employeeId = 'Employee is required';
+    if (!form.caseType) errs.caseType = 'Case type is required';
+    setErrors(errs);
+    return errs;
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length > 0) {
+      toast.error(`Please fix: ${Object.values(errs).join(', ')}`);
+      return;
+    }
+    onSubmit(form);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <Card>
+        <CardContent className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Employee *</Label>
+            <Select value={form.employeeId} onValueChange={v => set('employeeId', v)} disabled={isEdit}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select employee" />
+              </SelectTrigger>
+              <SelectContent>
+                {employees.map(e => (
+                  <SelectItem key={e.id} value={e.id}>
+                    {e.firstName} {e.lastName} {e.displayId ? `(${e.displayId})` : ''}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.employeeId && <p className="text-xs text-red-500">{errors.employeeId}</p>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Case Type *</Label>
+            <Select value={form.caseType} onValueChange={v => set('caseType', v as CaseType)}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select case type" />
+              </SelectTrigger>
+              <SelectContent>
+                {(Object.keys(CASE_TYPE_LABELS) as CaseType[]).map(t => (
+                  <SelectItem key={t} value={t}>{CASE_TYPE_LABELS[t]}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {errors.caseType && <p className="text-xs text-red-500">{errors.caseType}</p>}
+          </div>
+
+          {isEdit && (
+            <div className="space-y-2">
+              <Label>Status</Label>
+              <Select value={form.status} onValueChange={v => set('status', v as CaseStatus)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(CASE_STATUS_LABELS) as CaseStatus[]).map(s => (
+                    <SelectItem key={s} value={s}>{CASE_STATUS_LABELS[s]}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <Label>Receipt Number</Label>
+            <Input value={form.receiptNumber} onChange={e => set('receiptNumber', e.target.value)} placeholder="e.g. WAC-25-000-00000" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Priority Date</Label>
+            <UsDateInput value={form.priorityDate} onChange={iso => set('priorityDate', iso)} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Filed Date</Label>
+            <UsDateInput value={form.filedDate} onChange={iso => set('filedDate', iso)} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Decision Date</Label>
+            <UsDateInput value={form.decisionDate} onChange={iso => set('decisionDate', iso)} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Attorney Name</Label>
+            <Input value={form.attorneyName} onChange={e => set('attorneyName', e.target.value)} placeholder="Outside counsel, if any" />
+          </div>
+
+          <div className="col-span-1 sm:col-span-2 space-y-2">
+            <Label>Description</Label>
+            <Textarea
+              value={form.description}
+              onChange={e => set('description', e.target.value)}
+              placeholder="What is this case about?"
+              rows={3}
+              className="resize-none"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="flex justify-end gap-3">
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isPending}>Cancel</Button>
+        <Button type="submit" loading={isPending} loadingText={isEdit ? 'Saving…' : 'Creating…'}>
+          {isEdit ? 'Save Changes' : 'Create Case'}
+        </Button>
+      </div>
+    </form>
+  );
+}
