@@ -19,6 +19,7 @@ const FinanceDashboard = lazy(() =>
 const EmployeeDashboard = lazy(() =>
   import('./dashboards/EmployeeDashboard').then(m => ({ default: m.EmployeeDashboard })),
 );
+const LegalReview = lazy(() => import('./LegalReview'));
 
 function DashboardFallback() {
   return (
@@ -40,6 +41,7 @@ export default function Dashboard() {
       case 'operations': return <OperationsDashboard />;
       case 'finance':    return <FinanceDashboard />;
       case 'employee':   return <EmployeeDashboard />;
+      case 'legal':      return <LegalReview />;
       default:           return <AdminDashboard />;
     }
   })();

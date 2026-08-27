@@ -19,7 +19,7 @@ import {
   Star,
   Shield, Gift, Calendar, DollarSign, TrendingUp, FileWarning,
   Award, UserCheck, FileSpreadsheet, Gauge,
-  HeartPulse,
+  HeartPulse, Scale,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '../../hooks/useAuth';
@@ -43,8 +43,9 @@ interface NavItem {
 // Rendered in this order, each as its own labeled section — see GROUP_ORDER.
 const NAV_ITEMS: NavItem[] = [
   // ── Core features ─────────────────────────────────────────────────────────
-  { label: 'Dashboard',           path: '/portal/dashboard',           icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee'], group: 'Core' },
-  { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee'], badgeKey: 'announcements', group: 'Core' },
+  { label: 'Dashboard',           path: '/portal/dashboard',           icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee','legal'], group: 'Core' },
+  { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee','legal'], badgeKey: 'announcements', group: 'Core' },
+  { label: 'Legal Review',        path: '/portal/legal-review',        icon: <Scale className="h-4 w-4" />,           roles: ['admin','legal'], group: 'Core' },
   { label: 'People',              path: '/portal/people',              icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance'], group: 'Core' },
   { label: 'Employees',           path: '/portal/employees',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'], group: 'Core' },
   { label: 'Add Employee',        path: '/portal/employees/new',       icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'], group: 'Core' },
@@ -64,7 +65,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Templates',           path: '/portal/templates',           icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'], group: 'Core' },
   { label: 'Documents',           path: '/portal/documents',           icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'], group: 'Core' },
   { label: 'Reports',             path: '/portal/reports',             icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','hr'], group: 'Core' },
-  { label: 'Notifications',       path: '/portal/notifications',       icon: <Bell className="h-4 w-4" />,            roles: ['admin','hr','operations','finance','employee'], group: 'Core' },
+  { label: 'Notifications',       path: '/portal/notifications',       icon: <Bell className="h-4 w-4" />,            roles: ['admin','hr','operations','finance','employee','legal'], group: 'Core' },
   { label: 'My Profile',          path: '/portal/profile',             icon: <UserCircle className="h-4 w-4" />,      roles: ['employee'], group: 'Core' },
   { label: 'Admin Settings',      path: '/portal/admin',               icon: <Settings className="h-4 w-4" />,        roles: ['admin'], group: 'Core' },
   // ── Analytics & extended features ─────────────────────────────────────────

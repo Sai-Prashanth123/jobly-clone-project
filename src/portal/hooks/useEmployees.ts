@@ -54,6 +54,8 @@ function mapEmployee(raw: any): Employee {
       uploadedAt: d.uploaded_at,
       url: d.storage_url ?? undefined,
       expiryDate: d.expiry_date ?? undefined,
+      legalFlagged: !!d.legal_flagged,
+      legalFlagComment: d.legal_flag_comment ?? undefined,
     })),
 
     // Onboarding-form extension fields (migration 005). JSONB columns map 1:1.
@@ -419,6 +421,23 @@ export function useDeleteEmployeeDocument(employeeId: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['employees', employeeId] });
+    },
+  });
+}
+
+// Legal flags/unflags a document for HR's attention, with an optional note.
+// Not scoped to one employeeId like the hooks above (Legal Review lists many
+// employees at once) — invalidates the whole employees cache so both the
+// Legal Review list and Employee Detail (HR's flagged-doc badge) stay fresh.
+export function useSetDocumentLegalReview() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ docId, legalFlagged, legalFlagComment }: { docId: string; legalFlagged: boolean; legalFlagComment?: string | null }) => {
+      const { data } = await apiClient.patch(`/documents/${docId}/legal-review`, { legalFlagged, legalFlagComment });
+      return data;
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 }

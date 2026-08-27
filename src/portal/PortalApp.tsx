@@ -61,6 +61,10 @@ const LeaveRequests = lazy(() => import('./pages/LeaveRequests'));
 const Announcements = lazy(() => import('./pages/Announcements'));
 const People = lazy(() => import('./pages/People'));
 
+// Legal role — document/immigration review only
+const LegalReview = lazy(() => import('./pages/LegalReview'));
+const LegalReviewDetail = lazy(() => import('./pages/LegalReviewDetail'));
+
 // Phase 2 — Expense Reports
 const Expenses = lazy(() => import('./pages/Expenses'));
 
@@ -309,6 +313,23 @@ export default function PortalApp() {
               }
             />
 
+            <Route
+              path="legal-review"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                  <LegalReview />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="legal-review/:id"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                  <LegalReviewDetail />
+                </ProtectedRoute>
+              }
+            />
+
             <Route path="expenses" element={<Expenses />} />
             <Route
               path="reviews"
@@ -425,7 +446,7 @@ export default function PortalApp() {
             <Route
               path="notifications"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'hr', 'finance', 'operations', 'employee']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'finance', 'operations', 'employee', 'legal']}>
                   <NotificationsPage />
                 </ProtectedRoute>
               }

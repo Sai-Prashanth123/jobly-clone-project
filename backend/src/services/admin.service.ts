@@ -3,7 +3,7 @@ import { NotFoundError, ForbiddenError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
 
-const VALID_ROLES = ['admin', 'hr', 'operations', 'finance', 'employee'];
+const VALID_ROLES = ['admin', 'hr', 'operations', 'finance', 'employee', 'legal'];
 
 // ── Portal User Management ────────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'hr' | 'operations' | 'finance' | 'employee';
+export type UserRole = 'admin' | 'hr' | 'operations' | 'finance' | 'employee' | 'legal';
 export type EmployeeStatus = 'active' | 'inactive' | 'onboarding';
 export type TimesheetStatus = 'draft' | 'submitted' | 'manager_approved' | 'rejected';
 export type LeaveType = 'medical_leave' | 'sick' | 'vacation' | 'unpaid_leave' | 'bereavement' | 'jury_duty' | 'other';
@@ -143,6 +143,8 @@ export interface EmployeeDocument {
   uploadedAt: string;
   url?: string;
   expiryDate?: string;
+  legalFlagged?: boolean;
+  legalFlagComment?: string | null;
 }
 
 export interface OnboardingChecklistItem {

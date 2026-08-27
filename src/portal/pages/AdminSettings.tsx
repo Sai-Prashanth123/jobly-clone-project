@@ -27,6 +27,7 @@ const ROLE_COLORS: Record<string, string> = {
   operations: 'bg-amber-100 text-amber-800 border-amber-200',
   finance:    'bg-emerald-100 text-emerald-800 border-emerald-200',
   employee:   'bg-blue-100 text-blue-800 border-blue-200',
+  legal:      'bg-rose-100 text-rose-800 border-rose-200',
 };
 
 function RoleBadge({ role }: { role: string }) {
@@ -113,8 +114,8 @@ function UsersTab() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {(['admin','hr','operations','finance','employee'] as const).map(role => {
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {(['admin','hr','operations','finance','employee','legal'] as const).map(role => {
           const count = users.filter(u => u.role === role).length;
           return (
             <Card key={role}>
@@ -172,6 +173,7 @@ function UsersTab() {
                             <SelectItem value="operations">Operations</SelectItem>
                             <SelectItem value="finance">Finance</SelectItem>
                             <SelectItem value="employee">Employee</SelectItem>
+                            <SelectItem value="legal">Legal</SelectItem>
                           </SelectContent>
                         </Select>
                       ) : (

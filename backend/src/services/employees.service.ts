@@ -23,9 +23,24 @@ function serializeEmployee(emp: any) {
 // details, or pay rate. Redaction happens at the API boundary (list + getOne).
 const SENSITIVE_EMPLOYEE_FIELDS = ['ssn', 'bank_routing_number', 'bank_account_number', 'pay_rate'] as const;
 
+// Legal reviews immigration paperwork only — no org/finance/personal-contact
+// data. Allowlist (not denylist) on purpose: a column added later defaults to
+// hidden from legal unless someone deliberately adds it here.
+const LEGAL_ALLOWED_EMPLOYEE_FIELDS = new Set([
+  'id', 'display_id', 'first_name', 'last_name', 'middle_name', 'email', 'status',
+  'nationality', 'visa_type', 'visa_expiry', 'i9_status', 'e_verify_status', 'e_verify_case_number',
+  'dependents', 'documents', 'onboarding', 'profile_photo_url', 'created_at', 'updated_at',
+]);
+
 export function redactEmployee(emp: any, viewerRole?: string, isOwn = false): any {
   if (!emp) return emp;
   if (viewerRole === 'admin' || viewerRole === 'hr' || isOwn) return emp;
+  if (viewerRole === 'legal') {
+    const out: any = {};
+    for (const key of Object.keys(emp)) out[key] = LEGAL_ALLOWED_EMPLOYEE_FIELDS.has(key) ? emp[key] : null;
+    out.pay_rate = 0; // serializeEmployee coerces null→0; keep the shape numeric
+    return out;
+  }
   const out = { ...emp };
   for (const f of SENSITIVE_EMPLOYEE_FIELDS) out[f] = null;
   out.pay_rate = 0; // serializeEmployee coerces null→0; keep the shape numeric

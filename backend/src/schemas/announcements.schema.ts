@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 const ANNOUNCEMENT_TYPES = ['info', 'urgent', 'event', 'policy'] as const;
-const ALL_ROLES = ['admin', 'hr', 'operations', 'finance', 'employee'] as const;
+const ALL_ROLES = ['admin', 'hr', 'operations', 'finance', 'employee', 'legal'] as const;
 
 export const createAnnouncementSchema = z.object({
   title:       z.string().min(1).max(200),

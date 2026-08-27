@@ -332,6 +332,17 @@ export async function downloadDocumentBuffer(
   return Buffer.from(await data.arrayBuffer());
 }
 
+export async function setDocumentLegalReview(docId: string, flagged: boolean, comment: string | null) {
+  const { data, error } = await supabaseAdmin
+    .from('documents')
+    .update({ legal_flagged: flagged, legal_flag_comment: comment })
+    .eq('id', docId)
+    .select()
+    .single();
+  if (error || !data) throw new NotFoundError('Document not found');
+  return data;
+}
+
 export async function deleteDocument(docId: string) {
   const { data: doc, error } = await supabaseAdmin
     .from('documents')

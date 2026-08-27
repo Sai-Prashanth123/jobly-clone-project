@@ -694,7 +694,17 @@ export default function EmployeeDetail() {
               {employee.documents.map(doc => (
                 <div key={doc.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
-                    <p className="text-sm font-medium">{doc.name}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium">{doc.name}</p>
+                      {doc.legalFlagged && (
+                        <span
+                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700"
+                          title={doc.legalFlagComment || 'Flagged by Legal for review'}
+                        >
+                          <ShieldOff className="h-3 w-3" /> Flagged by Legal
+                        </span>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 flex-wrap mt-0.5">
                       <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
                       {doc.expiryDate && (() => {
@@ -703,6 +713,9 @@ export default function EmployeeDetail() {
                         return <span className={`text-xs font-medium ${cls}`}>Expires {formatDate(doc.expiryDate)}{days >= 0 && days <= 90 ? ` (${days}d)` : ''}</span>;
                       })()}
                     </div>
+                    {doc.legalFlagged && doc.legalFlagComment && (
+                      <p className="text-xs text-red-600 mt-1 max-w-md">&ldquo;{doc.legalFlagComment}&rdquo;</p>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}>
