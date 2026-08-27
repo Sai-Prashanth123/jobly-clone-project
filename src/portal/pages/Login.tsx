@@ -14,6 +14,7 @@ const ACCOUNTS = [
   { role: 'HR',         email: 'hr@joblysolutions.com',      password: 'Jbly#Hr!2026',   color: '#8B5CF6' },
   { role: 'Operations', email: 'ops@joblysolutions.com',     password: 'Jbly#0ps!2026',  color: '#F59E0B' },
   { role: 'Finance',    email: 'finance@joblysolutions.com', password: 'Jbly#F!n2026',   color: '#10B981' },
+  { role: 'Legal',      email: 'legal@joblysolutions.com',   password: 'Jbly#Lgl!2026',  color: '#E11D48' },
 ];
 
 // ── Clean × Elegant tokens — minimal, delicate type, generous whitespace ──
