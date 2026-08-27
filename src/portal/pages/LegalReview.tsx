@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, AlertCircle, Scale, FlagTriangleRight, Users } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -21,8 +21,12 @@ function flaggedCount(emp: Employee) {
   return emp.documents.filter(d => d.legalFlagged).length;
 }
 
+const VALID_FILTERS = ['all', 'visa', 'flagged'] as const;
+type FilterValue = (typeof VALID_FILTERS)[number];
+
 export function LegalReview() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   // Legal's role-based redaction happens server-side (employees.service.ts
   // redactEmployee) — every field this page doesn't explicitly render below
   // (salary, bank details, personal contact, etc.) already comes back null.
@@ -31,6 +35,21 @@ export function LegalReview() {
 
   const withVisa = useMemo(() => employees.filter(e => e.visaType), [employees]);
   const flaggedTotal = useMemo(() => employees.reduce((sum, e) => sum + flaggedCount(e), 0), [employees]);
+
+  // Filter state lives in the URL (?filter=visa|flagged) so clicking a stat
+  // card actually navigates to a shareable/bookmarkable filtered view, not
+  // just a local toggle that resets on refresh.
+  const rawFilter = searchParams.get('filter');
+  const filter: FilterValue = VALID_FILTERS.includes(rawFilter as FilterValue) ? (rawFilter as FilterValue) : 'all';
+  const toggleFilter = (f: FilterValue) => {
+    const next = filter === f ? 'all' : f;
+    setSearchParams(next === 'all' ? {} : { filter: next });
+  };
+  const filteredEmployees = useMemo(() => {
+    if (filter === 'visa') return withVisa;
+    if (filter === 'flagged') return employees.filter(e => flaggedCount(e) > 0);
+    return employees;
+  }, [filter, employees, withVisa]);
 
   const columns: Column<Employee>[] = [
     {
@@ -105,7 +124,11 @@ export function LegalReview() {
       />
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="portal-panel">
+        <button
+          type="button"
+          onClick={() => toggleFilter('all')}
+          className={`portal-panel text-left transition-shadow ${filter === 'all' ? 'ring-2 ring-blue-500' : 'hover:shadow-md'}`}
+        >
           <div className="portal-panel-body flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
               <Users className="h-5 w-5 text-blue-600" />
@@ -115,8 +138,12 @@ export function LegalReview() {
               <p className="text-xs text-muted-foreground">Employees</p>
             </div>
           </div>
-        </div>
-        <div className="portal-panel">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleFilter('visa')}
+          className={`portal-panel text-left transition-shadow ${filter === 'visa' ? 'ring-2 ring-violet-500' : 'hover:shadow-md'}`}
+        >
           <div className="portal-panel-body flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
               <Scale className="h-5 w-5 text-violet-600" />
@@ -126,8 +153,12 @@ export function LegalReview() {
               <p className="text-xs text-muted-foreground">On a visa</p>
             </div>
           </div>
-        </div>
-        <div className="portal-panel">
+        </button>
+        <button
+          type="button"
+          onClick={() => toggleFilter('flagged')}
+          className={`portal-panel text-left transition-shadow ${filter === 'flagged' ? 'ring-2 ring-red-500' : 'hover:shadow-md'}`}
+        >
           <div className="portal-panel-body flex items-center gap-3">
             <div className="h-10 w-10 rounded-lg bg-red-50 flex items-center justify-center flex-shrink-0">
               <FlagTriangleRight className="h-5 w-5 text-red-600" />
@@ -137,7 +168,7 @@ export function LegalReview() {
               <p className="text-xs text-muted-foreground">Flagged documents</p>
             </div>
           </div>
-        </div>
+        </button>
       </div>
 
       {isLoading ? (
@@ -150,15 +181,27 @@ export function LegalReview() {
           <p className="text-sm">Failed to load employees. Please refresh.</p>
         </div>
       ) : (
-        <DataTable
-          columns={columns}
-          data={employees}
-          getRowKey={(e) => e.id}
-          onRowClick={(e) => navigate(`/portal/legal-review/${e.id}`)}
-          emptyTitle="No employees found"
-          searchPlaceholder="Search by name, visa type…"
-          searchKeys={['firstName', 'lastName', 'displayId', 'visaType'] as (keyof Employee)[]}
-        />
+        <>
+          {filter !== 'all' && (
+            <div className="flex items-center gap-2 text-sm text-gray-500">
+              <span>
+                Showing {filteredEmployees.length} {filter === 'visa' ? 'employee(s) on a visa' : 'employee(s) with flagged documents'}
+              </span>
+              <button type="button" onClick={() => toggleFilter(filter)} className="text-blue-600 hover:underline text-xs font-medium">
+                Clear filter
+              </button>
+            </div>
+          )}
+          <DataTable
+            columns={columns}
+            data={filteredEmployees}
+            getRowKey={(e) => e.id}
+            onRowClick={(e) => navigate(`/portal/legal-review/${e.id}`)}
+            emptyTitle={filter === 'all' ? 'No employees found' : 'No employees match this filter'}
+            searchPlaceholder="Search by name, visa type…"
+            searchKeys={['firstName', 'lastName', 'displayId', 'visaType'] as (keyof Employee)[]}
+          />
+        </>
       )}
     </div>
   );
