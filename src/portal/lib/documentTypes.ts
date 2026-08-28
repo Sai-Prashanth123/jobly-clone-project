@@ -96,6 +96,12 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'perm_questionnaire', label: 'PERM Questionnaire - Employee', placeholder: '',
     hint: 'Download the blank questionnaire, fill it out, then upload it here.',
     downloadUrl: 'https://ufkrfrmqangydrjbzljo.supabase.co/storage/v1/object/public/document-templates/perm-questionnaire-employee.doc' },
+  { type: 'h1b_employee_questionnaire', label: 'H-1B Employee Questionnaire', placeholder: '',
+    hint: 'Download the blank questionnaire, fill it out, then upload it here.',
+    downloadUrl: 'https://ufkrfrmqangydrjbzljo.supabase.co/storage/v1/object/public/document-templates/h1b-employee-questionnaire.docx' },
+  { type: 'h4_beneficiary_questionnaire', label: 'H-4 Beneficiary Questionnaire', placeholder: '',
+    hint: 'Download the blank questionnaire, fill it out, then upload it here.',
+    downloadUrl: 'https://ufkrfrmqangydrjbzljo.supabase.co/storage/v1/object/public/document-templates/h4-beneficiary-questionnaire.doc' },
   { type: 'i797',           label: 'I-797',                            placeholder: '',
     hint: 'Notice of Action / approval notice (e.g., H-1B, I-140, extension approvals), if you have one. Up to 10 files.',
     hasExpiry: true, multi: true, maxFiles: 10 },
@@ -137,6 +143,8 @@ export const ROW_VISA_GATE: Record<string, string[]> = {
   vendor_letter: ['h1b'],
   project_documents: ['h1b'],
   lca: ['h1b'],
+  h1b_employee_questionnaire: ['h1b'],
+  h4_beneficiary_questionnaire: ['h1b'],
   experience_letters: ['h1b', 'gc'],
   education_documents: ['h1b', 'gc'],
   certificates: ['gc'],
@@ -179,6 +187,7 @@ const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
   opt: ['i9_form', 'i20', 'ead'],
   stem_opt: ['i9_form', 'i20', 'ead', 'driver_license', 'us_visa'],
   gc: ['passport', 'education_documents', 'experience_letters', 'i140', 'i140_approval_notice', 'labor_certificate', 'i797'],
+  h1b: ['h1b_employee_questionnaire', 'h4_beneficiary_questionnaire'],
 };
 
 export function getRequiredIdentityTypes(visaType?: string | null): string[] {
