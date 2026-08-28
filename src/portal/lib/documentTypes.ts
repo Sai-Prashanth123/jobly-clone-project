@@ -185,7 +185,7 @@ const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt
 // "(if any)" / "(Optional)" hedge become required).
 const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
   opt: ['i9_form', 'i20', 'ead'],
-  stem_opt: ['i9_form', 'i20', 'ead', 'driver_license', 'us_visa'],
+  stem_opt: ['i9_form', 'i20', 'ead', 'us_visa'],
   gc: ['passport', 'education_documents', 'experience_letters', 'i140', 'i140_approval_notice', 'labor_certificate', 'i797'],
 };
 
