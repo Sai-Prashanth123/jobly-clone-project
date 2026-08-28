@@ -162,7 +162,7 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
   i140_questionnaire: ['opt', 'h1b', 'stem_opt'],
   perm_questionnaire: ['opt', 'h1b', 'stem_opt'],
   us_visa: ['opt'],
-  i797: ['h1b'],
+  i797: ['h1b', 'opt'],
 };
 
 // Identity doc types mandatory for every employee during onboarding, regardless
@@ -187,7 +187,6 @@ const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
   opt: ['i9_form', 'i20', 'ead'],
   stem_opt: ['i9_form', 'i20', 'ead', 'driver_license', 'us_visa'],
   gc: ['passport', 'education_documents', 'experience_letters', 'i140', 'i140_approval_notice', 'labor_certificate', 'i797'],
-  h1b: ['h1b_employee_questionnaire', 'h4_beneficiary_questionnaire'],
 };
 
 export function getRequiredIdentityTypes(visaType?: string | null): string[] {
