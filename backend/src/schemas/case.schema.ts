@@ -49,6 +49,10 @@ export const updateFilingSchema = createFilingSchema.partial();
 
 export const createNoteSchema = z.object({
   body: z.string().min(1),
+  title: z.string().optional().nullable().transform(v => v || null),
+  taggedTo: z.string().uuid().optional().nullable().transform(v => v || null),
+  status: z.string().optional().nullable().transform(v => v || null),
+  accessLevel: z.string().optional().nullable().transform(v => v || null),
 });
 
 export const updateNoteSchema = createNoteSchema;

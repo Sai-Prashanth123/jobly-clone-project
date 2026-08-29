@@ -393,6 +393,21 @@ export interface CaseNote {
   authorName?: string;
   editedAt?: string;
   createdAt: string;
+  title?: string;
+  taggedTo?: string;
+  taggedToName?: string;
+  status?: string;
+  accessLevel?: string;
+}
+
+export interface CaseMessage {
+  id: string;
+  body: string;
+  authorId?: string;
+  authorName?: string;
+  audience: 'all' | 'law_firm' | 'beneficiary';
+  createdAt: string;
+  read: boolean;
 }
 
 // A Case is Legal's tracked immigration matter for one Employee — the

@@ -1118,7 +1118,7 @@ export async function raiseLegalRequest(id: string, input: RaiseLegalRequestInpu
     },
     actorId,
   );
-  await casesService.createNote(created.id, { body: input.reason }, actorId);
+  await casesService.createNote(created.id, { body: input.reason, title: null, taggedTo: null, status: null, accessLevel: null }, actorId);
 
   const legalIds = await getUserIdsByRole('legal');
   for (const uid of legalIds) {

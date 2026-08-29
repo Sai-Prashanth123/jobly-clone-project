@@ -19,6 +19,7 @@ import { DependentsInfoCard } from '../components/legal/DependentsInfoCard';
 import { CaseWagesTable } from '../components/legal/CaseWagesTable';
 import { CasePermForm } from '../components/legal/CasePermForm';
 import { CaseStatusTimeline } from '../components/legal/CaseStatusTimeline';
+import { CaseMessagesThread } from '../components/legal/CaseMessagesThread';
 import {
   useCase, useUpdateCase, useDeleteCase,
   useCreateFiling, useUpdateFiling, useDeleteFiling,
@@ -46,7 +47,7 @@ export default function CaseDetail() {
   const [filingDialog, setFilingDialog] = useState<{ mode: 'create' | 'edit'; filing?: CaseFiling } | null>(null);
   const [removeFilingTarget, setRemoveFilingTarget] = useState<CaseFiling | null>(null);
   const [section, setSection] = useState<
-    'overview' | 'beneficiary' | 'documents' | 'dependents' | 'children' | 'wages' | 'tax' | 'formsLetters' | 'scannedSigned' | 'perm'
+    'overview' | 'beneficiary' | 'documents' | 'dependents' | 'children' | 'wages' | 'tax' | 'formsLetters' | 'scannedSigned' | 'perm' | 'messages'
   >('overview');
 
   if (isLoading) {
@@ -126,6 +127,7 @@ export default function CaseDetail() {
             { key: 'formsLetters', label: 'Forms and Letters' },
             { key: 'scannedSigned', label: 'Scanned/Signed Documents' },
             { key: 'perm', label: 'PERM' },
+            { key: 'messages', label: 'Messages' },
           ] as const).map(s => (
             <button
               key={s.key}
@@ -289,6 +291,13 @@ export default function CaseDetail() {
             <Card>
               <CardHeader><CardTitle className="text-base">PERM</CardTitle></CardHeader>
               <CardContent><CasePermForm caseId={legalCase.id} /></CardContent>
+            </Card>
+          )}
+
+          {section === 'messages' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Messages</CardTitle></CardHeader>
+              <CardContent><CaseMessagesThread caseId={legalCase.id} /></CardContent>
             </Card>
           )}
         </div>

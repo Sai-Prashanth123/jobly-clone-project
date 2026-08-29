@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 import { isValidId } from '../lib/utils';
 import { mapEmployee } from './useEmployees';
-import type { LegalCase, CaseFiling, CaseNote, CaseDocument, Petitioner, CaseStatusStep } from '../types';
+import type { LegalCase, CaseFiling, CaseNote, CaseDocument, Petitioner, CaseStatusStep, CaseMessage } from '../types';
 
 // Mirrors backend/src/lib/caseStatusSteps.ts — one fixed 11-step list for
 // every case type. The backend only returns key/order/completedAt; labels
@@ -57,6 +57,11 @@ function mapNote(raw: any): CaseNote {
     authorName: raw.portal_users?.name ?? undefined,
     editedAt: raw.edited_at ?? undefined,
     createdAt: raw.created_at,
+    title: raw.title ?? undefined,
+    taggedTo: raw.tagged_to ?? undefined,
+    taggedToName: raw.tagged_to_user?.name ?? undefined,
+    status: raw.status ?? undefined,
+    accessLevel: raw.access_level ?? undefined,
   };
 }
 
@@ -244,11 +249,14 @@ export function useDeleteFiling(caseId: string) {
   });
 }
 
+interface NoteBody { body: string; title?: string; taggedTo?: string; status?: string; accessLevel?: string }
+
 export function useAddCaseNote(caseId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body: string) => {
-      const { data } = await apiClient.post(`/cases/${caseId}/notes`, { body });
+    mutationFn: async (input: string | NoteBody) => {
+      const body = typeof input === 'string' ? { body: input } : input;
+      const { data } = await apiClient.post(`/cases/${caseId}/notes`, body);
       return data.data;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId] }),
@@ -309,6 +317,20 @@ export function useDeleteCaseDocument(caseId: string) {
   return useMutation({
     mutationFn: (docId: string) => apiClient.delete(`/cases/${caseId}/documents/${docId}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId, 'documents'] }),
+  });
+}
+
+export interface TaggableUser { id: string; name: string; role: string }
+
+// Legal can't reach /admin/users (admin-only) — this is the narrow
+// substitute for populating the Notes "Tagged To" picker.
+export function useTaggableUsers() {
+  return useQuery({
+    queryKey: ['cases', 'taggable-users'],
+    queryFn: async () => {
+      const { data } = await apiClient.get('/cases/taggable-users');
+      return data.data as TaggableUser[];
+    },
   });
 }
 
@@ -444,6 +466,52 @@ export function useUpsertPermDetails(caseId: string) {
 }
 
 // ── Status Timeline ──────────────────────────────────────────────────────────
+
+// ── Messages ──────────────────────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapCaseMessage(raw: any): CaseMessage {
+  return {
+    id: raw.id,
+    body: raw.body,
+    authorId: raw.author_id ?? undefined,
+    authorName: raw.portal_users?.name ?? undefined,
+    audience: raw.audience,
+    createdAt: raw.created_at,
+    read: !!raw.read,
+  };
+}
+
+export function useCaseMessages(caseId: string) {
+  return useQuery({
+    queryKey: ['cases', caseId, 'messages'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/cases/${caseId}/messages`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data.data as any[]).map(mapCaseMessage);
+    },
+    enabled: isValidId(caseId),
+  });
+}
+
+export function useCreateCaseMessage(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { body: string; audience: 'all' | 'law_firm' | 'beneficiary' }) => {
+      const { data } = await apiClient.post(`/cases/${caseId}/messages`, body);
+      return mapCaseMessage(data.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId, 'messages'] }),
+  });
+}
+
+export function useMarkMessageRead(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (messageId: string) => apiClient.post(`/cases/${caseId}/messages/${messageId}/read`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId, 'messages'] }),
+  });
+}
 
 export function useCompleteStatusStep(caseId: string) {
   const qc = useQueryClient();

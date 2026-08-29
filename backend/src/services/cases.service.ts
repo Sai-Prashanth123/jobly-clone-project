@@ -17,7 +17,17 @@ import type {
 // field added to one must be deliberately added to the other, never just one.
 const EMPLOYEE_EMBED = 'employees!employee_id(id, first_name, last_name, middle_name, display_id, email, status, nationality, visa_type, visa_expiry, i9_status, e_verify_status, e_verify_case_number, dependents, profile_photo_url, dob, gender, marital_status, preferred_language, languages_known, phone, alt_phone, address_street, address_city, address_state, address_zip, address_country, permanent_address_street, permanent_address_city, permanent_address_state, permanent_address_zip, permanent_address_country, department, job_title, employment_type, start_date, work_location, education, work_history, total_experience_years, experience_level, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_alt_phone, emergency_contact_address, emergency_contact_city, emergency_contact_state, emergency_contact_zip)';
 const PETITIONER_EMBED = 'petitioners!petitioner_id(id, name, ein_fein)';
-const DETAIL_SELECT = `*, ${EMPLOYEE_EMBED}, ${PETITIONER_EMBED}, case_filings(*), case_notes(*, portal_users!author_id(name)), case_status_steps(*)`;
+const DETAIL_SELECT = `*, ${EMPLOYEE_EMBED}, ${PETITIONER_EMBED}, case_filings(*), case_notes(*, portal_users!author_id(name), tagged_to_user:portal_users!tagged_to(name)), case_status_steps(*)`;
+
+// Minimal directory for the Notes "Tagged To" picker — legal can't reach
+// /admin/users (admin-only), so this is a narrow, purpose-built substitute
+// scoped to just the roles relevant to case work.
+export async function listTaggableUsers() {
+  const { data, error } = await supabaseAdmin
+    .from('portal_users').select('id, name, role').in('role', ['admin', 'legal']).order('name');
+  if (error) throw error;
+  return data ?? [];
+}
 
 export async function listCases(query: ListCasesQuery) {
   let q = supabaseAdmin
@@ -139,7 +149,7 @@ export async function deleteCase(id: string, actorId?: string) {
   logActivity(actorId ?? null, 'deleted', 'case', data.id, data.display_id, {});
 }
 
-async function assertCaseExists(caseId: string) {
+export async function assertCaseExists(caseId: string) {
   const { data } = await supabaseAdmin.from('cases').select('id, display_id').eq('id', caseId).is('deleted_at', null).maybeSingle();
   if (!data) throw new NotFoundError('Case not found');
   return data;
@@ -206,12 +216,17 @@ export async function removeFiling(caseId: string, filingId: string, actorId?: s
   logActivity(actorId ?? null, 'deleted', 'case_filing', data.id, data.display_id, {});
 }
 
+const NOTE_SELECT = '*, portal_users!author_id(name), tagged_to_user:portal_users!tagged_to(name)';
+
 export async function createNote(caseId: string, input: CreateNoteInput, actorId?: string) {
   const parent = await assertCaseExists(caseId);
   const { data, error } = await supabaseAdmin
     .from('case_notes')
-    .insert({ case_id: caseId, body: input.body, author_id: actorId ?? null })
-    .select('*, portal_users!author_id(name)')
+    .insert({
+      case_id: caseId, body: input.body, author_id: actorId ?? null,
+      title: input.title, tagged_to: input.taggedTo, status: input.status, access_level: input.accessLevel,
+    })
+    .select(NOTE_SELECT)
     .single();
 
   if (error) throw error;
@@ -222,11 +237,14 @@ export async function createNote(caseId: string, input: CreateNoteInput, actorId
 export async function updateNote(caseId: string, noteId: string, input: CreateNoteInput, actorId?: string) {
   const { data, error } = await supabaseAdmin
     .from('case_notes')
-    .update({ body: input.body, edited_at: new Date().toISOString() })
+    .update({
+      body: input.body, edited_at: new Date().toISOString(),
+      title: input.title, tagged_to: input.taggedTo, status: input.status, access_level: input.accessLevel,
+    })
     .eq('id', noteId)
     .eq('case_id', caseId)
     .is('deleted_at', null)
-    .select('*, portal_users!author_id(name)')
+    .select(NOTE_SELECT)
     .single();
 
   if (error || !data) throw new NotFoundError('Note not found');

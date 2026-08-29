@@ -14,6 +14,13 @@ export async function list(req: Request, res: Response, next: NextFunction): Pro
   } catch (err) { next(err); }
 }
 
+export async function listTaggableUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.listTaggableUsers();
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.getCase(req.params.id);
