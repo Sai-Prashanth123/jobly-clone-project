@@ -116,6 +116,18 @@ export async function requestOnboardingChanges(req: Request, res: Response, next
   } catch (err) { next(err); }
 }
 
+export async function getOnboardingChangeRequests(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    // Same ownership rule as getOne/updateEmployee — an employee may only see
+    // the history of requests made about their own onboarding.
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only view their own change-request history');
+    }
+    const data = await svc.listOnboardingChangeRequests(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function reopenOnboarding(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.reopenOnboarding(req.params.id, req.user!.role, req.user?.employeeId);

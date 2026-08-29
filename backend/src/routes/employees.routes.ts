@@ -41,6 +41,8 @@ router.delete('/:id/documents/:docId', requireRole('admin','hr','employee'), ctr
 router.post('/:id/onboarding/complete', requireRole('admin','hr','employee'), ctrl.completeOnboarding);
 // HR asks the employee to fix something in their submitted onboarding.
 router.post('/:id/onboarding/request-changes', requireRole('admin','hr'), ctrl.requestOnboardingChanges);
+// Full history of past "Request Changes" messages (not just the current one).
+router.get('/:id/onboarding/change-requests', requireRole('admin','hr','employee'), ctrl.getOnboardingChangeRequests);
 // Employee self-reopens the wizard while still in the "pending review" state
 // (before HR has acted). The service enforces ownership.
 router.post('/:id/onboarding/reopen', requireRole('admin','hr','employee'), ctrl.reopenOnboarding);

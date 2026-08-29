@@ -23,6 +23,7 @@ import { useAssignments } from '../hooks/useAssignments';
 import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
 import { OnboardingChecklist } from '../components/employees/OnboardingProgress';
+import { OnboardingChangeHistoryDialog } from '../components/employees/OnboardingChangeHistoryDialog';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
@@ -69,6 +70,7 @@ export default function EmployeeDetail() {
   const [sendOfficialEmailOpen, setSendOfficialEmailOpen] = useState(false);
   const [officialEmailInput, setOfficialEmailInput] = useState('');
   const [changesOpen, setChangesOpen] = useState(false);
+  const [changeHistoryOpen, setChangeHistoryOpen] = useState(false);
   const [changesMessage, setChangesMessage] = useState('');
   const [docRequestOpen, setDocRequestOpen] = useState(false);
   const [docRequestMessage, setDocRequestMessage] = useState('');
@@ -204,12 +206,14 @@ export default function EmployeeDetail() {
                 </span>
               )}
               {employee.onboardingChangeRequestMessage && (
-                <span
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap"
-                  title={`Sent ${employee.onboardingChangeRequestedAt ? formatDate(employee.onboardingChangeRequestedAt) : ''}: ${employee.onboardingChangeRequestMessage}`}
+                <button
+                  type="button"
+                  onClick={() => setChangeHistoryOpen(true)}
+                  className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 rounded-full px-2 py-0.5 whitespace-nowrap hover:bg-amber-100"
+                  title="View full history of requested changes"
                 >
                   <MessageSquareWarning className="h-3 w-3 flex-shrink-0" /> Changes requested — awaiting employee
-                </span>
+                </button>
               )}
               {employee.jobTitle && <span className="text-xs text-muted-foreground whitespace-nowrap">· {employee.jobTitle}</span>}
             </div>
@@ -848,6 +852,13 @@ export default function EmployeeDetail() {
             /* failed-request toast raised centrally (queryClient.ts) */
           }
         }}
+      />
+
+      <OnboardingChangeHistoryDialog
+        employeeId={employee.id}
+        employeeName={`${employee.firstName} ${employee.lastName}`}
+        open={changeHistoryOpen}
+        onOpenChange={setChangeHistoryOpen}
       />
 
       {/* Request-Changes dialog — HR types a message that the employee will see

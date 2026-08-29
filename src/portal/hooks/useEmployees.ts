@@ -366,6 +366,40 @@ export function useRequestOnboardingChanges(id: string) {
   });
 }
 
+export interface OnboardingChangeRequest {
+  id: string;
+  message: string;
+  requestedByName: string | null;
+  requestedAt: string;
+  resolvedAt: string | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapOnboardingChangeRequest(raw: any): OnboardingChangeRequest {
+  return {
+    id: raw.id,
+    message: raw.message,
+    requestedByName: raw.portal_users?.name ?? null,
+    requestedAt: raw.requested_at,
+    resolvedAt: raw.resolved_at,
+  };
+}
+
+// Full history of every "Request Changes" message ever sent to this
+// employee (newest first) — unlike `employee.onboardingChangeRequestMessage`,
+// which only ever holds the current one. Only fetched on demand (dialog open).
+export function useOnboardingChangeRequests(id: string, options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['employees', id, 'onboarding-change-requests'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/employees/${id}/onboarding/change-requests`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data.data as any[]).map(mapOnboardingChangeRequest);
+    },
+    enabled: options?.enabled,
+  });
+}
+
 // Ask an employee (any status — active, onboarding, on-leave) for a document
 // or piece of information outside the onboarding flow. Pure notification —
 // no employee fields change, so there's nothing to update in the cache.

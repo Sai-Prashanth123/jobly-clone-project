@@ -945,6 +945,16 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
     .from('employees').update(patch).eq('id', id).select().single();
   if (updErr) throw updErr;
 
+  if (wasChangeRequested) {
+    // Close out the history entry/entries HR is asking to see resolved by
+    // this resubmission — mirrors the 3-column clear above, but for history.
+    await supabaseAdmin
+      .from('onboarding_change_requests')
+      .update({ resolved_at: new Date().toISOString() })
+      .eq('employee_id', id)
+      .is('resolved_at', null);
+  }
+
   logActivity(
     actorId ?? null, 'updated', 'employee', id,
     updated.display_id ?? id.slice(0, 8),
@@ -1011,6 +1021,12 @@ export async function requestOnboardingChanges(
     .from('employees').update(patch).eq('id', id).select().single();
   if (updErr) throw updErr;
 
+  // Append to history — the 3 columns above only ever hold the current
+  // request, this is the durable record of every request ever made.
+  await supabaseAdmin.from('onboarding_change_requests').insert({
+    employee_id: id, message, requested_by: actorId ?? null,
+  });
+
   logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
     event: 'onboarding_changes_requested',
   });
@@ -1019,6 +1035,18 @@ export async function requestOnboardingChanges(
   void notifyOnboardingChangesRequested(updated, message);
 
   return updated;
+}
+
+// Full history of "Request Changes" messages ever sent to this employee,
+// newest first — unlike the 3 columns on `employees` (current request only).
+export async function listOnboardingChangeRequests(employeeId: string) {
+  const { data, error } = await supabaseAdmin
+    .from('onboarding_change_requests')
+    .select('id, message, requested_at, resolved_at, portal_users!requested_by(name)')
+    .eq('employee_id', employeeId)
+    .order('requested_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
 }
 
 // Internal helper — mirrors notifyOnboardingCompleted but for the changes-requested case.
