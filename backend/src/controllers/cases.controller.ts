@@ -81,3 +81,27 @@ export async function removeNote(req: Request, res: Response, next: NextFunction
     res.json({ success: true });
   } catch (err) { next(err); }
 }
+
+export async function listDocuments(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.listCaseDocuments(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function uploadDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const file = req.file;
+    if (!file) { res.status(400).json({ success: false, error: 'No file provided' }); return; }
+    const category = String((req.body as any)?.category ?? '');
+    const data = await svc.uploadCaseDocument(req.params.id, file, category, req.user!.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function removeDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    await svc.removeCaseDocument(req.params.id, req.params.docId, req.user?.id);
+    res.json({ success: true });
+  } catch (err) { next(err); }
+}

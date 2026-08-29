@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import type { LegalCase, CaseType, CaseStatus } from '../../types';
 import { useEmployees } from '../../hooks/useEmployees';
+import { usePetitioners, useCreatePetitioner } from '../../hooks/useCases';
 import { UsDateInput } from '../shared/UsDateInput';
 
 export const CASE_TYPE_LABELS: Record<CaseType, string> = {
@@ -20,6 +21,10 @@ export const CASE_TYPE_LABELS: Record<CaseType, string> = {
   l1_extension: 'L-1 — Extension',
   other: 'Other',
 };
+
+// Free-choice list over a TEXT column on the backend (not a DB enum) — kept
+// in sync with backend/src/schemas/case.schema.ts's CASE_CLASSIFICATIONS.
+export const CASE_CLASSIFICATIONS = ['EB-1', 'EB-2', 'EB-3', 'H-1B', 'L-1', 'TN', 'O-1', 'Other'] as const;
 
 export const CASE_STATUS_LABELS: Record<CaseStatus, string> = {
   open: 'Open',
@@ -40,11 +45,14 @@ type CaseFormData = {
   decisionDate: string;
   attorneyName: string;
   description: string;
+  petitionerId: string;
+  classification: string;
 };
 
 const defaultForm: CaseFormData = {
   employeeId: '', caseType: '', status: 'open',
   receiptNumber: '', priorityDate: '', filedDate: '', decisionDate: '', attorneyName: '', description: '',
+  petitionerId: '', classification: '',
 };
 
 interface CaseFormProps {
@@ -58,6 +66,9 @@ interface CaseFormProps {
 export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: CaseFormProps) {
   const { data: empData } = useEmployees({ limit: 500 });
   const employees = empData?.data ?? [];
+  const { data: petitioners } = usePetitioners();
+  const createPetitioner = useCreatePetitioner();
+  const [newPetitionerName, setNewPetitionerName] = useState('');
 
   const seed = (src?: Partial<LegalCase>): CaseFormData => ({
     employeeId: src?.employeeId ?? defaultForm.employeeId,
@@ -69,6 +80,8 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
     decisionDate: src?.decisionDate ?? '',
     attorneyName: src?.attorneyName ?? '',
     description: src?.description ?? '',
+    petitionerId: src?.petitionerId ?? '',
+    classification: src?.classification ?? '',
   });
 
   const [form, setForm] = useState<CaseFormData>(seed(initial));
@@ -93,14 +106,24 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
     return errs;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       toast.error(`Please fix: ${Object.values(errs).join(', ')}`);
       return;
     }
-    onSubmit(form);
+    let petitionerId = form.petitionerId;
+    if (newPetitionerName.trim()) {
+      try {
+        const created = await createPetitioner.mutateAsync({ name: newPetitionerName.trim() });
+        petitionerId = created.id;
+      } catch {
+        toast.error('Could not create the new petitioner. Please try again.');
+        return;
+      }
+    }
+    onSubmit({ ...form, petitionerId });
   };
 
   return (
@@ -176,6 +199,46 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
           <div className="space-y-2">
             <Label>Attorney Name</Label>
             <Input value={form.attorneyName} onChange={e => set('attorneyName', e.target.value)} placeholder="Outside counsel, if any" />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Classification</Label>
+            <Select value={form.classification || undefined} onValueChange={v => set('classification', v)}>
+              <SelectTrigger><SelectValue placeholder="Select classification" /></SelectTrigger>
+              <SelectContent>
+                {CASE_CLASSIFICATIONS.map(c => (
+                  <SelectItem key={c} value={c}>{c}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Petitioner</Label>
+            <Select
+              value={newPetitionerName ? '__new__' : (form.petitionerId || undefined)}
+              onValueChange={v => {
+                if (v === '__new__') { setNewPetitionerName(' '); set('petitionerId', ''); }
+                else { setNewPetitionerName(''); set('petitionerId', v); }
+              }}
+            >
+              <SelectTrigger><SelectValue placeholder="Select petitioner" /></SelectTrigger>
+              <SelectContent>
+                {(petitioners ?? []).map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+                <SelectItem value="__new__">+ New petitioner…</SelectItem>
+              </SelectContent>
+            </Select>
+            {newPetitionerName && (
+              <Input
+                autoFocus
+                value={newPetitionerName.trim()}
+                onChange={e => setNewPetitionerName(e.target.value)}
+                placeholder="Petitioner (company) name"
+                className="mt-2"
+              />
+            )}
           </div>
 
           <div className="col-span-1 sm:col-span-2 space-y-2">

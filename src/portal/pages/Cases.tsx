@@ -136,6 +136,8 @@ export default function Cases() {
                     decisionDate: formData.decisionDate || undefined,
                     attorneyName: formData.attorneyName || undefined,
                     description: formData.description || undefined,
+                    petitionerId: formData.petitionerId || null,
+                    classification: formData.classification || null,
                   });
                   toast.success(`Case ${created.displayId ?? created.id} created`);
                   setShowForm(false);

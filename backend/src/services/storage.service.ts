@@ -7,16 +7,18 @@ const BUCKET_MAP: Record<string, string> = {
   employee: 'employee-docs',
   client: 'client-docs',
   invoice: 'invoices',
+  case: 'case-docs',
 };
 
 export async function uploadDocument(
-  entityType: 'employee' | 'client' | 'invoice',
+  entityType: 'employee' | 'client' | 'invoice' | 'case',
   entityId: string,
   file: Express.Multer.File,
   uploadedBy: string,
   nameOverride?: string,
   docTypeOverride?: string,
   expiryDate?: string | null,
+  category?: string | null,
 ) {
   const bucket = BUCKET_MAP[entityType];
   // Strip everything but alphanumerics/dot/dash/underscore (incl. slashes and
@@ -49,6 +51,7 @@ export async function uploadDocument(
       storage_url: null,
       uploaded_by: uploadedBy,
       expiry_date: expiryDate || null,
+      category: category || null,
     })
     .select()
     .single();

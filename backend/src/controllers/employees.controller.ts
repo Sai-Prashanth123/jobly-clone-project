@@ -4,7 +4,7 @@ import { exportEmployeesCSV } from '../services/employees.service';
 import * as storageSvc from '../services/storage.service';
 import { ForbiddenError, NotFoundError } from '../lib/errors';
 import { supabaseAdmin } from '../config/supabase';
-import type { ListEmployeesQuery, CreateEmployeeInput, UpdateEmployeeInput } from '../schemas/employee.schema';
+import type { ListEmployeesQuery, CreateEmployeeInput, UpdateEmployeeInput, RaiseLegalRequestInput } from '../schemas/employee.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -112,6 +112,13 @@ export async function requestOnboardingChanges(req: Request, res: Response, next
     }
     const expectedSubmittedAt = (req.body as any)?.expectedSubmittedAt ?? null;
     const data = await svc.requestOnboardingChanges(req.params.id, message, req.user?.id, expectedSubmittedAt);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function raiseLegalRequest(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.raiseLegalRequest(req.params.id, req.body as RaiseLegalRequestInput, req.user?.id);
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }

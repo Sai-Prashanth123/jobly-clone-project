@@ -407,8 +407,51 @@ export interface LegalCase {
   decisionDate?: string;
   attorneyName?: string;
   description: string;
+  petitionerId?: string;
+  petitionerName?: string;
+  classification?: string;
+  // Full Beneficiary Info (Personal/Employment/Additional Information tabs) —
+  // whatever fields cases.service.ts's EMPLOYEE_EMBED currently returns,
+  // kept in sync with the backend's LEGAL_ALLOWED_EMPLOYEE_FIELDS allowlist.
+  beneficiary?: Partial<Employee>;
   filings: CaseFiling[];
   notes: CaseNote[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export const CASE_DOCUMENT_CATEGORIES = [
+  'Clear Copy of New and Old Passport along with Visa Stamps',
+  'Degree along with transcripts of all semesters',
+  'Copy of W-2 Forms issued for all tax years till present',
+  'Copy of all prior Notice of Approvals/Receipts',
+  'Copy of Educational Evaluation, if any',
+  'Letters of Experience',
+  'PERM Documents',
+  'Forms and Letters',
+  'Scanned/Signed Documents',
+  'Other Documents, if any',
+] as const;
+export type CaseDocumentCategory = typeof CASE_DOCUMENT_CATEGORIES[number];
+
+export interface CaseDocument {
+  id: string;
+  name: string;
+  category: CaseDocumentCategory | string;
+  uploadedByName?: string;
+  uploadedByRole?: string;
+  uploadedAt: string;
+}
+
+export interface Petitioner {
+  id: string;
+  name: string;
+  addressStreet?: string;
+  addressCity?: string;
+  addressState?: string;
+  addressZip?: string;
+  addressCountry?: string;
+  einFein?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -1,9 +1,14 @@
 import { z } from 'zod';
 
-const CASE_TYPES = ['h1b_new', 'h1b_extension', 'h1b_transfer', 'perm_green_card', 'opt_stem_extension', 'tn_renewal', 'l1_extension', 'other'] as const;
+export const CASE_TYPES = ['h1b_new', 'h1b_extension', 'h1b_transfer', 'perm_green_card', 'opt_stem_extension', 'tn_renewal', 'l1_extension', 'other'] as const;
 const CASE_STATUSES = ['open', 'pending_uscis', 'rfe_received', 'case_approved', 'denied', 'closed'] as const;
 const FILING_TYPES = ['cap_registration', 'pwd'] as const;
 const FILING_STATUSES = ['draft', 'filed', 'certified', 'selected', 'not_selected', 'denied', 'withdrawn'] as const;
+
+// Free-choice list, not schema-enforced (kept as TEXT on the column) — same
+// "frontend catalog over a TEXT column" pattern as documentTypes.ts, so the
+// list can be tuned without an enum migration.
+export const CASE_CLASSIFICATIONS = ['EB-1', 'EB-2', 'EB-3', 'H-1B', 'L-1', 'TN', 'O-1', 'Other'] as const;
 
 export const createCaseSchema = z.object({
   employeeId: z.string().uuid(),
@@ -15,6 +20,8 @@ export const createCaseSchema = z.object({
   decisionDate: z.string().optional().nullable().transform(v => v || null),
   attorneyName: z.string().optional().nullable().transform(v => v || null),
   description: z.string().optional().default(''),
+  petitionerId: z.string().uuid().optional().nullable().transform(v => v || null),
+  classification: z.string().optional().nullable().transform(v => v || null),
 });
 
 export const updateCaseSchema = createCaseSchema.partial();

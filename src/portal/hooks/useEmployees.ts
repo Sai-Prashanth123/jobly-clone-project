@@ -4,7 +4,7 @@ import { isValidId } from '../lib/utils';
 import type { Employee, DirectoryEmployee } from '../types';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapEmployee(raw: any): Employee {
+export function mapEmployee(raw: any): Employee {
   return {
     id: raw.id,
     displayId: raw.display_id,
@@ -397,6 +397,19 @@ export function useOnboardingChangeRequests(id: string, options?: { enabled?: bo
       return (data.data as any[]).map(mapOnboardingChangeRequest);
     },
     enabled: options?.enabled,
+  });
+}
+
+// HR/Admin raises a request to the Legal team (e.g. "H1B review needed") —
+// creates a real Case in the existing Legal Cases feature. No employee
+// fields change, so nothing to update in the employee cache; the toast
+// carries the new case's displayId so HR can reference it in conversation.
+export function useRaiseLegalRequest(id: string) {
+  return useMutation({
+    mutationFn: async (body: { caseType: string; reason: string }) => {
+      const { data } = await apiClient.post(`/employees/${id}/legal-requests`, body);
+      return data.data as { caseId: string; caseDisplayId: string };
+    },
   });
 }
 

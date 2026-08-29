@@ -35,6 +35,7 @@ import analyticsReportsRoutes from './analyticsReports.routes';
 import navBadgesRoutes from './navBadges.routes';
 import caseRoutes from './cases.routes';
 import supportTicketRoutes from './supportTickets.routes';
+import petitionerRoutes from './petitioners.routes';
 
 export const router = Router();
 
@@ -74,3 +75,4 @@ router.use('/analytics', analyticsReportsRoutes);
 router.use('/nav-badges', navBadgesRoutes);
 router.use('/cases', caseRoutes);
 router.use('/support-tickets', supportTicketRoutes);
+router.use('/petitioners', petitionerRoutes);

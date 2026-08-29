@@ -3,7 +3,7 @@ import { authenticate } from '../middleware/auth';
 import { requireRole } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
 import { documentUpload } from '../middleware/upload';
-import { createEmployeeSchema, updateEmployeeSchema, listEmployeesQuerySchema, placeOnLeaveSchema, terminateEmployeeSchema } from '../schemas/employee.schema';
+import { createEmployeeSchema, updateEmployeeSchema, listEmployeesQuerySchema, placeOnLeaveSchema, terminateEmployeeSchema, raiseLegalRequestSchema } from '../schemas/employee.schema';
 import * as ctrl from '../controllers/employees.controller';
 
 const router = Router();
@@ -43,6 +43,10 @@ router.post('/:id/onboarding/complete', requireRole('admin','hr','employee'), ct
 router.post('/:id/onboarding/request-changes', requireRole('admin','hr'), ctrl.requestOnboardingChanges);
 // Full history of past "Request Changes" messages (not just the current one).
 router.get('/:id/onboarding/change-requests', requireRole('admin','hr','employee'), ctrl.getOnboardingChangeRequests);
+// HR/Admin raises a request to the Legal team about this employee — creates a
+// Case in the existing Legal Cases feature. Not a Cases-route RBAC widen:
+// this is HR's own narrow write action, same shape as request-documents above.
+router.post('/:id/legal-requests', requireRole('admin','hr'), validateBody(raiseLegalRequestSchema), ctrl.raiseLegalRequest);
 // Employee self-reopens the wizard while still in the "pending review" state
 // (before HR has acted). The service enforces ownership.
 router.post('/:id/onboarding/reopen', requireRole('admin','hr','employee'), ctrl.reopenOnboarding);

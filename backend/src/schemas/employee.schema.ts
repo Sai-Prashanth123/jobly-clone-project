@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { CASE_TYPES } from './case.schema';
 
 // Education + work-history rows stored as JSONB. Loose validation here —
 // the UI is the source of truth for required fields per row and we don't
@@ -206,6 +207,14 @@ export const terminateEmployeeSchema = z.object({
   effectiveDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'effectiveDate must be YYYY-MM-DD').optional().nullable(),
 });
 
+// HR/Admin raising a request to the Legal team about this employee (e.g. "H1B
+// review needed"). Reuses the Cases feature's own case_type list rather than
+// inventing a parallel enum — creates a real Case that Legal sees in Cases.tsx.
+export const raiseLegalRequestSchema = z.object({
+  caseType: z.enum(CASE_TYPES),
+  reason: z.string().min(1).max(2000),
+});
+
 export const listEmployeesQuerySchema = z.object({
   status: z.enum(['active','inactive','onboarding']).optional(),
   department: z.string().optional().transform(v => v?.trim()),
@@ -223,3 +232,4 @@ export type EducationEntryInput = z.infer<typeof educationEntrySchema>;
 export type WorkHistoryEntryInput = z.infer<typeof workHistoryEntrySchema>;
 export type IdentityDocumentEntryInput = z.infer<typeof identityDocumentEntrySchema>;
 export type DependentEntryInput = z.infer<typeof dependentEntrySchema>;
+export type RaiseLegalRequestInput = z.infer<typeof raiseLegalRequestSchema>;

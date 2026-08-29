@@ -8,7 +8,8 @@ import { todayUTC } from '../lib/dateUtils';
 import { generateTasksForEmployee } from './onboardingChecklist.service';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import { resolveEmployeeEmailRecipients } from '../lib/employeeCommunication';
-import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery } from '../schemas/employee.schema';
+import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery, RaiseLegalRequestInput } from '../schemas/employee.schema';
+import * as casesService from './cases.service';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
 function serializeEmployee(emp: any) {
@@ -23,13 +24,30 @@ function serializeEmployee(emp: any) {
 // details, or pay rate. Redaction happens at the API boundary (list + getOne).
 const SENSITIVE_EMPLOYEE_FIELDS = ['ssn', 'bank_routing_number', 'bank_account_number', 'pay_rate'] as const;
 
-// Legal reviews immigration paperwork only — no org/finance/personal-contact
-// data. Allowlist (not denylist) on purpose: a column added later defaults to
-// hidden from legal unless someone deliberately adds it here.
+// Legal reviews immigration paperwork + case Beneficiary Info — no financial
+// (SSN/bank/pay) or org-management (manager) data. Allowlist (not denylist)
+// on purpose: a column added later defaults to hidden from legal unless
+// someone deliberately adds it here. Expanded for the Case Details
+// "Beneficiary Info" Personal/Employment/Additional Information tabs — keep
+// this in sync with cases.service.ts's EMPLOYEE_EMBED, the other place
+// employee PII crosses into a legal-role view.
 const LEGAL_ALLOWED_EMPLOYEE_FIELDS = new Set([
   'id', 'display_id', 'first_name', 'last_name', 'middle_name', 'email', 'status',
   'nationality', 'visa_type', 'visa_expiry', 'i9_status', 'e_verify_status', 'e_verify_case_number',
   'dependents', 'documents', 'onboarding', 'profile_photo_url', 'created_at', 'updated_at',
+  // Personal
+  'dob', 'gender', 'marital_status', 'preferred_language', 'languages_known',
+  // Contact
+  'phone', 'alt_phone',
+  'address_street', 'address_city', 'address_state', 'address_zip', 'address_country',
+  'permanent_address_street', 'permanent_address_city', 'permanent_address_state', 'permanent_address_zip', 'permanent_address_country',
+  // Employment
+  'department', 'job_title', 'employment_type', 'start_date', 'work_location',
+  // Additional Information
+  'education', 'work_history', 'total_experience_years', 'experience_level',
+  'emergency_contact_name', 'emergency_contact_relationship', 'emergency_contact_phone',
+  'emergency_contact_alt_phone', 'emergency_contact_address', 'emergency_contact_city',
+  'emergency_contact_state', 'emergency_contact_zip',
 ]);
 
 export function redactEmployee(emp: any, viewerRole?: string, isOwn = false): any {
@@ -1080,6 +1098,42 @@ async function notifyOnboardingChangesRequested(emp: any, message: string): Prom
   } catch (err) {
     console.error('[employees.service] changes-requested notification failed', err);
   }
+}
+
+// HR/Admin raises a request to the Legal team about this employee (e.g. "H1B
+// review needed"). Creates a real Case (the existing Legal Cases feature) so
+// Legal sees it in their normal Cases queue, seeded with a note carrying the
+// reason HR gave, and notifies every `legal`-role user — mirrors the exact
+// pattern supportTickets.service.ts already uses for its own legal fan-out.
+export async function raiseLegalRequest(id: string, input: RaiseLegalRequestInput, actorId?: string) {
+  const { data: emp, error } = await supabaseAdmin
+    .from('employees').select('id, display_id').eq('id', id).is('deleted_at', null).single();
+  if (error || !emp) throw new NotFoundError('Employee not found');
+
+  const created = await casesService.createCase(
+    {
+      employeeId: id, caseType: input.caseType, status: 'open', description: input.reason,
+      receiptNumber: null, priorityDate: null, filedDate: null, decisionDate: null, attorneyName: null,
+      petitionerId: null, classification: null,
+    },
+    actorId,
+  );
+  await casesService.createNote(created.id, { body: input.reason }, actorId);
+
+  const legalIds = await getUserIdsByRole('legal');
+  for (const uid of legalIds) {
+    await createNotification(
+      uid, 'New Legal Request',
+      `${emp.display_id}: ${input.reason.slice(0, 140)}`,
+      'info', 'case', created.id, `/portal/cases/${created.id}`,
+    );
+  }
+
+  logActivity(actorId ?? null, 'created', 'employee', id, emp.display_id ?? id.slice(0, 8), {
+    event: 'legal_request_raised', caseId: created.id,
+  });
+
+  return { caseId: created.id, caseDisplayId: created.display_id };
 }
 
 // Ask an employee (any status — active, onboarding, on-leave) for a document

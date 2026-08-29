@@ -1,19 +1,25 @@
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError } from '../lib/errors';
+import { NotFoundError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
+import * as storageSvc from './storage.service';
+import { isValidCaseDocumentCategory } from '../lib/caseDocumentCategories';
 import type {
   CreateCaseInput, UpdateCaseInput, ListCasesQuery,
   CreateFilingInput, UpdateFilingInput, CreateNoteInput,
 } from '../schemas/case.schema';
 
-const EMPLOYEE_EMBED = 'employees!employee_id(id, first_name, last_name, display_id, visa_type, visa_expiry, i9_status, e_verify_status, e_verify_case_number)';
-const DETAIL_SELECT = `*, ${EMPLOYEE_EMBED}, case_filings(*), case_notes(*, portal_users!author_id(name))`;
+// Kept in sync with LEGAL_ALLOWED_EMPLOYEE_FIELDS in employees.service.ts —
+// the only other place employee PII crosses into a `legal`-role view. Any
+// field added to one must be deliberately added to the other, never just one.
+const EMPLOYEE_EMBED = 'employees!employee_id(id, first_name, last_name, middle_name, display_id, email, status, nationality, visa_type, visa_expiry, i9_status, e_verify_status, e_verify_case_number, dependents, profile_photo_url, dob, gender, marital_status, preferred_language, languages_known, phone, alt_phone, address_street, address_city, address_state, address_zip, address_country, permanent_address_street, permanent_address_city, permanent_address_state, permanent_address_zip, permanent_address_country, department, job_title, employment_type, start_date, work_location, education, work_history, total_experience_years, experience_level, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_alt_phone, emergency_contact_address, emergency_contact_city, emergency_contact_state, emergency_contact_zip)';
+const PETITIONER_EMBED = 'petitioners!petitioner_id(id, name, ein_fein)';
+const DETAIL_SELECT = `*, ${EMPLOYEE_EMBED}, ${PETITIONER_EMBED}, case_filings(*), case_notes(*, portal_users!author_id(name))`;
 
 export async function listCases(query: ListCasesQuery) {
   let q = supabaseAdmin
     .from('cases')
-    .select(`*, ${EMPLOYEE_EMBED}`, { count: 'exact' })
+    .select(`*, ${EMPLOYEE_EMBED}, ${PETITIONER_EMBED}`, { count: 'exact' })
     .is('deleted_at', null);
 
   if (query.status) q = q.eq('status', query.status);
@@ -65,6 +71,8 @@ export async function createCase(input: CreateCaseInput, actorId?: string) {
       decision_date: input.decisionDate,
       attorney_name: input.attorneyName,
       description: input.description,
+      petitioner_id: input.petitionerId,
+      classification: input.classification,
       created_by: actorId ?? null,
     })
     .select()
@@ -85,6 +93,8 @@ export async function updateCase(id: string, input: UpdateCaseInput, actorId?: s
   if (input.decisionDate !== undefined) updateData.decision_date = input.decisionDate;
   if (input.attorneyName !== undefined) updateData.attorney_name = input.attorneyName;
   if (input.description !== undefined) updateData.description = input.description;
+  if (input.petitionerId !== undefined) updateData.petitioner_id = input.petitionerId;
+  if (input.classification !== undefined) updateData.classification = input.classification;
 
   const { data, error } = await supabaseAdmin
     .from('cases')
@@ -219,4 +229,47 @@ export async function removeNote(caseId: string, noteId: string, actorId?: strin
 
   if (error || !data) throw new NotFoundError('Note not found');
   logActivity(actorId ?? null, 'deleted', 'case_note', data.id, caseId, {});
+}
+
+// ── Case Documents ──────────────────────────────────────────────────────────
+// Reuses the existing polymorphic documents table (entity_type='case') rather
+// than a dedicated table — every upload/signed-URL/delete code path in
+// storage.service.ts already works generically off entity_type/entity_id.
+// `uploaded_by` is joined to portal_users here (no other document read path in
+// the app does this) so the UI can show "Uploaded By X (role)" attribution.
+export async function listCaseDocuments(caseId: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('documents')
+    .select('*, portal_users!uploaded_by(name, role)')
+    .eq('entity_type', 'case')
+    .eq('entity_id', caseId)
+    .order('uploaded_at', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function uploadCaseDocument(
+  caseId: string,
+  file: Express.Multer.File,
+  category: string,
+  uploadedBy: string,
+) {
+  await assertCaseExists(caseId);
+  if (!isValidCaseDocumentCategory(category)) {
+    throw new ValidationError('Invalid document category');
+  }
+  const doc = await storageSvc.uploadDocument('case', caseId, file, uploadedBy, undefined, category, null, category);
+  logActivity(uploadedBy, 'created', 'case_document', doc.id, caseId, { category });
+  return doc;
+}
+
+export async function removeCaseDocument(caseId: string, docId: string, actorId?: string) {
+  const { data: doc, error } = await supabaseAdmin
+    .from('documents').select('id, entity_type, entity_id').eq('id', docId).single();
+  if (error || !doc || doc.entity_type !== 'case' || doc.entity_id !== caseId) {
+    throw new NotFoundError('Document not found on this case');
+  }
+  await storageSvc.deleteDocument(docId);
+  logActivity(actorId ?? null, 'deleted', 'case_document', docId, caseId, {});
 }

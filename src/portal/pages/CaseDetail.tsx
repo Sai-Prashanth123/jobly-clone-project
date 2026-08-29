@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { CaseForm, CASE_TYPE_LABELS, CASE_STATUS_LABELS } from '../components/legal/CaseForm';
 import { FilingForm } from '../components/legal/FilingForm';
 import { CaseNotesThread } from '../components/legal/CaseNotesThread';
+import { CaseDocumentsPanel } from '../components/legal/CaseDocumentsPanel';
 import {
   useCase, useUpdateCase, useDeleteCase,
   useCreateFiling, useUpdateFiling, useDeleteFiling,
@@ -39,6 +40,7 @@ export default function CaseDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [filingDialog, setFilingDialog] = useState<{ mode: 'create' | 'edit'; filing?: CaseFiling } | null>(null);
   const [removeFilingTarget, setRemoveFilingTarget] = useState<CaseFiling | null>(null);
+  const [section, setSection] = useState<'overview' | 'documents'>('overview');
 
   if (isLoading) {
     return (
@@ -74,6 +76,8 @@ export default function CaseDetail() {
             <p className="text-sm text-muted-foreground truncate">
               {CASE_TYPE_LABELS[legalCase.caseType] ?? legalCase.caseType} — {legalCase.employeeFirstName} {legalCase.employeeLastName}
               {legalCase.employeeDisplayId && ` (${legalCase.employeeDisplayId})`}
+              {legalCase.petitionerName && ` · Petitioner: ${legalCase.petitionerName}`}
+              {legalCase.classification && ` · ${legalCase.classification}`}
             </p>
           </div>
         </div>
@@ -102,79 +106,116 @@ export default function CaseDetail() {
         </div>
       </div>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Case Details</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <Field label="Receipt Number" value={legalCase.receiptNumber} />
-          <Field label="Attorney" value={legalCase.attorneyName} />
-          <Field label="Priority Date" value={legalCase.priorityDate ? formatDate(legalCase.priorityDate) : undefined} />
-          <Field label="Filed Date" value={legalCase.filedDate ? formatDate(legalCase.filedDate) : undefined} />
-          <Field label="Decision Date" value={legalCase.decisionDate ? formatDate(legalCase.decisionDate) : undefined} />
-          <div className="min-w-0">
-            <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Employee Visa Expiry</p>
-            <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
-              <span>{legalCase.employeeVisaExpiry ? formatDate(legalCase.employeeVisaExpiry) : '—'}</span>
-              <ExpiryBadge date={legalCase.employeeVisaExpiry} />
-            </p>
-          </div>
-          {legalCase.description && (
-            <div className="sm:col-span-2">
-              <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Description</p>
-              <p className="text-sm text-gray-900 mt-0.5 whitespace-pre-wrap break-words">{legalCase.description}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <div className="flex flex-col md:flex-row gap-4">
+        <nav className="flex md:flex-col gap-1 overflow-x-auto md:w-48 flex-shrink-0 md:border-r md:border-gray-100 md:pr-3">
+          {([
+            { key: 'overview', label: 'Overview' },
+            { key: 'documents', label: 'Documents' },
+          ] as const).map(s => (
+            <button
+              key={s.key}
+              type="button"
+              onClick={() => setSection(s.key)}
+              className={`text-left text-sm px-3 py-2 rounded-md whitespace-nowrap flex-shrink-0 ${
+                section === s.key ? 'bg-blue-50 text-blue-700 font-medium' : 'text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </nav>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle className="text-base">Filings</CardTitle>
-          <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setFilingDialog({ mode: 'create' })}>
-            <Plus className="h-3.5 w-3.5" /> Add Filing
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {legalCase.filings.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
-              <FileStack className="h-8 w-8 text-gray-300" />
-              <p className="text-sm">No filings yet.</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {legalCase.filings.map(f => (
-                <div key={f.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 gap-3 flex-wrap">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium">{FILING_TYPE_LABELS[f.filingType] ?? f.filingType}</p>
-                      <StatusBadge status={f.status} />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {f.referenceNumber && `${f.referenceNumber} · `}
-                      {f.filedDate ? `Filed ${formatDate(f.filedDate)}` : 'Not yet filed'}
-                      {f.decisionDate && ` · Decided ${formatDate(f.decisionDate)}`}
+        <div className="flex-1 min-w-0 space-y-4">
+          {section === 'overview' && (
+            <>
+              <Card>
+                <CardHeader><CardTitle className="text-base">Case Details</CardTitle></CardHeader>
+                <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <Field label="Receipt Number" value={legalCase.receiptNumber} />
+                  <Field label="Attorney" value={legalCase.attorneyName} />
+                  <Field label="Petitioner" value={legalCase.petitionerName} />
+                  <Field label="Classification" value={legalCase.classification} />
+                  <Field label="Priority Date" value={legalCase.priorityDate ? formatDate(legalCase.priorityDate) : undefined} />
+                  <Field label="Filed Date" value={legalCase.filedDate ? formatDate(legalCase.filedDate) : undefined} />
+                  <Field label="Decision Date" value={legalCase.decisionDate ? formatDate(legalCase.decisionDate) : undefined} />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Employee Visa Expiry</p>
+                    <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
+                      <span>{legalCase.employeeVisaExpiry ? formatDate(legalCase.employeeVisaExpiry) : '—'}</span>
+                      <ExpiryBadge date={legalCase.employeeVisaExpiry} />
                     </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => setFilingDialog({ mode: 'edit', filing: f })}>
-                      <Pencil className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => setRemoveFilingTarget(f)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                  {legalCase.description && (
+                    <div className="sm:col-span-2">
+                      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Description</p>
+                      <p className="text-sm text-gray-900 mt-0.5 whitespace-pre-wrap break-words">{legalCase.description}</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
-        <CardContent>
-          <CaseNotesThread caseId={legalCase.id} notes={legalCase.notes} />
-        </CardContent>
-      </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                  <CardTitle className="text-base">Filings</CardTitle>
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setFilingDialog({ mode: 'create' })}>
+                    <Plus className="h-3.5 w-3.5" /> Add Filing
+                  </Button>
+                </CardHeader>
+                <CardContent>
+                  {legalCase.filings.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-8 text-gray-400 gap-2">
+                      <FileStack className="h-8 w-8 text-gray-300" />
+                      <p className="text-sm">No filings yet.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {legalCase.filings.map(f => (
+                        <div key={f.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0 gap-3 flex-wrap">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-sm font-medium">{FILING_TYPE_LABELS[f.filingType] ?? f.filingType}</p>
+                              <StatusBadge status={f.status} />
+                            </div>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                              {f.referenceNumber && `${f.referenceNumber} · `}
+                              {f.filedDate ? `Filed ${formatDate(f.filedDate)}` : 'Not yet filed'}
+                              {f.decisionDate && ` · Decided ${formatDate(f.decisionDate)}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" onClick={() => setFilingDialog({ mode: 'edit', filing: f })}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50" onClick={() => setRemoveFilingTarget(f)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader><CardTitle className="text-base">Notes</CardTitle></CardHeader>
+                <CardContent>
+                  <CaseNotesThread caseId={legalCase.id} notes={legalCase.notes} />
+                </CardContent>
+              </Card>
+            </>
+          )}
+
+          {section === 'documents' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Documents</CardTitle></CardHeader>
+              <CardContent>
+                <CaseDocumentsPanel caseId={legalCase.id} />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col">
@@ -197,6 +238,8 @@ export default function CaseDetail() {
                     decisionDate: formData.decisionDate || undefined,
                     attorneyName: formData.attorneyName || undefined,
                     description: formData.description || undefined,
+                    petitionerId: formData.petitionerId || null,
+                    classification: formData.classification || null,
                   });
                   toast.success('Case updated');
                   setEditOpen(false);

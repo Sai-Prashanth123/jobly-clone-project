@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, Eye, EyeOff, AlertCircle, Send, ShieldOff, ShieldCheck } from 'lucide-react';
+import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSquareWarning, CalendarClock, UserX, UserCheck, Eye, EyeOff, AlertCircle, Send, ShieldOff, ShieldCheck, Scale } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
@@ -24,6 +24,7 @@ import { useTimesheets } from '../hooks/useTimesheets';
 import { useAuth } from '../hooks/useAuth';
 import { OnboardingChecklist } from '../components/employees/OnboardingProgress';
 import { OnboardingChangeHistoryDialog } from '../components/employees/OnboardingChangeHistoryDialog';
+import { RaiseLegalRequestDialog } from '../components/employees/RaiseLegalRequestDialog';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
@@ -71,6 +72,7 @@ export default function EmployeeDetail() {
   const [officialEmailInput, setOfficialEmailInput] = useState('');
   const [changesOpen, setChangesOpen] = useState(false);
   const [changeHistoryOpen, setChangeHistoryOpen] = useState(false);
+  const [raiseLegalOpen, setRaiseLegalOpen] = useState(false);
   const [changesMessage, setChangesMessage] = useState('');
   const [docRequestOpen, setDocRequestOpen] = useState(false);
   const [docRequestMessage, setDocRequestMessage] = useState('');
@@ -343,6 +345,20 @@ export default function EmployeeDetail() {
             >
               <Mail className="h-4 w-4" />
               Request Documents
+            </Button>
+          )}
+          {/* Raise Request to Legal — HR/Admin escalates something to the
+              Legal team (H-1B review, PERM filing, renewal, etc). Not gated
+              to onboarding status — can apply to an active employee too. */}
+          {(user?.role === 'admin' || user?.role === 'hr') && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="gap-2 text-purple-700 border-purple-200 hover:bg-purple-50"
+              onClick={() => setRaiseLegalOpen(true)}
+            >
+              <Scale className="h-4 w-4" />
+              Raise Request to Legal
             </Button>
           )}
           {(user?.role === 'admin' || user?.role === 'hr') && (
@@ -859,6 +875,13 @@ export default function EmployeeDetail() {
         employeeName={`${employee.firstName} ${employee.lastName}`}
         open={changeHistoryOpen}
         onOpenChange={setChangeHistoryOpen}
+      />
+
+      <RaiseLegalRequestDialog
+        employeeId={employee.id}
+        employeeName={`${employee.firstName} ${employee.lastName}`}
+        open={raiseLegalOpen}
+        onOpenChange={setRaiseLegalOpen}
       />
 
       {/* Request-Changes dialog — HR types a message that the employee will see
