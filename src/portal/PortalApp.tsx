@@ -337,7 +337,7 @@ export default function PortalApp() {
             <Route
               path="cases"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'legal']}>
                   <Cases />
                 </ProtectedRoute>
               }
@@ -345,7 +345,7 @@ export default function PortalApp() {
             <Route
               path="cases/:id"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'legal']}>
                   <CaseDetail />
                 </ProtectedRoute>
               }

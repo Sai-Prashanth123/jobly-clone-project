@@ -18,39 +18,43 @@ const upload = documentUpload;
 
 router.use(authenticate);
 
-// Cases (and their filings/notes) are Legal's own work product — admin can
-// see everything in the system, legal manages it directly. No other role.
-router.get('/', requireRole('admin', 'legal'), validateQuery(listCasesQuerySchema), ctrl.list);
-router.post('/', requireRole('admin', 'legal'), validateBody(createCaseSchema), ctrl.create);
+// Cases (and their filings/notes/etc) are worked by Legal, with HR/admin
+// having the same level of access — HR already sees broader employee data
+// elsewhere in this app than Legal's redacted view, so this isn't a wider
+// PII exposure than HR already has.
+router.get('/', requireRole('admin', 'hr', 'legal'), validateQuery(listCasesQuerySchema), ctrl.list);
+// Case creation is admin/hr only — Legal works cases already raised to it,
+// it doesn't open its own.
+router.post('/', requireRole('admin', 'hr'), validateBody(createCaseSchema), ctrl.create);
 // Must come before /:id so "taggable-users" isn't captured as a case id.
-router.get('/taggable-users', requireRole('admin', 'legal'), ctrl.listTaggableUsers);
-router.get('/:id', requireRole('admin', 'legal'), ctrl.getOne);
-router.put('/:id', requireRole('admin', 'legal'), validateBody(updateCaseSchema), ctrl.update);
-router.delete('/:id', requireRole('admin', 'legal'), ctrl.remove);
+router.get('/taggable-users', requireRole('admin', 'hr', 'legal'), ctrl.listTaggableUsers);
+router.get('/:id', requireRole('admin', 'hr', 'legal'), ctrl.getOne);
+router.put('/:id', requireRole('admin', 'hr', 'legal'), validateBody(updateCaseSchema), ctrl.update);
+router.delete('/:id', requireRole('admin', 'hr', 'legal'), ctrl.remove);
 
-router.post('/:id/filings', requireRole('admin', 'legal'), validateBody(createFilingSchema), ctrl.createFiling);
-router.put('/:id/filings/:filingId', requireRole('admin', 'legal'), validateBody(updateFilingSchema), ctrl.updateFiling);
-router.delete('/:id/filings/:filingId', requireRole('admin', 'legal'), ctrl.removeFiling);
+router.post('/:id/filings', requireRole('admin', 'hr', 'legal'), validateBody(createFilingSchema), ctrl.createFiling);
+router.put('/:id/filings/:filingId', requireRole('admin', 'hr', 'legal'), validateBody(updateFilingSchema), ctrl.updateFiling);
+router.delete('/:id/filings/:filingId', requireRole('admin', 'hr', 'legal'), ctrl.removeFiling);
 
-router.post('/:id/notes', requireRole('admin', 'legal'), validateBody(createNoteSchema), ctrl.createNote);
-router.put('/:id/notes/:noteId', requireRole('admin', 'legal'), validateBody(updateNoteSchema), ctrl.updateNote);
-router.delete('/:id/notes/:noteId', requireRole('admin', 'legal'), ctrl.removeNote);
+router.post('/:id/notes', requireRole('admin', 'hr', 'legal'), validateBody(createNoteSchema), ctrl.createNote);
+router.put('/:id/notes/:noteId', requireRole('admin', 'hr', 'legal'), validateBody(updateNoteSchema), ctrl.updateNote);
+router.delete('/:id/notes/:noteId', requireRole('admin', 'hr', 'legal'), ctrl.removeNote);
 
-router.get('/:id/documents', requireRole('admin', 'legal'), ctrl.listDocuments);
-router.post('/:id/documents', requireRole('admin', 'legal'), upload.single('file'), ctrl.uploadDocument);
-router.delete('/:id/documents/:docId', requireRole('admin', 'legal'), ctrl.removeDocument);
+router.get('/:id/documents', requireRole('admin', 'hr', 'legal'), ctrl.listDocuments);
+router.post('/:id/documents', requireRole('admin', 'hr', 'legal'), upload.single('file'), ctrl.uploadDocument);
+router.delete('/:id/documents/:docId', requireRole('admin', 'hr', 'legal'), ctrl.removeDocument);
 
-router.get('/:id/wages', requireRole('admin', 'legal'), ctrl.listWages);
-router.put('/:id/wages', requireRole('admin', 'legal'), validateBody(upsertWageSchema), ctrl.upsertWage);
-router.get('/:id/tax-returns', requireRole('admin', 'legal'), ctrl.listTaxReturns);
-router.put('/:id/tax-returns', requireRole('admin', 'legal'), validateBody(upsertTaxReturnSchema), ctrl.upsertTaxReturn);
-router.get('/:id/perm', requireRole('admin', 'legal'), ctrl.getPermDetails);
-router.put('/:id/perm', requireRole('admin', 'legal'), validateBody(upsertPermDetailsSchema), ctrl.upsertPermDetails);
+router.get('/:id/wages', requireRole('admin', 'hr', 'legal'), ctrl.listWages);
+router.put('/:id/wages', requireRole('admin', 'hr', 'legal'), validateBody(upsertWageSchema), ctrl.upsertWage);
+router.get('/:id/tax-returns', requireRole('admin', 'hr', 'legal'), ctrl.listTaxReturns);
+router.put('/:id/tax-returns', requireRole('admin', 'hr', 'legal'), validateBody(upsertTaxReturnSchema), ctrl.upsertTaxReturn);
+router.get('/:id/perm', requireRole('admin', 'hr', 'legal'), ctrl.getPermDetails);
+router.put('/:id/perm', requireRole('admin', 'hr', 'legal'), validateBody(upsertPermDetailsSchema), ctrl.upsertPermDetails);
 
-router.post('/:id/status-steps/:stepKey/complete', requireRole('admin', 'legal'), ctrl.completeStatusStep);
+router.post('/:id/status-steps/:stepKey/complete', requireRole('admin', 'hr', 'legal'), ctrl.completeStatusStep);
 
-router.get('/:id/messages', requireRole('admin', 'legal'), messagesCtrl.list);
-router.post('/:id/messages', requireRole('admin', 'legal'), validateBody(createCaseMessageSchema), messagesCtrl.create);
-router.post('/:id/messages/:messageId/read', requireRole('admin', 'legal'), messagesCtrl.markRead);
+router.get('/:id/messages', requireRole('admin', 'hr', 'legal'), messagesCtrl.list);
+router.post('/:id/messages', requireRole('admin', 'hr', 'legal'), validateBody(createCaseMessageSchema), messagesCtrl.create);
+router.post('/:id/messages/:messageId/read', requireRole('admin', 'hr', 'legal'), messagesCtrl.markRead);
 
 export default router;

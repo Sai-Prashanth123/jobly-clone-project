@@ -10,11 +10,13 @@ import { StatusBadge } from '../components/shared/StatusBadge';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { CaseForm, CASE_TYPE_LABELS } from '../components/legal/CaseForm';
 import { useCases, useCreateCase } from '../hooks/useCases';
+import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/utils';
 import type { LegalCase } from '../types';
 
 export default function Cases() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { data, isLoading, isError, isFetching, refetch } = useCases({ limit: 500 });
   const createCase = useCreateCase();
   const [showForm, setShowForm] = useState(false);
@@ -85,10 +87,15 @@ export default function Cases() {
         title="Cases"
         description={isLoading ? 'Loading…' : `${cases.length} total cases`}
         action={
-          <Button onClick={() => setShowForm(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            New Case
-          </Button>
+          // Case creation is admin/hr only — Legal works cases already
+          // raised to them, it doesn't open its own. Matches the backend's
+          // POST /cases RBAC.
+          (user?.role === 'admin' || user?.role === 'hr') ? (
+            <Button onClick={() => setShowForm(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              New Case
+            </Button>
+          ) : undefined
         }
         onRefresh={refetch}
         isRefreshing={isFetching}
