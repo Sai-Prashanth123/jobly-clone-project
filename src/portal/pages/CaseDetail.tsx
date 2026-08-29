@@ -14,6 +14,8 @@ import { CaseForm, CASE_TYPE_LABELS, CASE_STATUS_LABELS } from '../components/le
 import { FilingForm } from '../components/legal/FilingForm';
 import { CaseNotesThread } from '../components/legal/CaseNotesThread';
 import { CaseDocumentsPanel } from '../components/legal/CaseDocumentsPanel';
+import { BeneficiaryInfoTabs } from '../components/legal/BeneficiaryInfoTabs';
+import { DependentsInfoCard } from '../components/legal/DependentsInfoCard';
 import {
   useCase, useUpdateCase, useDeleteCase,
   useCreateFiling, useUpdateFiling, useDeleteFiling,
@@ -40,7 +42,7 @@ export default function CaseDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [filingDialog, setFilingDialog] = useState<{ mode: 'create' | 'edit'; filing?: CaseFiling } | null>(null);
   const [removeFilingTarget, setRemoveFilingTarget] = useState<CaseFiling | null>(null);
-  const [section, setSection] = useState<'overview' | 'documents'>('overview');
+  const [section, setSection] = useState<'overview' | 'beneficiary' | 'documents' | 'dependents' | 'children'>('overview');
 
   if (isLoading) {
     return (
@@ -110,7 +112,10 @@ export default function CaseDetail() {
         <nav className="flex md:flex-col gap-1 overflow-x-auto md:w-48 flex-shrink-0 md:border-r md:border-gray-100 md:pr-3">
           {([
             { key: 'overview', label: 'Overview' },
+            { key: 'beneficiary', label: 'Beneficiary Info' },
             { key: 'documents', label: 'Documents' },
+            { key: 'dependents', label: 'Dependents Info' },
+            { key: 'children', label: 'Children Info' },
           ] as const).map(s => (
             <button
               key={s.key}
@@ -206,11 +211,38 @@ export default function CaseDetail() {
             </>
           )}
 
+          {section === 'beneficiary' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Beneficiary Info</CardTitle></CardHeader>
+              <CardContent>
+                <BeneficiaryInfoTabs beneficiary={legalCase.beneficiary} />
+              </CardContent>
+            </Card>
+          )}
+
           {section === 'documents' && (
             <Card>
               <CardHeader><CardTitle className="text-base">Documents</CardTitle></CardHeader>
               <CardContent>
                 <CaseDocumentsPanel caseId={legalCase.id} />
+              </CardContent>
+            </Card>
+          )}
+
+          {section === 'dependents' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Dependents Info</CardTitle></CardHeader>
+              <CardContent>
+                <DependentsInfoCard employeeId={legalCase.employeeId} dependents={legalCase.beneficiary?.dependents} relationship="spouse" />
+              </CardContent>
+            </Card>
+          )}
+
+          {section === 'children' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Children Info</CardTitle></CardHeader>
+              <CardContent>
+                <DependentsInfoCard employeeId={legalCase.employeeId} dependents={legalCase.beneficiary?.dependents} relationship="child" />
               </CardContent>
             </Card>
           )}
