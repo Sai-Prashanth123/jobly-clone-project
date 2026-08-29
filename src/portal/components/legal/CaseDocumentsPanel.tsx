@@ -1,8 +1,9 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Loader2, Upload, Trash2, FileText } from 'lucide-react';
+import { Loader2, Upload, Trash2, FileText, Eye } from 'lucide-react';
 import { ConfirmDialog } from '../shared/ConfirmDialog';
+import { DocumentPreviewDialog } from '../shared/DocumentPreviewDialog';
 import { useCaseDocuments, useUploadCaseDocument, useDeleteCaseDocument } from '../../hooks/useCases';
 import { CASE_DOCUMENT_CATEGORIES, type CaseDocument } from '../../types';
 import { formatDate } from '../../lib/utils';
@@ -13,6 +14,7 @@ export function CaseDocumentsPanel({ caseId, categories }: { caseId: string; cat
   const deleteDoc = useDeleteCaseDocument(caseId);
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null);
   const [removeTarget, setRemoveTarget] = useState<CaseDocument | null>(null);
+  const [previewTarget, setPreviewTarget] = useState<CaseDocument | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCategoryRef = useRef<string | null>(null);
 
@@ -90,13 +92,18 @@ export function CaseDocumentsPanel({ caseId, categories }: { caseId: string; cat
                         </p>
                       </div>
                     </div>
-                    <Button
-                      variant="ghost" size="sm"
-                      className="text-red-600 hover:bg-red-50 flex-shrink-0"
-                      onClick={() => setRemoveTarget(doc)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setPreviewTarget(doc)}>
+                        <Eye className="h-3.5 w-3.5" /> Preview
+                      </Button>
+                      <Button
+                        variant="ghost" size="sm"
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={() => setRemoveTarget(doc)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -123,6 +130,13 @@ export function CaseDocumentsPanel({ caseId, categories }: { caseId: string; cat
             setRemoveTarget(null);
           }
         }}
+      />
+
+      <DocumentPreviewDialog
+        open={!!previewTarget}
+        onOpenChange={(open) => { if (!open) setPreviewTarget(null); }}
+        docId={previewTarget?.id ?? ''}
+        fileName={previewTarget?.name ?? ''}
       />
     </div>
   );
