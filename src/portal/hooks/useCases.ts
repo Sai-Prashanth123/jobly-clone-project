@@ -307,3 +307,110 @@ export function useCreatePetitioner() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['petitioners'] }),
   });
 }
+
+// ── Wages / Tax Returns / PERM ───────────────────────────────────────────────
+// Manual entry by Legal — simple year-by-year tables.
+
+export interface CaseWage { id: string; wageYear: number; salaryReceived?: number; documentId?: string }
+export interface CaseTaxReturn { id: string; taxYear: number; amount?: number; documentId?: string }
+export interface CasePermDetails {
+  jobTitle?: string; fullTimePosition?: boolean; workHoursPerWeek?: number; wageRate?: number;
+  socCode?: string; payFrequency?: string; classification?: string; permanentPosition?: boolean;
+  experienceRequired?: boolean; monthsOfExperience?: number; workAddress?: string;
+  minimumEducation?: string; majorFieldOfStudy?: string;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapWage(raw: any): CaseWage {
+  return { id: raw.id, wageYear: raw.wage_year, salaryReceived: raw.salary_received ?? undefined, documentId: raw.document_id ?? undefined };
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapTaxReturn(raw: any): CaseTaxReturn {
+  return { id: raw.id, taxYear: raw.tax_year, amount: raw.amount ?? undefined, documentId: raw.document_id ?? undefined };
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapPermDetails(raw: any): CasePermDetails {
+  return {
+    jobTitle: raw.job_title ?? undefined,
+    fullTimePosition: raw.full_time_position ?? undefined,
+    workHoursPerWeek: raw.work_hours_per_week ?? undefined,
+    wageRate: raw.wage_rate ?? undefined,
+    socCode: raw.soc_code ?? undefined,
+    payFrequency: raw.pay_frequency ?? undefined,
+    classification: raw.classification ?? undefined,
+    permanentPosition: raw.permanent_position ?? undefined,
+    experienceRequired: raw.experience_required ?? undefined,
+    monthsOfExperience: raw.months_of_experience ?? undefined,
+    workAddress: raw.work_address ?? undefined,
+    minimumEducation: raw.minimum_education ?? undefined,
+    majorFieldOfStudy: raw.major_field_of_study ?? undefined,
+  };
+}
+
+export function useCaseWages(caseId: string) {
+  return useQuery({
+    queryKey: ['cases', caseId, 'wages'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/cases/${caseId}/wages`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data.data as any[]).map(mapWage);
+    },
+    enabled: isValidId(caseId),
+  });
+}
+
+export function useUpsertWage(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { wageYear: number; salaryReceived?: number | null; documentId?: string | null }) => {
+      const { data } = await apiClient.put(`/cases/${caseId}/wages`, body);
+      return mapWage(data.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId, 'wages'] }),
+  });
+}
+
+export function useCaseTaxReturns(caseId: string) {
+  return useQuery({
+    queryKey: ['cases', caseId, 'tax-returns'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/cases/${caseId}/tax-returns`);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (data.data as any[]).map(mapTaxReturn);
+    },
+    enabled: isValidId(caseId),
+  });
+}
+
+export function useUpsertTaxReturn(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: { taxYear: number; amount?: number | null; documentId?: string | null }) => {
+      const { data } = await apiClient.put(`/cases/${caseId}/tax-returns`, body);
+      return mapTaxReturn(data.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId, 'tax-returns'] }),
+  });
+}
+
+export function useCasePermDetails(caseId: string) {
+  return useQuery({
+    queryKey: ['cases', caseId, 'perm'],
+    queryFn: async () => {
+      const { data } = await apiClient.get(`/cases/${caseId}/perm`);
+      return data.data ? mapPermDetails(data.data) : null;
+    },
+    enabled: isValidId(caseId),
+  });
+}
+
+export function useUpsertPermDetails(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (body: CasePermDetails) => {
+      const { data } = await apiClient.put(`/cases/${caseId}/perm`, body);
+      return mapPermDetails(data.data);
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId, 'perm'] }),
+  });
+}

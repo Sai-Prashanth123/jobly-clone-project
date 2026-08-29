@@ -7,7 +7,7 @@ import { useCaseDocuments, useUploadCaseDocument, useDeleteCaseDocument } from '
 import { CASE_DOCUMENT_CATEGORIES, type CaseDocument } from '../../types';
 import { formatDate } from '../../lib/utils';
 
-export function CaseDocumentsPanel({ caseId }: { caseId: string }) {
+export function CaseDocumentsPanel({ caseId, categories }: { caseId: string; categories?: readonly string[] }) {
   const { data: documents, isLoading } = useCaseDocuments(caseId);
   const uploadDoc = useUploadCaseDocument(caseId);
   const deleteDoc = useDeleteCaseDocument(caseId);
@@ -16,11 +16,12 @@ export function CaseDocumentsPanel({ caseId }: { caseId: string }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const pendingCategoryRef = useRef<string | null>(null);
 
+  const visibleCategories = categories ?? CASE_DOCUMENT_CATEGORIES;
   const byCategory = new Map<string, CaseDocument[]>();
-  for (const cat of CASE_DOCUMENT_CATEGORIES) byCategory.set(cat, []);
+  for (const cat of visibleCategories) byCategory.set(cat, []);
   for (const doc of documents ?? []) {
-    const list = byCategory.get(doc.category) ?? byCategory.get('Other Documents, if any')!;
-    list.push(doc);
+    if (!byCategory.has(doc.category)) continue;
+    byCategory.get(doc.category)!.push(doc);
   }
 
   const triggerUpload = (category: string) => {
@@ -55,7 +56,7 @@ export function CaseDocumentsPanel({ caseId }: { caseId: string }) {
   return (
     <div className="space-y-4">
       <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChosen} />
-      {CASE_DOCUMENT_CATEGORIES.map(category => {
+      {visibleCategories.map(category => {
         const docs = byCategory.get(category) ?? [];
         return (
           <div key={category} className="rounded-lg border border-gray-100 overflow-hidden">

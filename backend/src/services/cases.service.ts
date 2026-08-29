@@ -4,6 +4,8 @@ import { logActivity } from '../lib/activityLogger';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import * as storageSvc from './storage.service';
 import { isValidCaseDocumentCategory } from '../lib/caseDocumentCategories';
+import type { UpsertWageInput, UpsertTaxReturnInput } from '../schemas/caseWages.schema';
+import type { UpsertPermDetailsInput } from '../schemas/casePerm.schema';
 import type {
   CreateCaseInput, UpdateCaseInput, ListCasesQuery,
   CreateFilingInput, UpdateFilingInput, CreateNoteInput,
@@ -272,4 +274,96 @@ export async function removeCaseDocument(caseId: string, docId: string, actorId?
   }
   await storageSvc.deleteDocument(docId);
   logActivity(actorId ?? null, 'deleted', 'case_document', docId, caseId, {});
+}
+
+// ── Wages as per W2 / Tax Returns ────────────────────────────────────────────
+// Manual entry by Legal — simple per-year tables, matching the reference
+// screenshots (a year-by-year list, mostly blank until Legal fills it in).
+
+export async function listWages(caseId: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('case_wages').select('*').eq('case_id', caseId).order('wage_year', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function upsertWage(caseId: string, input: UpsertWageInput, actorId?: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('case_wages')
+    .upsert(
+      { case_id: caseId, wage_year: input.wageYear, salary_received: input.salaryReceived ?? null, document_id: input.documentId ?? null },
+      { onConflict: 'case_id,wage_year' },
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  logActivity(actorId ?? null, 'updated', 'case', caseId, String(input.wageYear), { event: 'wage_upserted' });
+  return data;
+}
+
+export async function listTaxReturns(caseId: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('case_tax_returns').select('*').eq('case_id', caseId).order('tax_year', { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function upsertTaxReturn(caseId: string, input: UpsertTaxReturnInput, actorId?: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('case_tax_returns')
+    .upsert(
+      { case_id: caseId, tax_year: input.taxYear, amount: input.amount ?? null, document_id: input.documentId ?? null },
+      { onConflict: 'case_id,tax_year' },
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  logActivity(actorId ?? null, 'updated', 'case', caseId, String(input.taxYear), { event: 'tax_return_upserted' });
+  return data;
+}
+
+// ── PERM ─────────────────────────────────────────────────────────────────────
+// One row per case, upserted as Legal fills in job details — null/absent
+// until then.
+
+export async function getPermDetails(caseId: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('case_perm_details').select('*').eq('case_id', caseId).maybeSingle();
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function upsertPermDetails(caseId: string, input: UpsertPermDetailsInput, actorId?: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('case_perm_details')
+    .upsert(
+      {
+        case_id: caseId,
+        job_title: input.jobTitle ?? null,
+        full_time_position: input.fullTimePosition ?? null,
+        work_hours_per_week: input.workHoursPerWeek ?? null,
+        wage_rate: input.wageRate ?? null,
+        soc_code: input.socCode ?? null,
+        pay_frequency: input.payFrequency ?? null,
+        classification: input.classification ?? null,
+        permanent_position: input.permanentPosition ?? null,
+        experience_required: input.experienceRequired ?? null,
+        months_of_experience: input.monthsOfExperience ?? null,
+        work_address: input.workAddress ?? null,
+        minimum_education: input.minimumEducation ?? null,
+        major_field_of_study: input.majorFieldOfStudy ?? null,
+      },
+      { onConflict: 'case_id' },
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  logActivity(actorId ?? null, 'updated', 'case', caseId, 'PERM', { event: 'perm_details_upserted' });
+  return data;
 }

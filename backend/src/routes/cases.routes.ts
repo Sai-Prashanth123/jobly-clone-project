@@ -7,6 +7,8 @@ import {
   createCaseSchema, updateCaseSchema, listCasesQuerySchema,
   createFilingSchema, updateFilingSchema, createNoteSchema, updateNoteSchema,
 } from '../schemas/case.schema';
+import { upsertWageSchema, upsertTaxReturnSchema } from '../schemas/caseWages.schema';
+import { upsertPermDetailsSchema } from '../schemas/casePerm.schema';
 import * as ctrl from '../controllers/cases.controller';
 
 const router = Router();
@@ -33,5 +35,12 @@ router.delete('/:id/notes/:noteId', requireRole('admin', 'legal'), ctrl.removeNo
 router.get('/:id/documents', requireRole('admin', 'legal'), ctrl.listDocuments);
 router.post('/:id/documents', requireRole('admin', 'legal'), upload.single('file'), ctrl.uploadDocument);
 router.delete('/:id/documents/:docId', requireRole('admin', 'legal'), ctrl.removeDocument);
+
+router.get('/:id/wages', requireRole('admin', 'legal'), ctrl.listWages);
+router.put('/:id/wages', requireRole('admin', 'legal'), validateBody(upsertWageSchema), ctrl.upsertWage);
+router.get('/:id/tax-returns', requireRole('admin', 'legal'), ctrl.listTaxReturns);
+router.put('/:id/tax-returns', requireRole('admin', 'legal'), validateBody(upsertTaxReturnSchema), ctrl.upsertTaxReturn);
+router.get('/:id/perm', requireRole('admin', 'legal'), ctrl.getPermDetails);
+router.put('/:id/perm', requireRole('admin', 'legal'), validateBody(upsertPermDetailsSchema), ctrl.upsertPermDetails);
 
 export default router;

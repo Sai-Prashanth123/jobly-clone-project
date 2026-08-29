@@ -16,6 +16,8 @@ import { CaseNotesThread } from '../components/legal/CaseNotesThread';
 import { CaseDocumentsPanel } from '../components/legal/CaseDocumentsPanel';
 import { BeneficiaryInfoTabs } from '../components/legal/BeneficiaryInfoTabs';
 import { DependentsInfoCard } from '../components/legal/DependentsInfoCard';
+import { CaseWagesTable } from '../components/legal/CaseWagesTable';
+import { CasePermForm } from '../components/legal/CasePermForm';
 import {
   useCase, useUpdateCase, useDeleteCase,
   useCreateFiling, useUpdateFiling, useDeleteFiling,
@@ -42,7 +44,9 @@ export default function CaseDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [filingDialog, setFilingDialog] = useState<{ mode: 'create' | 'edit'; filing?: CaseFiling } | null>(null);
   const [removeFilingTarget, setRemoveFilingTarget] = useState<CaseFiling | null>(null);
-  const [section, setSection] = useState<'overview' | 'beneficiary' | 'documents' | 'dependents' | 'children'>('overview');
+  const [section, setSection] = useState<
+    'overview' | 'beneficiary' | 'documents' | 'dependents' | 'children' | 'wages' | 'tax' | 'formsLetters' | 'scannedSigned' | 'perm'
+  >('overview');
 
   if (isLoading) {
     return (
@@ -116,6 +120,11 @@ export default function CaseDetail() {
             { key: 'documents', label: 'Documents' },
             { key: 'dependents', label: 'Dependents Info' },
             { key: 'children', label: 'Children Info' },
+            { key: 'wages', label: 'Wages as per W2' },
+            { key: 'tax', label: 'Tax Returns' },
+            { key: 'formsLetters', label: 'Forms and Letters' },
+            { key: 'scannedSigned', label: 'Scanned/Signed Documents' },
+            { key: 'perm', label: 'PERM' },
           ] as const).map(s => (
             <button
               key={s.key}
@@ -244,6 +253,41 @@ export default function CaseDetail() {
               <CardContent>
                 <DependentsInfoCard employeeId={legalCase.employeeId} dependents={legalCase.beneficiary?.dependents} relationship="child" />
               </CardContent>
+            </Card>
+          )}
+
+          {section === 'wages' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Wages as per W2</CardTitle></CardHeader>
+              <CardContent><CaseWagesTable caseId={legalCase.id} kind="wages" /></CardContent>
+            </Card>
+          )}
+
+          {section === 'tax' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Tax Returns</CardTitle></CardHeader>
+              <CardContent><CaseWagesTable caseId={legalCase.id} kind="tax" /></CardContent>
+            </Card>
+          )}
+
+          {section === 'formsLetters' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Forms and Letters</CardTitle></CardHeader>
+              <CardContent><CaseDocumentsPanel caseId={legalCase.id} categories={['Forms and Letters']} /></CardContent>
+            </Card>
+          )}
+
+          {section === 'scannedSigned' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Scanned/Signed Documents</CardTitle></CardHeader>
+              <CardContent><CaseDocumentsPanel caseId={legalCase.id} categories={['Scanned/Signed Documents']} /></CardContent>
+            </Card>
+          )}
+
+          {section === 'perm' && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">PERM</CardTitle></CardHeader>
+              <CardContent><CasePermForm caseId={legalCase.id} /></CardContent>
             </Card>
           )}
         </div>

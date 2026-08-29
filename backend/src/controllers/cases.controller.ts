@@ -4,6 +4,8 @@ import type {
   ListCasesQuery, CreateCaseInput, UpdateCaseInput,
   CreateFilingInput, UpdateFilingInput, CreateNoteInput,
 } from '../schemas/case.schema';
+import type { UpsertWageInput, UpsertTaxReturnInput } from '../schemas/caseWages.schema';
+import type { UpsertPermDetailsInput } from '../schemas/casePerm.schema';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -103,5 +105,47 @@ export async function removeDocument(req: Request, res: Response, next: NextFunc
   try {
     await svc.removeCaseDocument(req.params.id, req.params.docId, req.user?.id);
     res.json({ success: true });
+  } catch (err) { next(err); }
+}
+
+export async function listWages(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.listWages(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function upsertWage(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.upsertWage(req.params.id, req.body as UpsertWageInput, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function listTaxReturns(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.listTaxReturns(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function upsertTaxReturn(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.upsertTaxReturn(req.params.id, req.body as UpsertTaxReturnInput, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function getPermDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.getPermDetails(req.params.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+export async function upsertPermDetails(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.upsertPermDetails(req.params.id, req.body as UpsertPermDetailsInput, req.user?.id);
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 }
