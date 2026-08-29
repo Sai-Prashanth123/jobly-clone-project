@@ -2,7 +2,34 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 import { isValidId } from '../lib/utils';
 import { mapEmployee } from './useEmployees';
-import type { LegalCase, CaseFiling, CaseNote, CaseDocument, Petitioner } from '../types';
+import type { LegalCase, CaseFiling, CaseNote, CaseDocument, Petitioner, CaseStatusStep } from '../types';
+
+// Mirrors backend/src/lib/caseStatusSteps.ts — one fixed 11-step list for
+// every case type. The backend only returns key/order/completedAt; labels
+// are a frontend-only display concern.
+export const CASE_STATUS_STEP_LABELS: Record<string, string> = {
+  started: 'Started',
+  beneficiary_questionnaire: 'Beneficiary Questionnaire',
+  petitioner_reviewed: 'Petitioner Reviewed',
+  forms_letters_generated: 'Forms & Letters Generated',
+  paralegal_review: 'Paralegal Review',
+  forms_sent_for_signatures: 'Forms Sent for Signatures',
+  received_signed_forms: 'Received Signed Forms',
+  supervisor_review: 'Supervisor Review',
+  submitted_to_uscis: 'Submitted to USCIS',
+  receipt_received: 'Receipt Received',
+  uscis_response: 'USCIS Response',
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapStatusStep(raw: any): CaseStatusStep {
+  return {
+    key: raw.step_key,
+    label: CASE_STATUS_STEP_LABELS[raw.step_key] ?? raw.step_key,
+    order: raw.step_order,
+    completedAt: raw.completed_at ?? undefined,
+  };
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapFiling(raw: any): CaseFiling {
@@ -60,6 +87,7 @@ function mapCase(raw: any): LegalCase {
     // Full embed only has employee.id set on list/create responses — mapEmployee
     // defensively falls back for every field it doesn't find on the raw object.
     beneficiary: emp.id ? mapEmployee(emp) : undefined,
+    statusSteps: (raw.case_status_steps ?? []).map(mapStatusStep),
     filings: (raw.case_filings ?? []).map(mapFiling),
     notes: (raw.case_notes ?? []).map(mapNote),
     createdAt: raw.created_at,
@@ -412,5 +440,18 @@ export function useUpsertPermDetails(caseId: string) {
       return mapPermDetails(data.data);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId, 'perm'] }),
+  });
+}
+
+// ── Status Timeline ──────────────────────────────────────────────────────────
+
+export function useCompleteStatusStep(caseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (stepKey: string) => {
+      const { data } = await apiClient.post(`/cases/${caseId}/status-steps/${stepKey}/complete`, {});
+      return data.data;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['cases', caseId] }),
   });
 }

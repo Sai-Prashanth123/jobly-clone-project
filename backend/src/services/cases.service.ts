@@ -6,6 +6,7 @@ import * as storageSvc from './storage.service';
 import { isValidCaseDocumentCategory } from '../lib/caseDocumentCategories';
 import type { UpsertWageInput, UpsertTaxReturnInput } from '../schemas/caseWages.schema';
 import type { UpsertPermDetailsInput } from '../schemas/casePerm.schema';
+import { CASE_STATUS_STEPS, isValidCaseStatusStepKey } from '../lib/caseStatusSteps';
 import type {
   CreateCaseInput, UpdateCaseInput, ListCasesQuery,
   CreateFilingInput, UpdateFilingInput, CreateNoteInput,
@@ -16,7 +17,7 @@ import type {
 // field added to one must be deliberately added to the other, never just one.
 const EMPLOYEE_EMBED = 'employees!employee_id(id, first_name, last_name, middle_name, display_id, email, status, nationality, visa_type, visa_expiry, i9_status, e_verify_status, e_verify_case_number, dependents, profile_photo_url, dob, gender, marital_status, preferred_language, languages_known, phone, alt_phone, address_street, address_city, address_state, address_zip, address_country, permanent_address_street, permanent_address_city, permanent_address_state, permanent_address_zip, permanent_address_country, department, job_title, employment_type, start_date, work_location, education, work_history, total_experience_years, experience_level, emergency_contact_name, emergency_contact_relationship, emergency_contact_phone, emergency_contact_alt_phone, emergency_contact_address, emergency_contact_city, emergency_contact_state, emergency_contact_zip)';
 const PETITIONER_EMBED = 'petitioners!petitioner_id(id, name, ein_fein)';
-const DETAIL_SELECT = `*, ${EMPLOYEE_EMBED}, ${PETITIONER_EMBED}, case_filings(*), case_notes(*, portal_users!author_id(name))`;
+const DETAIL_SELECT = `*, ${EMPLOYEE_EMBED}, ${PETITIONER_EMBED}, case_filings(*), case_notes(*, portal_users!author_id(name)), case_status_steps(*)`;
 
 export async function listCases(query: ListCasesQuery) {
   let q = supabaseAdmin
@@ -52,11 +53,18 @@ export async function getCase(id: string) {
 
   // Soft-deleted filings/notes ride along in the embed (PostgREST embeds don't
   // support mid-embed .is('deleted_at', null)) — filter them out here.
-  const record = data as unknown as { case_filings?: { deleted_at: string | null }[]; case_notes?: { deleted_at: string | null }[] };
+  const record = data as unknown as {
+    case_filings?: { deleted_at: string | null }[];
+    case_notes?: { deleted_at: string | null }[];
+    case_status_steps?: { step_order: number }[];
+  };
   return {
     ...data,
     case_filings: (record.case_filings ?? []).filter(f => !f.deleted_at),
     case_notes: (record.case_notes ?? []).filter(n => !n.deleted_at),
+    // PostgREST embeds don't guarantee order without an explicit hint on the
+    // embedded resource — sort here instead.
+    case_status_steps: [...(record.case_status_steps ?? [])].sort((a, b) => a.step_order - b.step_order),
   };
 }
 
@@ -82,6 +90,13 @@ export async function createCase(input: CreateCaseInput, actorId?: string) {
 
   if (error) throw error;
   logActivity(actorId ?? null, 'created', 'case', data.id, data.display_id, {});
+
+  // Seed the 11 fixed status-timeline steps (all uncompleted) — additive to
+  // the coarse `status` column above, not a replacement for it.
+  await supabaseAdmin.from('case_status_steps').insert(
+    CASE_STATUS_STEPS.map(s => ({ case_id: data.id, step_key: s.key, step_order: s.order })),
+  );
+
   return data;
 }
 
@@ -366,4 +381,33 @@ export async function upsertPermDetails(caseId: string, input: UpsertPermDetails
   if (error) throw error;
   logActivity(actorId ?? null, 'updated', 'case', caseId, 'PERM', { event: 'perm_details_upserted' });
   return data;
+}
+
+// ── Status Timeline ──────────────────────────────────────────────────────────
+// Additive to the coarse `case_status` enum, not derived from/into it —
+// deliberately kept independent (see caseStatusSteps.ts).
+
+export async function listStatusSteps(caseId: string) {
+  await assertCaseExists(caseId);
+  const { data, error } = await supabaseAdmin
+    .from('case_status_steps').select('*').eq('case_id', caseId).order('step_order', { ascending: true });
+  if (error) throw error;
+  return data ?? [];
+}
+
+// Idempotent — completing an already-completed step is a no-op, not an error.
+export async function completeStatusStep(caseId: string, stepKey: string, actorId?: string) {
+  await assertCaseExists(caseId);
+  if (!isValidCaseStatusStepKey(stepKey)) throw new ValidationError('Invalid status step');
+  const { data, error } = await supabaseAdmin
+    .from('case_status_steps')
+    .update({ completed_at: new Date().toISOString() })
+    .eq('case_id', caseId)
+    .eq('step_key', stepKey)
+    .is('completed_at', null)
+    .select()
+    .maybeSingle();
+  if (error) throw error;
+  if (data) logActivity(actorId ?? null, 'updated', 'case', caseId, stepKey, { event: 'status_step_completed' });
+  return data ?? { case_id: caseId, step_key: stepKey };
 }

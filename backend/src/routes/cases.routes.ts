@@ -43,4 +43,6 @@ router.put('/:id/tax-returns', requireRole('admin', 'legal'), validateBody(upser
 router.get('/:id/perm', requireRole('admin', 'legal'), ctrl.getPermDetails);
 router.put('/:id/perm', requireRole('admin', 'legal'), validateBody(upsertPermDetailsSchema), ctrl.upsertPermDetails);
 
+router.post('/:id/status-steps/:stepKey/complete', requireRole('admin', 'legal'), ctrl.completeStatusStep);
+
 export default router;

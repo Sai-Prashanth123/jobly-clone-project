@@ -18,6 +18,7 @@ import { BeneficiaryInfoTabs } from '../components/legal/BeneficiaryInfoTabs';
 import { DependentsInfoCard } from '../components/legal/DependentsInfoCard';
 import { CaseWagesTable } from '../components/legal/CaseWagesTable';
 import { CasePermForm } from '../components/legal/CasePermForm';
+import { CaseStatusTimeline } from '../components/legal/CaseStatusTimeline';
 import {
   useCase, useUpdateCase, useDeleteCase,
   useCreateFiling, useUpdateFiling, useDeleteFiling,
@@ -291,6 +292,10 @@ export default function CaseDetail() {
             </Card>
           )}
         </div>
+
+        <aside className="md:w-64 flex-shrink-0">
+          <CaseStatusTimeline caseId={legalCase.id} steps={legalCase.statusSteps} />
+        </aside>
       </div>
 
       <Dialog open={editOpen} onOpenChange={setEditOpen}>

@@ -379,6 +379,13 @@ export interface CaseFiling {
   updatedAt: string;
 }
 
+export interface CaseStatusStep {
+  key: string;
+  label: string;
+  order: number;
+  completedAt?: string;
+}
+
 export interface CaseNote {
   id: string;
   body: string;
@@ -414,6 +421,7 @@ export interface LegalCase {
   // whatever fields cases.service.ts's EMPLOYEE_EMBED currently returns,
   // kept in sync with the backend's LEGAL_ALLOWED_EMPLOYEE_FIELDS allowlist.
   beneficiary?: Partial<Employee>;
+  statusSteps: CaseStatusStep[];
   filings: CaseFiling[];
   notes: CaseNote[];
   createdAt: string;

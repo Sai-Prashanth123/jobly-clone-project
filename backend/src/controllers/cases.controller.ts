@@ -149,3 +149,10 @@ export async function upsertPermDetails(req: Request, res: Response, next: NextF
     res.json({ success: true, data });
   } catch (err) { next(err); }
 }
+
+export async function completeStatusStep(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.completeStatusStep(req.params.id, req.params.stepKey, req.user?.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
