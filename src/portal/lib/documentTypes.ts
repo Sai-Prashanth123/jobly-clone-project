@@ -162,7 +162,11 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
   i140_questionnaire: ['opt', 'h1b', 'stem_opt'],
   perm_questionnaire: ['opt', 'h1b', 'stem_opt'],
   us_visa: ['opt'],
-  i797: ['h1b', 'opt'],
+  // H1B uses I-797 (below) instead of the single-file EAD row — per HR
+  // feedback, H1B employees accumulate multiple I-797 approval/extension
+  // notices over time, which the single-file EAD slot can't hold.
+  ead: ['h1b'],
+  i797: ['opt'],
 };
 
 // Identity doc types mandatory for every employee during onboarding, regardless

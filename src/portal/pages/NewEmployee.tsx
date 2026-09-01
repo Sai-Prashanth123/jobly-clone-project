@@ -67,6 +67,14 @@ const STATUS_OPTIONS = [
   { value: 'inactive',   label: 'Inactive' },
 ];
 
+// Rows whose downloadable blank template is a Word doc (.doc/.docx), not a
+// PDF/scan — the single-file upload input below must accept Word files for
+// these specifically, since the employee fills the template in Word (or
+// prints to PDF) and uploads it back.
+const WORD_TEMPLATE_ROW_TYPES = new Set([
+  'i140_questionnaire', 'perm_questionnaire', 'h1b_employee_questionnaire', 'h4_beneficiary_questionnaire',
+]);
+
 const VISA_OPTIONS = [
   { value: 'citizen',  label: 'US Citizen' },
   { value: 'gc',       label: 'Green Card (Permanent Resident)' },
@@ -886,12 +894,23 @@ export default function NewEmployee() {
               <input
                 id={inputId}
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept={WORD_TEMPLATE_ROW_TYPES.has(row.type) ? '.pdf,.jpg,.jpeg,.png,.doc,.docx' : '.pdf,.jpg,.jpeg,.png'}
                 className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0] ?? null;
-                  if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
-                    toast.error('Please upload a PDF, JPEG, or PNG file.');
+                  const isWordRow = WORD_TEMPLATE_ROW_TYPES.has(row.type);
+                  const allowedTypes = isWordRow
+                    ? ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+                    : ['application/pdf', 'image/jpeg', 'image/png'];
+                  // Some Windows setups report .doc/.docx as a generic/empty
+                  // mimetype rather than the real Word MIME type — fall back
+                  // to a filename-extension check so those uploads aren't
+                  // wrongly rejected.
+                  const hasWordExtension = isWordRow && /\.(docx?|DOCX?)$/.test(f?.name ?? '');
+                  if (f && !allowedTypes.includes(f.type) && !hasWordExtension) {
+                    toast.error(isWordRow
+                      ? 'Please upload a PDF, Word document, JPEG, or PNG file.'
+                      : 'Please upload a PDF, JPEG, or PNG file.');
                     e.target.value = '';
                     return;
                   }

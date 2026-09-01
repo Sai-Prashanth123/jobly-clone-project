@@ -23,7 +23,12 @@ function fileFilter(
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ) {
-  if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
+  // Some Windows setups report .doc/.docx as a generic/empty mimetype
+  // (e.g. application/octet-stream) instead of the real Word MIME type —
+  // fall back to a filename-extension check so those uploads aren't wrongly
+  // rejected server-side even after the frontend now lets them through.
+  const hasWordExtension = /\.docx?$/i.test(file.originalname);
+  if (ALLOWED_MIME_TYPES.has(file.mimetype) || hasWordExtension) {
     cb(null, true);
   } else {
     // multer aborts the upload and surfaces this via the route's next(err) chain
