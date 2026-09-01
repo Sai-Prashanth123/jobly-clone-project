@@ -64,7 +64,11 @@ interface CaseFormProps {
 }
 
 export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPending = false }: CaseFormProps) {
-  const { data: empData } = useEmployees({ limit: 500 });
+  // The employee picker is disabled (and irrelevant) in edit mode — skip the
+  // fetch entirely so opening "Edit" on a case doesn't pull the full
+  // employee roster to whoever has Cases access (e.g. legal) but shouldn't
+  // see employees they have no case for.
+  const { data: empData } = useEmployees({ limit: 500 }, { enabled: !isEdit });
   const employees = empData?.data ?? [];
   const { data: petitioners } = usePetitioners();
   const createPetitioner = useCreatePetitioner();

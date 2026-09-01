@@ -17,16 +17,20 @@ interface TicketFormProps {
 
 export function TicketForm({ onSubmit, onCancel, isPending = false }: TicketFormProps) {
   const { user } = useAuth();
-  // HR can't list Cases (that endpoint is admin/legal-only), so HR always
-  // asks "about an employee" — only admin/legal can also link a specific case.
-  const canPickCase = user?.role === 'admin' || user?.role === 'legal';
+  const canPickCase = user?.role === 'admin' || user?.role === 'hr' || user?.role === 'legal';
+  // Legal shouldn't browse the full employee roster just to raise a ticket —
+  // it already knows which employees it has cases for, so it can only
+  // target a case here, not "an employee" (which would otherwise pull every
+  // employee's name/visa data into this dropdown regardless of whether
+  // legal has any case for them).
+  const isLegal = user?.role === 'legal';
 
-  const { data: empData } = useEmployees({ limit: 500 });
+  const { data: empData } = useEmployees({ limit: 500 }, { enabled: !isLegal });
   const { data: caseData } = useCases({ limit: 500 }, { enabled: canPickCase });
   const employees = empData?.data ?? [];
   const cases = canPickCase ? (caseData?.data ?? []) : [];
 
-  const [targetType, setTargetType] = useState<'employee' | 'case'>('employee');
+  const [targetType, setTargetType] = useState<'employee' | 'case'>(isLegal ? 'case' : 'employee');
   const [employeeId, setEmployeeId] = useState('');
   const [caseId, setCaseId] = useState('');
   const [subject, setSubject] = useState('');
@@ -52,7 +56,7 @@ export function TicketForm({ onSubmit, onCancel, isPending = false }: TicketForm
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
         <CardContent className="pt-6 space-y-4">
-          {canPickCase && (
+          {canPickCase && !isLegal && (
             <div className="space-y-2">
               <Label>This ticket is about *</Label>
               <Select value={targetType} onValueChange={v => setTargetType(v as 'employee' | 'case')}>
