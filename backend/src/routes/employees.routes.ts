@@ -11,12 +11,16 @@ const upload = documentUpload;
 
 router.use(authenticate);
 
-router.get('/', requireRole('admin','hr','operations','finance','employee','legal'), validateQuery(listEmployeesQuerySchema), ctrl.list);
+// 'legal' intentionally excluded — Legal Review (its only prior use for this
+// endpoint) is now admin-only; legal works cases already raised to it via
+// cases.service.ts's own embedded employee subset, never the full roster.
+router.get('/', requireRole('admin','hr','operations','finance','employee'), validateQuery(listEmployeesQuerySchema), ctrl.list);
 router.post('/', requireRole('admin','hr'), validateBody(createEmployeeSchema), ctrl.create);
 router.get('/export',             requireRole('admin', 'hr', 'operations'), ctrl.exportEmployees);
 router.get('/directory',          requireRole('admin','hr','operations','finance'), ctrl.directory);
 router.get('/expiring-documents', requireRole('admin','hr','legal'), ctrl.expiringDocuments);
-router.get('/:id', requireRole('admin','hr','operations','finance','employee','legal'), ctrl.getOne);
+// 'legal' intentionally excluded — see the list route above.
+router.get('/:id', requireRole('admin','hr','operations','finance','employee'), ctrl.getOne);
 // 'employee' is allowed so a user can edit their own profile; the controller
 // enforces that an employee may only update their OWN record (ownership check).
 router.put('/:id', requireRole('admin','hr','employee'), validateBody(updateEmployeeSchema), ctrl.update);

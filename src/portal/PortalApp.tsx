@@ -320,7 +320,11 @@ export default function PortalApp() {
             <Route
               path="legal-review"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                // 'legal' intentionally excluded — this is a whole-roster
+                // view (every employee's visa/I-9/E-Verify status), which
+                // legal should not browse; it works cases already raised to
+                // it instead. Admin-only now.
+                <ProtectedRoute allowedRoles={['admin']}>
                   <LegalReview />
                 </ProtectedRoute>
               }
@@ -328,7 +332,7 @@ export default function PortalApp() {
             <Route
               path="legal-review/:id"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'legal']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <LegalReviewDetail />
                 </ProtectedRoute>
               }

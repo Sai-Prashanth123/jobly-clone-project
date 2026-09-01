@@ -45,7 +45,7 @@ const NAV_ITEMS: NavItem[] = [
   // ── Core features ─────────────────────────────────────────────────────────
   { label: 'Dashboard',           path: '/portal/dashboard',           icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee','legal'], group: 'Core' },
   { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee','legal'], badgeKey: 'announcements', group: 'Core' },
-  { label: 'Legal Review',        path: '/portal/legal-review',        icon: <Scale className="h-4 w-4" />,           roles: ['admin','legal'], group: 'Core' },
+  { label: 'Legal Review',        path: '/portal/legal-review',        icon: <Scale className="h-4 w-4" />,           roles: ['admin'], group: 'Core' },
   { label: 'Cases',                path: '/portal/cases',               icon: <Gavel className="h-4 w-4" />,           roles: ['admin','hr','legal'], group: 'Core' },
   { label: 'Support Tickets',      path: '/portal/support-tickets',     icon: <LifeBuoy className="h-4 w-4" />,        roles: ['admin','hr','legal'], group: 'Core' },
   { label: 'People',              path: '/portal/people',              icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance'], group: 'Core' },
