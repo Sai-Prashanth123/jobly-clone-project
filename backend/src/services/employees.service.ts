@@ -1382,24 +1382,27 @@ async function notifyHrAdmin(title: string, body: string, empId: string, type: '
   }
 }
 
-// Fire-and-forget: notify HR + admin whenever a document is uploaded while an
-// employee is still onboarding, so HR gets incremental signal instead of only
-// learning about documents once onboarding hits 100% and is submitted. Purely
-// additive — does NOT touch completeOnboarding()'s existing 100%-gated notify.
-export async function notifyDocumentUploadedDuringOnboarding(employeeId: string, doc: { name?: string; type?: string }): Promise<void> {
+// Fire-and-forget: notify HR + admin whenever a document is uploaded to an
+// employee's record, regardless of onboarding/active status — HR previously
+// only got this signal during onboarding (status==='onboarding'), which
+// meant a document uploaded by an already-active employee (e.g. a renewed
+// EAD/I-797) silently notified no one. Purely additive — does NOT touch
+// completeOnboarding()'s existing 100%-gated notify.
+export async function notifyEmployeeDocumentUpload(employeeId: string, doc: { name?: string; type?: string }): Promise<void> {
   try {
     const { data: emp } = await supabaseAdmin
       .from('employees')
       .select('id, display_id, first_name, last_name, status')
       .eq('id', employeeId)
       .maybeSingle();
-    if (!emp || emp.status !== 'onboarding') return;
+    if (!emp) return;
     const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
     const label = emp.display_id ?? fullName;
     const docLabel = doc.type ?? doc.name ?? 'A document';
-    await notifyHrAdmin('Onboarding document uploaded', `${label} (${fullName}) uploaded "${docLabel}" during onboarding.`, employeeId);
+    const context = emp.status === 'onboarding' ? ' during onboarding' : '';
+    await notifyHrAdmin('Document uploaded', `${label} (${fullName}) uploaded "${docLabel}"${context}.`, employeeId);
   } catch (err) {
-    console.error('[employees.service] onboarding-document-upload notification failed', err);
+    console.error('[employees.service] employee-document-upload notification failed', err);
   }
 }
 
