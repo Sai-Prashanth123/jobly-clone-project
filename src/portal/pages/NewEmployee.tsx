@@ -2227,10 +2227,11 @@ export default function NewEmployee() {
                 if (['i983', 'stem_opt_card'].includes(row.type)) {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
-                // I-20 also applies (optionally) to H-1B holders who recently
-                // transitioned from F-1/OPT status.
+                // I-20 is F-1/OPT-specific — H-1B holders don't need it shown,
+                // per HR feedback (previously also shown for H-1B holders who
+                // recently transitioned from F-1/OPT, but that was confusing).
                 if (row.type === 'i20') {
-                  return form.visaType === 'opt' || form.visaType === 'stem_opt' || form.visaType === 'h1b';
+                  return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
                 // OPT Card stays OPT/STEM-OPT only — H-1B holders use the
                 // generic I-797/employer paperwork instead.
