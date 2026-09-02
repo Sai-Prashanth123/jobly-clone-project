@@ -1,5 +1,6 @@
 import { Upload } from 'lucide-react';
 import { toast } from 'sonner';
+import { MAX_DOCUMENT_BYTES } from '../../lib/utils';
 
 interface ExistingDoc {
   id?: string;
@@ -76,6 +77,11 @@ export function MultiFileUploadSlot({
                 if (!f) return;
                 if (!['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
                   toast.error('Please upload a PDF, JPEG, or PNG file.');
+                  e.target.value = '';
+                  return;
+                }
+                if (f.size > MAX_DOCUMENT_BYTES) {
+                  toast.error(`${f.name} is larger than ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB.`);
                   e.target.value = '';
                   return;
                 }

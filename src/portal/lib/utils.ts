@@ -106,12 +106,20 @@ export const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
   'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/plain', 'text/csv',
 ]);
-const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 
 /** Returns an error message if the file should be rejected, or null if it's fine. */
 export function validateUploadFile(file: File, maxBytes = MAX_DOCUMENT_BYTES): string | null {
   if (file.size > maxBytes) return `${file.name} is larger than ${Math.round(maxBytes / (1024 * 1024))}MB.`;
-  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(file.type)) return `${file.name}: that file type isn't allowed.`;
+  // Some Windows setups report .doc/.docx as a generic/empty mimetype (e.g.
+  // application/octet-stream) instead of the real Word MIME type — fall back
+  // to a filename-extension check, mirroring backend/src/middleware/upload.ts's
+  // fileFilter so a file this rejects wouldn't have been accepted server-side
+  // either, and a file it allows here won't be rejected after upload.
+  const hasWordExtension = /\.docx?$/i.test(file.name);
+  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(file.type) && !hasWordExtension) {
+    return `${file.name}: that file type isn't allowed.`;
+  }
   return null;
 }
 

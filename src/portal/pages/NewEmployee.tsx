@@ -21,7 +21,7 @@ import { UsDateInput } from '../components/shared/UsDateInput';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
-import { parseNumberInput, formatUsPhone, formatZip } from '../lib/utils';
+import { parseNumberInput, formatUsPhone, formatZip, MAX_DOCUMENT_BYTES } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
 import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
@@ -911,6 +911,11 @@ export default function NewEmployee() {
                     toast.error(isWordRow
                       ? 'Please upload a PDF, Word document, JPEG, or PNG file.'
                       : 'Please upload a PDF, JPEG, or PNG file.');
+                    e.target.value = '';
+                    return;
+                  }
+                  if (f && f.size > MAX_DOCUMENT_BYTES) {
+                    toast.error(`${f.name} is larger than ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB.`);
                     e.target.value = '';
                     return;
                   }

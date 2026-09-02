@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, ChevronDown, ChevronRight, Paperclip, UploadCloud, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency, formatDate, parseNumberInput, computeDiscount } from '../../lib/utils';
+import { formatCurrency, formatDate, parseNumberInput, computeDiscount, validateUploadFile } from '../../lib/utils';
 import { CURRENCIES, currencyLabel } from '../../lib/currencies';
 import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
@@ -71,15 +71,6 @@ const PAYMENT_TERMS_OPTIONS = [
   { value: 'net_45', label: 'Net 45', days: 45 },
   { value: 'net_60', label: 'Net 60', days: 60 },
 ];
-
-// Mirrors backend ALLOWED_MIME_TYPES (middleware/upload.ts) for instant feedback.
-const ALLOWED_MIME = new Set([
-  'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp',
-  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain', 'text/csv',
-]);
-const MAX_FILE_BYTES = 20 * 1024 * 1024;
 
 const todayIso = () => new Date().toISOString().slice(0, 10);
 function addDays(dateIso: string, days: number): string {
@@ -210,16 +201,11 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const removeLine = (id: string) => setLines(prev => (prev.length > 1 ? prev.filter(l => l.id !== id) : prev));
 
   // ── Attachment handling ──
-  const validateFile = (file: File): string | null => {
-    if (file.size > MAX_FILE_BYTES) return `${file.name} is larger than 20MB.`;
-    if (!ALLOWED_MIME.has(file.type)) return `${file.name}: that file type isn't allowed.`;
-    return null;
-  };
   const acceptFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const list = Array.from(files);
     for (const f of list) {
-      const err = validateFile(f);
+      const err = validateUploadFile(f);
       if (err) { toast.error(err); continue; }
       if (initial?.id) {
         // Edit mode: upload immediately to the existing invoice.
@@ -554,6 +540,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                     <p className="mt-1 text-xs text-blue-600 inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</p>
                   )}
                   <input ref={fileInputRef} type="file" multiple className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.xls,.xlsx,.csv,.txt"
                     onChange={e => { acceptFiles(e.target.files); e.target.value = ''; }} />
                 </div>
 
