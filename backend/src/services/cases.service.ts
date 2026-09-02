@@ -64,10 +64,28 @@ export async function getCase(id: string) {
   // Soft-deleted filings/notes ride along in the embed (PostgREST embeds don't
   // support mid-embed .is('deleted_at', null)) — filter them out here.
   const record = data as unknown as {
+    employee_id: string;
     case_filings?: { deleted_at: string | null }[];
     case_notes?: { deleted_at: string | null }[];
     case_status_steps?: { step_order: number }[];
   };
+
+  // The employee's own already-uploaded documents (onboarding/identity docs
+  // like I-797, passport, questionnaires) live in the SAME `documents` table
+  // as case documents but under entity_type='employee' — a completely
+  // separate, non-overlapping set from this case's own entity_type='case'
+  // documents. EMPLOYEE_EMBED above only pulls plain `employees` columns
+  // (documents is a separate table, not a column), so without this explicit
+  // second query legal has no way to see documents already on file for the
+  // employee this case is about — read-only here, uploads/edits still only
+  // happen from the employee's own record.
+  const { data: employeeDocuments } = await supabaseAdmin
+    .from('documents')
+    .select('*, portal_users!uploaded_by(name, role)')
+    .eq('entity_type', 'employee')
+    .eq('entity_id', record.employee_id)
+    .order('uploaded_at', { ascending: false });
+
   return {
     ...data,
     case_filings: (record.case_filings ?? []).filter(f => !f.deleted_at),
@@ -75,6 +93,7 @@ export async function getCase(id: string) {
     // PostgREST embeds don't guarantee order without an explicit hint on the
     // embedded resource — sort here instead.
     case_status_steps: [...(record.case_status_steps ?? [])].sort((a, b) => a.step_order - b.step_order),
+    employee_documents: employeeDocuments ?? [],
   };
 }
 

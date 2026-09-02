@@ -145,6 +145,8 @@ export interface EmployeeDocument {
   expiryDate?: string;
   legalFlagged?: boolean;
   legalFlagComment?: string | null;
+  uploadedByName?: string;
+  uploadedByRole?: string;
 }
 
 export interface OnboardingChecklistItem {
@@ -436,6 +438,10 @@ export interface LegalCase {
   // whatever fields cases.service.ts's EMPLOYEE_EMBED currently returns,
   // kept in sync with the backend's LEGAL_ALLOWED_EMPLOYEE_FIELDS allowlist.
   beneficiary?: Partial<Employee>;
+  // The employee's own already-uploaded documents (onboarding/identity docs)
+  // — a separate, read-only-here set from this case's own categorized
+  // documents (CaseDocument, entity_type='case').
+  employeeDocuments: EmployeeDocument[];
   statusSteps: CaseStatusStep[];
   filings: CaseFiling[];
   notes: CaseNote[];

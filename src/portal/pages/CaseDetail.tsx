@@ -14,6 +14,7 @@ import { CaseForm, CASE_TYPE_LABELS, CASE_STATUS_LABELS } from '../components/le
 import { FilingForm } from '../components/legal/FilingForm';
 import { CaseNotesThread } from '../components/legal/CaseNotesThread';
 import { CaseDocumentsPanel } from '../components/legal/CaseDocumentsPanel';
+import { CaseEmployeeDocuments } from '../components/legal/CaseEmployeeDocuments';
 import { BeneficiaryInfoTabs } from '../components/legal/BeneficiaryInfoTabs';
 import { DependentsInfoCard } from '../components/legal/DependentsInfoCard';
 import { CaseWagesTable } from '../components/legal/CaseWagesTable';
@@ -44,7 +45,7 @@ export default function CaseDetail() {
   const [filingDialog, setFilingDialog] = useState<{ mode: 'create' | 'edit'; filing?: CaseFiling } | null>(null);
   const [removeFilingTarget, setRemoveFilingTarget] = useState<CaseFiling | null>(null);
   const [section, setSection] = useState<
-    'overview' | 'beneficiary' | 'documents' | 'dependents' | 'children' | 'wages' | 'tax' | 'formsLetters' | 'scannedSigned'
+    'overview' | 'beneficiary' | 'employeeDocuments' | 'documents' | 'dependents' | 'children' | 'wages' | 'tax' | 'formsLetters' | 'scannedSigned'
   >('overview');
 
   if (isLoading) {
@@ -116,6 +117,7 @@ export default function CaseDetail() {
           {([
             { key: 'overview', label: 'Overview' },
             { key: 'beneficiary', label: 'Beneficiary Info' },
+            { key: 'employeeDocuments', label: 'Employee Documents' },
             { key: 'documents', label: 'Documents' },
             { key: 'dependents', label: 'Dependents Info' },
             { key: 'children', label: 'Children Info' },
@@ -223,6 +225,20 @@ export default function CaseDetail() {
               <CardHeader><CardTitle className="text-base">Beneficiary Info</CardTitle></CardHeader>
               <CardContent>
                 <BeneficiaryInfoTabs beneficiary={legalCase.beneficiary} />
+              </CardContent>
+            </Card>
+          )}
+
+          {section === 'employeeDocuments' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Employee Documents</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Documents already on file for this employee (onboarding/identity docs) — read-only here.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <CaseEmployeeDocuments documents={legalCase.employeeDocuments} />
               </CardContent>
             </Card>
           )}

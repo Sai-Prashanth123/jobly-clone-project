@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '../lib/apiClient';
 import { isValidId } from '../lib/utils';
 import { mapEmployee } from './useEmployees';
-import type { LegalCase, CaseFiling, CaseNote, CaseDocument, Petitioner, CaseStatusStep, CaseMessage } from '../types';
+import type { LegalCase, CaseFiling, CaseNote, CaseDocument, Petitioner, CaseStatusStep, CaseMessage, EmployeeDocument } from '../types';
 
 // Mirrors backend/src/lib/caseStatusSteps.ts — one fixed 11-step list for
 // every case type. The backend only returns key/order/completedAt; labels
@@ -66,6 +66,22 @@ function mapNote(raw: any): CaseNote {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapCaseEmployeeDocument(raw: any): EmployeeDocument {
+  return {
+    id: raw.id,
+    name: raw.name,
+    type: raw.type,
+    uploadedAt: raw.uploaded_at,
+    url: raw.storage_url ?? undefined,
+    expiryDate: raw.expiry_date ?? undefined,
+    legalFlagged: !!raw.legal_flagged,
+    legalFlagComment: raw.legal_flag_comment ?? undefined,
+    uploadedByName: raw.portal_users?.name ?? undefined,
+    uploadedByRole: raw.portal_users?.role ?? undefined,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapCase(raw: any): LegalCase {
   const emp = raw.employees ?? {};
   const petitioner = raw.petitioners ?? undefined;
@@ -92,6 +108,7 @@ function mapCase(raw: any): LegalCase {
     // Full embed only has employee.id set on list/create responses — mapEmployee
     // defensively falls back for every field it doesn't find on the raw object.
     beneficiary: emp.id ? mapEmployee(emp) : undefined,
+    employeeDocuments: (raw.employee_documents ?? []).map(mapCaseEmployeeDocument),
     statusSteps: (raw.case_status_steps ?? []).map(mapStatusStep),
     filings: (raw.case_filings ?? []).map(mapFiling),
     notes: (raw.case_notes ?? []).map(mapNote),
