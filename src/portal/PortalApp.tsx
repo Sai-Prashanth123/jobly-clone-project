@@ -66,6 +66,7 @@ const LegalReview = lazy(() => import('./pages/LegalReview'));
 const LegalReviewDetail = lazy(() => import('./pages/LegalReviewDetail'));
 const Cases = lazy(() => import('./pages/Cases'));
 const CaseDetail = lazy(() => import('./pages/CaseDetail'));
+const CaseMessages = lazy(() => import('./pages/CaseMessages'));
 const SupportTickets = lazy(() => import('./pages/SupportTickets'));
 const SupportTicketDetail = lazy(() => import('./pages/SupportTicketDetail'));
 
@@ -351,6 +352,14 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'hr', 'legal']}>
                   <CaseDetail />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="case-messages/:caseId"
+              element={
+                <ProtectedRoute allowedRoles={['employee']}>
+                  <CaseMessages />
                 </ProtectedRoute>
               }
             />

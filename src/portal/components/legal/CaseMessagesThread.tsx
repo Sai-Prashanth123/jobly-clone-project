@@ -13,7 +13,17 @@ const AUDIENCE_LABELS: Record<string, string> = {
   beneficiary: 'Beneficiary',
 };
 
-export function CaseMessagesThread({ caseId }: { caseId: string }) {
+interface CaseMessagesThreadProps {
+  caseId: string;
+  // Employee-facing view (CaseMessages.tsx): there's no "audience" concept
+  // from the employee's side — their reply is always to the case-handling
+  // team, so hide the picker and force it server-side instead (see
+  // caseMessages.service.ts's createMessage). Legal/admin/hr keep the full
+  // picker via Case Detail's Messages tab (the default, unset here).
+  hideAudiencePicker?: boolean;
+}
+
+export function CaseMessagesThread({ caseId, hideAudiencePicker = false }: CaseMessagesThreadProps) {
   const { data: messages, isLoading } = useCaseMessages(caseId);
   const createMessage = useCreateCaseMessage(caseId);
   const markRead = useMarkMessageRead(caseId);
@@ -24,7 +34,7 @@ export function CaseMessagesThread({ caseId }: { caseId: string }) {
     const body = draft.trim();
     if (!body) return;
     try {
-      await createMessage.mutateAsync({ body, audience });
+      await createMessage.mutateAsync({ body, audience: hideAudiencePicker ? 'law_firm' : audience });
       setDraft('');
     } catch {
       toast.error('Could not send the message. Please try again.');
@@ -37,22 +47,24 @@ export function CaseMessagesThread({ caseId }: { caseId: string }) {
         <Textarea
           value={draft}
           onChange={e => setDraft(e.target.value)}
-          placeholder="Insert text here…"
+          placeholder={hideAudiencePicker ? 'Write a reply…' : 'Insert text here…'}
           rows={3}
           maxLength={4000}
           className="resize-y"
         />
-        <div className="flex items-center justify-between gap-3">
-          <div className="w-44">
-            <Select value={audience} onValueChange={v => setAudience(v as typeof audience)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                {Object.entries(AUDIENCE_LABELS).map(([k, label]) => (
-                  <SelectItem key={k} value={k}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="flex items-center justify-end gap-3">
+          {!hideAudiencePicker && (
+            <div className="w-44 mr-auto">
+              <Select value={audience} onValueChange={v => setAudience(v as typeof audience)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {Object.entries(AUDIENCE_LABELS).map(([k, label]) => (
+                    <SelectItem key={k} value={k}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <Button size="sm" onClick={send} disabled={!draft.trim()} loading={createMessage.isPending}>
             Submit
           </Button>
@@ -72,7 +84,8 @@ export function CaseMessagesThread({ caseId }: { caseId: string }) {
                 <div className="min-w-0">
                   <p className="text-sm text-gray-900 whitespace-pre-wrap break-words">{m.body}</p>
                   <p className="text-xs text-gray-400 mt-1">
-                    Sent By {m.authorName ?? 'Unknown'} On {formatDate(m.createdAt)} · {AUDIENCE_LABELS[m.audience]}
+                    Sent By {m.authorName ?? 'Unknown'} On {formatDate(m.createdAt)}
+                    {!hideAudiencePicker && ` · ${AUDIENCE_LABELS[m.audience]}`}
                   </p>
                 </div>
                 {!m.read && (

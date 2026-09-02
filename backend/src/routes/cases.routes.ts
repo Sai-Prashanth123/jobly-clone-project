@@ -53,8 +53,11 @@ router.put('/:id/perm', requireRole('admin', 'hr', 'legal'), validateBody(upsert
 
 router.post('/:id/status-steps/:stepKey/complete', requireRole('admin', 'hr', 'legal'), ctrl.completeStatusStep);
 
-router.get('/:id/messages', requireRole('admin', 'hr', 'legal'), messagesCtrl.list);
-router.post('/:id/messages', requireRole('admin', 'hr', 'legal'), validateBody(createCaseMessageSchema), messagesCtrl.create);
-router.post('/:id/messages/:messageId/read', requireRole('admin', 'hr', 'legal'), messagesCtrl.markRead);
+// An employee may also reach these three — scoped to their OWN case only,
+// enforced inside caseMessages.service.ts (never widened here, since /:id and
+// every other case sub-resource above stays admin/hr/legal-only).
+router.get('/:id/messages', requireRole('admin', 'hr', 'legal', 'employee'), messagesCtrl.list);
+router.post('/:id/messages', requireRole('admin', 'hr', 'legal', 'employee'), validateBody(createCaseMessageSchema), messagesCtrl.create);
+router.post('/:id/messages/:messageId/read', requireRole('admin', 'hr', 'legal', 'employee'), messagesCtrl.markRead);
 
 export default router;

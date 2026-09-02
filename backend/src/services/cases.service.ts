@@ -174,7 +174,7 @@ export async function deleteCase(id: string, actorId?: string) {
 }
 
 export async function assertCaseExists(caseId: string) {
-  const { data } = await supabaseAdmin.from('cases').select('id, display_id').eq('id', caseId).is('deleted_at', null).maybeSingle();
+  const { data } = await supabaseAdmin.from('cases').select('id, display_id, employee_id').eq('id', caseId).is('deleted_at', null).maybeSingle();
   if (!data) throw new NotFoundError('Case not found');
   return data;
 }

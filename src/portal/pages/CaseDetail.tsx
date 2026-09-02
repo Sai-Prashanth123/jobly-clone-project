@@ -13,6 +13,7 @@ import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { CaseForm, CASE_TYPE_LABELS, CASE_STATUS_LABELS } from '../components/legal/CaseForm';
 import { FilingForm } from '../components/legal/FilingForm';
 import { CaseNotesThread } from '../components/legal/CaseNotesThread';
+import { CaseMessagesThread } from '../components/legal/CaseMessagesThread';
 import { CaseDocumentsPanel } from '../components/legal/CaseDocumentsPanel';
 import { CaseEmployeeDocuments } from '../components/legal/CaseEmployeeDocuments';
 import { BeneficiaryInfoTabs } from '../components/legal/BeneficiaryInfoTabs';
@@ -45,7 +46,7 @@ export default function CaseDetail() {
   const [filingDialog, setFilingDialog] = useState<{ mode: 'create' | 'edit'; filing?: CaseFiling } | null>(null);
   const [removeFilingTarget, setRemoveFilingTarget] = useState<CaseFiling | null>(null);
   const [section, setSection] = useState<
-    'overview' | 'beneficiary' | 'employeeDocuments' | 'documents' | 'dependents' | 'children' | 'wages' | 'tax' | 'formsLetters' | 'scannedSigned'
+    'overview' | 'beneficiary' | 'messages' | 'employeeDocuments' | 'documents' | 'dependents' | 'children' | 'wages' | 'tax' | 'formsLetters' | 'scannedSigned'
   >('overview');
 
   if (isLoading) {
@@ -117,6 +118,7 @@ export default function CaseDetail() {
           {([
             { key: 'overview', label: 'Overview' },
             { key: 'beneficiary', label: 'Beneficiary Info' },
+            { key: 'messages', label: 'Messages' },
             { key: 'employeeDocuments', label: 'Employee Documents' },
             { key: 'documents', label: 'Documents' },
             { key: 'dependents', label: 'Dependents Info' },
@@ -225,6 +227,20 @@ export default function CaseDetail() {
               <CardHeader><CardTitle className="text-base">Beneficiary Info</CardTitle></CardHeader>
               <CardContent>
                 <BeneficiaryInfoTabs beneficiary={legalCase.beneficiary} />
+              </CardContent>
+            </Card>
+          )}
+
+          {section === 'messages' && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Messages</CardTitle>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Message the employee about document needs, or the internal team. "Beneficiary"/"All Users" messages reach the employee's own portal — they can reply here.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <CaseMessagesThread caseId={legalCase.id} />
               </CardContent>
             </Card>
           )}
