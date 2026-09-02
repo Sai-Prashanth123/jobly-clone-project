@@ -427,6 +427,17 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
   }
 
   logActivity(actorId ?? null, 'created', 'employee', emp.id, emp.display_id ?? `${input.firstName} ${input.lastName}`);
+
+  // A candidate record (quick-added from the New Case form, before the person
+  // is actually hired) gets nothing beyond the bare row: no onboarding
+  // checklist, no portal login/welcome email, no HR "new hire" notification.
+  // All of that happens later, once they're actually hired, via the normal
+  // "Resend Credentials" action (which already handles an employee with no
+  // existing portal_users row — see resendCredentials below).
+  if (input.isCandidate) {
+    return { ...serializeEmployee(emp) };
+  }
+
   void generateTasksForEmployee(emp.id);
 
   // Issue credentials and send welcome email — capture status so the controller

@@ -239,6 +239,11 @@ export interface ClientDocument {
 export interface Employee {
   id: string; // UUID (primary key for API calls)
   displayId?: string; // EMP-XXXX (human-readable)
+  // Write-only: set on useCreateEmployee's payload for the New Case "quick add
+  // candidate" flow to skip issuing portal credentials/welcome email/onboarding
+  // checklist for a placeholder record created before the person is hired.
+  // Never populated by mapEmployee — read-side responses don't carry it back.
+  isCandidate?: boolean;
   firstName: string;
   lastName: string;
   email: string;

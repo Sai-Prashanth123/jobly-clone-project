@@ -73,6 +73,13 @@ export const createEmployeeSchema = z.object({
   // creation — every other field is optional and is completed by the employee
   // during self-onboarding (or by HR later).
   dob: z.string().optional().nullable(),
+  // Set when this employee record is a bare-minimum placeholder created from
+  // the New Case "quick add candidate" flow, before the person is actually
+  // hired — skips issuing portal credentials/welcome email and generating an
+  // onboarding checklist. Deliberately left as plain `.optional()` (no
+  // `.default()`) so CreateEmployeeInput keeps the field optional rather than
+  // required — see resendCredentials's own CreateEmployeeInput literal.
+  isCandidate: z.boolean().optional(),
   address: z.object({
     street: z.string().optional().default(''),
     city: z.string().optional().default(''),

@@ -498,6 +498,7 @@ export function useSetDocumentLegalReview() {
 function toSnake(e: Partial<Employee>): Record<string, any> {
   const blank = (v: unknown) => (typeof v === 'string' && v.trim() === '' ? undefined : v);
   return {
+    ...(e.isCandidate !== undefined && { isCandidate: e.isCandidate }),
     ...(e.firstName !== undefined && { firstName: e.firstName }),
     ...(e.lastName !== undefined && { lastName: e.lastName }),
     ...(e.email !== undefined && { email: e.email }),
