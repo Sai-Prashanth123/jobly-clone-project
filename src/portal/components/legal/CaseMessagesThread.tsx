@@ -9,7 +9,7 @@ import { formatDate } from '../../lib/utils';
 
 const AUDIENCE_LABELS: Record<string, string> = {
   all: 'All Users',
-  law_firm: 'Law Firm',
+  law_firm: 'Admin/HR (Internal)',
   beneficiary: 'Beneficiary',
 };
 
