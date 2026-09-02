@@ -1662,7 +1662,17 @@ export interface ExpiringDoc {
   daysRemaining: number;
 }
 
-export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
+// `legal` may only see expiring documents for employees it has a case with —
+// never the full roster. Pass the caller's role/id in and this resolves the
+// employee-id allowlist to filter both queries below by; every other role
+// gets `undefined` (no filter, full roster) unchanged.
+async function legalScopedEmployeeIds(viewerRole: string): Promise<string[] | undefined> {
+  if (viewerRole !== 'legal') return undefined;
+  const { data } = await supabaseAdmin.from('cases').select('employee_id').is('deleted_at', null);
+  return [...new Set((data ?? []).map(c => c.employee_id))];
+}
+
+export async function listExpiringDocuments(days = 90, viewerRole = 'admin'): Promise<ExpiringDoc[]> {
   // UTC-safe date range — avoids server-timezone drift on setDate() calls
   // (mirrors notifications.service.ts's triggerDocumentExpiryAlerts).
   const now = new Date();
@@ -1670,11 +1680,16 @@ export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
   const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days));
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
-  const { data, error } = await supabaseAdmin
+  const scopedIds = await legalScopedEmployeeIds(viewerRole);
+  if (scopedIds && scopedIds.length === 0) return [];
+
+  let empQuery = supabaseAdmin
     .from('employees')
     .select('id,display_id,first_name,last_name,visa_type,visa_expiry,identity_documents')
     .is('deleted_at', null)
     .in('status', ['active', 'inactive', 'onboarding']);
+  if (scopedIds) empQuery = empQuery.in('id', scopedIds);
+  const { data, error } = await empQuery;
   if (error) throw error;
 
   const results: ExpiringDoc[] = [];
@@ -1708,12 +1723,14 @@ export async function listExpiringDocuments(days = 90): Promise<ExpiringDoc[]> {
 
   // Also check uploaded documents that have an expiry_date set.
   // entity_id is polymorphic (no FK to employees), so do two queries.
-  const { data: uploadedDocs } = await supabaseAdmin
+  let uploadedDocsQuery = supabaseAdmin
     .from('documents')
     .select('entity_id, type, expiry_date')
     .eq('entity_type', 'employee')
     .gte('expiry_date', today)
     .lte('expiry_date', cutoffStr);
+  if (scopedIds) uploadedDocsQuery = uploadedDocsQuery.in('entity_id', scopedIds);
+  const { data: uploadedDocs } = await uploadedDocsQuery;
 
   if (uploadedDocs && uploadedDocs.length > 0) {
     const empIds = [...new Set(uploadedDocs.map((d: any) => d.entity_id as string))];

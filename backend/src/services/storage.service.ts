@@ -10,6 +10,34 @@ const BUCKET_MAP: Record<string, string> = {
   case: 'case-docs',
 };
 
+// `legal` may only reach a document when it's tied to a case: either the
+// document itself is a case document, or it's an employee document for an
+// employee who has at least one non-deleted case. Mirrors the scoping already
+// applied to the `employee_documents` embed in cases.service.ts's getCase() —
+// every document read/write path for `legal` must enforce this same rule so
+// a raw document/employee UUID can't be used to bypass the case-scoping this
+// role is restricted to everywhere else.
+async function employeeHasCase(employeeId: string): Promise<boolean> {
+  const { data } = await supabaseAdmin
+    .from('cases')
+    .select('id')
+    .eq('employee_id', employeeId)
+    .is('deleted_at', null)
+    .limit(1)
+    .maybeSingle();
+  return !!data;
+}
+
+async function assertLegalCanAccessDocument(doc: { entity_type: string; entity_id: string }): Promise<void> {
+  if (doc.entity_type === 'case') {
+    const { data } = await supabaseAdmin.from('cases').select('id').eq('id', doc.entity_id).is('deleted_at', null).maybeSingle();
+    if (!data) throw new ForbiddenError('This document is not linked to a case you can access');
+    return;
+  }
+  if (doc.entity_type === 'employee' && await employeeHasCase(doc.entity_id)) return;
+  throw new ForbiddenError('This document is not linked to a case you can access');
+}
+
 export async function uploadDocument(
   entityType: 'employee' | 'client' | 'invoice' | 'case',
   entityId: string,
@@ -164,6 +192,9 @@ export async function getDependentPassportSignedUrl(
   if (user.role === 'employee' && user.employeeId !== employeeId) {
     throw new ForbiddenError('You may only access your own dependents\' documents');
   }
+  if (user.role === 'legal' && !(await employeeHasCase(employeeId))) {
+    throw new ForbiddenError('This document is not linked to a case you can access');
+  }
   const { data: emp, error } = await supabaseAdmin
     .from('employees')
     .select('dependents')
@@ -202,6 +233,7 @@ export async function getDocumentSignedUrl(
     const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
     if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
   }
+  if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
   const { data } = await supabaseAdmin
@@ -234,6 +266,7 @@ export async function getDocumentPreviewUrl(
     const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
     if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
   }
+  if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
   const { data } = await supabaseAdmin
@@ -263,6 +296,7 @@ export async function renderDocument(
     const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
     if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
   }
+  if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const name: string = doc.name ?? 'document';
   const ext = (name.split('.').pop() ?? '').toLowerCase();
@@ -335,7 +369,22 @@ export async function downloadDocumentBuffer(
   return Buffer.from(await data.arrayBuffer());
 }
 
-export async function setDocumentLegalReview(docId: string, flagged: boolean, comment: string | null) {
+export async function setDocumentLegalReview(
+  docId: string,
+  flagged: boolean,
+  comment: string | null,
+  user: { role: string },
+) {
+  if (user.role === 'legal') {
+    const { data: doc, error: findErr } = await supabaseAdmin
+      .from('documents')
+      .select('entity_type, entity_id')
+      .eq('id', docId)
+      .single();
+    if (findErr || !doc) throw new NotFoundError('Document not found');
+    await assertLegalCanAccessDocument(doc);
+  }
+
   const { data, error } = await supabaseAdmin
     .from('documents')
     .update({ legal_flagged: flagged, legal_flag_comment: comment })

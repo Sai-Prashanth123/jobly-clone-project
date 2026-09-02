@@ -16,8 +16,12 @@ export async function listTickets(query: ListTicketsQuery, userRole: string, use
   let q = supabaseAdmin.from('support_tickets').select(SELECT, { count: 'exact' });
 
   // HR only ever sees the tickets they personally raised — their own request
-  // queue to Legal, not every ticket in the system. Admin/legal see everything.
+  // queue to Legal, not every ticket in the system. Admin sees everything.
   if (userRole === 'hr') q = q.eq('created_by', userId);
+  // Legal is restricted to case work — a ticket with no case_id is a general
+  // HR question with no case linkage, matching TicketForm.tsx's frontend
+  // restriction that legal can only ever target a Case, never browse employees.
+  if (userRole === 'legal') q = q.not('case_id', 'is', null);
   if (query.status) q = q.eq('status', query.status);
 
   const offset = (query.page - 1) * query.limit;
@@ -33,6 +37,9 @@ export async function getTicket(id: string, userRole: string, userId: string) {
   if (error || !data) throw new NotFoundError('Support ticket not found');
   if (userRole === 'hr' && data.created_by !== userId) {
     throw new ForbiddenError('You may only view support tickets you created.');
+  }
+  if (userRole === 'legal' && !data.case_id) {
+    throw new ForbiddenError('This ticket is not linked to a case you can access');
   }
   return data;
 }
