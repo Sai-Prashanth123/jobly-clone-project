@@ -131,8 +131,8 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'labor_certificate', label: 'Labor Certificate (PERM)',      placeholder: '',
     hint: 'PERM labor certification.' },
   { type: 'other',         label: 'Other Documents',                  placeholder: '',
-    hint: 'Any additional supporting document not covered above. Up to 5 files.',
-    multi: true, maxFiles: 5 },
+    hint: 'Any additional supporting document not covered above. Up to 15 files.',
+    multi: true, maxFiles: 15 },
 ];
 
 // Rows only shown for specific visa types — a narrower, additive layer on top
