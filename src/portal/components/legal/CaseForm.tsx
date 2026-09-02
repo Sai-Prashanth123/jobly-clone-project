@@ -177,12 +177,12 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
                 <SelectValue placeholder="Select employee" />
               </SelectTrigger>
               <SelectContent>
+                {!isEdit && <SelectItem value="__new_candidate__">+ Add new candidate…</SelectItem>}
                 {employees.map(e => (
                   <SelectItem key={e.id} value={e.id}>
                     {e.firstName} {e.lastName} {e.displayId ? `(${e.displayId})` : ''}
                   </SelectItem>
                 ))}
-                {!isEdit && <SelectItem value="__new_candidate__">+ Add new candidate…</SelectItem>}
               </SelectContent>
             </Select>
             {newCandidate && (

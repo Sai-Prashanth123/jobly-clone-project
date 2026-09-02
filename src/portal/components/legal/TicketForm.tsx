@@ -106,12 +106,12 @@ export function TicketForm({ onSubmit, onCancel, isPending = false }: TicketForm
               >
                 <SelectTrigger><SelectValue placeholder="Select case" /></SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="__new_case__">+ Create new case…</SelectItem>
                   {caseOptions.map(c => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.displayId} — {c.employeeFirstName} {c.employeeLastName}
                     </SelectItem>
                   ))}
-                  <SelectItem value="__new_case__">+ Create new case…</SelectItem>
                 </SelectContent>
               </Select>
             </div>
