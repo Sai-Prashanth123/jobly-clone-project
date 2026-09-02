@@ -65,8 +65,8 @@ export async function getCase(id: string) {
   // support mid-embed .is('deleted_at', null)) — filter them out here.
   const record = data as unknown as {
     employee_id: string;
-    case_filings?: { deleted_at: string | null }[];
-    case_notes?: { deleted_at: string | null }[];
+    case_filings?: { deleted_at: string | null; created_at: string }[];
+    case_notes?: { deleted_at: string | null; created_at: string }[];
     case_status_steps?: { step_order: number }[];
   };
 
@@ -86,12 +86,17 @@ export async function getCase(id: string) {
     .eq('entity_id', record.employee_id)
     .order('uploaded_at', { ascending: false });
 
+  // PostgREST embeds don't guarantee order without an explicit hint on the
+  // embedded resource — sort every embed here instead (case_status_steps
+  // already did; case_filings/case_notes didn't, so they could render in a
+  // non-deterministic order depending on Postgres's physical row order).
+  const byCreatedAtDesc = (a: { created_at: string }, b: { created_at: string }) =>
+    b.created_at.localeCompare(a.created_at);
+
   return {
     ...data,
-    case_filings: (record.case_filings ?? []).filter(f => !f.deleted_at),
-    case_notes: (record.case_notes ?? []).filter(n => !n.deleted_at),
-    // PostgREST embeds don't guarantee order without an explicit hint on the
-    // embedded resource — sort here instead.
+    case_filings: (record.case_filings ?? []).filter(f => !f.deleted_at).sort(byCreatedAtDesc),
+    case_notes: (record.case_notes ?? []).filter(n => !n.deleted_at).sort(byCreatedAtDesc),
     case_status_steps: [...(record.case_status_steps ?? [])].sort((a, b) => a.step_order - b.step_order),
     employee_documents: employeeDocuments ?? [],
   };

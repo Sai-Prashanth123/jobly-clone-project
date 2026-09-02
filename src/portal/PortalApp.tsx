@@ -371,7 +371,14 @@ export default function PortalApp() {
               }
             />
 
-            <Route path="expenses" element={<Expenses />} />
+            <Route
+              path="expenses"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'finance', 'operations', 'employee']}>
+                  <Expenses />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="reviews"
               element={
@@ -388,7 +395,14 @@ export default function PortalApp() {
                 </ProtectedRoute>
               }
             />
-            <Route path="my-reviews" element={<MyPerformanceReviews />} />
+            <Route
+              path="my-reviews"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'employee']}>
+                  <MyPerformanceReviews />
+                </ProtectedRoute>
+              }
+            />
 
             <Route
               path="enrollment-forms"
@@ -505,7 +519,14 @@ export default function PortalApp() {
             {/* Phase 4 — Admin */}
             <Route path="audit-log" element={<ProtectedRoute allowedRoles={['admin']}><AuditLog /></ProtectedRoute>} />
             <Route path="holidays" element={<ProtectedRoute allowedRoles={['admin','hr']}><HolidaysSettings /></ProtectedRoute>} />
-            <Route path="company-holidays" element={<CompanyHolidays />} />
+            <Route
+              path="company-holidays"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'finance', 'employee']}>
+                  <CompanyHolidays />
+                </ProtectedRoute>
+              }
+            />
             <Route path="system-settings" element={<ProtectedRoute allowedRoles={['admin']}><SystemSettings /></ProtectedRoute>} />
 
             {/* Phase 4 — HR */}

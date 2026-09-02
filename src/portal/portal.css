@@ -23,6 +23,15 @@
   padding-bottom: unset !important;
 }
 
+/* style.css sets a global, unscoped `p { margin: 0; text-align: justify; }`
+   for the marketing site's body copy — without this reset every wrapped
+   multi-line <p> in the portal renders justified (stretched inter-word
+   spacing) instead of normal ragged-right text. */
+.portal-scope p {
+  text-align: revert;
+  margin: revert;
+}
+
 .portal-scope * {
   box-sizing: border-box;
 }
