@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
+import { todayUTC, daysBetween } from '../lib/dateUtils';
 
 // ── Headcount & Turnover ─────────────────────────────────────────────────────
 
@@ -89,11 +90,11 @@ export async function getProbationEmployees() {
     .not('probation_end_date', 'is', null)
     .order('probation_end_date');
   if (error) throw error;
-  const now = new Date();
+  const today = todayUTC();
   return (data ?? []).map(e => ({
     ...e,
-    daysLeft: e.probation_end_date ? Math.ceil((new Date(e.probation_end_date).getTime() - now.getTime()) / 86400000) : null,
-    isOverdue: e.probation_end_date ? new Date(e.probation_end_date) < now : false,
+    daysLeft: e.probation_end_date ? daysBetween(today, e.probation_end_date) : null,
+    isOverdue: e.probation_end_date ? e.probation_end_date < today : false,
   }));
 }
 
@@ -263,8 +264,9 @@ export async function getInvoiceAnalytics() {
     .select('id, status, total_amount, issue_date, due_date, paid_at, client_id');
 
   const all = invoices ?? [];
+  const today = todayUTC();
   const paid = all.filter(i => i.status === 'paid');
-  const overdue = all.filter(i => i.status === 'overdue' || (i.status === 'sent' && i.due_date && new Date(i.due_date) < new Date()));
+  const overdue = all.filter(i => i.status === 'overdue' || (i.status === 'sent' && i.due_date && i.due_date < today));
 
   const paidWithDates = paid.filter(i => i.issue_date && i.paid_at);
   const avgDaysToPay = paidWithDates.length > 0
@@ -277,11 +279,10 @@ export async function getInvoiceAnalytics() {
   const totalOutstanding = all.filter(i => ['sent','overdue'].includes(i.status)).reduce((s, i) => s + Number(i.total_amount ?? 0), 0);
 
   // Aging buckets
-  const now = new Date();
   const aging = { '0-30': 0, '31-60': 0, '61-90': 0, '90+': 0 };
   for (const i of overdue) {
     if (!i.due_date) continue;
-    const days = Math.floor((now.getTime() - new Date(i.due_date).getTime()) / 86400000);
+    const days = daysBetween(i.due_date, today);
     if (days <= 30) aging['0-30'] += Number(i.total_amount ?? 0);
     else if (days <= 60) aging['31-60'] += Number(i.total_amount ?? 0);
     else if (days <= 90) aging['61-90'] += Number(i.total_amount ?? 0);

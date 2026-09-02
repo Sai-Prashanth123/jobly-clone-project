@@ -25,8 +25,9 @@ function getDayName(dateStr: string): string {
 }
 
 export default function CompanyHolidays() {
-  const currentYear = new Date().getFullYear();
-  const currentMonthNum = new Date().getUTCMonth() + 1;
+  const nowUTC = new Date();
+  const currentYear = nowUTC.getUTCFullYear();
+  const currentMonthNum = nowUTC.getUTCMonth() + 1;
   const [year, setYear] = useState(currentYear);
   const [month, setMonth] = useState(currentMonthNum);
   const [view, setView] = useState<'calendar' | 'list'>('calendar');

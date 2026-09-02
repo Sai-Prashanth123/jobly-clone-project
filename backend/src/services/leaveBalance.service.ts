@@ -80,7 +80,7 @@ export async function deleteLeaveType(id: string, actorId: string) {
 // ─── Balances ────────────────────────────────────────────────────────────────
 
 export async function getEmployeeBalances(employeeId: string, year?: number) {
-  const targetYear = year ?? new Date().getFullYear();
+  const targetYear = year ?? new Date().getUTCFullYear();
 
   // Get active leave types
   const leaveTypes = await listLeaveTypes(true);
@@ -152,13 +152,13 @@ export async function getEmployeeBalances(employeeId: string, year?: number) {
       // the year ended, and a future year (not yet started) wrongly accrues
       // as if it were already underway.
       const now = new Date();
-      const referenceDate = targetYear < now.getFullYear() ? new Date(yearEnd)
-        : targetYear > now.getFullYear() ? accrualStart // clamps monthsElapsed to 0 below
+      const referenceDate = targetYear < now.getUTCFullYear() ? new Date(yearEnd)
+        : targetYear > now.getUTCFullYear() ? accrualStart // clamps monthsElapsed to 0 below
         : now;
       const monthsElapsed = Math.max(
         0,
-        (referenceDate.getFullYear() - accrualStart.getFullYear()) * 12 +
-        (referenceDate.getMonth() - accrualStart.getMonth()),
+        (referenceDate.getUTCFullYear() - accrualStart.getUTCFullYear()) * 12 +
+        (referenceDate.getUTCMonth() - accrualStart.getUTCMonth()),
       );
       const rate    = lt.accrual_rate ?? 0;
       const accrued = Math.min(monthsElapsed * rate, lt.default_days);
