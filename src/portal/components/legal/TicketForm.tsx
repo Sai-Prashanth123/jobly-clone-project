@@ -5,9 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { toast } from 'sonner';
 import { useAuth } from '../../hooks/useAuth';
 import { useEmployees } from '../../hooks/useEmployees';
-import { useCases } from '../../hooks/useCases';
+import { useCases, useCreateCase } from '../../hooks/useCases';
+import { CaseForm } from './CaseForm';
+import type { LegalCase } from '../../types';
 
 interface TicketFormProps {
   onSubmit: (data: { caseId?: string; employeeId?: string; subject: string; message: string }) => void;
@@ -27,6 +31,7 @@ export function TicketForm({ onSubmit, onCancel, isPending = false }: TicketForm
 
   const { data: empData } = useEmployees({ limit: 500 }, { enabled: !isLegal });
   const { data: caseData } = useCases({ limit: 500 }, { enabled: canPickCase });
+  const createCase = useCreateCase();
   const employees = empData?.data ?? [];
   const cases = canPickCase ? (caseData?.data ?? []) : [];
 
@@ -36,6 +41,15 @@ export function TicketForm({ onSubmit, onCancel, isPending = false }: TicketForm
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [showNewCase, setShowNewCase] = useState(false);
+  // Case just created inline via "+ Create new case…" — the shared cases
+  // query cache isn't force-refetched on create (see useCreateCase), so merge
+  // it into the dropdown's options locally to guarantee it's selectable and
+  // shows a label immediately, without waiting on a background refetch.
+  const [justCreatedCase, setJustCreatedCase] = useState<LegalCase | null>(null);
+  const caseOptions = justCreatedCase && !cases.some(c => c.id === justCreatedCase.id)
+    ? [justCreatedCase, ...cases]
+    : cases;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -86,14 +100,18 @@ export function TicketForm({ onSubmit, onCancel, isPending = false }: TicketForm
           ) : (
             <div className="space-y-2">
               <Label>Case *</Label>
-              <Select value={caseId} onValueChange={setCaseId}>
+              <Select
+                value={caseId}
+                onValueChange={v => { if (v === '__new_case__') setShowNewCase(true); else setCaseId(v); }}
+              >
                 <SelectTrigger><SelectValue placeholder="Select case" /></SelectTrigger>
                 <SelectContent>
-                  {cases.map(c => (
+                  {caseOptions.map(c => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.displayId} — {c.employeeFirstName} {c.employeeLastName}
                     </SelectItem>
                   ))}
+                  <SelectItem value="__new_case__">+ Create new case…</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -119,6 +137,43 @@ export function TicketForm({ onSubmit, onCancel, isPending = false }: TicketForm
           Submit Ticket
         </Button>
       </div>
+
+      <Dialog open={showNewCase} onOpenChange={setShowNewCase}>
+        <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>New Case</DialogTitle>
+            <DialogDescription className="sr-only">Fill in the case details.</DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-1 pb-2">
+            <CaseForm
+              onSubmit={async (formData) => {
+                try {
+                  const created = await createCase.mutateAsync({
+                    employeeId: formData.employeeId,
+                    caseType: formData.caseType as string,
+                    receiptNumber: formData.receiptNumber || undefined,
+                    priorityDate: formData.priorityDate || undefined,
+                    filedDate: formData.filedDate || undefined,
+                    decisionDate: formData.decisionDate || undefined,
+                    attorneyName: formData.attorneyName || undefined,
+                    description: formData.description || undefined,
+                    petitionerId: formData.petitionerId || null,
+                    classification: formData.classification || null,
+                  });
+                  toast.success(`Case ${created.displayId ?? created.id} created`);
+                  setJustCreatedCase(created);
+                  setCaseId(created.id);
+                  setShowNewCase(false);
+                } catch {
+                  /* failed-request toast raised centrally (queryClient.ts) */
+                }
+              }}
+              onCancel={() => setShowNewCase(false)}
+              isPending={createCase.isPending}
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     </form>
   );
 }
