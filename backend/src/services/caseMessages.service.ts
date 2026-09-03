@@ -80,18 +80,35 @@ export async function createMessage(caseId: string, input: CreateCaseMessageInpu
         createNotification(uid, 'New reply on case ' + parent.display_id, input.body.slice(0, 140), 'info', 'case', caseId, `/portal/cases/${caseId}`),
       ),
     );
-  } else if (audience !== 'law_firm' && parent.employee_id) {
-    // Staff-authored message visible to the employee ('beneficiary'/'all') —
-    // surfaced via the normal notifications system, linking to the
-    // employee's own case-messages page (not their profile — there's
-    // nothing case-related there).
-    const portalUserId = await getPortalUserByEmployeeId(parent.employee_id);
-    if (portalUserId) {
-      await createNotification(
-        portalUserId, 'New message on your case',
-        input.body.slice(0, 140),
-        'info', 'case', caseId, `/portal/case-messages/${caseId}`,
+  } else {
+    // Staff-authored message. 'law_firm'/'all' notify the OTHER staff
+    // (admin/hr/legal, excluding the author) — this was previously missing
+    // entirely, so an internal message from Legal never reached Admin/HR at
+    // all. Link to the case detail page they already have access to, not the
+    // employee-only /portal/case-messages/:caseId link used below.
+    if (audience === 'law_firm' || audience === 'all') {
+      const [hrIds, adminIds, legalIds] = await Promise.all([
+        getUserIdsByRole('hr'), getUserIdsByRole('admin'), getUserIdsByRole('legal'),
+      ]);
+      const staffIds = [...new Set([...hrIds, ...adminIds, ...legalIds])].filter(uid => uid !== actor.id);
+      await Promise.all(
+        staffIds.map(uid =>
+          createNotification(uid, 'New message on case ' + parent.display_id, input.body.slice(0, 140), 'info', 'case', caseId, `/portal/cases/${caseId}`),
+        ),
       );
+    }
+    // 'beneficiary'/'all' also notify the employee — surfaced via the normal
+    // notifications system, linking to the employee's own case-messages page
+    // (not their profile — there's nothing case-related there).
+    if ((audience === 'beneficiary' || audience === 'all') && parent.employee_id) {
+      const portalUserId = await getPortalUserByEmployeeId(parent.employee_id);
+      if (portalUserId) {
+        await createNotification(
+          portalUserId, 'New message on your case',
+          input.body.slice(0, 140),
+          'info', 'case', caseId, `/portal/case-messages/${caseId}`,
+        );
+      }
     }
   }
 
