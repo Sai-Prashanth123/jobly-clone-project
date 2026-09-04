@@ -21,7 +21,7 @@ import { UsDateInput } from '../components/shared/UsDateInput';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
-import { parseNumberInput, formatUsPhone, formatZip, MAX_DOCUMENT_BYTES } from '../lib/utils';
+import { parseNumberInput, formatUsPhone, formatZip, IDENTITY_DOC_ACCEPT, validateIdentityDocFile } from '../lib/utils';
 import { US_STATES } from '../lib/usStates';
 import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
@@ -71,10 +71,6 @@ const STATUS_OPTIONS = [
 // PDF/scan — the single-file upload input below must accept Word files for
 // these specifically, since the employee fills the template in Word (or
 // prints to PDF) and uploads it back.
-const WORD_TEMPLATE_ROW_TYPES = new Set([
-  'i140_questionnaire', 'perm_questionnaire', 'h1b_employee_questionnaire', 'h4_beneficiary_questionnaire',
-]);
-
 const VISA_OPTIONS = [
   { value: 'citizen',  label: 'US Citizen' },
   { value: 'gc',       label: 'Green Card (Permanent Resident)' },
@@ -894,28 +890,13 @@ export default function NewEmployee() {
               <input
                 id={inputId}
                 type="file"
-                accept={WORD_TEMPLATE_ROW_TYPES.has(row.type) ? '.pdf,.jpg,.jpeg,.png,.doc,.docx' : '.pdf,.jpg,.jpeg,.png'}
+                accept={IDENTITY_DOC_ACCEPT}
                 className="hidden"
                 onChange={e => {
                   const f = e.target.files?.[0] ?? null;
-                  const isWordRow = WORD_TEMPLATE_ROW_TYPES.has(row.type);
-                  const allowedTypes = isWordRow
-                    ? ['application/pdf', 'image/jpeg', 'image/png', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
-                    : ['application/pdf', 'image/jpeg', 'image/png'];
-                  // Some Windows setups report .doc/.docx as a generic/empty
-                  // mimetype rather than the real Word MIME type — fall back
-                  // to a filename-extension check so those uploads aren't
-                  // wrongly rejected.
-                  const hasWordExtension = isWordRow && /\.(docx?|DOCX?)$/.test(f?.name ?? '');
-                  if (f && !allowedTypes.includes(f.type) && !hasWordExtension) {
-                    toast.error(isWordRow
-                      ? 'Please upload a PDF, Word document, JPEG, or PNG file.'
-                      : 'Please upload a PDF, JPEG, or PNG file.');
-                    e.target.value = '';
-                    return;
-                  }
-                  if (f && f.size > MAX_DOCUMENT_BYTES) {
-                    toast.error(`${f.name} is larger than ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB.`);
+                  const err = f && validateIdentityDocFile(f);
+                  if (err) {
+                    toast.error(err);
                     e.target.value = '';
                     return;
                   }

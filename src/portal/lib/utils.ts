@@ -123,6 +123,33 @@ export function validateUploadFile(file: File, maxBytes = MAX_DOCUMENT_BYTES): s
   return null;
 }
 
+// Identity & Documents uploads (the onboarding wizard's section 07) accept
+// PDFs, image scans and Word documents — narrower than
+// ALLOWED_DOCUMENT_MIME_TYPES above (no spreadsheets/plain text), but shared
+// by BOTH controls in that section: the single-file rows in NewEmployee.tsx
+// and the multi-file MultiFileUploadSlot. They previously carried separate
+// hardcoded lists that drifted apart twice — first Word docs were blocked for
+// the questionnaire templates, then for every other row — so the rule lives
+// here once instead.
+export const IDENTITY_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
+const IDENTITY_DOC_MIME_TYPES = new Set([
+  'application/pdf', 'image/jpeg', 'image/png',
+  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]);
+
+/** Returns an error message if the file should be rejected, or null if it's fine. */
+export function validateIdentityDocFile(file: File): string | null {
+  // Same Windows generic-mimetype fallback as validateUploadFile above.
+  const hasWordExtension = /\.docx?$/i.test(file.name);
+  if (!IDENTITY_DOC_MIME_TYPES.has(file.type) && !hasWordExtension) {
+    return 'Please upload a PDF, Word document, JPEG, or PNG file.';
+  }
+  if (file.size > MAX_DOCUMENT_BYTES) {
+    return `${file.name} is larger than ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB.`;
+  }
+  return null;
+}
+
 export function maskSsn(ssn: string): string {
   const digits = ssn.replace(/\D/g, '');
   const last4 = digits.length >= 4 ? digits.slice(-4) : (digits || ssn.slice(-4));
