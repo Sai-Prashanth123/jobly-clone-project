@@ -5,7 +5,7 @@
 //   - Each identity-doc label (Driver's License, Passport, etc.) matches
 //     a row in IDENTITY_DOC_ROWS so uploads from section 07 line up with the
 //     dropdown options here
-//   - W-4/W-9/ID Proof/Compliance Document/Other are the genuinely optional
+//   - W-9/ID Proof/Compliance Document/Other are the genuinely optional
 //     types the standalone Documents page (Documents.tsx) offers — everything
 //     in IDENTITY_OWNED_DOC_LABELS is excluded there since it's collected
 //     exclusively via the Identity & Documents section (single source of
@@ -87,6 +87,9 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'i9_form',       label: 'I-9 Form',                         placeholder: '',
     hint: 'Employment Eligibility Verification. Download the current blank form, sign it, then upload it here.',
     downloadUrl: 'https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf' },
+  { type: 'w4',            label: 'W-4',                              placeholder: '',
+    hint: "Employee's Withholding Certificate. Download the current blank form, fill it out, then upload it here.",
+    downloadUrl: 'https://www.irs.gov/pub/irs-pdf/fw4.pdf' },
   { type: 'insurance_waiver', label: 'Insurance Waiver Form',         placeholder: '',
     hint: 'Download the blank waiver form, sign it, then upload it here.',
     downloadUrl: 'https://ufkrfrmqangydrjbzljo.supabase.co/storage/v1/object/public/document-templates/insurance-waiver-form.pdf' },
@@ -172,8 +175,10 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
 // Identity doc types mandatory for every employee during onboarding, regardless
 // of visa/citizenship status. Offer Letter was removed from this list per HR
 // feedback — it's still a normal (optional) row, just no longer blocks
-// Finish Onboarding for anyone.
-export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume'] as const;
+// Finish Onboarding for anyone. W-4 is here (not in VISA_REQUIRED_EXTRA)
+// because it's a payroll form every US employee files, not a visa-specific
+// document — per HR, it's common to H1B/OPT/STEM OPT and everyone else alike.
+export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4'] as const;
 
 // Passport and I-94 are only relevant to non-immigrant work-visa holders — an
 // I-94 is an arrival/departure record issued at US entry to visa entrants, and
@@ -245,7 +250,9 @@ export const EMPLOYER_ROW_VISA_GATE: Record<string, string[]> = {
 
 // Labels from IDENTITY_DOC_ROWS and EMPLOYER_DOC_ROWS — used to exclude these
 // from the standalone Documents page's type dropdown so the same document
-// can't be uploaded via two different places.
+// can't be uploaded via two different places. W-4 moved into this set when it
+// became a required identity row; any W-4 uploaded from the Documents page
+// before that still counts, since docMatchesRow() matches on the stored label.
 export const IDENTITY_OWNED_DOC_LABELS = new Set([...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS].map(r => r.label));
 
 // Documents already uploaded under a row's PREVIOUS label — keeps them
