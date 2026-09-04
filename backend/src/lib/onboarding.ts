@@ -18,10 +18,18 @@ export const COMPLIANCE_REQUIRED_DOC_TYPES = [
   'Resume',
 ] as const;
 
+// MUST mirror REQUIRED_IDENTITY_TYPES in src/portal/lib/documentTypes.ts
+// (by row label, not row type) — the wizard computes its progress from that
+// list while this one gates the server-side "Finish onboarding" action, so a
+// mismatch either blocks a 100%-complete employee or lets an incomplete one
+// through. Offer Letter was dropped here after HR made it optional on the
+// frontend: the wizard showed 100% while this list still demanded it, so
+// Finish onboarding failed with "Still required: Offer Letter". W-4 was added
+// when it became required for every employee.
 export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
-  'Offer Letter',
   'Social Security Card',
+  'W-4',
 ] as const;
 
 // Passport and I-94 are only relevant to non-immigrant work-visa holders — an

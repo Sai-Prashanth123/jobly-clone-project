@@ -2326,12 +2326,13 @@ export default function NewEmployee() {
                             <input
                               id={inputId}
                               type="file"
-                              accept=".pdf,.jpg,.jpeg,.png"
+                              accept={IDENTITY_DOC_ACCEPT}
                               className="hidden"
                               onChange={e => {
                                 const f = e.target.files?.[0] ?? null;
-                                if (f && !['application/pdf', 'image/jpeg', 'image/png'].includes(f.type)) {
-                                  toast.error('Please upload a PDF, JPEG, or PNG file.');
+                                const err = f && validateIdentityDocFile(f);
+                                if (err) {
+                                  toast.error(err);
                                   e.target.value = '';
                                   return;
                                 }
