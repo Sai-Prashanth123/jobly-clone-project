@@ -20,7 +20,13 @@ services:
     rootDir: backend
     # Mirrors the Dockerfile's build steps: deps -> prisma client -> tsc ->
     # copy the generated client next to the compiled output.
-    buildCommand: npm ci && npx prisma generate && npm run build && cp -r src/generated dist/
+    #
+    # `--include=dev` is required: NODE_ENV=production below makes plain
+    # `npm ci` skip devDependencies, which drops every @types/* package and
+    # fails the tsc build with "Could not find a declaration file for module
+    # 'express'". The Dockerfile dodged this by installing full deps in a
+    # separate builder stage before the production stage existed.
+    buildCommand: npm ci --include=dev && npx prisma generate && npm run build && cp -r src/generated dist/
     startCommand: node dist/server.js
     healthCheckPath: /health
     autoDeployTrigger: commit
@@ -59,8 +65,10 @@ services:
     envVars:
       # Baked in at build time. Includes the /api/v1 suffix — AuthContext.tsx
       # strips it back off for non-versioned routes.
+      # Render appended a suffix when creating the backend service, so this is
+      # jobly-backend-jeeh, not jobly-backend.
       - key: VITE_API_URL
-        value: https://jobly-backend.onrender.com/api/v1
+        value: https://jobly-backend-jeeh.onrender.com/api/v1
     routes:
       # SPA fallback. Without this every deep link (/portal/cases/:id,
       # /portal/login on refresh) returns 404 instead of the app shell.
