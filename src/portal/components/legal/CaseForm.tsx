@@ -7,8 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent } from '@/components/ui/card';
 import { toast } from 'sonner';
 import type { LegalCase, CaseType, CaseStatus } from '../../types';
-import { useEmployees, useCreateEmployee } from '../../hooks/useEmployees';
-import { getApiErrorMessage } from '../../lib/apiError';
+import { useEmployees } from '../../hooks/useEmployees';
 import { usePetitioners, useCreatePetitioner } from '../../hooks/useCases';
 import { UsDateInput } from '../shared/UsDateInput';
 
@@ -74,13 +73,6 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
   const { data: petitioners } = usePetitioners();
   const createPetitioner = useCreatePetitioner();
   const [newPetitionerName, setNewPetitionerName] = useState('');
-  // "Quick add candidate" — lets HR/admin open a case for someone who isn't an
-  // employee yet, without going through the full onboarding wizard. Creates a
-  // minimal, credential-free employee record (see useCreateEmployee's
-  // isCandidate flag) and uses its id as the case's employeeId. Non-null means
-  // this mode is active (mirrors the petitioner "+ New petitioner…" pattern).
-  const [newCandidate, setNewCandidate] = useState<{ firstName: string; lastName: string; email: string } | null>(null);
-  const createEmployee = useCreateEmployee();
 
   const seed = (src?: Partial<LegalCase>): CaseFormData => ({
     employeeId: src?.employeeId ?? defaultForm.employeeId,
@@ -112,13 +104,7 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
 
   const validate = (): Record<string, string> => {
     const errs: Record<string, string> = {};
-    if (newCandidate) {
-      if (!newCandidate.firstName.trim() || !newCandidate.lastName.trim() || !newCandidate.email.trim()) {
-        errs.employeeId = 'New candidate needs a first name, last name, and email';
-      }
-    } else if (!form.employeeId) {
-      errs.employeeId = 'Employee is required';
-    }
+    if (!form.employeeId) errs.employeeId = 'Employee is required';
     if (!form.caseType) errs.caseType = 'Case type is required';
     setErrors(errs);
     return errs;
@@ -131,21 +117,6 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
       toast.error(`Please fix: ${Object.values(errs).join(', ')}`);
       return;
     }
-    let employeeId = form.employeeId;
-    if (newCandidate) {
-      try {
-        const { employee } = await createEmployee.mutateAsync({
-          firstName: newCandidate.firstName.trim(),
-          lastName: newCandidate.lastName.trim(),
-          email: newCandidate.email.trim(),
-          isCandidate: true,
-        });
-        employeeId = employee.id;
-      } catch (err) {
-        toast.error(getApiErrorMessage(err).description);
-        return;
-      }
-    }
     let petitionerId = form.petitionerId;
     if (newPetitionerName.trim()) {
       try {
@@ -156,7 +127,7 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
         return;
       }
     }
-    onSubmit({ ...form, employeeId, petitionerId });
+    onSubmit({ ...form, petitionerId });
   };
 
   return (
@@ -165,19 +136,16 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
         <CardContent className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Employee *</Label>
-            <Select
-              value={newCandidate ? '__new_candidate__' : form.employeeId}
-              onValueChange={v => {
-                if (v === '__new_candidate__') { setNewCandidate({ firstName: '', lastName: '', email: '' }); set('employeeId', ''); }
-                else { setNewCandidate(null); set('employeeId', v); }
-              }}
-              disabled={isEdit}
-            >
+            {/* Existing employees only. The "+ Add new candidate…" inline
+                option was removed per HR: it created a bare employee record
+                with no portal login, so the person had no way to submit their
+                own details or documents and the profile looked broken. A case
+                is now always opened against someone already onboarded. */}
+            <Select value={form.employeeId} onValueChange={v => set('employeeId', v)} disabled={isEdit}>
               <SelectTrigger>
                 <SelectValue placeholder="Select employee" />
               </SelectTrigger>
               <SelectContent>
-                {!isEdit && <SelectItem value="__new_candidate__">+ Add new candidate…</SelectItem>}
                 {employees.map(e => (
                   <SelectItem key={e.id} value={e.id}>
                     {e.firstName} {e.lastName} {e.displayId ? `(${e.displayId})` : ''}
@@ -185,30 +153,6 @@ export function CaseForm({ initial, onSubmit, onCancel, isEdit = false, isPendin
                 ))}
               </SelectContent>
             </Select>
-            {newCandidate && (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mt-2">
-                <Input
-                  autoFocus
-                  value={newCandidate.firstName}
-                  onChange={e => setNewCandidate(prev => prev && { ...prev, firstName: e.target.value })}
-                  placeholder="First name"
-                />
-                <Input
-                  value={newCandidate.lastName}
-                  onChange={e => setNewCandidate(prev => prev && { ...prev, lastName: e.target.value })}
-                  placeholder="Last name"
-                />
-                <Input
-                  type="email"
-                  value={newCandidate.email}
-                  onChange={e => setNewCandidate(prev => prev && { ...prev, email: e.target.value })}
-                  placeholder="Email"
-                />
-                <p className="col-span-1 sm:col-span-3 text-[11px] text-muted-foreground">
-                  Creates a minimal employee record — no portal login or welcome email is sent until they're actually hired.
-                </p>
-              </div>
-            )}
             {errors.employeeId && <p className="text-xs text-red-500">{errors.employeeId}</p>}
           </div>
 

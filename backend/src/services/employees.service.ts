@@ -443,12 +443,17 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
 
   logActivity(actorId ?? null, 'created', 'employee', emp.id, emp.display_id ?? `${input.firstName} ${input.lastName}`);
 
-  // A candidate record (quick-added from the New Case form, before the person
-  // is actually hired) gets nothing beyond the bare row: no onboarding
+  // A candidate record gets nothing beyond the bare row: no onboarding
   // checklist, no portal login/welcome email, no HR "new hire" notification.
-  // All of that happens later, once they're actually hired, via the normal
-  // "Resend Credentials" action (which already handles an employee with no
-  // existing portal_users row — see resendCredentials below).
+  //
+  // NOTE: no UI currently sets isCandidate. The New Case form's inline
+  // "+ Add new candidate…" option was removed per HR — a record created this
+  // way has no portal login, so the person couldn't submit their own details
+  // or documents and the profile just looked broken. Kept here because
+  // EMP-0129 was created this way and because the behaviour is still correct
+  // if the flow is ever reinstated; anyone with no login can be invited via
+  // "Send Login & Onboarding Invite" on their profile (see resendCredentials,
+  // which handles an employee with no existing portal_users row).
   if (input.isCandidate) {
     return { ...serializeEmployee(emp) };
   }
