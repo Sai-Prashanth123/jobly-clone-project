@@ -8,6 +8,8 @@ export function mapEmployee(raw: any): Employee {
   return {
     id: raw.id,
     displayId: raw.display_id,
+    // Only GET /employees/:id supplies this; list responses omit it.
+    hasLogin: raw.has_login ?? undefined,
     firstName: raw.first_name ?? '',
     lastName: raw.last_name ?? '',
     email: raw.email,

@@ -244,6 +244,10 @@ export interface Employee {
   // checklist for a placeholder record created before the person is hired.
   // Never populated by mapEmployee — read-side responses don't carry it back.
   isCandidate?: boolean;
+  // Read-only, set by GET /employees/:id: whether this person has a portal
+  // login yet. Candidates quick-added from New Case have none until someone
+  // invites them, so they can't sign in to submit their own details/documents.
+  hasLogin?: boolean;
   firstName: string;
   lastName: string;
   email: string;

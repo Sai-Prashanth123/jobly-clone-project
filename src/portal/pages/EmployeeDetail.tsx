@@ -135,6 +135,13 @@ export default function EmployeeDetail() {
   const reportingManager = allEmployees.find(e => e.id === employee?.reportingManagerId);
   const canManage = user?.role === 'admin' || user?.role === 'hr';
 
+  // Candidates quick-added from the New Case form deliberately get no portal
+  // credentials (see createEmployee's isCandidate branch), so they can't sign
+  // in to submit their own details or upload documents until someone invites
+  // them. Undefined (e.g. a list response that omits the field) is treated as
+  // "already invited" so the wording never regresses for normal employees.
+  const neverInvited = employee.hasLogin === false;
+
   // 'inactive' is overloaded: it backs three distinct states distinguished by
   // the leave/termination columns. Disambiguate so the action bar + badges show
   // the right control (Return vs Re-hire vs plain Activate).
@@ -169,6 +176,20 @@ export default function EmployeeDetail() {
             <strong>{employee.firstName} re-submitted their onboarding just now.</strong> You're viewing the latest version — review it before approving or requesting changes.
           </p>
           <button type="button" onClick={() => setResubmittedBanner(false)} className="text-amber-700 hover:text-amber-900 text-xs font-medium flex-shrink-0">Dismiss</button>
+        </div>
+      )}
+      {/* Candidates quick-added from New Case have no portal login yet, so
+          their profile looks empty and they have no way to fill it in. Say so
+          explicitly — otherwise it just looks like missing data. */}
+      {neverInvited && (
+        <div role="status" className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 flex items-start gap-2 portal-animate-in">
+          <Mail className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
+          <p className="text-sm text-blue-800 flex-1">
+            <strong>{employee.firstName} hasn't been invited to the portal yet.</strong>{' '}
+            {canManage
+              ? 'They were added as a candidate, so no login was created and no welcome email was sent — which is why their personal details and documents are empty. Use "Send Login & Onboarding Invite" above to email them a login so they can complete their profile and upload documents themselves. You can also fill anything in for them via Edit.'
+              : 'They were added as a candidate, so no login was created yet — which is why their details and documents are empty. An admin or HR user can send them an invite.'}
+          </p>
         </div>
       )}
       <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-100 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
@@ -372,15 +393,21 @@ export default function EmployeeDetail() {
                 onClick={async () => {
                   try {
                     const r = await resendCreds.mutateAsync(employee.id);
+                    const recipients = [employee.email, employee.workEmail].filter(Boolean).join(' and ') || employee.email;
                     if (r.welcomeEmailSent) {
-                      toast.success(`Welcome email re-sent to ${[employee.email, employee.workEmail].filter(Boolean).join(' and ') || employee.email}. If not received, check spam/junk folder.`, { duration: 10000 });
+                      toast.success(
+                        neverInvited
+                          ? `Login details sent to ${recipients}. They can now sign in and complete their profile and documents.`
+                          : `Welcome email re-sent to ${recipients}. If not received, check spam/junk folder.`,
+                        { duration: 10000 },
+                      );
                     } else if (r.tempPassword) {
                       toast.warning(
                         `${r.warning ?? 'Email could not be delivered.'} Login: ${r.loginEmail} · Temp password: ${r.tempPassword}`,
                         { duration: 30000 },
                       );
                     } else {
-                      toast.error(r.warning ?? 'Resend failed.');
+                      toast.error(r.warning ?? (neverInvited ? 'Could not send the invite.' : 'Resend failed.'));
                     }
                   } catch {
                     /* failed-request toast raised centrally (queryClient.ts) */
@@ -388,7 +415,7 @@ export default function EmployeeDetail() {
                 }}
               >
                 <Mail className="h-4 w-4" />
-                Resend Welcome Email
+                {neverInvited ? 'Send Login & Onboarding Invite' : 'Resend Welcome Email'}
               </Button>
               <Button
                 variant="outline"

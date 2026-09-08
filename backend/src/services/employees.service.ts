@@ -137,10 +137,25 @@ export async function getEmployee(id: string) {
     .eq('entity_type', 'employee')
     .eq('entity_id', id);
 
+  // Does this person actually have a portal login yet? Candidates added via
+  // the New Case "quick add candidate" flow deliberately get no credentials
+  // (see createEmployee's isCandidate branch), so they cannot sign in to
+  // submit their own details or documents until someone invites them. The UI
+  // uses this to offer "Send Login & Onboarding Invite" instead of the
+  // meaningless "Resend Welcome Email" for those records.
+  // NOTE: portal_users!created_by in the select above is the person who
+  // CREATED the record, not this employee's own account — different thing.
+  const { data: loginRow } = await supabaseAdmin
+    .from('portal_users')
+    .select('id')
+    .eq('employee_id', id)
+    .maybeSingle();
+
   const docList = docs ?? [];
   const docTypes = new Set<string>(docList.map((d: any) => d.type));
   return {
     ...serializeEmployee(emp),
+    has_login: !!loginRow,
     documents: docList,
     onboarding: computeOnboarding(emp, docTypes),
   };
