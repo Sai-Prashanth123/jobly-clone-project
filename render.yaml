@@ -1,0 +1,69 @@
+# Render Blueprint — deploys both halves of the Jobly portal.
+# Replaces the Azure App Service (backend) + Azure Static Web Apps (frontend)
+# setup, which went down when the Azure student credit expired.
+#
+# The backend runs in VIRGINIA deliberately: the Supabase database lives in
+# us-east-1, and the old backend was in East Asia. That split put a ~300-700ms
+# Pacific round trip on every query — and `authenticate` alone makes two of
+# them on every request. Co-locating removes that entirely.
+#
+# Secrets use `sync: false`: Render prompts for them once in the dashboard and
+# they are never committed to this repo.
+
+services:
+  # ── Backend API (Express + TypeScript) ──────────────────────────────────
+  - type: web
+    name: jobly-backend
+    runtime: node
+    region: virginia
+    plan: free
+    rootDir: backend
+    # Mirrors the Dockerfile's build steps: deps -> prisma client -> tsc ->
+    # copy the generated client next to the compiled output.
+    buildCommand: npm ci && npx prisma generate && npm run build && cp -r src/generated dist/
+    startCommand: node dist/server.js
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: SUPABASE_URL
+        value: https://ufkrfrmqangydrjbzljo.supabase.co
+      # Modern publishable key. The project's legacy `anon` key is DISABLED,
+      # so that one must not be used here.
+      - key: SUPABASE_ANON_KEY
+        value: sb_publishable_X4GwoSK7833d_3PeldVLuQ_nA9i6pME
+      # Prompted in the dashboard on first deploy — never stored in git.
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      # Optional: outbound mail (welcome letters, credentials). The app runs
+      # fine without these; only email sending fails.
+      - key: GMAIL_USER
+        sync: false
+      - key: GMAIL_APP_PASSWORD
+        sync: false
+      # Drives the CORS allow-list in backend/src/app.ts. Must be the exact
+      # origin of the static site below, including scheme.
+      - key: FRONTEND_URL
+        value: https://jobly-portal.onrender.com
+    # PORT is intentionally NOT set — Render injects it and src/config/env.ts
+    # reads it. Hardcoding it here would break the health check.
+
+  # ── Frontend (Vite React SPA, served from the CDN) ──────────────────────
+  - type: web
+    name: jobly-portal
+    runtime: static
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    autoDeployTrigger: commit
+    envVars:
+      # Baked in at build time. Includes the /api/v1 suffix — AuthContext.tsx
+      # strips it back off for non-versioned routes.
+      - key: VITE_API_URL
+        value: https://jobly-backend.onrender.com/api/v1
+    routes:
+      # SPA fallback. Without this every deep link (/portal/cases/:id,
+      # /portal/login on refresh) returns 404 instead of the app shell.
+      - type: rewrite
+        source: /*
+        destination: /index.html
