@@ -118,6 +118,25 @@ Parameters:
       Lambda - the process is frozen between invocations, so the timer never
       fires.
 
+  MailFrom:
+    Type: String
+    Default: ''
+    Description: >
+      Sender address for outbound email, e.g. "Jobly Portal
+      <no-reply@joblysolutions.com>". Its domain (or the exact address) must
+      be a verified SES identity. Leave blank to keep email disabled - the
+      app then skips every send rather than erroring, which is the behaviour
+      it has had since the Azure transport was decommissioned.
+
+  MailDriver:
+    Type: String
+    Default: none
+    AllowedValues: [none, ses]
+    Description: >
+      'ses' enables outbound email through Amazon SES. 'none' (default)
+      leaves it disabled. Both this and MailFrom must be set before anything
+      is sent.
+
   EnableNatGateway:
     Type: String
     Default: 'true'
@@ -837,6 +856,16 @@ Resources:
                 Resource: !GetAtt UserPool.Arn
         # Documents. No s3:DeleteObjectVersion: the app removes objects, and
         # version history is the safety net if it removes the wrong one.
+        # Send-only, and only as an identity in this account. No
+        # ses:CreateEmailIdentity and no ses:DeleteEmailIdentity - the backend
+        # must not be able to add a sender for itself.
+        - PolicyName: ses-send
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [ses:SendEmail, ses:SendRawEmail]
+                Resource: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*'
         - PolicyName: documents-bucket
           PolicyDocument:
             Version: '2012-10-17'
@@ -914,6 +943,11 @@ Resources:
           # Documents move to S3. This is the last Supabase dependency to go.
           STORAGE_DRIVER: s3
           DOCUMENTS_BUCKET: !Ref DocumentsBucket
+          # Outbound email. Inert until BOTH are set - the app skips every
+          # send rather than erroring, exactly as it has since the Azure
+          # transport went away.
+          MAIL_DRIVER: !Ref MailDriver
+          MAIL_FROM: !Ref MailFrom
           # Persisted into employees.profile_photo_url, so it must stay stable
           # across deploys - hence the distribution domain, not a signed URL.
           PUBLIC_ASSET_BASE_URL: !If

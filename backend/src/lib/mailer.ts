@@ -1,4 +1,5 @@
-import { EmailClient, KnownEmailSendStatus, type EmailMessage } from '@azure/communication-email';
+import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import MailComposer from 'nodemailer/lib/mail-composer';
 import { formatDateSafe, formatDateUS } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
 
@@ -74,27 +75,30 @@ function emailShell(opts: {
 </html>`;
 }
 
-// ── Azure Communication Services Email transport ──────────────────────────────
-// Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.
-// ACS_SENDER_ADDRESS is pre-configured to the Azure-managed domain provisioned
-// during setup; override with ACS_SENDER_ADDRESS env var if domain changes.
-const ACS_CONNECTION_STRING = process.env.AZURE_COMM_CONNECTION_STRING?.trim();
-const ACS_SENDER = (process.env.ACS_SENDER_ADDRESS?.trim())
-  || 'DoNotReply@1dab9ceb-3c53-4e33-a4b1-c00cedde4e29.azurecomm.net';
+// ── Amazon SES email transport ───────────────────────────────────────────────
+// Amazon SES. The previous transport was Azure Communication Services, which
+// went away with the Azure deployment - since then every send here has been a
+// silent no-op, because mailerConfigured was false and all 23 call sites are
+// guarded by it.
+//
+// MAIL_DRIVER defaults to 'none' so that stays the behaviour until a sender is
+// verified: no configuration, no sending, no errors. Set MAIL_DRIVER=ses and
+// MAIL_FROM to switch it on.
+const MAIL_DRIVER = (process.env.MAIL_DRIVER ?? 'none').trim().toLowerCase();
+const MAIL_FROM = process.env.MAIL_FROM?.trim() || '';
 
-export const mailerConfigured = !!ACS_CONNECTION_STRING;
+// SES refuses any address whose domain or identity is not verified, so an
+// unset MAIL_FROM has to count as "not configured" rather than fail per-send.
+export const mailerConfigured = MAIL_DRIVER === 'ses' && !!MAIL_FROM;
 
-let _acsClient: EmailClient | null = null;
-function getAcsClient(): EmailClient {
-  if (!_acsClient) {
-    if (!ACS_CONNECTION_STRING) throw new Error('AZURE_COMM_CONNECTION_STRING is not configured. Set it in Azure App Settings.');
-    _acsClient = new EmailClient(ACS_CONNECTION_STRING);
-  }
-  return _acsClient;
+let _ses: SESv2Client | null = null;
+function getSes(): SESv2Client {
+  if (!_ses) _ses = new SESv2Client({ region: process.env.AWS_REGION ?? 'us-east-1' });
+  return _ses;
 }
 
-function toAcsRecipients(to: string | string[]): { address: string }[] {
-  return (Array.isArray(to) ? to : [to]).map(a => ({ address: a.trim() })).filter(r => r.address);
+function toList(to: string | string[]): string[] {
+  return (Array.isArray(to) ? to : [to]).map(a => a.trim()).filter(Boolean);
 }
 
 // Nodemailer-compatible send interface so all callers keep the same signature.
@@ -115,57 +119,88 @@ interface MailOptions {
   }>;
 }
 
+/**
+ * Build the full MIME message with nodemailer's composer and hand SES the raw
+ * bytes.
+ *
+ * SES's "Simple" content shape cannot carry attachments, and this app emails
+ * invoice and timesheet PDFs, so raw MIME is the only option that covers every
+ * caller. Composing it by hand would mean hand-rolling multipart boundaries
+ * and base64 chunking; nodemailer is already a dependency and does it
+ * correctly.
+ */
+async function buildRawMessage(mail: MailOptions): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    new MailComposer({
+      from: mail.from ?? MAIL_FROM,
+      to: toList(mail.to),
+      subject: mail.subject,
+      html: mail.html,
+      text: mail.text,
+      replyTo: mail.replyTo,
+      // cid (inline) attachments are dropped, matching the previous transport:
+      // the templates embed images by URL, not by content id.
+      attachments: (mail.attachments ?? [])
+        .filter(a => !a.cid && a.content)
+        .map(a => ({
+          filename: a.filename,
+          content: a.content,
+          contentType: a.contentType,
+        })),
+    }).compile().build((err, message) => (err ? reject(err) : resolve(message)));
+  });
+}
+
 async function sendWithRetry(mail: MailOptions): Promise<void> {
-  if (!ACS_CONNECTION_STRING) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+  if (!mailerConfigured) {
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
-  const client = getAcsClient();
-  const acsAttachments = (mail.attachments ?? [])
-    .filter(a => !a.cid && a.content)
-    .map(a => ({
-      name: a.filename,
-      contentType: a.contentType ?? 'application/octet-stream',
-      contentInBase64: a.content!.toString('base64'),
-    }));
 
-  // Build content with at least one body field (ACS requires html or plainText).
-  const rawContent = { subject: mail.subject, html: mail.html, plainText: mail.text };
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content = rawContent as any as EmailMessage['content'];
-
-  const message: EmailMessage = {
-    senderAddress: ACS_SENDER,
-    recipients: { to: toAcsRecipients(mail.to) },
-    content,
-    replyTo: mail.replyTo ? [{ address: mail.replyTo }] : undefined,
-    attachments: acsAttachments.length ? acsAttachments : undefined,
-  };
+  const recipients = toList(mail.to);
+  if (recipients.length === 0) {
+    console.warn(`[mailer] skipped "${mail.subject}" — no recipients`);
+    return;
+  }
 
   try {
-    const poller = await client.beginSend(message);
-    const result = await poller.pollUntilDone();
-    if (result.status !== KnownEmailSendStatus.Succeeded) {
-      throw new Error(`Azure email send failed: ${result.error?.message ?? result.status}`);
-    }
+    const raw = await buildRawMessage(mail);
+    await getSes().send(new SendEmailCommand({
+      // Redundant with the MIME From header, but SES checks this against the
+      // verified identity, so a mismatch fails loudly rather than silently
+      // sending as the wrong sender.
+      FromEmailAddress: mail.from ?? MAIL_FROM,
+      Destination: { ToAddresses: recipients },
+      Content: { Raw: { Data: raw } },
+    }));
     console.log(`[mailer] ✓ Email sent to ${JSON.stringify(mail.to)} subject="${mail.subject}"`);
   } catch (err: any) {
-    console.error(`[mailer] ✗ Email to ${JSON.stringify(mail.to)} failed: ${err?.message ?? err}`);
+    // MessageRejected with "Email address is not verified" is the expected
+    // failure while SES is still in the sandbox - call it out rather than let
+    // it read as a generic send failure.
+    const msg = err?.message ?? String(err);
+    const hint = /not verified/i.test(msg)
+      ? ' (SES sandbox: the recipient must be a verified identity until production access is granted)'
+      : '';
+    console.error(`[mailer] ✗ Email to ${JSON.stringify(mail.to)} failed: ${msg}${hint}`);
     throw err;
   }
 }
 
-const FROM = ACS_SENDER;
-const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
+const FROM = MAIL_FROM;
+const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://dudsz4n8290kv.cloudfront.net';
 // Always the live USCIS-hosted PDF — never store/attach a static copy, so it
 // can never go stale when USCIS updates the form.
 const I9_USCIS_URL = 'https://www.uscis.gov/sites/default/files/document/forms/i-9.pdf';
 
 export async function verifyMailer(): Promise<void> {
   if (!mailerConfigured) {
-    console.warn('[mailer] AZURE_COMM_CONNECTION_STRING not set — email is disabled. Add it to Azure App Settings.');
+    console.warn(
+      `[mailer] email is disabled (MAIL_DRIVER=${MAIL_DRIVER}${MAIL_FROM ? '' : ', MAIL_FROM unset'})` +
+      ' — set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.',
+    );
     return;
   }
-  console.log(`[mailer] ✓ Azure Communication Email configured; sending as "${ACS_SENDER}"`);
+  console.log(`[mailer] ✓ Amazon SES configured; sending as "${MAIL_FROM}"`);
 }
 
 export interface WelcomeEmailPayload {
@@ -289,7 +324,7 @@ ${showCreds ? `
   });
 
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   await sendWithRetry({
     from: FROM,
@@ -335,7 +370,7 @@ export interface InvoiceEmailPayload {
 
 export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   const logoDataUri = `data:image/png;base64,${getJoblyLogoBuffer().toString('base64')}`;
   const {
@@ -531,7 +566,7 @@ export interface CustomEmailPayload { to: string | string[]; subject: string; ht
 // Send a fully-rendered custom email (used by the bulk client mailer).
 export async function sendCustomEmail(payload: CustomEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   await sendWithRetry({ from: FROM, to: payload.to, subject: payload.subject, html: payload.html });
 }
@@ -550,7 +585,7 @@ export interface ContactFormPayload {
 
 export async function sendContactEmail(p: ContactFormPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   const contactBody = `
 <p style="margin:0 0 20px;font-size:13px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#8b9fc9;">Sender Details</p>
@@ -588,7 +623,7 @@ export async function sendInvoiceReminderEmail(payload: {
   to: string; contactName: string; invoiceNumber: string; dueDate: string;
   balanceDue: number; currency?: string; tone: 'upcoming' | 'due' | 'overdue'; viewUrl?: string;
 }): Promise<void> {
-  if (!mailerConfigured) throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+  if (!mailerConfigured) throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   const fmt = (n: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: payload.currency || 'USD' }).format(n);
   const fmtDate = (s: string) => formatDateSafe(s, { long: true }) || s;
   const headline = payload.tone === 'overdue'
@@ -666,7 +701,7 @@ export interface MonthlyTimesheetEmailPayload {
 
 export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   const {
     to, employeeName, employeeDisplayId, department, monthLabel,
@@ -779,7 +814,7 @@ export interface OnboardingCompletedEmailPayload {
 // employee stays in 'onboarding' until HR opens their profile and approves.
 export async function sendOnboardingCompletedEmail(payload: OnboardingCompletedEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   const { to, employeeName, displayId, department, jobTitle, completedAt, detailUrl } = payload;
   const when = formatDateSafe(completedAt, { long: true }) || completedAt;
@@ -858,7 +893,7 @@ export async function sendOnboardingChangesRequestedEmail(
   payload: OnboardingChangesRequestedEmailPayload,
 ): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   const { to, employeeName, displayId, message, portalUrl } = payload;
   const link = portalUrl || `${PORTAL_URL}/portal/onboarding/pending`;
@@ -924,7 +959,7 @@ export interface DocumentRequestEmailPayload {
 // employee to upload/provide something outside the onboarding flow.
 export async function sendDocumentRequestEmail(payload: DocumentRequestEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   const { to, employeeName, displayId, message, portalUrl } = payload;
   const link = portalUrl || `${PORTAL_URL}/portal/profile`;
@@ -1048,7 +1083,7 @@ export interface PerformanceReviewEmailPayload {
 
 export async function sendPerformanceReviewEmail(payload: PerformanceReviewEmailPayload): Promise<void> {
   if (!mailerConfigured) {
-    throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
   const { to, employeeName, displayId, periodStart, periodEnd, pdfBuffer, pdfFileName } = payload;
   const period = `${formatDateUS(periodStart)} to ${formatDateUS(periodEnd)}`;
