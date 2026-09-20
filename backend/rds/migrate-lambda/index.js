@@ -141,6 +141,93 @@ exports.handler = async (event = {}) => {
       return { ok: true, rows: r.rows };
     }
 
+    // Run arbitrary statements in one transaction.
+    //
+    // This is an administrative escape hatch, and it is the reason this whole
+    // function should be deleted once the migration is signed off: RDS has no
+    // inbound route from outside the VPC, so this Lambda is the only way to
+    // reach the database at all - which also makes it the only thing that
+    // could reach the database if its invoke permission were ever abused.
+    if (event.exec) {
+      const stmts = Array.isArray(event.exec) ? event.exec : [event.exec];
+      const done = [];
+      await client.query('BEGIN');
+      try {
+        for (const s of stmts) {
+          const r = await client.query(s);
+          done.push({ rows: r.rowCount, command: r.command });
+        }
+      } catch (err) {
+        await client.query('ROLLBACK');
+        return { ok: false, error: err.message, completed: done.length, of: stmts.length };
+      }
+      await client.query('COMMIT');
+      return { ok: true, results: done };
+    }
+
+    // Load the production data dump.
+    //
+    // session_replication_role = replica is what makes this possible at all.
+    // pg_dump warned that employees carries circular foreign keys, so no
+    // insert order satisfies every constraint; 'replica' suspends FK checks
+    // for the session. It also suspends the 29 user triggers, which matters
+    // just as much: update_updated_at would otherwise stamp every row with
+    // the load time and destroy the real audit timestamps.
+    if (event.loadData) {
+      // pg_dump 18 emits \restrict / \unrestrict around the dump. Those are
+      // psql meta-commands, not SQL, so node-postgres rejects them. Stripped
+      // here rather than in the file so data.sql stays a pristine pg_dump.
+      const sql = fs
+        .readFileSync(__dirname + '/data.sql', 'utf8')
+        .replace(/^\\(un)?restrict .*$/gm, '');
+      const statements = splitStatements(sql);
+
+      await client.query('BEGIN');
+      await client.query("SET LOCAL session_replication_role = 'replica'");
+
+      // Re-runnable: clear whatever is there first. Built from the catalog so
+      // a new table can never be silently left behind holding stale rows.
+      const tbl = await client.query(
+        `SELECT string_agg(format('%I.%I', schemaname, tablename), ', ') AS list
+           FROM pg_tables WHERE schemaname = 'public'`
+      );
+      if (tbl.rows[0].list) {
+        await client.query(`TRUNCATE TABLE ${tbl.rows[0].list} CASCADE`);
+      }
+
+      // No per-statement savepoints here, unlike the schema load: a data load
+      // is all-or-nothing, and 5.5k savepoints would triple the round trips.
+      let n = 0;
+      try {
+        for (const stmt of statements) {
+          await client.query(stmt);
+          n++;
+        }
+      } catch (err) {
+        await client.query('ROLLBACK');
+        return {
+          ok: false,
+          failedAt: n + 1,
+          of: statements.length,
+          error: err.message,
+          statement: statements[n] ? statements[n].slice(0, 200).replace(/\s+/g, ' ') : null,
+        };
+      }
+
+      if (event.dryRun) {
+        await client.query('ROLLBACK');
+        return { ok: true, mode: 'dryRun', statements: statements.length };
+      }
+      await client.query('COMMIT');
+
+      const counts = await client.query(
+        `SELECT c.relname AS tbl, c.reltuples::bigint AS est
+           FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+          WHERE n.nspname = 'public' AND c.relkind = 'r'`
+      );
+      return { ok: true, statements: statements.length, tables: counts.rowCount };
+    }
+
     // Run several SELECTs in one invocation and report each outcome. Used to
     // validate generated SQL against the real schema without a round trip per
     // statement. SELECT-only, same as `select`.

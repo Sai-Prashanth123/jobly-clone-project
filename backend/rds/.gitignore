@@ -13,3 +13,7 @@ migrate-lambda/schema.sql
 
 # Lambda invoke payloads/responses
 *-out.json
+
+# Intermediate pg_dump of production row data, and the Lambda's build copy.
+live-data.sql
+migrate-lambda/data.sql

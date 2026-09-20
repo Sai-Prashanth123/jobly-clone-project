@@ -118,7 +118,25 @@ Parameters:
       Lambda - the process is frozen between invocations, so the timer never
       fires.
 
+  EnableNatGateway:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Give the private subnets outbound internet access. Required while the
+      backend still calls Supabase Auth (login), Supabase Storage (documents)
+      and an SMTP provider - all public-internet services. Costs roughly
+      $32/month plus data. Set to 'false' once Auth, Storage and mail have
+      moved to Cognito, S3 and SES, which are all reachable over VPC
+      endpoints.
+
+  PublicSubnetCidr:
+    Type: String
+    Default: 10.0.10.0/24
+    Description: Subnet holding only the NAT gateway. No app resource lives here.
+
 Conditions:
+  NatEnabled: !Equals [!Ref EnableNatGateway, 'true']
   UseCognitoAuthorizer: !Equals [!Ref ApiAuthMode, cognito]
   SchedulerEnabled: !Equals [!Ref EnableScheduler, 'true']
   HasFrontendUrl: !Not [!Equals [!Ref FrontendUrl, '']]
@@ -186,6 +204,105 @@ Resources:
     Properties:
       SubnetId: !Ref PrivateSubnetB
       RouteTableId: !Ref PrivateRouteTable
+
+  # --------------------------------------------------------------------
+  # Outbound internet access.
+  #
+  # The backend still depends on three services that live on the public
+  # internet: Supabase Auth (every login), Supabase Storage (every document
+  # download) and the SMTP provider. With no route to 0.0.0.0/0 those calls
+  # do not fail fast - they hang until the socket times out, which is why a
+  # login returned "fetch failed" after 14 seconds rather than an error.
+  #
+  # This becomes removable once Auth moves to Cognito, Storage to S3 and mail
+  # to SES: all three are reachable over VPC endpoints, and the stack can go
+  # back to having no internet egress at all. Until then it is load-bearing.
+  # --------------------------------------------------------------------
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Condition: NatEnabled
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-igw'
+
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Condition: NatEnabled
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # Holds the NAT gateway only. No application resource is ever placed here,
+  # so nothing of ours is directly addressable from the internet.
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Condition: NatEnabled
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PublicSubnetCidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-public-a'
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Condition: NatEnabled
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-public-rt'
+
+  PublicDefaultRoute:
+    Type: AWS::EC2::Route
+    Condition: NatEnabled
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnetRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: NatEnabled
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+  NatEip:
+    Type: AWS::EC2::EIP
+    Condition: NatEnabled
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-nat-eip'
+
+  # Single NAT, single AZ. Deliberate: two would double the hourly cost for
+  # redundancy the rest of this stack does not have (the RDS instance is
+  # also single-AZ). Worth revisiting together, not separately.
+  NatGateway:
+    Type: AWS::EC2::NatGateway
+    Condition: NatEnabled
+    Properties:
+      AllocationId: !GetAtt NatEip.AllocationId
+      SubnetId: !Ref PublicSubnet
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-nat'
+
+  PrivateDefaultRoute:
+    Type: AWS::EC2::Route
+    Condition: NatEnabled
+    Properties:
+      RouteTableId: !Ref PrivateRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGateway
 
   LambdaSecurityGroup:
     Type: AWS::EC2::SecurityGroup
@@ -366,6 +483,32 @@ Resources:
       DestinationSecurityGroupId: !Ref DbProxySecurityGroup
       Description: Postgres to RDS Proxy
 
+  # A NAT gateway alone is not enough - this security group only allowed
+  # egress to specific groups, so internet-bound packets were dropped before
+  # they ever reached the route table. Scoped to the two ports the backend
+  # actually needs outbound, not "all traffic".
+  LambdaEgressHttps:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: NatEnabled
+    Properties:
+      GroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      CidrIp: 0.0.0.0/0
+      Description: HTTPS to Supabase Auth and Storage
+
+  LambdaEgressSmtp:
+    Type: AWS::EC2::SecurityGroupEgress
+    Condition: NatEnabled
+    Properties:
+      GroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 587
+      ToPort: 587
+      CidrIp: 0.0.0.0/0
+      Description: SMTP submission (STARTTLS) to the mail provider
+
   # ----------------------------------------------------------------------
   # Database
   # ----------------------------------------------------------------------
@@ -418,6 +561,24 @@ Resources:
         # '/', '@', '"', ' ' and '\' break libpq connection strings and URL
         # forms; excluding them keeps the secret usable in every context.
         ExcludeCharacters: '/@" \'
+
+  # Shared secret proving a request actually came through CloudFront.
+  #
+  # The API Gateway default endpoint is public and cannot be given a resource
+  # policy (HTTP APIs do not support them), so every WAF rule in this stack -
+  # rate limiting, the managed rule sets, IP reputation - was bypassable by
+  # calling the execute-api URL directly. CloudFront injects this header on
+  # the origin request and the backend rejects anything without it.
+  OriginVerifySecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ProjectName}/api/origin-verify'
+      Description: Shared secret that proves a request traversed CloudFront
+      GenerateSecretString:
+        SecretStringTemplate: '{"header":"x-origin-verify"}'
+        GenerateStringKey: value
+        PasswordLength: 48
+        ExcludePunctuation: true
 
   DbProxyRole:
     Type: AWS::IAM::Role
@@ -630,6 +791,9 @@ Resources:
           # Deliberately 'false': node-cron cannot work on Lambda. The daily
           # tick arrives from EventBridge instead (see DailyTickRule).
           ENABLE_SCHEDULER: 'false'
+          # Requests must carry this header, which only CloudFront adds.
+          # Without it the execute-api URL is a way around every WAF rule.
+          ORIGIN_VERIFY_SECRET: !Sub '{{resolve:secretsmanager:${OriginVerifySecret}:SecretString:value}}'
       VpcConfig:
         SecurityGroupIds: [!Ref LambdaSecurityGroup]
         SubnetIds:
@@ -949,6 +1113,52 @@ Resources:
   # CloudFront
   # ----------------------------------------------------------------------
 
+  SiteHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: !Sub '${ProjectName}-site-headers'
+        Comment: Security headers for the SPA shell served from S3
+        SecurityHeadersConfig:
+          StrictTransportSecurity:
+            # Two years, subdomains included. Not preloaded: preload is
+            # effectively irreversible, and this stack may yet move domains.
+            AccessControlMaxAgeSec: 63072000
+            IncludeSubdomains: true
+            Preload: false
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+          XSSProtection:
+            # 0, deliberately: the legacy XSS auditor is deprecated and its
+            # filter introduced its own vulnerabilities. CSP does this job.
+            Protection: false
+            ModeBlock: false
+            Override: true
+          ContentSecurityPolicy:
+            # connect-src must include Supabase: the SPA talks to Supabase
+            # Auth directly for session refresh. 'unsafe-inline' on styles is
+            # required by the Tailwind/Radix runtime style injection.
+            ContentSecurityPolicy: >-
+              default-src 'self';
+              base-uri 'self';
+              object-src 'none';
+              frame-ancestors 'none';
+              img-src 'self' data: blob: https:;
+              font-src 'self' data: https:;
+              style-src 'self' 'unsafe-inline' https:;
+              script-src 'self';
+              connect-src 'self' https://*.supabase.co;
+              form-action 'self';
+              upgrade-insecure-requests
+            Override: true
+
   SiteOriginAccessControl:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
@@ -991,6 +1201,12 @@ Resources:
             CustomOriginConfig:
               OriginProtocolPolicy: https-only
               OriginSSLProtocols: [TLSv1.2]
+            # Only CloudFront knows this value, so the backend can tell a
+            # request that came through the CDN (and therefore through WAF)
+            # from one aimed straight at the execute-api URL.
+            OriginCustomHeaders:
+              - HeaderName: x-origin-verify
+                HeaderValue: !Sub '{{resolve:secretsmanager:${OriginVerifySecret}:SecretString:value}}'
 
         # Single-page app: any path that is not a real file must return
         # index.html so React Router can resolve the route in the browser.
@@ -1010,6 +1226,11 @@ Resources:
         DefaultCacheBehavior:
           TargetOriginId: s3-site
           ViewerProtocolPolicy: redirect-to-https
+          # helmet sets these on API responses, but the SPA shell is served
+          # straight from S3 and never touches Express - so without this the
+          # HTML document itself had no HSTS, no framing protection and no
+          # nosniff.
+          ResponseHeadersPolicyId: !Ref SiteHeadersPolicy
           # Static assets are read-only; no write methods reach the bucket.
           AllowedMethods: [GET, HEAD, OPTIONS]
           CachedMethods: [GET, HEAD, OPTIONS]

@@ -8,6 +8,7 @@ import { supabaseAdmin } from './config/supabase';
 import { apiLimiter } from './middleware/rateLimiter';
 import { errorHandler } from './middleware/errorHandler';
 import { requestId } from './middleware/requestId';
+import { originVerify } from './middleware/originVerify';
 import { router } from './routes';
 
 const app = express();
@@ -43,6 +44,11 @@ if (env.NODE_ENV !== 'test') {
 
 // Rate limiting
 app.use('/api', apiLimiter);
+
+// Only CloudFront-originated traffic may reach the API. Scoped to /api so
+// /health stays reachable directly for uptime checks, which carry no data and
+// no credentials. No-op unless ORIGIN_VERIFY_SECRET is set.
+app.use('/api', originVerify);
 
 // Health check
 app.get('/health', async (_req, res) => {

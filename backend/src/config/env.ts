@@ -23,6 +23,9 @@ const EnvSchema = z.object({
   DB_PASSWORD: z.string().optional(),
   DB_SSL: z.enum(['require', 'disable']).optional(),
   DB_POOL_MAX: z.string().optional(),
+  // Shared secret proving a request arrived via CloudFront. Unset locally and
+  // on Render, where the origin-verify check is inactive.
+  ORIGIN_VERIFY_SECRET: z.string().optional(),
   FRONTEND_URL: z.string().default('http://localhost:8080'),
   // Email transport. Preferred: a transactional SMTP provider (Brevo/SendGrid)
   // — no Gmail App Password, better deliverability to Gmail/Outlook.
