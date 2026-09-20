@@ -18,16 +18,18 @@ process.on('uncaughtException', (err) => {
 });
 
 async function startServer(): Promise<void> {
-  // Test Supabase connection
+  // Test the database connection.
+  // Selects 'id', not 'count': 'count' worked only as a PostgREST aggregate
+  // quirk and is not a real column, so it errors against plain SQL.
   try {
-    const { error } = await supabaseAdmin.from('portal_users').select('count').limit(1);
-    if (error && error.code !== 'PGRST116') {
-      console.warn('⚠️  Supabase connection warning:', error.message);
+    const { error } = await supabaseAdmin.from('portal_users').select('id').limit(1);
+    if (error) {
+      console.warn(`⚠️  Database connection warning (${env.DB_DRIVER}):`, error.message);
     } else {
-      console.log('✅ Supabase connected successfully');
+      console.log(`✅ Database connected successfully (driver: ${env.DB_DRIVER})`);
     }
   } catch (err) {
-    console.error('❌ Failed to connect to Supabase:', err);
+    console.error('❌ Failed to connect to the database:', err);
     process.exit(1);
   }
 

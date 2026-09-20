@@ -70,7 +70,58 @@ Parameters:
     Default: ''
     Description: Optional. ACM certificate in us-east-1 covering DomainName.
 
+  ApiAuthMode:
+    Type: String
+    Default: cognito
+    AllowedValues: [cognito, application]
+    Description: >
+      Who authenticates API calls. 'cognito' puts an API Gateway JWT
+      authorizer in front of every route. 'application' removes it and relies
+      on the Express authenticate middleware instead, which is how the app
+      works on Render today. Use 'application' until the Supabase Auth ->
+      Cognito migration lands: a Cognito authorizer rejects the Supabase
+      tokens the frontend currently sends, so every request 401s.
+
+  SupabaseUrl:
+    Type: String
+    Default: ''
+    Description: >
+      Supabase project URL. Still required after the database moves to RDS,
+      because Storage (documents) and Auth are separate migration phases.
+
+  SupabaseServiceRoleKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Supabase service-role key, for Storage and Auth only.
+
+  SupabaseAnonKey:
+    Type: String
+    Default: ''
+    NoEcho: true
+    Description: Supabase anon key, for Auth only.
+
+  FrontendUrl:
+    Type: String
+    Default: ''
+    Description: >
+      Origin allowed by CORS. Leave blank to use the CloudFront distribution
+      domain, which is what the SPA is served from.
+
+  EnableScheduler:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Run the daily tick (invoice reminders, expiry alerts, leave-return
+      reactivation) from an EventBridge rule. node-cron cannot do this on
+      Lambda - the process is frozen between invocations, so the timer never
+      fires.
+
 Conditions:
+  UseCognitoAuthorizer: !Equals [!Ref ApiAuthMode, cognito]
+  SchedulerEnabled: !Equals [!Ref EnableScheduler, 'true']
+  HasFrontendUrl: !Not [!Equals [!Ref FrontendUrl, '']]
   HasDomain: !And
     - !Not [!Equals [!Ref DomainName, '']]
     - !Not [!Equals [!Ref AcmCertificateArn, '']]
@@ -530,10 +581,15 @@ Resources:
     Properties:
       FunctionName: !Sub '${ProjectName}-backend'
       Runtime: nodejs22.x
-      Handler: index.handler
+      # dist/lambda.js wraps the same Express app server.ts serves locally.
+      Handler: dist/lambda.handler
       Role: !GetAtt BackendRole.Arn
-      Timeout: 15
-      MemorySize: 512
+      # API Gateway HTTP API caps an integration at 30s, so there is no point
+      # going higher. 15s was tight for PDF/XLSX generation.
+      Timeout: 29
+      # pdfkit and xlsx are memory-hungry, and Lambda scales CPU with memory -
+      # 512MB made exports slow as much as it made them fragile.
+      MemorySize: 1024
       # ReservedConcurrentExecutions: 20
       # Disabled: this AWS account is new, so its Lambda concurrency limit is
       # still the default 10 (not 1000). Reserving 20 fails with
@@ -544,6 +600,11 @@ Resources:
       # stack currently shares between the SSR and backend functions.
       Environment:
         Variables:
+          NODE_ENV: production
+          PORT: '3001'
+          # Table reads/writes go to RDS; Storage and Auth still go to
+          # Supabase until those phases land.
+          DB_DRIVER: postgres
           # The proxy endpoint, not the instance endpoint - pointing at the
           # instance would bypass the pool and reintroduce the per-invocation
           # connection storm the proxy exists to prevent.
@@ -551,40 +612,50 @@ Resources:
           DB_PORT: !GetAtt Database.Endpoint.Port
           DB_NAME: !Ref DbName
           DB_USER: app_user
-          DB_SECRET_ARN: !Ref AppUserSecret
+          # Resolved by CloudFormation at deploy time, so the password is
+          # never in the template, the repo or a shell history. Note this is
+          # a deploy-time read: rotating the secret needs a stack update to
+          # take effect.
+          DB_PASSWORD: !Sub '{{resolve:secretsmanager:${AppUserSecret}:SecretString:password}}'
+          # One Lambda container serves one request at a time, and RDS Proxy
+          # is doing the real pooling, so a large local pool buys nothing.
+          DB_POOL_MAX: '2'
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_SERVICE_ROLE_KEY: !Ref SupabaseServiceRoleKey
+          SUPABASE_ANON_KEY: !Ref SupabaseAnonKey
+          FRONTEND_URL: !If
+            - HasFrontendUrl
+            - !Ref FrontendUrl
+            - !Sub 'https://${Distribution.DomainName}'
+          # Deliberately 'false': node-cron cannot work on Lambda. The daily
+          # tick arrives from EventBridge instead (see DailyTickRule).
+          ENABLE_SCHEDULER: 'false'
       VpcConfig:
         SecurityGroupIds: [!Ref LambdaSecurityGroup]
         SubnetIds:
           - !Ref PrivateSubnetA
           - !Ref PrivateSubnetB
+      # Placeholder only. The real package is ~23MB (Express app + production
+      # node_modules), far past the 4KB inline ZipFile limit, so it is pushed
+      # separately and CloudFormation never sees it:
+      #
+      #   cd backend && npm run package:lambda
+      #   aws lambda update-function-code --function-name <project>-backend \
+      #       --zip-file fileb://lambda.zip
+      #
+      # Note the Handler above points at dist/lambda.handler, which this
+      # placeholder does not provide - the function only works once the real
+      # package is pushed.
       Code:
         ZipFile: |
-          // Sample backend. Replace with your real handler.
-          // To talk to Postgres: bundle the 'pg' package and use
-          // RDS IAM auth via @aws-sdk/rds-signer (no password in code).
-          exports.handler = async (event) => {
-            const claims =
-              event.requestContext?.authorizer?.jwt?.claims ?? null;
-
-            const body = {
-              ok: true,
-              path: event.rawPath,
-              method: event.requestContext?.http?.method,
-              user: claims ? { sub: claims.sub, email: claims.email } : null,
-              db: {
-                host: process.env.DB_HOST,
-                name: process.env.DB_NAME,
-                user: process.env.DB_USER
-              },
-              note: 'Sample response - no database query is executed yet.'
-            };
-
-            return {
-              statusCode: 200,
-              headers: { 'content-type': 'application/json' },
-              body: JSON.stringify(body)
-            };
-          };
+          exports.handler = async () => ({
+            statusCode: 503,
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              error: 'Backend package not deployed',
+              hint: 'Run: cd backend && npm run package:lambda, then aws lambda update-function-code',
+            }),
+          });
 
   # ----------------------------------------------------------------------
   # Migration Lambda - loads the ported schema into RDS.
@@ -755,8 +826,13 @@ Resources:
     Properties:
       ApiId: !Ref HttpApi
       RouteKey: 'ANY /{proxy+}'
-      AuthorizationType: JWT
-      AuthorizerId: !Ref JwtAuthorizer
+      # With ApiAuthMode=application this drops to NONE and the Express
+      # authenticate middleware is the only gate - the same arrangement the
+      # app runs under on Render today. The Cognito authorizer cannot be left
+      # on before the auth migration: it validates Cognito-issued tokens, and
+      # the frontend still sends Supabase ones, so every call would 401.
+      AuthorizationType: !If [UseCognitoAuthorizer, JWT, NONE]
+      AuthorizerId: !If [UseCognitoAuthorizer, !Ref JwtAuthorizer, !Ref 'AWS::NoValue']
       Target: !Sub 'integrations/${BackendIntegration}'
 
   DefaultStage:
@@ -765,6 +841,38 @@ Resources:
       ApiId: !Ref HttpApi
       StageName: $default
       AutoDeploy: true
+
+  # --------------------------------------------------------------------
+  # Daily tick.
+  #
+  # On Render this is node-cron inside the always-on process. A Lambda is
+  # frozen between invocations, so a cron timer inside it would never fire
+  # and invoice reminders, contract/document expiry alerts and leave-return
+  # reactivations would stop without any error to notice. EventBridge invokes
+  # the same function instead; lambda.ts routes aws.events to runDailyTick().
+  # --------------------------------------------------------------------
+
+  DailyTickRule:
+    Type: AWS::Events::Rule
+    Condition: SchedulerEnabled
+    Properties:
+      Name: !Sub '${ProjectName}-daily-tick'
+      Description: Invoice reminders, expiry alerts and leave-return reactivation
+      # 02:00 UTC, matching the cron expression it replaces.
+      ScheduleExpression: 'cron(0 2 * * ? *)'
+      State: ENABLED
+      Targets:
+        - Id: backend
+          Arn: !GetAtt BackendFunction.Arn
+
+  DailyTickPermission:
+    Type: AWS::Lambda::Permission
+    Condition: SchedulerEnabled
+    Properties:
+      FunctionName: !GetAtt BackendFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt DailyTickRule.Arn
 
   BackendApiPermission:
     Type: AWS::Lambda::Permission

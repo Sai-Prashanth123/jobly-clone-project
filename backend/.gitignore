@@ -3,3 +3,7 @@ node_modules
 .env
 
 /src/generated/prisma
+
+# Lambda deployment artifacts (npm run package:lambda)
+lambda.zip
+.lambda-build/
