@@ -1,0 +1,15 @@
+# Intermediate pg_dump of the live Supabase database. schema.sql is generated
+# from it and is the file that matters; keeping both would mean two copies of
+# the same 4,000 lines drifting apart.
+live-schema.sql
+
+# Built Lambda bundle (~2.4MB, contains node_modules). Rebuild with:
+#   cp ../schema.sql migrate-lambda/ && Compress-Archive migrate-lambda/* migrate.zip
+migrate.zip
+
+# Build-time copy of ../schema.sql, placed here only so Compress-Archive can
+# pick it up alongside index.js. The tracked copy is backend/rds/schema.sql.
+migrate-lambda/schema.sql
+
+# Lambda invoke payloads/responses
+*-out.json

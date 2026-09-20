@@ -1,0 +1,983 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Serverless web stack - CloudFront + WAF -> private S3 bucket (OAC) for the
+  client-rendered SPA, and API Gateway HTTP API -> backend Lambda (VPC) ->
+  RDS PostgreSQL.
+  Private subnets only. No internet gateway, no NAT gateway.
+  MUST be deployed in us-east-1 (CLOUDFRONT-scope WAF requirement).
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: joblyportal
+    AllowedPattern: '[a-z0-9-]+'
+    Description: Lowercase name used as a prefix for resources.
+
+  VpcCidr:
+    Type: String
+    Default: 10.0.0.0/16
+
+  PrivateSubnetACidr:
+    Type: String
+    Default: 10.0.1.0/24
+
+  PrivateSubnetBCidr:
+    Type: String
+    Default: 10.0.2.0/24
+
+  DbInstanceClass:
+    Type: String
+    Default: db.t4g.micro
+
+  DbName:
+    Type: String
+    Default: appdb
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9]*'
+
+  DbMasterUsername:
+    Type: String
+    Default: dbadmin
+    AllowedPattern: '[a-zA-Z][a-zA-Z0-9_]*'
+
+  DbAllocatedStorage:
+    Type: Number
+    Default: 20
+    MinValue: 20
+
+  DbDeletionProtection:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: Set to false before you attempt to delete this stack.
+
+  RateLimitPer5Min:
+    Type: Number
+    Default: 2000
+    Description: WAF rate-based rule threshold per IP per 5 minutes.
+
+  DomainName:
+    Type: String
+    Default: ''
+    Description: Optional. Leave blank until the domain is registered.
+
+  HostedZoneId:
+    Type: String
+    Default: ''
+    Description: Optional. Route 53 hosted zone ID for DomainName.
+
+  AcmCertificateArn:
+    Type: String
+    Default: ''
+    Description: Optional. ACM certificate in us-east-1 covering DomainName.
+
+Conditions:
+  HasDomain: !And
+    - !Not [!Equals [!Ref DomainName, '']]
+    - !Not [!Equals [!Ref AcmCertificateArn, '']]
+  HasHostedZone: !And
+    - !Condition HasDomain
+    - !Not [!Equals [!Ref HostedZoneId, '']]
+
+Resources:
+
+  # ----------------------------------------------------------------------
+  # Networking. Private subnets only - no IGW, no NAT, no route to 0.0.0.0/0.
+  # ----------------------------------------------------------------------
+
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-vpc'
+
+  PrivateSubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PrivateSubnetACidr
+      AvailabilityZone: !Select [0, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-private-a'
+
+  PrivateSubnetB:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref Vpc
+      CidrBlock: !Ref PrivateSubnetBCidr
+      AvailabilityZone: !Select [1, !GetAZs '']
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-private-b'
+
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-private-rt'
+
+  PrivateSubnetARouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetA
+      RouteTableId: !Ref PrivateRouteTable
+
+  PrivateSubnetBRouteAssoc:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PrivateSubnetB
+      RouteTableId: !Ref PrivateRouteTable
+
+  LambdaSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Backend Lambda ENIs. No inbound.
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 127.0.0.1/32
+          Description: Placeholder - real egress added by LambdaEgressToRds
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-lambda-sg'
+
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS PostgreSQL. Inbound 5432 from Lambda SG only.
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 127.0.0.1/32
+          Description: No egress required
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-rds-sg'
+
+  LambdaEgressToRds:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      DestinationSecurityGroupId: !Ref RdsSecurityGroup
+      Description: Postgres to RDS
+
+  # --------------------------------------------------------------------
+  # VPC endpoints.
+  #
+  # The private subnets have no internet gateway and no NAT, so a Lambda in
+  # this VPC can reach NOTHING outside it - not Secrets Manager, not S3.
+  # Without these endpoints the backend cannot fetch its DB credentials or
+  # store a document, which makes the stack unusable for this app.
+  # --------------------------------------------------------------------
+
+  VpcEndpointSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Interface VPC endpoints. HTTPS in from Lambda only.
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 127.0.0.1/32
+          Description: No egress required
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-vpce-sg'
+
+  VpcEndpointIngressFromLambda:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref VpcEndpointSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Description: HTTPS from Lambda ENIs
+
+  # Easy to miss: the Lambda SG only had egress to RDS:5432, so even with
+  # endpoints present the calls would have been dropped on the way out.
+  LambdaEgressToVpcEndpoints:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 443
+      ToPort: 443
+      DestinationSecurityGroupId: !Ref VpcEndpointSecurityGroup
+      Description: HTTPS to interface VPC endpoints
+
+  # Gateway endpoint - no hourly charge, and it needs a route table entry
+  # rather than an ENI, so no security group applies.
+  S3GatewayEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PrivateRouteTable
+
+  # Interface endpoint (~$7/mo) - required for the DB password.
+  SecretsManagerEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.secretsmanager'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  RdsIngressFromLambda:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Description: Postgres from backend Lambda (migration Lambda talks direct)
+
+  # --------------------------------------------------------------------
+  # RDS Proxy network path: Lambda -> Proxy -> RDS.
+  #
+  # Lambda scales by creating concurrent execution environments, and each
+  # one opens its own Postgres connection. A db.t4g-class instance allows
+  # only a few hundred, and every connection costs ~10MB of server RAM, so
+  # a traffic spike exhausts them and the API starts returning connection
+  # errors. The proxy keeps a warm pool and multiplexes over it, which also
+  # removes the TLS+auth handshake (~30-50ms) from most cold invocations.
+  # --------------------------------------------------------------------
+
+  DbProxySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS Proxy ENIs. 5432 in from Lambda, 5432 out to RDS.
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 127.0.0.1/32
+          Description: Placeholder - real egress added by ProxyEgressToRds
+      Tags:
+        - Key: Name
+          Value: !Sub '${ProjectName}-proxy-sg'
+
+  ProxyIngressFromLambda:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref DbProxySecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref LambdaSecurityGroup
+      Description: Postgres from backend Lambda
+
+  ProxyEgressToRds:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref DbProxySecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      DestinationSecurityGroupId: !Ref RdsSecurityGroup
+      Description: Postgres to RDS
+
+  RdsIngressFromProxy:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      GroupId: !Ref RdsSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      SourceSecurityGroupId: !Ref DbProxySecurityGroup
+      Description: Postgres from RDS Proxy
+
+  LambdaEgressToProxy:
+    Type: AWS::EC2::SecurityGroupEgress
+    Properties:
+      GroupId: !Ref LambdaSecurityGroup
+      IpProtocol: tcp
+      FromPort: 5432
+      ToPort: 5432
+      DestinationSecurityGroupId: !Ref DbProxySecurityGroup
+      Description: Postgres to RDS Proxy
+
+  # ----------------------------------------------------------------------
+  # Database
+  # ----------------------------------------------------------------------
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Private subnets for RDS
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+
+  Database:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    Properties:
+      DBInstanceIdentifier: !Sub '${ProjectName}-db'
+      Engine: postgres
+      DBInstanceClass: !Ref DbInstanceClass
+      DBName: !Ref DbName
+      MasterUsername: !Ref DbMasterUsername
+      ManageMasterUserPassword: true
+      AllocatedStorage: !Ref DbAllocatedStorage
+      StorageType: gp3
+      StorageEncrypted: true
+      EnableIAMDatabaseAuthentication: true
+      PubliclyAccessible: false
+      MultiAZ: false
+      BackupRetentionPeriod: 7
+      DeletionProtection: !Ref DbDeletionProtection
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VPCSecurityGroups:
+        - !Ref RdsSecurityGroup
+      AutoMinorVersionUpgrade: true
+
+  # The application connects as app_user, not as the RDS master user.
+  # CloudFormation generates the password so it never exists in the repo,
+  # in a parameter, or in anyone's shell history; the migration Lambda reads
+  # it back out to CREATE ROLE, and the backend reads it to connect.
+  AppUserSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub '${ProjectName}/db/app_user'
+      Description: Password for the least-privilege application database role
+      GenerateSecretString:
+        SecretStringTemplate: '{"username":"app_user"}'
+        GenerateStringKey: password
+        PasswordLength: 40
+        # '/', '@', '"', ' ' and '\' break libpq connection strings and URL
+        # forms; excluding them keeps the secret usable in every context.
+        ExcludeCharacters: '/@" \'
+
+  DbProxyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: rds.amazonaws.com}
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: read-db-secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - secretsmanager:GetSecretValue
+                  - secretsmanager:DescribeSecret
+                Resource:
+                  - !GetAtt Database.MasterUserSecret.SecretArn
+                  - !Ref AppUserSecret
+              # Both secrets are encrypted with the AWS-managed
+              # aws/secretsmanager key, whose policy cannot be edited. Access
+              # is therefore granted here instead, narrowed with ViaService so
+              # this role can only decrypt through Secrets Manager.
+              - Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'secretsmanager.${AWS::Region}.amazonaws.com'
+
+  DbProxy:
+    Type: AWS::RDS::DBProxy
+    Properties:
+      DBProxyName: !Sub '${ProjectName}-proxy'
+      EngineFamily: POSTGRESQL
+      RoleArn: !GetAtt DbProxyRole.Arn
+      RequireTLS: true
+      IdleClientTimeout: 1800
+      DebugLogging: false
+      Auth:
+        - AuthScheme: SECRETS
+          SecretArn: !Ref AppUserSecret
+          IAMAuth: DISABLED
+          ClientPasswordAuthType: POSTGRES_SCRAM_SHA_256
+          Description: Application role
+        # The master secret is registered too so administrative sessions can
+        # also go through the proxy rather than around it.
+        - AuthScheme: SECRETS
+          SecretArn: !GetAtt Database.MasterUserSecret.SecretArn
+          IAMAuth: DISABLED
+          ClientPasswordAuthType: POSTGRES_SCRAM_SHA_256
+          Description: Master role
+      VpcSubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+      VpcSecurityGroupIds:
+        - !Ref DbProxySecurityGroup
+
+  DbProxyTargetGroup:
+    Type: AWS::RDS::DBProxyTargetGroup
+    Properties:
+      DBProxyName: !Ref DbProxy
+      # 'default' is the only name RDS Proxy accepts for a target group.
+      TargetGroupName: default
+      DBInstanceIdentifiers:
+        - !Ref Database
+      ConnectionPoolConfigurationInfo:
+        MaxConnectionsPercent: 90
+        MaxIdleConnectionsPercent: 50
+        # Wait rather than error when the pool is saturated - a brief queue
+        # is far better than a 500 back to the browser.
+        ConnectionBorrowTimeout: 120
+
+  # ----------------------------------------------------------------------
+  # Cognito
+  # ----------------------------------------------------------------------
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub '${ProjectName}-users'
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      MfaConfiguration: 'OPTIONAL'
+      EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireUppercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${ProjectName}-web'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs:
+        - !If [HasDomain, !Sub 'https://${DomainName}/auth/callback', 'http://localhost:3000/auth/callback']
+      LogoutURLs:
+        - !If [HasDomain, !Sub 'https://${DomainName}/', 'http://localhost:3000/']
+      AccessTokenValidity: 15
+      IdTokenValidity: 15
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      PreventUserExistenceErrors: ENABLED
+      EnableTokenRevocation: true
+
+  # ----------------------------------------------------------------------
+  # Backend Lambda - VPC attached, reaches RDS
+  # ----------------------------------------------------------------------
+
+  BackendLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-backend'
+      RetentionInDays: 14
+
+  BackendRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        # Connections go through RDS Proxy using the app_user secret, so the
+        # backend needs to read that secret and nothing else. It is NOT given
+        # the master secret: a leak of this role must not yield superuser.
+        - PolicyName: read-app-user-secret
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource: !Ref AppUserSecret
+
+  BackendFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: BackendLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-backend'
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt BackendRole.Arn
+      Timeout: 15
+      MemorySize: 512
+      # ReservedConcurrentExecutions: 20
+      # Disabled: this AWS account is new, so its Lambda concurrency limit is
+      # still the default 10 (not 1000). Reserving 20 fails with
+      # "decreases account's UnreservedConcurrentExecution below its minimum
+      # value of [10]" — and reserving ANY amount breaks that same floor.
+      # Re-enable after raising Service Quotas -> Lambda -> Concurrent
+      # executions, which also lifts the 10-invocation ceiling this whole
+      # stack currently shares between the SSR and backend functions.
+      Environment:
+        Variables:
+          # The proxy endpoint, not the instance endpoint - pointing at the
+          # instance would bypass the pool and reintroduce the per-invocation
+          # connection storm the proxy exists to prevent.
+          DB_HOST: !GetAtt DbProxy.Endpoint
+          DB_PORT: !GetAtt Database.Endpoint.Port
+          DB_NAME: !Ref DbName
+          DB_USER: app_user
+          DB_SECRET_ARN: !Ref AppUserSecret
+      VpcConfig:
+        SecurityGroupIds: [!Ref LambdaSecurityGroup]
+        SubnetIds:
+          - !Ref PrivateSubnetA
+          - !Ref PrivateSubnetB
+      Code:
+        ZipFile: |
+          // Sample backend. Replace with your real handler.
+          // To talk to Postgres: bundle the 'pg' package and use
+          // RDS IAM auth via @aws-sdk/rds-signer (no password in code).
+          exports.handler = async (event) => {
+            const claims =
+              event.requestContext?.authorizer?.jwt?.claims ?? null;
+
+            const body = {
+              ok: true,
+              path: event.rawPath,
+              method: event.requestContext?.http?.method,
+              user: claims ? { sub: claims.sub, email: claims.email } : null,
+              db: {
+                host: process.env.DB_HOST,
+                name: process.env.DB_NAME,
+                user: process.env.DB_USER
+              },
+              note: 'Sample response - no database query is executed yet.'
+            };
+
+            return {
+              statusCode: 200,
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(body)
+            };
+          };
+
+  # ----------------------------------------------------------------------
+  # Migration Lambda - loads the ported schema into RDS.
+  #
+  # RDS sits in private subnets with no inbound route, so nothing outside
+  # the VPC can reach it - including a developer laptop. Running schema
+  # changes from a Lambda inside the VPC is the only path in.
+  #
+  # Created here with placeholder code; the real bundle (pg driver +
+  # schema.sql) is pushed afterwards with `aws lambda update-function-code`,
+  # because it needs node_modules and so cannot be inlined as ZipFile.
+  # ----------------------------------------------------------------------
+
+  MigrationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-migrate'
+      RetentionInDays: 14
+
+  MigrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
+      Policies:
+        - PolicyName: read-db-secrets
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Scoped to this database's two secrets only. The master secret
+              # is needed to run DDL; the app_user secret is needed to CREATE
+              # ROLE with the password CloudFormation generated.
+              - Effect: Allow
+                Action: secretsmanager:GetSecretValue
+                Resource:
+                  - !GetAtt Database.MasterUserSecret.SecretArn
+                  - !Ref AppUserSecret
+
+  MigrationFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: MigrationLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-migrate'
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt MigrationRole.Arn
+      # Schema load touches ~48 migrations worth of DDL in one transaction.
+      Timeout: 300
+      MemorySize: 512
+      Environment:
+        Variables:
+          DB_HOST: !GetAtt Database.Endpoint.Address
+          DB_PORT: !GetAtt Database.Endpoint.Port
+          DB_NAME: !Ref DbName
+          DB_SECRET_ARN: !GetAtt Database.MasterUserSecret.SecretArn
+          APP_USER_SECRET_ARN: !Ref AppUserSecret
+      VpcConfig:
+        SecurityGroupIds: [!Ref LambdaSecurityGroup]
+        SubnetIds:
+          - !Ref PrivateSubnetA
+          - !Ref PrivateSubnetB
+      Code:
+        ZipFile: |
+          exports.handler = async () => ({
+            ok: false,
+            note: 'Placeholder. Real bundle is pushed via update-function-code.'
+          });
+
+  # ----------------------------------------------------------------------
+  # Static site bucket - private, reachable only through CloudFront OAC.
+  #
+  # Replaces the original SSR Lambda origin. This app is a client-rendered
+  # Vite SPA with no SSR framework, so there is nothing to render on the
+  # server - the SSR Lambda was a stub. Serving the built assets from S3 is
+  # cheaper (no invocation per page view), removes a Lambda (this account's
+  # concurrency limit is only 10), and avoids SigV4 signing against a Lambda
+  # Function URL, which is what returned 403 on the first deploy.
+  # ----------------------------------------------------------------------
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    # Assets are rebuildable from git, so let the stack clean this up. Note
+    # the bucket must be emptied before a stack delete will succeed.
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      BucketName: !Sub '${ProjectName}-site-${AWS::AccountId}'
+      # No public access at all - CloudFront OAC is the only reader.
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # Only this distribution may read, and only over TLS.
+          - Sid: AllowCloudFrontOacRead
+            Effect: Allow
+            Principal: {Service: cloudfront.amazonaws.com}
+            Action: s3:GetObject
+            Resource: !Sub '${SiteBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                'AWS:SourceArn': !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt SiteBucket.Arn
+              - !Sub '${SiteBucket.Arn}/*'
+            Condition:
+              Bool:
+                'aws:SecureTransport': false
+
+  # ----------------------------------------------------------------------
+  # API Gateway HTTP API - proxy route, Cognito JWT authorizer
+  # ----------------------------------------------------------------------
+
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub '${ProjectName}-api'
+      ProtocolType: HTTP
+
+  JwtAuthorizer:
+    Type: AWS::ApiGatewayV2::Authorizer
+    Properties:
+      ApiId: !Ref HttpApi
+      Name: cognito-jwt
+      AuthorizerType: JWT
+      IdentitySource: ['$request.header.Authorization']
+      JwtConfiguration:
+        Issuer: !Sub 'https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}'
+        Audience: [!Ref UserPoolClient]
+
+  BackendIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt BackendFunction.Arn
+      PayloadFormatVersion: '2.0'
+
+  ProxyRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: 'ANY /{proxy+}'
+      AuthorizationType: JWT
+      AuthorizerId: !Ref JwtAuthorizer
+      Target: !Sub 'integrations/${BackendIntegration}'
+
+  DefaultStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: $default
+      AutoDeploy: true
+
+  BackendApiPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt BackendFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub 'arn:${AWS::Partition}:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*/{proxy+}'
+
+  # ----------------------------------------------------------------------
+  # WAF (CLOUDFRONT scope - us-east-1 only)
+  # ----------------------------------------------------------------------
+
+  WebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: !Sub '${ProjectName}-web-acl'
+      Scope: CLOUDFRONT
+      DefaultAction: {Allow: {}}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: !Sub '${ProjectName}-web-acl'
+      Rules:
+        - Name: RateLimitPerIp
+          Priority: 0
+          Action: {Block: {}}
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref RateLimitPer5Min
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitPerIp
+
+        - Name: CommonRuleSet
+          Priority: 1
+          OverrideAction: {None: {}}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesCommonRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: CommonRuleSet
+
+        - Name: KnownBadInputs
+          Priority: 2
+          OverrideAction: {None: {}}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesKnownBadInputsRuleSet
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: KnownBadInputs
+
+        - Name: IpReputation
+          Priority: 3
+          OverrideAction: {None: {}}
+          Statement:
+            ManagedRuleGroupStatement:
+              VendorName: AWS
+              Name: AWSManagedRulesAmazonIpReputationList
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: IpReputation
+
+  # ----------------------------------------------------------------------
+  # CloudFront
+  # ----------------------------------------------------------------------
+
+  SiteOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${ProjectName}-site-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub '${ProjectName} edge'
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        WebACLId: !GetAtt WebAcl.Arn
+        Aliases: !If [HasDomain, [!Ref DomainName], !Ref 'AWS::NoValue']
+        ViewerCertificate: !If
+          - HasDomain
+          - AcmCertificateArn: !Ref AcmCertificateArn
+            SslSupportMethod: sni-only
+            MinimumProtocolVersion: TLSv1.2_2021
+          - CloudFrontDefaultCertificate: true
+
+        Origins:
+          # Private S3 bucket, read only by this distribution via OAC.
+          # S3OriginConfig with an empty OriginAccessIdentity is required
+          # alongside OAC - CloudFront rejects the origin without it.
+          - Id: s3-site
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+
+          - Id: http-api
+            DomainName: !Sub '${HttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+
+        # Single-page app: any path that is not a real file must return
+        # index.html so React Router can resolve the route in the browser.
+        # A private S3 bucket answers a missing key with 403 (not 404),
+        # because the OAC policy grants GetObject but not ListBucket - so
+        # both have to be mapped.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+
+        DefaultCacheBehavior:
+          TargetOriginId: s3-site
+          ViewerProtocolPolicy: redirect-to-https
+          # Static assets are read-only; no write methods reach the bucket.
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          # Managed-CachingOptimized. The old CachingDisabled made sense for
+          # dynamic SSR output, but for fingerprinted static assets it would
+          # mean paying an S3 GET on every request. This honours the
+          # Cache-Control headers set at upload time: immutable for
+          # /assets/*, no-cache for index.html.
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          # No origin request policy: forwarding viewer headers to an
+          # OAC-signed S3 origin breaks the SigV4 signature.
+
+        CacheBehaviors:
+          - PathPattern: '/api/*'
+            TargetOriginId: http-api
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS, PUT, POST, PATCH, DELETE]
+            CachedMethods: [GET, HEAD, OPTIONS]
+            Compress: true
+            CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad
+            OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac
+
+  # ----------------------------------------------------------------------
+  # Route 53 - created only once DomainName + HostedZoneId are supplied
+  # ----------------------------------------------------------------------
+
+  AliasRecord:
+    Type: AWS::Route53::RecordSet
+    Condition: HasHostedZone
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !Ref DomainName
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt Distribution.DomainName
+        # Fixed CloudFront hosted zone ID - the same in every region.
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+Outputs:
+  SiteUrl:
+    Description: Public entry point
+    Value: !If
+      - HasDomain
+      - !Sub 'https://${DomainName}'
+      - !Sub 'https://${Distribution.DomainName}'
+
+  DistributionId:
+    Value: !Ref Distribution
+
+  SiteBucketName:
+    Description: Upload the built SPA (dist/) here, then invalidate the distribution
+    Value: !Ref SiteBucket
+
+  ApiEndpoint:
+    Description: Direct API endpoint - reachable only via CloudFront in practice
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com'
+
+  DatabaseEndpoint:
+    Value: !GetAtt Database.Endpoint.Address
+
+  DatabaseProxyEndpoint:
+    Description: RDS Proxy endpoint - what the backend connects to
+    Value: !GetAtt DbProxy.Endpoint
+
+  AppUserSecretArn:
+    Description: Secret holding the app_user database credentials
+    Value: !Ref AppUserSecret
+
+  DatabaseSecretArn:
+    Description: RDS-managed master password secret
+    Value: !GetAtt Database.MasterUserSecret.SecretArn
+
+  UserPoolId:
+    Value: !Ref UserPool
+
+  UserPoolClientId:
+    Value: !Ref UserPoolClient
