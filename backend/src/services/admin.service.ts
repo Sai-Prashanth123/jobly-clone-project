@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
+import { authProvider } from '../lib/auth';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
@@ -62,11 +63,13 @@ export async function deactivateUser(userId: string, actorId: string) {
     .eq('id', userId)
     .single();
 
-  // Delete the Supabase Auth user (this also cascades portal_users via FK)
-  const { error } = await supabaseAdmin.auth.admin.deleteUser(userId);
-  if (error) throw error;
-
-  // Also remove portal_users row if not cascade-deleted
+  // Login first, then the profile row. The provider addresses the account via
+  // portal_users.email, so the row has to outlive the delete.
+  //
+  // The row is no longer removed by a cascade either: portal_users.id used to
+  // carry an ON DELETE CASCADE foreign key to auth.users, which the move to
+  // RDS dropped. Deleting it explicitly is now the only thing that removes it.
+  await authProvider.deleteUser(userId);
   await supabaseAdmin.from('portal_users').delete().eq('id', userId);
 
   logActivity(actorId, 'deleted', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
@@ -77,10 +80,7 @@ export async function deactivateUser(userId: string, actorId: string) {
 
 export async function resetUserPassword(userId: string, actorId?: string): Promise<string> {
   const tempPassword = 'Jobly@' + Math.random().toString(36).slice(2, 8).toUpperCase();
-  const { error } = await supabaseAdmin.auth.admin.updateUserById(userId, {
-    password: tempPassword,
-  });
-  if (error) throw error;
+  await authProvider.setPassword(userId, tempPassword);
 
   // The reset is one-time: force a fresh first-login password reset so the temp
   // never becomes the user's standing password.

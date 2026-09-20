@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabaseAnon, supabaseAdmin, fetchPortalUser, fetchPortalUserByEmail, patchPortalUser } from '../config/supabase';
+import { supabaseAdmin, fetchPortalUser, fetchPortalUserByEmail, patchPortalUser } from '../config/supabase';
+import { authProvider, InvalidCredentialsError } from '../lib/auth';
 import { UnauthorizedError } from '../lib/errors';
 import { resetUserPassword } from '../services/admin.service';
 import * as employeesSvc from '../services/employees.service';
@@ -61,15 +62,17 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const email = raw.email.trim().toLowerCase();
     const password = raw.password;
 
-    const { data, error } = await supabaseAnon.auth.signInWithPassword({ email, password });
-
-    if (error || !data.session) {
-      throw new UnauthorizedError(error?.message ?? 'Invalid credentials');
+    let session;
+    try {
+      session = await authProvider.signIn(email, password);
+    } catch (err) {
+      if (err instanceof InvalidCredentialsError) throw new UnauthorizedError(err.message);
+      throw err;
     }
 
     // Fetch portal user profile via direct REST (bypasses supabase-js client
     // header issues that can silently drop the service-role Authorization header)
-    const portalUser = await fetchPortalUser(data.user.id);
+    const portalUser = await fetchPortalUser(session.userId);
 
     if (!portalUser) {
       throw new UnauthorizedError('User profile not found. Contact your administrator.');
@@ -104,9 +107,9 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     res.json({
       success: true,
       data: {
-        token: data.session.access_token,
-        refreshToken: data.session.refresh_token,
-        expiresAt: data.session.expires_at,
+        token: session.token,
+        refreshToken: session.refreshToken,
+        expiresAt: session.expiresAt,
         user: {
           id: portalUser.id,
           email: portalUser.email,
@@ -127,9 +130,23 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
 
 export async function logout(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const token = req.headers.authorization?.slice(7);
+    // The route is deliberately unauthenticated - logging out must work even
+    // with an expired token - so req.user is never populated here. Resolve the
+    // caller from the token instead, and treat any failure as "already logged
+    // out" rather than an error.
+    //
+    // Under Cognito this genuinely revokes the refresh token, so the session
+    // cannot be resurrected. The Supabase path had no server-side equivalent.
+    const token = req.headers.authorization?.startsWith('Bearer ')
+      ? req.headers.authorization.slice(7)
+      : null;
     if (token) {
-      await supabaseAnon.auth.signOut();
+      try {
+        const { userId } = await authProvider.verifyToken(token);
+        await authProvider.signOut(userId);
+      } catch {
+        // Expired or malformed token: nothing to revoke.
+      }
     }
     res.json({ success: true });
   } catch (err) {
@@ -174,14 +191,14 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
     }
 
     // Verify the current password by attempting a sign-in with the anon client.
-    const { error: signInErr } = await supabaseAnon.auth.signInWithPassword({ email, password: currentPassword });
-    if (signInErr) {
+    try {
+      await authProvider.signIn(email, currentPassword);
+    } catch {
       res.status(400).json({ success: false, error: 'Current password is incorrect.' });
       return;
     }
 
-    const { error: updErr } = await supabaseAdmin.auth.admin.updateUserById(userId, { password: newPassword });
-    if (updErr) throw updErr;
+    await authProvider.setPassword(userId, newPassword);
 
     await patchPortalUser(userId, { must_reset_password: false, password_changed_at: new Date().toISOString() });
 
@@ -198,18 +215,19 @@ export async function refresh(req: Request, res: Response, next: NextFunction): 
       res.status(400).json({ success: false, error: 'refreshToken required' });
       return;
     }
-    // Use the Supabase admin client to refresh the session
-    const { data, error } = await supabaseAdmin.auth.refreshSession({ refresh_token: refreshToken });
-    if (error || !data?.session) {
+    let session;
+    try {
+      session = await authProvider.refresh(refreshToken);
+    } catch {
       res.status(401).json({ success: false, error: 'Session expired or invalid' });
       return;
     }
     res.json({
       success: true,
       data: {
-        token: data.session.access_token,
-        refreshToken: data.session.refresh_token,
-        expiresAt: data.session.expires_at,
+        token: session.token,
+        refreshToken: session.refreshToken,
+        expiresAt: session.expiresAt,
       },
     });
   } catch (err) { next(err); }

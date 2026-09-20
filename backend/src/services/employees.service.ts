@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
+import { authProvider } from '../lib/auth';
 import { ConflictError, NotFoundError, ForbiddenError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRequestedEmail, sendDocumentRequestEmail, mailerConfigured } from '../lib/mailer';
@@ -199,10 +200,11 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
 
     if (portalUserId) {
       // Update the existing login — email (in case it changed) + new password.
-      const { error: updateErr } = await supabaseAdmin.auth.admin.updateUserById(
-        portalUserId, { email: portalLoginEmail, password: tempPassword, email_confirm: true },
-      );
-      if (updateErr) throw updateErr;
+      // Order matters: setEmail resolves the account by its CURRENT address
+      // from portal_users, so it must run before the upsert below writes the
+      // new one.
+      await authProvider.setEmail(portalUserId, portalLoginEmail);
+      await authProvider.setPassword(portalUserId, tempPassword);
 
       const { error: upsertErr } = await supabaseAdmin.from('portal_users').upsert({
         id: portalUserId,
@@ -218,17 +220,14 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
 
       credentialsReady = true;
     } else {
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      const created = await authProvider.createUser({
         email: portalLoginEmail,
         password: tempPassword,
-        email_confirm: true,
-        user_metadata: { role: 'employee' },
       });
-      if (authError) throw authError;
 
-      if (authData?.user) {
+      if (created?.userId) {
         const { error: insertErr } = await supabaseAdmin.from('portal_users').insert({
-          id: authData.user.id,
+          id: created.userId,
           email: portalLoginEmail,
           name: `${input.firstName} ${input.lastName}`,
           role: 'employee',
@@ -830,10 +829,9 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
         const newWork = (emp.work_email ?? '').trim();
         const newLoginEmail = newWork || newPersonal;
         if (newLoginEmail) {
-          const { error: authErr } = await supabaseAdmin.auth.admin.updateUserById(
-            pu.id, { email: newLoginEmail, email_confirm: true },
-          );
-          if (authErr) throw authErr;
+          // Again, before the portal_users row is updated: the provider looks
+          // the account up by its current address.
+          await authProvider.setEmail(pu.id, newLoginEmail);
           await supabaseAdmin.from('portal_users').update({ email: newLoginEmail }).eq('id', pu.id);
 
           try {
@@ -1301,9 +1299,15 @@ async function purgeEmployeeData(empId: string, currentEmail: string | null): Pr
     const { data: pu } = await supabaseAdmin
       .from('portal_users').select('id').eq('employee_id', empId).maybeSingle();
     if (pu?.id) {
+      // Login first, portal_users second. The provider addresses the account
+      // through portal_users.email, so deleting the row first would leave the
+      // login orphaned and still able to authenticate.
+      try {
+        await authProvider.deleteUser(pu.id);
+      } catch (authErr) {
+        console.error('[purgeEmployeeData] deleteUser failed for', pu.id, authErr);
+      }
       await supabaseAdmin.from('portal_users').delete().eq('id', pu.id);
-      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(pu.id);
-      if (authErr) console.error('[purgeEmployeeData] auth.deleteUser failed for', pu.id, authErr);
     }
   } catch (err) {
     console.error('[purgeEmployeeData] login cleanup failed for employee', empId, err);
@@ -1364,9 +1368,13 @@ async function disableEmployeeLogin(empId: string): Promise<void> {
     const { data: pu } = await supabaseAdmin
       .from('portal_users').select('id').eq('employee_id', empId).maybeSingle();
     if (pu?.id) {
+      // Login first, portal_users second - see purgeEmployeeData above.
+      try {
+        await authProvider.deleteUser(pu.id);
+      } catch (authErr) {
+        console.error('[disableEmployeeLogin] deleteUser failed for', pu.id, authErr);
+      }
       await supabaseAdmin.from('portal_users').delete().eq('id', pu.id);
-      const { error: authErr } = await supabaseAdmin.auth.admin.deleteUser(pu.id);
-      if (authErr) console.error('[disableEmployeeLogin] auth.deleteUser failed for', pu.id, authErr);
     }
   } catch (err) {
     console.error('[disableEmployeeLogin] login cleanup failed for employee', empId, err);

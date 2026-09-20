@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
-import { supabaseAdmin, fetchPortalUser } from '../config/supabase';
+import { fetchPortalUser } from '../config/supabase';
+import { authProvider } from '../lib/auth';
 import { UnauthorizedError } from '../lib/errors';
 
 export interface AuthUser {
@@ -28,21 +29,23 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     }
 
     const token = authHeader.slice(7);
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-
-    if (error || !user) {
+    // Returns portal_users.id under either driver: Supabase's auth user id and
+    // Cognito's custom:portal_id are the same value by construction.
+    let userId: string;
+    try {
+      ({ userId } = await authProvider.verifyToken(token));
+    } catch {
       throw new UnauthorizedError('Invalid or expired token');
     }
 
-    // Fetch portal user profile via direct REST (same reason as auth.controller)
-    const portalUser = await fetchPortalUser(user.id);
+    const portalUser = await fetchPortalUser(userId);
 
     if (!portalUser) {
       throw new UnauthorizedError('User profile not found');
     }
 
     req.user = {
-      id: user.id,
+      id: userId,
       email: portalUser.email,
       name: portalUser.name,
       role: portalUser.role,

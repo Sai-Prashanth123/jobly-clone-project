@@ -26,6 +26,12 @@ const EnvSchema = z.object({
   // Shared secret proving a request arrived via CloudFront. Unset locally and
   // on Render, where the origin-verify check is inactive.
   ORIGIN_VERIFY_SECRET: z.string().optional(),
+  // Which identity store backs login. 'supabase' (default) is what Render
+  // runs; 'cognito' is the AWS path. Storage is a separate phase either way.
+  AUTH_DRIVER: z.enum(['supabase', 'cognito']).default('supabase'),
+  COGNITO_USER_POOL_ID: z.string().optional(),
+  COGNITO_CLIENT_ID: z.string().optional(),
+  AWS_REGION: z.string().optional(),
   FRONTEND_URL: z.string().default('http://localhost:8080'),
   // Email transport. Preferred: a transactional SMTP provider (Brevo/SendGrid)
   // — no Gmail App Password, better deliverability to Gmail/Outlook.

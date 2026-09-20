@@ -667,6 +667,19 @@ Resources:
       AutoVerifiedAttributes: [email]
       MfaConfiguration: 'OPTIONAL'
       EnabledMfas: [SOFTWARE_TOKEN_MFA]
+      # Carries the existing portal_users.id. Cognito mints its own `sub`, but
+      # that id is the foreign key every one of the 48 tables references, so it
+      # has to survive the move unchanged - otherwise each migrated login would
+      # come back detached from its own timesheets, cases and documents.
+      # Mutable so an operator can correct a mislinked account.
+      Schema:
+        - Name: portal_id
+          AttributeDataType: String
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: '36'
+            MaxLength: '36'
       Policies:
         PasswordPolicy:
           MinimumLength: 12
@@ -678,30 +691,101 @@ Resources:
         RecoveryMechanisms:
           - Name: verified_email
             Priority: 1
+      LambdaConfig:
+        UserMigration: !GetAtt UserMigrationFunction.Arn
 
   UserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
       ClientName: !Sub '${ProjectName}-web'
       UserPoolId: !Ref UserPool
+      # No secret: the only password flow enabled is the admin one, which is
+      # authorised by the backend's IAM role. A secret would add a value to
+      # distribute without adding a check.
       GenerateSecret: false
-      AllowedOAuthFlowsUserPoolClient: true
-      AllowedOAuthFlows: [code]
-      AllowedOAuthScopes: [openid, email, profile]
+      # ADMIN_USER_PASSWORD_AUTH only - the browser never talks to Cognito, so
+      # the plain USER_PASSWORD_AUTH flow is deliberately left off. The hosted
+      # UI / OAuth code flow is gone too: it needs a user pool domain this
+      # stack does not have, and the app authenticates through its own API.
+      ExplicitAuthFlows:
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
       SupportedIdentityProviders: [COGNITO]
-      CallbackURLs:
-        - !If [HasDomain, !Sub 'https://${DomainName}/auth/callback', 'http://localhost:3000/auth/callback']
-      LogoutURLs:
-        - !If [HasDomain, !Sub 'https://${DomainName}/', 'http://localhost:3000/']
-      AccessTokenValidity: 15
-      IdTokenValidity: 15
+      # 60 minutes, matching the Supabase session length the frontend was
+      # written against; 15 would have expired mid-form.
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
       RefreshTokenValidity: 30
       TokenValidityUnits:
         AccessToken: minutes
         IdToken: minutes
         RefreshToken: days
+      # Answers "no such user" and "wrong password" identically, so the login
+      # form cannot be used to enumerate who has an account.
       PreventUserExistenceErrors: ENABLED
       EnableTokenRevocation: true
+
+  # --------------------------------------------------------------------
+  # Seamless password migration.
+  #
+  # Cognito has no API for importing password hashes, so the choice was
+  # between making all 23 users reset their password and migrating each
+  # account on its owner's next login. A reset would have emailed a temporary
+  # password - and outbound mail is not configured yet, so it would have
+  # locked everyone out.
+  #
+  # This trigger fires only for accounts Cognito has not seen. It checks the
+  # typed password against Supabase, then hands back the attributes to create
+  # the user with. Nobody is prompted for anything.
+  # --------------------------------------------------------------------
+
+  UserMigrationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/lambda/${ProjectName}-user-migration'
+      RetentionInDays: 14
+
+  UserMigrationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: {Service: lambda.amazonaws.com}
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  UserMigrationFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: UserMigrationLogGroup
+    Properties:
+      FunctionName: !Sub '${ProjectName}-user-migration'
+      Runtime: nodejs22.x
+      Handler: index.handler
+      Role: !GetAtt UserMigrationRole.Arn
+      Timeout: 10
+      MemorySize: 256
+      # Deliberately NOT in the VPC: its only dependency is Supabase's public
+      # API, so leaving it out avoids an ENI and a NAT hop per cold start.
+      Environment:
+        Variables:
+          SUPABASE_URL: !Ref SupabaseUrl
+          SUPABASE_ANON_KEY: !Ref SupabaseAnonKey
+      Code:
+        ZipFile: |
+          exports.handler = async () => {
+            throw new Error('Placeholder - deploy backend/cognito/user-migration');
+          };
+
+  UserMigrationPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !GetAtt UserMigrationFunction.Arn
+      Action: lambda:InvokeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !GetAtt UserPool.Arn
 
   # ----------------------------------------------------------------------
   # Backend Lambda - VPC attached, reaches RDS
@@ -735,6 +819,22 @@ Resources:
               - Effect: Allow
                 Action: secretsmanager:GetSecretValue
                 Resource: !Ref AppUserSecret
+        # Scoped to this one user pool. Notably absent: AdminGetUser and
+        # ListUsers - the backend never needs to read a Cognito profile,
+        # because every attribute it cares about lives in portal_users.
+        - PolicyName: cognito-user-admin
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - cognito-idp:AdminInitiateAuth
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminSetUserPassword
+                  - cognito-idp:AdminUpdateUserAttributes
+                  - cognito-idp:AdminDeleteUser
+                  - cognito-idp:AdminUserGlobalSignOut
+                Resource: !GetAtt UserPool.Arn
 
   BackendFunction:
     Type: AWS::Lambda::Function
@@ -794,6 +894,11 @@ Resources:
           # Requests must carry this header, which only CloudFront adds.
           # Without it the execute-api URL is a way around every WAF rule.
           ORIGIN_VERIFY_SECRET: !Sub '{{resolve:secretsmanager:${OriginVerifySecret}:SecretString:value}}'
+          # Logins go to Cognito. Supabase Auth stays reachable only through
+          # the user-migration trigger, until every account has signed in once.
+          AUTH_DRIVER: cognito
+          COGNITO_USER_POOL_ID: !Ref UserPool
+          COGNITO_CLIENT_ID: !Ref UserPoolClient
       VpcConfig:
         SecurityGroupIds: [!Ref LambdaSecurityGroup]
         SubnetIds:

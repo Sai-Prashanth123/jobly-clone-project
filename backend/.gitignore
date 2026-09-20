@@ -7,3 +7,6 @@ node_modules
 # Lambda deployment artifacts (npm run package:lambda)
 lambda.zip
 .lambda-build/
+
+# Built Cognito trigger bundle
+cognito/*.zip
