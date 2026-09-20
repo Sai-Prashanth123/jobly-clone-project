@@ -1309,6 +1309,38 @@ Resources:
               RuleActionOverrides:
                 - Name: SizeRestrictions_BODY
                   ActionToUse: {Count: {}}
+              # Skip this rule group entirely for file uploads.
+              #
+              # Its body rules inspect raw bytes, and a PDF or image will
+              # sooner or later contain a byte sequence that matches an XSS,
+              # LFI or RFI signature. That is not an attack, it is binary
+              # data - CrossSiteScripting_BODY was blocking real case-document
+              # uploads outright, and SizeRestrictions_BODY above had already
+              # blocked every upload over 8KB for the same underlying reason.
+              # Content rules and arbitrary binary bodies simply cannot
+              # coexist; whitelisting one rule at a time would just wait for
+              # the next false positive.
+              #
+              # multipart/form-data is an exact discriminator here: all six
+              # upload routes use it, and no JSON endpoint does. So the group
+              # still inspects every ordinary API call.
+              #
+              # Uploads are NOT unprotected: KnownBadInputs, IpReputation and
+              # the per-IP rate limit are separate rules and still apply, and
+              # the request must still pass the origin-verify header,
+              # authentication, a role check, multer's MIME whitelist and its
+              # 20MB cap. Files land in S3, which does not execute them.
+              ScopeDownStatement:
+                NotStatement:
+                  Statement:
+                    ByteMatchStatement:
+                      FieldToMatch:
+                        SingleHeader: {Name: content-type}
+                      PositionalConstraint: STARTS_WITH
+                      SearchString: multipart/form-data
+                      TextTransformations:
+                        - Priority: 0
+                          Type: LOWERCASE
           VisibilityConfig:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
