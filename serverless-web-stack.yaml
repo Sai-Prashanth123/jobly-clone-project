@@ -1076,10 +1076,25 @@ Resources:
         - Name: CommonRuleSet
           Priority: 1
           OverrideAction: {None: {}}
+          # SizeRestrictions_BODY blocks any request body over 8KB, which
+          # silently broke EVERY document and image upload - confirmed in the
+          # WAF sampled requests as BLOCK on POST /api/v1/*/documents. 8KB is
+          # smaller than essentially any real file, so this rule and a file
+          # upload API cannot coexist.
+          #
+          # Counted rather than removed, so the matches still show up in
+          # metrics. Upload size is still bounded, just by the layers that can
+          # actually judge it: multer (20MB, with a MIME whitelist), API
+          # Gateway (10MB) and Lambda (6MB).
+          #
+          # Every other rule in the group keeps blocking.
           Statement:
             ManagedRuleGroupStatement:
               VendorName: AWS
               Name: AWSManagedRulesCommonRuleSet
+              RuleActionOverrides:
+                - Name: SizeRestrictions_BODY
+                  ActionToUse: {Count: {}}
           VisibilityConfig:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
@@ -1112,6 +1127,31 @@ Resources:
   # ----------------------------------------------------------------------
   # CloudFront
   # ----------------------------------------------------------------------
+
+  # Deep-link support for the SPA, replacing the distribution-wide
+  # CustomErrorResponses. Attached to the static behaviour only, so it can
+  # never touch an API response.
+  SpaRouterFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub '${ProjectName}-spa-router'
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Serve index.html for client-side routes
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var uri = event.request.uri;
+          // Anything with a file extension is a real object in the bucket
+          // (/assets/index-abc123.js, /favicon.png) and is left alone.
+          // Everything else is a React Router path such as /portal/login,
+          // which only exists in the browser.
+          var last = uri.substring(uri.lastIndexOf('/') + 1);
+          if (last.indexOf('.') === -1) {
+            event.request.uri = '/index.html';
+          }
+          return event.request;
+        }
 
   SiteHeadersPolicy:
     Type: AWS::CloudFront::ResponseHeadersPolicy
@@ -1208,20 +1248,17 @@ Resources:
               - HeaderName: x-origin-verify
                 HeaderValue: !Sub '{{resolve:secretsmanager:${OriginVerifySecret}:SecretString:value}}'
 
-        # Single-page app: any path that is not a real file must return
-        # index.html so React Router can resolve the route in the browser.
-        # A private S3 bucket answers a missing key with 403 (not 404),
-        # because the OAC policy grants GetObject but not ListBucket - so
-        # both have to be mapped.
-        CustomErrorResponses:
-          - ErrorCode: 403
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-            ErrorCachingMinTTL: 0
-          - ErrorCode: 404
-            ResponseCode: 200
-            ResponsePagePath: /index.html
-            ErrorCachingMinTTL: 0
+        # No CustomErrorResponses. They used to map 403/404 to index.html so
+        # React Router could resolve deep links, but they are DISTRIBUTION-wide
+        # - they cannot be scoped to one behaviour - so they also rewrote every
+        # API 403 and 404 into an HTML page with status 200. That is what hid
+        # the WAF upload block: the browser received a 200 and some HTML where
+        # it expected JSON, so the portal showed no error and simply did
+        # nothing. It would equally have masked the app's own 403s, such as
+        # PASSWORD_RESET_REQUIRED.
+        #
+        # SpaRouterFunction does the rewrite instead, on the static behaviour
+        # only, so API responses now reach the browser untouched.
 
         DefaultCacheBehavior:
           TargetOriginId: s3-site
@@ -1231,6 +1268,9 @@ Resources:
           # HTML document itself had no HSTS, no framing protection and no
           # nosniff.
           ResponseHeadersPolicyId: !Ref SiteHeadersPolicy
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt SpaRouterFunction.FunctionMetadata.FunctionARN
           # Static assets are read-only; no write methods reach the bucket.
           AllowedMethods: [GET, HEAD, OPTIONS]
           CachedMethods: [GET, HEAD, OPTIONS]
