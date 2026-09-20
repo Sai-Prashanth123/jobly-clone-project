@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
+import { storageProvider } from '../lib/storage';
 
 const BUCKET_MAP: Record<string, string> = {
   employee: 'employee-docs',
@@ -54,15 +55,10 @@ export async function uploadDocument(
   // storage key.
   const storagePath = `${entityId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
-  const { error: uploadError } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    .upload(storagePath, file.buffer, {
+  await storageProvider.upload(bucket, storagePath, file.buffer, {
       contentType: file.mimetype,
       upsert: false,
     });
-
-  if (uploadError) throw uploadError;
 
   // Don't generate/store a signed URL here: it's an extra storage round-trip on
   // every upload (slows uploads) and the value expires in ~1h anyway. Downloads
@@ -101,27 +97,22 @@ export async function uploadEmployeePhoto(employeeId: string, file: Express.Mult
   // doesn't accumulate orphan images on repeated uploads (#21 edge-case audit).
   // Best-effort: a cleanup failure must not block the upload.
   try {
-    const { data: existing } = await supabaseAdmin.storage
-      .from(bucket).list(`${employeeId}/`, { limit: 100 });
+    const existing = await storageProvider.list(bucket, `${employeeId}/`);
     if (existing && existing.length > 0) {
-      await supabaseAdmin.storage.from(bucket).remove(existing.map(f => `${employeeId}/${f.name}`));
+      await storageProvider.remove(bucket, existing.map(f => `${employeeId}/${f.name}`));
     }
   } catch (err) {
     console.error('[storage] employee photo cleanup failed for', employeeId, err);
   }
 
-  const { error: uploadError } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    .upload(storagePath, file.buffer, {
+  await storageProvider.upload(bucket, storagePath, file.buffer, {
       contentType: file.mimetype,
       upsert: true,
     });
-  if (uploadError) throw uploadError;
 
   // Public bucket → permanent, unauthenticated URL (no expiry).
-  const { data: urlData } = supabaseAdmin.storage.from(bucket).getPublicUrl(storagePath);
-  const publicUrl = urlData.publicUrl;
+  const urlData = storageProvider.publicUrl(bucket, storagePath);
+  const publicUrl = urlData;
 
   const { error: updErr } = await supabaseAdmin
     .from('employees')
@@ -165,11 +156,7 @@ export async function uploadDependentPassport(
   if (idx === -1) throw new NotFoundError('Dependent not found');
 
   const storagePath = `${employeeId}/dependents/${dependentId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  const { error: uploadError } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    .upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
-  if (uploadError) throw uploadError;
+  await storageProvider.upload(bucket, storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
 
   const nextDependents = dependents.map((d, i) =>
     i === idx ? { ...d, passportStoragePath: storagePath, passportFileName: file.originalname } : d,
@@ -180,8 +167,8 @@ export async function uploadDependentPassport(
     .eq('id', employeeId);
   if (updErr) throw updErr;
 
-  const { data: urlData } = await supabaseAdmin.storage.from(bucket).createSignedUrl(storagePath, 3600, { download: file.originalname });
-  return { passportStoragePath: storagePath, passportFileName: file.originalname, signedUrl: urlData?.signedUrl ?? null };
+  const urlData = await storageProvider.signedUrl(bucket, storagePath, 3600, { download: file.originalname });
+  return { passportStoragePath: storagePath, passportFileName: file.originalname, signedUrl: urlData ?? null };
 }
 
 export async function getDependentPassportSignedUrl(
@@ -206,11 +193,10 @@ export async function getDependentPassportSignedUrl(
   const dep = dependents.find(d => d.id === dependentId);
   if (!dep?.passportStoragePath) throw new NotFoundError('No passport on file for this dependent');
 
-  const { data } = await supabaseAdmin
-    .storage
-    .from('employee-docs')
-    .createSignedUrl(dep.passportStoragePath, 3600, { download: dep.passportFileName ?? 'passport' });
-  return data?.signedUrl ?? null;
+  return storageProvider.signedUrl(
+    'employee-docs', dep.passportStoragePath, 3600,
+    { download: dep.passportFileName ?? 'passport' },
+  );
 }
 
 export async function getDocumentSignedUrl(
@@ -236,18 +222,17 @@ export async function getDocumentSignedUrl(
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
-  const { data } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    // `download` sets Content-Disposition: attachment so the browser SAVES the
-    // file (under its real name) instead of rendering it inline. Without it,
-    // TXT/PDF/images open in a tab instead of downloading.
-    // 60 min TTL — long enough for users to open an emailed link without
-    // re-issuing, short enough that a leaked URL has a bounded window
-    // (#19 edge-case audit).
-    .createSignedUrl(doc.storage_path, 3600, { download: doc.name ?? 'document' });
+  // `download` sets Content-Disposition: attachment so the browser SAVES the
+  // file (under its real name) instead of rendering it inline. Without it,
+  // TXT/PDF/images open in a tab instead of downloading.
+  // 60 min TTL — long enough for users to open an emailed link without
+  // re-issuing, short enough that a leaked URL has a bounded window
+  // (#19 edge-case audit).
+  const url = await storageProvider.signedUrl(bucket, doc.storage_path, 3600, {
+    download: doc.name ?? 'document',
+  });
 
-  return data?.signedUrl ?? null;
+  return url ?? null;
 }
 
 export async function getDocumentPreviewUrl(
@@ -269,12 +254,10 @@ export async function getDocumentPreviewUrl(
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
-  const { data } = await supabaseAdmin
-    .storage
-    .from(bucket)
-    .createSignedUrl(doc.storage_path, 3600);  // no download: true → inline rendering
+  // No `download` option → inline rendering in the browser.
+  const url = await storageProvider.signedUrl(bucket, doc.storage_path, 3600);
 
-  return { url: data?.signedUrl ?? null, mimeType: doc.type ?? null, name: doc.name ?? 'document' };
+  return { url: url ?? null, mimeType: doc.type ?? null, name: doc.name ?? 'document' };
 }
 
 // Self-hosted document render: downloads from Supabase, converts to HTML server-side.
@@ -304,15 +287,14 @@ export async function renderDocument(
 
   // PDF and images: return inline signed URL so client renders them natively.
   if (ext === 'pdf' || ['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) {
-    const { data: urlData } = await supabaseAdmin.storage.from(bucket).createSignedUrl(doc.storage_path, 3600);
-    return { html: '', kind: 'passthrough', name, inlineUrl: urlData?.signedUrl ?? undefined };
+    const urlData = await storageProvider.signedUrl(bucket, doc.storage_path, 3600);
+    return { html: '', kind: 'passthrough', name, inlineUrl: urlData ?? undefined };
   }
 
   // Download the file bytes from Supabase storage.
-  const { data: fileData, error: dlErr } = await supabaseAdmin.storage.from(bucket).download(doc.storage_path);
-  if (dlErr || !fileData) throw new Error('Failed to download document for rendering');
+  const fileData = await storageProvider.download(bucket, doc.storage_path);
 
-  const buffer = Buffer.from(await fileData.arrayBuffer());
+  const buffer = fileData;
 
   // DOCX → HTML via mammoth (preserves headings, bold, lists, tables).
   if (ext === 'docx' || ext === 'doc') {
@@ -364,9 +346,13 @@ export async function downloadDocumentBuffer(
   entityType: 'employee' | 'client' | 'invoice',
 ): Promise<Buffer | null> {
   const bucket = BUCKET_MAP[entityType];
-  const { data, error } = await supabaseAdmin.storage.from(bucket).download(storagePath);
-  if (error || !data) return null;
-  return Buffer.from(await data.arrayBuffer());
+  try {
+    return await storageProvider.download(bucket, storagePath);
+  } catch {
+    // Callers treat null as "no such document"; the provider throws instead of
+    // returning an error object, so the envelope check becomes a catch.
+    return null;
+  }
 }
 
 export async function setDocumentLegalReview(
@@ -405,6 +391,6 @@ export async function deleteDocument(docId: string) {
   if (error || !doc) throw new NotFoundError('Document not found');
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
-  await supabaseAdmin.storage.from(bucket).remove([doc.storage_path]);
+  await storageProvider.remove(bucket, [doc.storage_path]);
   await supabaseAdmin.from('documents').delete().eq('id', docId);
 }

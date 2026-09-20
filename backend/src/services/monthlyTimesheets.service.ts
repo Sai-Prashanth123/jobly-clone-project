@@ -12,6 +12,7 @@ import { sendMonthlyTimesheetEmail, mailerConfigured } from '../lib/mailer';
 import { generateMonthlyTimesheetPDF, generateMonthlyTimesheetDOCX, type MonthlyTimesheetPDFData } from '../lib/pdfGenerator';
 import { listHolidays } from './holidays.service';
 import { env } from '../config/env';
+import { storageProvider } from '../lib/storage';
 import type {
   UpsertMonthlyTimesheetInput, UpdateMonthlyTimesheetInput,
   PatchMonthlyStatusInput, ListMonthlyTimesheetsQuery,
@@ -457,19 +458,16 @@ export async function generateAndStoreMonthlyPdf(row: any): Promise<string | nul
   const buffer = await generateMonthlyTimesheetPDF(await buildMonthlyReportData(row));
 
   const fileName = `${row.display_id}.pdf`;
-  const { error: uploadError } = await supabaseAdmin
-    .storage.from('monthly-timesheets')
-    .upload(fileName, buffer, { contentType: 'application/pdf', upsert: true });
-  if (uploadError) throw uploadError;
+  await storageProvider.upload('monthly-timesheets', fileName, buffer, { contentType: 'application/pdf', upsert: true });
 
-  const { data: urlData } = await supabaseAdmin
-    .storage.from('monthly-timesheets')
-    // `download` → Content-Disposition: attachment so the link saves the PDF
-    // (under its real name) instead of opening inline in a tab.
-    .createSignedUrl(fileName, 7 * 24 * 60 * 60, { download: fileName });
+  // `download` → Content-Disposition: attachment so the link saves the PDF
+  // (under its real name) instead of opening inline in a tab.
+  const urlData = await storageProvider.signedUrl(
+    'monthly-timesheets', fileName, 7 * 24 * 60 * 60, { download: fileName },
+  );
 
-  await supabaseAdmin.from('monthly_timesheets').update({ pdf_url: urlData?.signedUrl }).eq('id', row.id);
-  return urlData?.signedUrl ?? null;
+  await supabaseAdmin.from('monthly_timesheets').update({ pdf_url: urlData }).eq('id', row.id);
+  return urlData ?? null;
 }
 
 export async function getMonthlyTimesheetPDF(id: string): Promise<string | null> {
@@ -581,10 +579,9 @@ export async function uploadMonthlyClientProof(
   // Delete the previous proof (best-effort) so storage doesn't accumulate
   // orphan files when employees re-upload.
   try {
-    const { data: existing } = await supabaseAdmin.storage
-      .from(PROOF_BUCKET).list(`monthly/${id}/`, { limit: 100 });
+    const existing = await storageProvider.list(PROOF_BUCKET, `monthly/${id}/`);
     if (existing && existing.length > 0) {
-      await supabaseAdmin.storage.from(PROOF_BUCKET).remove(existing.map(f => `monthly/${id}/${f.name}`));
+      await storageProvider.remove(PROOF_BUCKET, existing.map(f => `monthly/${id}/${f.name}`));
     }
   } catch (err) {
     console.error('[monthlyTimesheets] old proof cleanup failed for', id, err);
@@ -592,17 +589,13 @@ export async function uploadMonthlyClientProof(
 
   const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
   const path = `monthly/${id}/${Date.now()}-${safeName}`;
-  const { error: upErr } = await supabaseAdmin.storage.from(PROOF_BUCKET)
-    .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
-  if (upErr) throw upErr;
+  await storageProvider.upload(PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
 
-  const { data: signed, error: signErr } = await supabaseAdmin.storage.from(PROOF_BUCKET)
-    .createSignedUrl(path, PROOF_URL_TTL_SECONDS);
-  if (signErr) throw signErr;
+  const signed = await storageProvider.signedUrl(PROOF_BUCKET, path, PROOF_URL_TTL_SECONDS);
 
   const { data: updated, error: dbErr } = await supabaseAdmin
     .from('monthly_timesheets')
-    .update({ client_signed_url: signed.signedUrl, client_signed_filename: file.originalname })
+    .update({ client_signed_url: signed, client_signed_filename: file.originalname })
     .eq('id', id).select().single();
   if (dbErr) throw dbErr;
 
@@ -646,10 +639,9 @@ export async function deleteMonthlyClientProof(
   }
 
   try {
-    const { data: existing } = await supabaseAdmin.storage
-      .from(PROOF_BUCKET).list(`monthly/${id}/`, { limit: 100 });
+    const existing = await storageProvider.list(PROOF_BUCKET, `monthly/${id}/`);
     if (existing && existing.length > 0) {
-      await supabaseAdmin.storage.from(PROOF_BUCKET).remove(existing.map(f => `monthly/${id}/${f.name}`));
+      await storageProvider.remove(PROOF_BUCKET, existing.map(f => `monthly/${id}/${f.name}`));
     }
   } catch (err) {
     console.error('[monthlyTimesheets] proof file cleanup failed for', id, err);

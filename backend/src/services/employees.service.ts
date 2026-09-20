@@ -11,6 +11,7 @@ import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import { resolveEmployeeEmailRecipients } from '../lib/employeeCommunication';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery, RaiseLegalRequestInput } from '../schemas/employee.schema';
 import * as casesService from './cases.service';
+import { storageProvider } from '../lib/storage';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
 function serializeEmployee(emp: any) {
@@ -1323,10 +1324,10 @@ async function purgeEmployeeData(empId: string, currentEmail: string | null): Pr
   // 4. Remove the employee's storage files in both buckets — best-effort.
   for (const bucket of ['employee-docs', 'employee-photos'] as const) {
     try {
-      const { data: files } = await supabaseAdmin.storage.from(bucket).list(`${empId}/`, { limit: 1000 });
+      const files = await storageProvider.list(bucket, `${empId}/`);
       if (files && files.length > 0) {
         const paths = files.map(f => `${empId}/${f.name}`);
-        await supabaseAdmin.storage.from(bucket).remove(paths);
+        await storageProvider.remove(bucket, paths);
       }
     } catch (err) {
       console.error(`[purgeEmployeeData] storage cleanup failed for ${bucket}/${empId}/`, err);

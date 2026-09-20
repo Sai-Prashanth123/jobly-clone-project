@@ -835,6 +835,18 @@ Resources:
                   - cognito-idp:AdminDeleteUser
                   - cognito-idp:AdminUserGlobalSignOut
                 Resource: !GetAtt UserPool.Arn
+        # Documents. No s3:DeleteObjectVersion: the app removes objects, and
+        # version history is the safety net if it removes the wrong one.
+        - PolicyName: documents-bucket
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: [s3:GetObject, s3:PutObject, s3:DeleteObject]
+                Resource: !Sub '${DocumentsBucket.Arn}/*'
+              - Effect: Allow
+                Action: s3:ListBucket
+                Resource: !GetAtt DocumentsBucket.Arn
 
   BackendFunction:
     Type: AWS::Lambda::Function
@@ -899,6 +911,15 @@ Resources:
           AUTH_DRIVER: cognito
           COGNITO_USER_POOL_ID: !Ref UserPool
           COGNITO_CLIENT_ID: !Ref UserPoolClient
+          # Documents move to S3. This is the last Supabase dependency to go.
+          STORAGE_DRIVER: s3
+          DOCUMENTS_BUCKET: !Ref DocumentsBucket
+          # Persisted into employees.profile_photo_url, so it must stay stable
+          # across deploys - hence the distribution domain, not a signed URL.
+          PUBLIC_ASSET_BASE_URL: !If
+            - HasFrontendUrl
+            - !Ref FrontendUrl
+            - !Sub 'https://${Distribution.DomainName}'
       VpcConfig:
         SecurityGroupIds: [!Ref LambdaSecurityGroup]
         SubnetIds:
@@ -1009,6 +1030,94 @@ Resources:
   # concurrency limit is only 10), and avoids SigV4 signing against a Lambda
   # Function URL, which is what returned 403 on the first deploy.
   # ----------------------------------------------------------------------
+
+  # --------------------------------------------------------------------
+  # Document storage.
+  #
+  # All eleven Supabase buckets land in this one bucket, separated by a key
+  # prefix that encodes visibility:
+  #
+  #   private/<supabase-bucket>/<path>   signed URLs only
+  #   public/<supabase-bucket>/<path>    served by CloudFront at /public/*
+  #
+  # That prefix is what makes sharing a bucket safe. The CloudFront behaviour
+  # below matches /public/* only, which maps one-to-one onto the public
+  # prefix, so there is no rewriting step and no path that reaches a private
+  # employee document through the distribution.
+  #
+  # Reached over the existing S3 gateway endpoint, so document traffic stays
+  # inside the VPC and never touches the NAT gateway.
+  # --------------------------------------------------------------------
+
+  DocumentsBucket:
+    Type: AWS::S3::Bucket
+    # Retain: these are employees' passports, I-9s and signed contracts. A
+    # stack delete must not take them with it.
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${ProjectName}-documents-${AWS::AccountId}'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      OwnershipControls:
+        Rules:
+          - ObjectOwnership: BucketOwnerEnforced
+      LifecycleConfiguration:
+        Rules:
+          # Old versions exist to undo an accidental overwrite, not as an
+          # archive - 90 days is long enough to notice.
+          - Id: expire-noncurrent-versions
+            Status: Enabled
+            NoncurrentVersionExpirationInDays: 90
+          - Id: abort-incomplete-uploads
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+      CorsConfiguration:
+        CorsRules:
+          # Needed for presigned PUT uploads from the browser, which is how
+          # files larger than Lambda's 6MB request ceiling will be handled.
+          - AllowedMethods: [GET, PUT, HEAD]
+            AllowedOrigins: ['*']
+            AllowedHeaders: ['*']
+            MaxAge: 3000
+
+  DocumentsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref DocumentsBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          # CloudFront may read ONLY the public prefix. Scoping the resource
+          # here, not just the behaviour, means a misconfigured distribution
+          # still cannot serve a private document.
+          - Sid: AllowCloudFrontPublicPrefix
+            Effect: Allow
+            Principal: {Service: cloudfront.amazonaws.com}
+            Action: s3:GetObject
+            Resource: !Sub '${DocumentsBucket.Arn}/public/*'
+            Condition:
+              StringEquals:
+                'AWS:SourceArn': !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${Distribution}'
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: s3:*
+            Resource:
+              - !GetAtt DocumentsBucket.Arn
+              - !Sub '${DocumentsBucket.Arn}/*'
+            Condition:
+              Bool: {'aws:SecureTransport': false}
 
   SiteBucket:
     Type: AWS::S3::Bucket
@@ -1341,6 +1450,12 @@ Resources:
             S3OriginConfig:
               OriginAccessIdentity: ''
 
+          - Id: s3-documents
+            DomainName: !GetAtt DocumentsBucket.RegionalDomainName
+            OriginAccessControlId: !GetAtt SiteOriginAccessControl.Id
+            S3OriginConfig:
+              OriginAccessIdentity: ''
+
           - Id: http-api
             DomainName: !Sub '${HttpApi}.execute-api.${AWS::Region}.amazonaws.com'
             CustomOriginConfig:
@@ -1390,6 +1505,20 @@ Resources:
           # OAC-signed S3 origin breaks the SigV4 signature.
 
         CacheBehaviors:
+          # Profile photos and document templates. The path pattern is the
+          # key prefix, so this behaviour can only ever reach objects stored
+          # under public/ - private documents are unreachable here by
+          # construction, and the bucket policy enforces the same scope.
+          - PathPattern: '/public/*'
+            TargetOriginId: s3-documents
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD, OPTIONS]
+            CachedMethods: [GET, HEAD, OPTIONS]
+            Compress: true
+            # CachingOptimized: these URLs are content-addressed by timestamp,
+            # so a changed photo is a new key rather than a new version.
+            CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+
           - PathPattern: '/api/*'
             TargetOriginId: http-api
             ViewerProtocolPolicy: redirect-to-https

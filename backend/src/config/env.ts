@@ -32,6 +32,13 @@ const EnvSchema = z.object({
   COGNITO_USER_POOL_ID: z.string().optional(),
   COGNITO_CLIENT_ID: z.string().optional(),
   AWS_REGION: z.string().optional(),
+  // Where document files live. 'supabase' (default) is Supabase Storage;
+  // 's3' is the AWS bucket, reached over the S3 VPC endpoint.
+  STORAGE_DRIVER: z.enum(['supabase', 's3']).default('supabase'),
+  DOCUMENTS_BUCKET: z.string().optional(),
+  // CloudFront origin serving the public/ prefix. Persisted into
+  // employees.profile_photo_url, so it must be stable.
+  PUBLIC_ASSET_BASE_URL: z.string().optional(),
   FRONTEND_URL: z.string().default('http://localhost:8080'),
   // Email transport. Preferred: a transactional SMTP provider (Brevo/SendGrid)
   // — no Gmail App Password, better deliverability to Gmail/Outlook.

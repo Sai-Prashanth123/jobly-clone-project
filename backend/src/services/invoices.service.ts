@@ -10,6 +10,7 @@ import { getEmailTemplate } from './emailTemplates.service';
 import { addDaysToDate, daysBetween, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
 import { paymentTermsDays } from '../schemas/invoice.schema';
+import { storageProvider } from '../lib/storage';
 
 // Resolve a document-level discount to a dollar amount applied to the subtotal.
 // Percentage → subtotal * value/100; fixed → value. Clamped to [0, subtotal] and
@@ -596,7 +597,7 @@ export async function deleteInvoice(id: string) {
   // remain accessible via a still-valid signed URL).
   if (inv.invoice_number) {
     try {
-      await supabaseAdmin.storage.from('invoices').remove([`${inv.invoice_number}.pdf`]);
+      await storageProvider.remove('invoices', [`${inv.invoice_number}.pdf`]);
     } catch (err) {
       console.error('[invoices.service] failed to remove PDF from storage for', inv.invoice_number, err);
     }
@@ -609,7 +610,7 @@ export async function deleteInvoice(id: string) {
       .from('documents').select('id, storage_path')
       .eq('entity_type', 'invoice').eq('entity_id', id);
     if (docs && docs.length > 0) {
-      await supabaseAdmin.storage.from('invoices').remove(docs.map(d => d.storage_path));
+      await storageProvider.remove('invoices', docs.map(d => d.storage_path));
       await supabaseAdmin.from('documents').delete().eq('entity_type', 'invoice').eq('entity_id', id);
     }
   } catch (err) {
@@ -958,19 +959,14 @@ async function renderAndStoreInvoicePDF(id: string): Promise<{ buffer: Buffer; s
   const buffer = await generateInvoicePDF(buildInvoicePdfData(inv, client), theme);
 
   const fileName = `${inv.invoice_number}.pdf`;
-  const { error: uploadError } = await supabaseAdmin
-    .storage.from('invoices')
-    .upload(fileName, buffer, { contentType: 'application/pdf', upsert: true });
-  if (uploadError) throw uploadError;
+  await storageProvider.upload('invoices', fileName, buffer, { contentType: 'application/pdf', upsert: true });
 
   // 7-day signed URL — the link is embedded in the invoice email and must
   // survive spam-folder delays.
-  const { data: urlData } = await supabaseAdmin
-    .storage.from('invoices')
-    .createSignedUrl(fileName, 7 * 24 * 60 * 60, { download: fileName });
+  const urlData = await storageProvider.signedUrl('invoices', fileName, 7 * 24 * 60 * 60, { download: fileName });
 
-  await supabaseAdmin.from('invoices').update({ pdf_url: urlData?.signedUrl }).eq('id', id);
-  return { buffer, signedUrl: urlData?.signedUrl ?? null };
+  await supabaseAdmin.from('invoices').update({ pdf_url: urlData }).eq('id', id);
+  return { buffer, signedUrl: urlData ?? null };
 }
 
 export async function getInvoicePDF(id: string): Promise<string | null> {

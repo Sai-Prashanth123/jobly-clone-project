@@ -3,6 +3,7 @@ import { NotFoundError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { createNotification, getUserIdsByRole } from './notifications.service';
 import { generateEnrollmentFormPDF, type EnrollmentFormPDFData } from '../lib/pdfGenerator';
+import { storageProvider } from '../lib/storage';
 import type {
   CreateEnrollmentFormInput, UpdateEnrollmentFormInput, SubmitEnrollmentFormInput, ListEnrollmentFormsQuery, FormData,
 } from '../schemas/enrollmentForms.schema';
@@ -198,17 +199,12 @@ export async function generateAndStoreEnrollmentFormPdf(row: any): Promise<strin
   const buffer = await generateEnrollmentFormPDF(buildPdfData(row));
 
   const fileName = `${row.display_id}.pdf`;
-  const { error: uploadError } = await supabaseAdmin
-    .storage.from('enrollment-forms')
-    .upload(fileName, buffer, { contentType: 'application/pdf', upsert: true });
-  if (uploadError) throw uploadError;
+  await storageProvider.upload('enrollment-forms', fileName, buffer, { contentType: 'application/pdf', upsert: true });
 
-  const { data: urlData } = await supabaseAdmin
-    .storage.from('enrollment-forms')
-    .createSignedUrl(fileName, 7 * 24 * 60 * 60, { download: fileName });
+  const urlData = await storageProvider.signedUrl('enrollment-forms', fileName, 7 * 24 * 60 * 60, { download: fileName });
 
-  await supabaseAdmin.from('enrollment_forms').update({ pdf_url: urlData?.signedUrl }).eq('id', row.id);
-  return urlData?.signedUrl ?? null;
+  await supabaseAdmin.from('enrollment_forms').update({ pdf_url: urlData }).eq('id', row.id);
+  return urlData ?? null;
 }
 
 export async function getEnrollmentFormPdf(id: string): Promise<string | null> {

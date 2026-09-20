@@ -6,6 +6,7 @@ import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getRep
 import { logActivity } from '../lib/activityLogger';
 import { bustNavBadgeCache } from './navBadges.service';
 import { listHolidays } from './holidays.service';
+import { storageProvider } from '../lib/storage';
 import type {
   CreateTimesheetInput, UpdateTimesheetInput,
   PatchTimesheetStatusInput, ListTimesheetsQuery,
@@ -568,10 +569,9 @@ export async function uploadWeeklyClientProof(
   // attached to any draft/rejected week the employee is still completing.
 
   try {
-    const { data: existing } = await supabaseAdmin.storage
-      .from(WEEKLY_PROOF_BUCKET).list(`weekly/${id}/`, { limit: 100 });
+    const existing = await storageProvider.list(WEEKLY_PROOF_BUCKET, `weekly/${id}/`);
     if (existing && existing.length > 0) {
-      await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET).remove(existing.map(f => `weekly/${id}/${f.name}`));
+      await storageProvider.remove(WEEKLY_PROOF_BUCKET, existing.map(f => `weekly/${id}/${f.name}`));
     }
   } catch (err) {
     console.error('[timesheets] old proof cleanup failed for', id, err);
@@ -579,17 +579,13 @@ export async function uploadWeeklyClientProof(
 
   const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
   const path = `weekly/${id}/${Date.now()}-${safeName}`;
-  const { error: upErr } = await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET)
-    .upload(path, file.buffer, { contentType: file.mimetype, upsert: false });
-  if (upErr) throw upErr;
+  await storageProvider.upload(WEEKLY_PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
 
-  const { data: signed, error: signErr } = await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET)
-    .createSignedUrl(path, WEEKLY_PROOF_URL_TTL_SECONDS);
-  if (signErr) throw signErr;
+  const signed = await storageProvider.signedUrl(WEEKLY_PROOF_BUCKET, path, WEEKLY_PROOF_URL_TTL_SECONDS);
 
   const { data: updated, error: dbErr } = await supabaseAdmin
     .from('timesheets')
-    .update({ client_signed_url: signed.signedUrl, client_signed_filename: file.originalname })
+    .update({ client_signed_url: signed, client_signed_filename: file.originalname })
     .eq('id', id).select().single();
   if (dbErr) throw dbErr;
 
@@ -613,10 +609,9 @@ export async function deleteWeeklyClientProof(
   }
 
   try {
-    const { data: existing } = await supabaseAdmin.storage
-      .from(WEEKLY_PROOF_BUCKET).list(`weekly/${id}/`, { limit: 100 });
+    const existing = await storageProvider.list(WEEKLY_PROOF_BUCKET, `weekly/${id}/`);
     if (existing && existing.length > 0) {
-      await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET).remove(existing.map(f => `weekly/${id}/${f.name}`));
+      await storageProvider.remove(WEEKLY_PROOF_BUCKET, existing.map(f => `weekly/${id}/${f.name}`));
     }
   } catch (err) {
     console.error('[timesheets] proof file cleanup failed for', id, err);
@@ -649,10 +644,9 @@ export async function reopenTimesheet(
   // The previously-uploaded client-signed proof attested to the hours that
   // are about to change — clear it out (same cleanup as deleteWeeklyClientProof).
   try {
-    const { data: existing } = await supabaseAdmin.storage
-      .from(WEEKLY_PROOF_BUCKET).list(`weekly/${id}/`, { limit: 100 });
+    const existing = await storageProvider.list(WEEKLY_PROOF_BUCKET, `weekly/${id}/`);
     if (existing && existing.length > 0) {
-      await supabaseAdmin.storage.from(WEEKLY_PROOF_BUCKET).remove(existing.map(f => `weekly/${id}/${f.name}`));
+      await storageProvider.remove(WEEKLY_PROOF_BUCKET, existing.map(f => `weekly/${id}/${f.name}`));
     }
   } catch (err) {
     console.error('[timesheets] proof file cleanup failed while reopening', id, err);

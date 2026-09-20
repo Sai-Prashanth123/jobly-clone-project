@@ -6,6 +6,7 @@ import { sendPerformanceReviewEmail as mailPerformanceReview, mailerConfigured }
 import { generatePerformanceReviewPDF, type PerformanceReviewPDFData } from '../lib/pdfGenerator';
 import { RATING_CRITERIA } from '../schemas/performanceReviews.schema';
 import { resolveEmployeeEmailRecipients } from '../lib/employeeCommunication';
+import { storageProvider } from '../lib/storage';
 import type {
   CreatePerformanceReviewInput, UpdatePerformanceReviewInput, ListPerformanceReviewsQuery,
 } from '../schemas/performanceReviews.schema';
@@ -143,17 +144,12 @@ export async function generateAndStorePerformanceReviewPdf(row: any): Promise<st
   const buffer = await generatePerformanceReviewPDF(buildPdfData(row));
 
   const fileName = `${row.display_id}.pdf`;
-  const { error: uploadError } = await supabaseAdmin
-    .storage.from('performance-reviews')
-    .upload(fileName, buffer, { contentType: 'application/pdf', upsert: true });
-  if (uploadError) throw uploadError;
+  await storageProvider.upload('performance-reviews', fileName, buffer, { contentType: 'application/pdf', upsert: true });
 
-  const { data: urlData } = await supabaseAdmin
-    .storage.from('performance-reviews')
-    .createSignedUrl(fileName, 7 * 24 * 60 * 60, { download: fileName });
+  const urlData = await storageProvider.signedUrl('performance-reviews', fileName, 7 * 24 * 60 * 60, { download: fileName });
 
-  await supabaseAdmin.from('performance_reviews').update({ pdf_url: urlData?.signedUrl }).eq('id', row.id);
-  return urlData?.signedUrl ?? null;
+  await supabaseAdmin.from('performance_reviews').update({ pdf_url: urlData }).eq('id', row.id);
+  return urlData ?? null;
 }
 
 export async function getPerformanceReviewPdf(id: string): Promise<string | null> {

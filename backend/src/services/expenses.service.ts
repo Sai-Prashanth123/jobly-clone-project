@@ -5,6 +5,7 @@ import { getPortalUserByEmployeeId, getUserIdsByRole } from './notifications.ser
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import { bustNavBadgeCache } from './navBadges.service';
 import type { CreateExpenseInput, UpdateExpenseInput, ReviewExpenseInput, ListExpensesQuery } from '../schemas/expenses.schema';
+import { storageProvider } from '../lib/storage';
 
 const RECEIPT_BUCKET = 'expense-receipts';
 
@@ -14,21 +15,21 @@ const RECEIPT_BUCKET = 'expense-receipts';
 // URL on every read, same download-forcing pattern as documents).
 async function resolveReceiptUrl(row: any): Promise<any> {
   if (!row?.receipt_url || /^https?:\/\//i.test(row.receipt_url)) return row;
-  const { data } = await supabaseAdmin.storage
-    .from(RECEIPT_BUCKET)
-    .createSignedUrl(row.receipt_url, 3600, { download: true });
-  return { ...row, receipt_url: data?.signedUrl ?? null };
+  // Supabase accepted `download: true` to mean "attach under the stored name".
+  // S3 needs an actual filename for Content-Disposition, so derive it from the
+  // key - which already ends in the original filename.
+  const filename = row.receipt_url.split('/').pop() || 'receipt';
+  const signed = await storageProvider.signedUrl(RECEIPT_BUCKET, row.receipt_url, 3600, {
+    download: filename,
+  });
+  return { ...row, receipt_url: signed ?? null };
 }
 
 export async function uploadReceipt(id: string, file: Express.Multer.File, actorId: string, actorRole: string, actorEmployeeId?: string | null) {
   const expense = await getExpense(id, actorRole, actorEmployeeId);
   const storagePath = `${id}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
 
-  const { error: uploadError } = await supabaseAdmin
-    .storage
-    .from(RECEIPT_BUCKET)
-    .upload(storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
-  if (uploadError) throw uploadError;
+  await storageProvider.upload(RECEIPT_BUCKET, storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
 
   const { data, error } = await supabaseAdmin
     .from('expense_reports')
