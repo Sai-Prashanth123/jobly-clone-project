@@ -141,6 +141,28 @@ exports.handler = async (event = {}) => {
       return { ok: true, rows: r.rows };
     }
 
+    // Run several SELECTs in one invocation and report each outcome. Used to
+    // validate generated SQL against the real schema without a round trip per
+    // statement. SELECT-only, same as `select`.
+    if (event.selects) {
+      const out = [];
+      for (const s of event.selects) {
+        const text = typeof s === 'string' ? s : s.text;
+        const values = typeof s === 'string' ? [] : (s.values || []);
+        if (!/^\s*select\b/i.test(text)) {
+          out.push({ ok: false, error: 'select-only', label: s.label });
+          continue;
+        }
+        try {
+          const r = await client.query(text, values);
+          out.push({ ok: true, label: s.label, rows: r.rowCount, cols: r.fields.map(f => f.name) });
+        } catch (err) {
+          out.push({ ok: false, label: s.label, error: err.message });
+        }
+      }
+      return { ok: out.every(o => o.ok), results: out };
+    }
+
     // The application must not connect as the RDS master user. This creates
     // (or re-syncs) app_user with the password CloudFormation generated, and
     // grants it DML on the schema but no DDL, no superuser, no role creation.
