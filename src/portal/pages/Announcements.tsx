@@ -323,11 +323,24 @@ export default function Announcements() {
 
               <div className="space-y-1.5">
                 <Label>Expires (optional)</Label>
+                {/* No min: past dates are selectable on purpose (staff asked
+                    for them). The calendar also opens on the current month,
+                    so near month-end it looks like only a few days are
+                    available - the hint below heads that off too. */}
                 <UsDateInput
                   value={form.expiresAt}
                   onChange={iso => setForm(f => ({ ...f, expiresAt: iso }))}
-                  min={todayIso}
                 />
+                {form.expiresAt && form.expiresAt < todayIso ? (
+                  <p className="text-[11px] text-amber-600">
+                    This date has already passed, so the announcement will be expired
+                    straight away and won&apos;t appear in the list.
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-gray-400">
+                    Type any date as MM/DD/YYYY, or use the calendar arrows to move months.
+                  </p>
+                )}
               </div>
             </div>
 

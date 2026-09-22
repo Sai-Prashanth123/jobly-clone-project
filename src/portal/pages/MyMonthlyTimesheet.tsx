@@ -318,6 +318,17 @@ export default function MyMonthlyTimesheet() {
         }
       }
       if ('startTime' in patch || 'endTime' in patch) next.hours = computeHours(next.startTime, next.endTime);
+      // Typing hours on an untouched day marks it worked. A blank weekday
+      // starts as 'none' (see buildMonthSkeleton), and the hours box used to
+      // be disabled for anything that wasn't already 'present' — so on a
+      // fresh month every weekday was greyed out with no visible way in, and
+      // you had to know to set Status to Present first. Entering hours is an
+      // unambiguous statement that the day was worked, so treat it as one.
+      // Times are left alone: filling in 09:00-17:00 here would imply 8 hours
+      // regardless of what was actually typed.
+      if ('hours' in patch && Number(patch.hours) > 0 && e.status === 'none') {
+        next.status = 'present';
+      }
       return next;
     }));
     setDirty(true);
@@ -768,6 +779,9 @@ export default function MyMonthlyTimesheet() {
                         // Worked-day fields are editable only on Present days; weekend +
                         // leave/holiday/absent rows are greyed out.
                         const fieldsDisabled = isLocked || e.status !== 'present';
+                        // Hours stay editable on an untouched day so there is a way in;
+                        // entering a value flips the day to Present (see updateEntry).
+                        const hoursDisabled = isLocked || (e.status !== 'present' && e.status !== 'none');
                         return (
                           <tr key={e.date} className={`border-b border-gray-100 ${ROW_TINT[e.status] ?? ''}`}>
                             <td className="px-3 py-2.5 text-gray-400 text-xs tabular-nums">{idx + 1}</td>
@@ -796,7 +810,7 @@ export default function MyMonthlyTimesheet() {
                                 <Input
                                   type="number" min={0} max={24} step={0.5}
                                   value={e.hours ? String(e.hours) : ''}
-                                  disabled={fieldsDisabled}
+                                  disabled={hoursDisabled}
                                   onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
                                   placeholder="0"
                                   className={`h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${leaveByDate?.[e.date]?.status === 'approved' && e.status === 'present' && e.hours > 0 ? 'border-red-400 ring-1 ring-red-300 bg-red-50' : ''}`}
@@ -830,6 +844,9 @@ export default function MyMonthlyTimesheet() {
                   {entries.map((e, idx) => ({ e, idx })).filter(({ e }) => dayFilter === 'all' || e.status === dayFilter).map(({ e, idx }) => {
                     const isWeekend = e.status === 'weekend';
                     const fieldsDisabled = isLocked || e.status !== 'present';
+                        // Hours stay editable on an untouched day so there is a way in;
+                        // entering a value flips the day to Present (see updateEntry).
+                        const hoursDisabled = isLocked || (e.status !== 'present' && e.status !== 'none');
                     const leave = leaveByDate?.[e.date];
                     return (
                       <div key={e.date} className={`px-3 py-3 ${ROW_TINT[e.status] ?? ''}`}>
@@ -872,7 +889,7 @@ export default function MyMonthlyTimesheet() {
                                 <Input
                                   type="number" min={0} max={24} step={0.5}
                                   value={e.hours ? String(e.hours) : ''}
-                                  disabled={fieldsDisabled}
+                                  disabled={hoursDisabled}
                                   onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
                                   placeholder="0"
                                   className={`h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${leave?.status === 'approved' && e.status === 'present' && e.hours > 0 ? 'border-red-400 ring-1 ring-red-300 bg-red-50' : ''}`}

@@ -1746,8 +1746,12 @@ export async function listExpiringDocuments(days = 90, viewerRole = 'admin'): Pr
       });
     }
 
-    // Check identity_documents JSONB array entries that have an expiry
-    const docs = (emp.identity_documents ?? []) as Array<{ type?: string; expiry?: string; label?: string }>;
+    // Check identity_documents JSONB array entries that have an expiry.
+    // Array.isArray, not `?? []`: the column is JSONB and at least one row
+    // holds an object rather than an array, which made `for...of` throw
+    // "docs is not iterable" and took the whole Expiring Documents page down
+    // for every user over one malformed record. Same guard as onboarding.ts.
+    const docs = (Array.isArray(emp.identity_documents) ? emp.identity_documents : []) as Array<{ type?: string; expiry?: string; label?: string }>;
     for (const doc of docs) {
       const expiry = doc.expiry;
       if (!expiry || expiry < today || expiry > cutoffStr) continue;

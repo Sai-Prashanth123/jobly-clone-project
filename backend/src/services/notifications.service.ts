@@ -432,7 +432,11 @@ export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number }> {
       expiringDocs.push({ type: 'Visa / Work Authorization', expiry: emp.visa_expiry, daysLeft });
     }
 
-    const docs = (emp.identity_documents ?? []) as Array<{ type?: string; label?: string; expiry?: string }>;
+    // Array.isArray, not `?? []` - see listExpiringDocuments. A row holding a
+    // JSONB object instead of an array makes `for...of` throw, and this runs
+    // inside the daily tick, so one bad record would kill the whole nightly
+    // expiry-alert job rather than just skipping that employee.
+    const docs = (Array.isArray(emp.identity_documents) ? emp.identity_documents : []) as Array<{ type?: string; label?: string; expiry?: string }>;
     for (const doc of docs) {
       if (!doc.expiry || doc.expiry < todayStr || doc.expiry > cutoffStr) continue;
       const daysLeft = Math.ceil((new Date(doc.expiry + 'T00:00:00Z').getTime() - new Date(todayStr + 'T00:00:00Z').getTime()) / 86400000);

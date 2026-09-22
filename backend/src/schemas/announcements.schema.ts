@@ -18,10 +18,12 @@ export const createAnnouncementSchema = z.object({
       if (/^\d{4}-\d{2}-\d{2}$/.test(v)) return `${v}T00:00:00.000Z`;
       return v;
     })
-    .pipe(z.string().datetime({ offset: true }).nullable())
-    .refine(v => v === null || new Date(v).getTime() > Date.now(), {
-      message: 'Expiration date must be in the future',
-    }),
+    // Deliberately NOT restricted to future dates. Staff asked to be able to
+    // set a past expiry, e.g. to record an announcement that has already run
+    // its course. Such an announcement is immediately expired and will not
+    // appear in the list (which filters on expires_at > now), so the form
+    // warns about that at the point of entry rather than the API refusing it.
+    .pipe(z.string().datetime({ offset: true }).nullable()),
 });
 
 export const updateAnnouncementSchema = createAnnouncementSchema.partial();
