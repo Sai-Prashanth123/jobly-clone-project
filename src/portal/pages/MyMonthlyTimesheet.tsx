@@ -811,6 +811,9 @@ export default function MyMonthlyTimesheet() {
                                   type="number" min={0} max={24} step={0.5}
                                   value={e.hours ? String(e.hours) : ''}
                                   disabled={hoursDisabled}
+                                  title={!hoursDisabled ? undefined : isLocked
+                                    ? "This timesheet has been submitted, so hours can no longer be changed."
+                                    : `Hours can only be logged on a working day - this one is marked ${e.status}. Change Status to Present first.`}
                                   onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
                                   placeholder="0"
                                   className={`h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${leaveByDate?.[e.date]?.status === 'approved' && e.status === 'present' && e.hours > 0 ? 'border-red-400 ring-1 ring-red-300 bg-red-50' : ''}`}
@@ -890,6 +893,9 @@ export default function MyMonthlyTimesheet() {
                                   type="number" min={0} max={24} step={0.5}
                                   value={e.hours ? String(e.hours) : ''}
                                   disabled={hoursDisabled}
+                                  title={!hoursDisabled ? undefined : isLocked
+                                    ? "This timesheet has been submitted, so hours can no longer be changed."
+                                    : `Hours can only be logged on a working day - this one is marked ${e.status}. Change Status to Present first.`}
                                   onChange={ev => updateEntry(idx, { hours: Math.max(0, Math.min(24, Number(ev.target.value) || 0)) })}
                                   placeholder="0"
                                   className={`h-9 text-sm text-center font-mono [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none ${leave?.status === 'approved' && e.status === 'present' && e.hours > 0 ? 'border-red-400 ring-1 ring-red-300 bg-red-50' : ''}`}

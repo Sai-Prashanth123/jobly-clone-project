@@ -9,7 +9,7 @@
 // three-way join through key_column_usage/constraint_column_usage that gets
 // the column ORDER wrong on composite keys, which would silently mis-pair
 // columns.
-import type { Pool } from 'pg';
+import type { Pool, QueryResult } from 'pg';
 
 export interface FkEdge {
   /** Table holding the FK column (the "child" / referencing side). */
@@ -78,12 +78,48 @@ const PK_QUERY = `
 
 let cached: Promise<SchemaInfo> | null = null;
 
+/**
+ * Run the two introspection queries, retrying a few times on a cold pool.
+ *
+ * Two separate problems are being handled here, both seen in production:
+ *
+ * 1. Promise.all adopts only the FIRST rejection. A connection blip takes out
+ *    BOTH queries, so the second rejection had no handler attached and Node
+ *    reported an unhandledRejection - which the Lambda runtime treats as
+ *    fatal and kills the whole invocation. So a brief network hiccup during
+ *    cold start turned into a hard 500 on whatever page the user was opening
+ *    (Enrollment Form, Templates, Expiring Documents...). allSettled attaches
+ *    a handler to both, so neither can dangle.
+ *
+ * 2. This runs once per Lambda container, on its very first query, when the
+ *    VPC ENI and the pooled TLS connection to RDS Proxy are both cold. The
+ *    database itself is idle when this happens - 7 connections, 5% CPU - so
+ *    it is a transient connection-layer failure, not load. Retrying costs a
+ *    few hundred milliseconds on the rare bad start and avoids failing the
+ *    request outright.
+ */
+async function introspect(pool: Pool, attempts = 3): Promise<[QueryResult, QueryResult]> {
+  let lastErr: unknown;
+  for (let i = 0; i < attempts; i++) {
+    const [fk, pk] = await Promise.allSettled([pool.query(FK_QUERY), pool.query(PK_QUERY)]);
+    if (fk.status === 'fulfilled' && pk.status === 'fulfilled') return [fk.value, pk.value];
+    lastErr = fk.status === 'rejected' ? fk.reason : (pk as PromiseRejectedResult).reason;
+    if (i < attempts - 1) {
+      // Short backoff: 200ms then 600ms. Long enough for a cold ENI or a
+      // re-dialled proxy connection, short enough that the user just sees a
+      // slightly slow page rather than an error.
+      await new Promise(r => setTimeout(r, 200 * 3 ** i));
+    }
+  }
+  throw lastErr;
+}
+
 export function loadSchema(pool: Pool): Promise<SchemaInfo> {
   // Cache the promise, not the result: concurrent callers during startup then
   // share one round trip instead of each firing their own introspection.
   if (!cached) {
     cached = (async () => {
-      const [fkRes, pkRes] = await Promise.all([pool.query(FK_QUERY), pool.query(PK_QUERY)]);
+      const [fkRes, pkRes] = await introspect(pool);
 
       const fks: FkEdge[] = fkRes.rows.map(r => ({
         table: r.table,
