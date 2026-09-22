@@ -82,6 +82,27 @@ export default function PerformanceReviewDetail() {
   const setRating = (key: string, value: number) =>
     setForm(prev => (prev ? { ...prev, ratings: { ...prev.ratings, [key]: value } } : prev));
 
+  // A number box the user can actually clear.
+  //
+  // These fields used `Number(e.target.value) || 0`, which snapped an empty
+  // box straight back to 0 on every keystroke. Because the field could
+  // therefore never be empty, a freshly typed digit landed next to that stuck
+  // zero: clear the box, type "8", and you got 80. Reported from the floor as
+  // "if we give the number like 80 or 90 it is adding a 0 in the second slot".
+  //
+  // Empty now stays empty, and the value is only clamped once it actually
+  // parses - so a half-typed "-" or "e" is ignored rather than becoming 0.
+  const setNumber = <K extends keyof PerformanceReviewBody>(
+    key: K,
+    raw: string,
+    opts: { min: number; max: number; empty: PerformanceReviewBody[K] },
+  ) => {
+    if (raw.trim() === '') return set(key, opts.empty);
+    const n = Number(raw);
+    if (!Number.isFinite(n)) return;
+    set(key, Math.max(opts.min, Math.min(opts.max, n)) as PerformanceReviewBody[K]);
+  };
+
   const handleSave = async () => {
     if (!form) return;
     if (!form.periodStart || !form.periodEnd) {
@@ -196,7 +217,7 @@ export default function PerformanceReviewDetail() {
                 Supervised for entire review period?
               </label>
               {!form.supervisedFullPeriod && (
-                <Input type="number" min={0} value={form.supervisedMonths ?? ''} onChange={e => set('supervisedMonths', Number(e.target.value) || 0)} disabled={!canEdit} placeholder="Months supervised" className="w-40" />
+                <Input type="number" min={0} value={form.supervisedMonths ?? ''} onChange={e => setNumber('supervisedMonths', e.target.value, { min: 0, max: 120, empty: null })} disabled={!canEdit} placeholder="Months supervised" className="w-40" />
               )}
             </div>
           </div>
@@ -255,8 +276,8 @@ export default function PerformanceReviewDetail() {
         <CardHeader><CardTitle className="text-base">Job Function</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 sm:grid-cols-4 gap-4">
           <div className="space-y-1.5 sm:col-span-2"><Label>Job Function</Label><Input value={form.jobFunction ?? ''} onChange={e => set('jobFunction', e.target.value)} disabled={!canEdit} /></div>
-          <div className="space-y-1.5"><Label>Weight (%)</Label><Input type="number" min={0} max={100} value={form.weightPercent ?? 100} onChange={e => set('weightPercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))} disabled={!canEdit} /></div>
-          <div className="space-y-1.5"><Label>Complete (%)</Label><Input type="number" min={0} max={100} value={form.completePercent ?? 100} onChange={e => set('completePercent', Math.max(0, Math.min(100, Number(e.target.value) || 0)))} disabled={!canEdit} /></div>
+          <div className="space-y-1.5"><Label>Weight (%)</Label><Input type="number" min={0} max={100} value={form.weightPercent ?? ''} placeholder="100" onChange={e => setNumber('weightPercent', e.target.value, { min: 0, max: 100, empty: void 0 })} disabled={!canEdit} /></div>
+          <div className="space-y-1.5"><Label>Complete (%)</Label><Input type="number" min={0} max={100} value={form.completePercent ?? ''} placeholder="100" onChange={e => setNumber('completePercent', e.target.value, { min: 0, max: 100, empty: void 0 })} disabled={!canEdit} /></div>
           <div className="space-y-1.5 sm:col-span-4"><Label>Status</Label><Input value={form.statusGoal ?? ''} onChange={e => set('statusGoal', e.target.value)} disabled={!canEdit} placeholder="Goal Achieved" /></div>
         </CardContent>
       </Card>
