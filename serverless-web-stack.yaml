@@ -1462,10 +1462,18 @@ Resources:
             ModeBlock: false
             Override: true
           ContentSecurityPolicy:
-            # connect-src must include Supabase: the SPA talks to Supabase
-            # Auth directly for session refresh. 'unsafe-inline' on styles is
-            # required by the Tailwind/Radix runtime style injection.
-            ContentSecurityPolicy: >-
+            # 'unsafe-inline' on styles is required by the Tailwind/Radix
+            # runtime style injection.
+            #
+            # frame-src must name the documents bucket. The preview dialog
+            # renders PDFs and Office files in an <iframe> pointed at a
+            # presigned S3 URL, and with no frame-src the default-src 'self'
+            # fallback blocks it - the file uploads fine and then the preview
+            # comes up blank. Images were unaffected because they go through
+            # img-src, which is why this only showed up on PDFs.
+            #
+            # connect-src carries the same origin for fetch-based downloads.
+            ContentSecurityPolicy: !Sub >-
               default-src 'self';
               base-uri 'self';
               object-src 'none';
@@ -1474,7 +1482,8 @@ Resources:
               font-src 'self' data: https:;
               style-src 'self' 'unsafe-inline' https:;
               script-src 'self';
-              connect-src 'self' https://*.supabase.co;
+              frame-src 'self' blob: https://${DocumentsBucket}.s3.${AWS::Region}.amazonaws.com;
+              connect-src 'self' https://${DocumentsBucket}.s3.${AWS::Region}.amazonaws.com https://*.supabase.co;
               form-action 'self';
               upgrade-insecure-requests
             Override: true
@@ -1498,7 +1507,14 @@ Resources:
         IPV6Enabled: true
         PriceClass: PriceClass_100
         WebACLId: !GetAtt WebAcl.Arn
-        Aliases: !If [HasDomain, [!Ref DomainName], !Ref 'AWS::NoValue']
+        # Both names, because the certificate covers both and a bare domain
+        # cannot be a CNAME - whichever way the apex ends up being pointed
+        # (ALIAS record, or a redirect to www), CloudFront has to be willing
+        # to answer for it.
+        Aliases: !If
+          - HasDomain
+          - [!Ref DomainName, !Sub 'www.${DomainName}']
+          - !Ref 'AWS::NoValue'
         ViewerCertificate: !If
           - HasDomain
           - AcmCertificateArn: !Ref AcmCertificateArn

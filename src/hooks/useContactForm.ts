@@ -1,8 +1,9 @@
 import { useState } from 'react';
 
-// Same base-URL resolution the public invoice view uses.
-const API_URL = import.meta.env.VITE_API_URL
-  ?? 'https://prashanthreddy-hndndtdfhkdjhwft.eastasia-01.azurewebsites.net/api/v1';
+// Same base-URL resolution the public invoice view uses: relative by default,
+// so the call is same-origin whatever hostname serves the page. The old
+// fallback pointed at the decommissioned Azure deployment.
+const API_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export interface ContactFields {
   name: string;

@@ -7,12 +7,17 @@ declare module 'axios' {
   }
 }
 
-// Base URL comes from VITE_API_URL in .env.local (see CLAUDE.md).
-// Falls back to the Azure deployment if the env var is missing so that
-// static hosting environments without a build-time env still work.
-const API_URL =
-  import.meta.env.VITE_API_URL ??
-  'https://prashanthreddy-hndndtdfhkdjhwft.eastasia-01.azurewebsites.net/api/v1';
+// Base URL comes from VITE_API_URL at build time (see CLAUDE.md).
+//
+// The default is RELATIVE on purpose. On AWS the SPA and the API are served
+// from the same CloudFront distribution, so a relative path keeps every call
+// same-origin: no CORS preflight, and the app works under whatever hostname
+// it happens to be served from. Baking in an absolute host is what broke
+// login the moment the site was reachable at www.joblysolutions.com as well
+// as the cloudfront.net URL.
+//
+// It previously fell back to the Azure deployment, which no longer exists.
+const API_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export const apiClient = axios.create({
   baseURL: API_URL,
@@ -58,6 +63,20 @@ apiClient.interceptors.request.use(config => {
 // so the user lands back where they were after re-authenticating.
 let redirecting = false;
 
+// ...except on the unauthenticated auth endpoints. A 401 from /auth/login is
+// not an expired session — it IS the answer to the question being asked ("are
+// these credentials valid?"). Redirecting on it reloaded /portal/login, which
+// wiped the form and destroyed the "Invalid email or password" message before
+// it could render, so a mistyped password looked like the Sign in button
+// simply did nothing. Same reasoning for /auth/forgot-password.
+//
+// /auth/change-password is deliberately NOT exempt: it requires a valid token,
+// so a 401 there really does mean the session died and the redirect is right.
+// /auth/refresh never reaches this interceptor — it uses a bare axios call.
+const UNAUTHENTICATED_AUTH_PATHS = ['/auth/login', '/auth/forgot-password'];
+const isUnauthenticatedAuthCall = (url?: string) =>
+  !!url && UNAUTHENTICATED_AUTH_PATHS.some(path => url.includes(path));
+
 // Shared in-flight refresh call. Supabase refresh tokens rotate on use, so
 // when several requests 401 at once (e.g. a dashboard firing parallel
 // queries right as the token expires), each independently calling
@@ -102,7 +121,7 @@ apiClient.interceptors.response.use(
       return Promise.reject(err);
     }
 
-    if (status === 401 && !err.config?._retry && !redirecting) {
+    if (status === 401 && !isUnauthenticatedAuthCall(err.config?.url) && !err.config?._retry && !redirecting) {
       // Attempt a silent token refresh before giving up.
       const rawSession = sessionStorage.getItem('jobly_session');
       const refreshToken = rawSession ? (() => { try { return JSON.parse(rawSession)?.refreshToken; } catch { return null; } })() : null;

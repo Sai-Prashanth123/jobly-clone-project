@@ -6,7 +6,9 @@ import { formatCurrency, formatDate } from '../lib/utils';
 
 // Public, unauthenticated invoice view (Wave-style shareable link). Uses a bare
 // axios call (NOT the authed apiClient) so no token is attached.
-const API_URL = import.meta.env.VITE_API_URL ?? 'https://prashanthreddy-hndndtdfhkdjhwft.eastasia-01.azurewebsites.net/api/v1';
+// Relative by default - same reasoning as apiClient.ts. The old fallback
+// pointed at the decommissioned Azure deployment.
+const API_URL = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export default function PublicInvoiceView() {
   const { token } = useParams<{ token: string }>();
