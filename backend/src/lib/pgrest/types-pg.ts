@@ -19,11 +19,23 @@
 // Postgres' own text output, adjusted to the JSON spelling Postgres uses
 // (`to_json`), which is what PostgREST serialises with.
 //
-// NOT converted: numeric/int8 still arrive as strings, which is node-postgres
-// protecting precision that a JS number cannot hold. PostgREST emitted them
-// as JSON numbers, so that divergence is real but separate - it is a silent
-// value difference rather than a crash, and changing it touches money
-// arithmetic, so it wants its own change and its own testing.
+// numeric is converted back to a JS number for the same reason. PostgREST
+// emitted it as a JSON number, so supabase-js handed the services a number
+// and they do arithmetic on it directly. node-postgres returns a string to
+// protect precision, which turns every sum into string concatenation:
+//
+//   timesheets.reduce((s, t) => s + t.totalHours, 0)   // 0 + "8.00" -> "08.00"
+//   ...that.toFixed(1)                                  // TypeError, 500
+//
+// and, worse, any total that did NOT go on to call a number-only method
+// silently rendered as concatenated digits instead of a sum.
+//
+// Precision: a JS double holds ~15 significant digits. This schema's numerics
+// are money and hours, nowhere near that, and PostgREST already round-tripped
+// them through exactly this conversion - so matching it restores the
+// behaviour the code was written against rather than inventing a new one.
+// There are no bigint/double precision/real columns in this schema, so
+// numeric is the only case that needs converting.
 import type { CustomTypesConfig } from 'pg';
 import { types } from 'pg';
 
@@ -35,6 +47,8 @@ const OID = {
   DATE_ARRAY: 1182,
   TIMESTAMP_ARRAY: 1115,
   TIMESTAMPTZ_ARRAY: 1185,
+  NUMERIC: 1700,
+  NUMERIC_ARRAY: 1231,
 } as const;
 
 /**
@@ -64,16 +78,26 @@ function parseTimestamp(raw: string): string {
   return pgTimestampToJson(raw);
 }
 
+/**
+ * numeric -> JS number, the way JSON.parse produced it for supabase-js.
+ *
+ * Postgres can return the literal 'NaN' for a numeric; Number() maps that to
+ * NaN, which is what JSON.parse would also have yielded.
+ */
+export function parseNumeric(raw: string): number {
+  return Number(raw);
+}
+
 // Arrays reuse node-postgres' own array splitter so quoting and NULLs stay
 // handled for us. It has to be the TEXT array parser (OID 1009): the
 // date/timestamp array parsers would convert each element to a Date before we
 // ever saw it, which is the exact thing being undone here.
 const TEXT_ARRAY_OID = 1009;
-function arrayOf(parse: (raw: string) => string) {
+function arrayOf<T>(parse: (raw: string) => T) {
   // Cast: pg types getTypeParser's published signature only enumerates the
   // OIDs it ships named constants for, and text[] is not one of them.
   const splitArray = types.getTypeParser(TEXT_ARRAY_OID as never) as unknown as (v: string) => (string | null)[];
-  return (raw: string): (string | null)[] =>
+  return (raw: string): (T | null)[] =>
     splitArray(raw).map(el => (el === null ? null : parse(el)));
 }
 
@@ -96,6 +120,10 @@ export const pgrestTypes: CustomTypesConfig = {
         case OID.TIMESTAMP_ARRAY:
         case OID.TIMESTAMPTZ_ARRAY:
           return arrayOf(parseTimestamp);
+        case OID.NUMERIC:
+          return parseNumeric;
+        case OID.NUMERIC_ARRAY:
+          return arrayOf(parseNumeric);
       }
     }
     return types.getTypeParser(oid, format as never);

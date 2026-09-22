@@ -9,6 +9,7 @@ const TIMESTAMP = 1114;
 const TIMESTAMPTZ = 1184;
 const DATE_ARRAY = 1182;
 const NUMERIC = 1700;
+const NUMERIC_ARRAY = 1231;
 const INT8 = 20;
 const TEXT = 25;
 
@@ -54,10 +55,38 @@ describe('pgrest type parsers', () => {
     expect(parserFor(DATE_ARRAY)('{2026-07-07,NULL}')).toEqual(['2026-07-07', null]);
   });
 
+  // The second half of the same bug: PostgREST sent numeric as a JSON number,
+  // so every service does arithmetic on it directly. As a string,
+  // `reduce((s, t) => s + t.totalHours, 0)` concatenates instead of adding and
+  // the following .toFixed() throws.
+  it('returns numeric as a number, not a string', () => {
+    expect(parserFor(NUMERIC)('17600.00')).toBe(17600);
+    expect(parserFor(NUMERIC)('8.50')).toBe(8.5);
+    expect(parserFor(NUMERIC)('0.00')).toBe(0);
+    expect(parserFor(NUMERIC)('-125.75')).toBe(-125.75);
+  });
+
+  it('sums numerics instead of concatenating them', () => {
+    const hours = ['8.00', '7.50', '8.25'].map(v => parserFor(NUMERIC)(v) as number);
+    const total = hours.reduce((s, h) => s + h, 0);
+    expect(total).toBe(23.75);
+    expect(total.toFixed(1)).toBe('23.8');
+  });
+
+  it('maps a numeric NaN the way JSON.parse would', () => {
+    expect(parserFor(NUMERIC)('NaN')).toBeNaN();
+  });
+
+  it('parses numeric arrays element-wise', () => {
+    expect(parserFor(NUMERIC_ARRAY)('{8.00,7.50}')).toEqual([8, 7.5]);
+    expect(parserFor(NUMERIC_ARRAY)('{8.00,NULL}')).toEqual([8, null]);
+  });
+
   it('leaves every other type on the stock parser', () => {
-    // numeric/int8 stay strings on purpose - see the note in types-pg.ts.
-    expect(parserFor(NUMERIC)('17600.00')).toBe('17600.00');
+    // int8 stays a string: node-postgres protects precision a double cannot
+    // hold, and this schema has no bigint columns for it to matter on.
     expect(parserFor(INT8)('9007199254740993')).toBe('9007199254740993');
     expect(parserFor(TEXT)('hello')).toBe('hello');
+    expect(parserFor(TEXT)('2026-07-07')).toBe('2026-07-07');
   });
 });
