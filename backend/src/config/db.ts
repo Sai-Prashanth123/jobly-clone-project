@@ -7,6 +7,7 @@
 // deliberately thrown.
 import { Pool } from 'pg';
 import { env } from './env';
+import { pgrestTypes } from '../lib/pgrest/types-pg';
 
 let pool: Pool | null = null;
 
@@ -26,6 +27,10 @@ export function getPool(): Pool {
   }
 
   pool = new Pool({
+    // Hand date/timestamp columns back as the strings PostgREST produced.
+    // Without this node-postgres returns Date objects, which the ~500 call
+    // sites written against supabase-js do not expect - see types-pg.ts.
+    types: pgrestTypes,
     host: env.DB_HOST,
     port: Number(env.DB_PORT ?? 5432),
     database: env.DB_NAME,
