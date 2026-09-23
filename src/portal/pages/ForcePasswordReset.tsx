@@ -65,7 +65,18 @@ export default function ForcePasswordReset() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr('');
-    if (next.length < 8) { setErr('New password must be at least 8 characters.'); return; }
+    // Must match the Cognito pool policy (and the API's changePasswordSchema).
+    // Checking only the length here let people submit an alphanumeric password
+    // that Cognito would always reject, and the rejection came back as a bare
+    // "Internal server error" with no hint about what was wrong.
+    const missing = ([
+      [next.length >= 12, 'be at least 12 characters'],
+      [/[A-Z]/.test(next), 'contain an uppercase letter'],
+      [/[a-z]/.test(next), 'contain a lowercase letter'],
+      [/[0-9]/.test(next), 'contain a number'],
+      [/[^A-Za-z0-9]/.test(next), 'contain a symbol'],
+    ] as const).filter(([ok]) => !ok).map(([, label]) => label);
+    if (missing.length) { setErr(`New password must ${missing.join(', ')}.`); return; }
     if (next !== confirm) { setErr('New password and confirmation do not match.'); return; }
     if (next === current) { setErr('New password must be different from the temporary password.'); return; }
     try {
@@ -125,7 +136,7 @@ export default function ForcePasswordReset() {
               value={next}
               onChange={setNext}
               autoComplete="new-password"
-              placeholder="At least 8 characters"
+              placeholder="12+ chars, upper, lower, number, symbol"
             />
             <PasswordField
               id="fr-confirm"

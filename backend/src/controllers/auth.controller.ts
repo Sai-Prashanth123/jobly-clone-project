@@ -198,7 +198,30 @@ export async function changePassword(req: Request, res: Response, next: NextFunc
       return;
     }
 
-    await authProvider.setPassword(userId, newPassword);
+    try {
+      await authProvider.setPassword(userId, newPassword);
+    } catch (err) {
+      // Cognito rejects anything the pool policy disallows. That is the
+      // user's mistake, not a server fault, so it must not fall through to
+      // the generic 500 handler - doing so showed "Internal server error"
+      // to someone whose only problem was a missing symbol. The schema above
+      // already mirrors the pool policy; this is the net for the case where
+      // the two drift apart.
+      const name = (err as { name?: string })?.name;
+      if (name === 'InvalidPasswordException' || name === 'InvalidParameterException') {
+        const detail = (err as { message?: string })?.message ?? '';
+        // Cognito prefixes its own text; keep the useful half.
+        const reason = detail.replace(/^Password does not conform to policy:\s*/i, '');
+        res.status(400).json({
+          success: false,
+          error: reason
+            ? `That password was rejected: ${reason.charAt(0).toLowerCase()}${reason.slice(1)}`
+            : 'That password does not meet the password requirements.',
+        });
+        return;
+      }
+      throw err;
+    }
 
     await patchPortalUser(userId, { must_reset_password: false, password_changed_at: new Date().toISOString() });
 
