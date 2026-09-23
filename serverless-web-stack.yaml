@@ -865,7 +865,16 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: [ses:SendEmail, ses:SendRawEmail]
-                Resource: !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*'
+                # The configuration set is a separate resource from the
+                # identity and needs its own grant. The domain identity has a
+                # default configuration set attached (joblyportal-mail, which
+                # publishes bounce/complaint events), so SES evaluates BOTH
+                # ARNs on every send - with only identity/* here, every send
+                # failed with "not authorized to perform ses:SendRawEmail on
+                # resource .../configuration-set/joblyportal-mail".
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*'
+                  - !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/*'
         - PolicyName: documents-bucket
           PolicyDocument:
             Version: '2012-10-17'
