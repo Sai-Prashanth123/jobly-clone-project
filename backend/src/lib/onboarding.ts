@@ -45,7 +45,11 @@ export const ONBOARDING_REQUIRED_DOCS = [
 // Resume. The ones every employee can produce are in ONBOARDING_REQUIRED_DOCS
 // above; Passport, Visa and I-94 are added for work-visa holders only, since a
 // US citizen has none of them and would otherwise never finish onboarding.
-const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
+// Green Card included per HR - they entered on a visa and were issued an I-94,
+// and both are kept on file. US citizens stay out: they have neither, so
+// requiring them would block onboarding permanently.
+// Mirrors WORK_VISA_TYPES in src/portal/lib/documentTypes.ts.
+const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
 const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
 // Maps the doc label above to its identity_documents[].type key (lowercase,
 // matches IDENTITY_DOC_ROWS in src/portal/lib/documentTypes.ts) so the

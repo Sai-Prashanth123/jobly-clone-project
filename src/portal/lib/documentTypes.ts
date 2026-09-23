@@ -197,7 +197,12 @@ export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4', 'insurance_waiver
 // REQUIRED_IDENTITY_TYPES; the three below are added for work-visa holders
 // only. Green Card holders get Passport through VISA_REQUIRED_EXTRA.gc
 // instead, since they hold one but have no visa stamp or I-94.
-const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
+// Green Card holders are included per HR: they entered the US on a visa and
+// were issued an I-94, and HR keeps both on file alongside the passport, so
+// the checklist demands them. US citizens remain the only exclusion - they
+// have no visa stamp or I-94 to produce at all, and requiring them would leave
+// onboarding permanently short of 100%.
+const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
 const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 
 // Additional identity-doc types required for specific visa types, on top of
@@ -252,7 +257,12 @@ export const EMPLOYER_DOC_ROWS: IdentityDocRow[] = [
 // never shown, for any visa type — unlike ROW_VISA_GATE above, there's no
 // "always visible" default for employer-managed documents.
 export const EMPLOYER_ROW_VISA_GATE: Record<string, string[]> = {
-  e_verify_letter: ['opt', 'stem_opt'],
+  // Every visa type, per Jagan via HR: the E-Verify letter is filed for any
+  // employee, not only OPT/STEM OPT. It stays employer-managed, so it is
+  // visible to admin/HR and never to the employee themselves - that part is
+  // enforced by the role check on the Employer / Admin Documents section, not
+  // by this gate.
+  e_verify_letter: ['citizen', 'gc', 'h1b', 'l1', 'opt', 'stem_opt', 'tn', 'other'],
   i129: ['h1b'],
   lca_copy: ['h1b'],
   employer_verification_letter: ['h1b'],
