@@ -78,7 +78,7 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
     hasExpiry: true, multi: true, maxFiles: 3 },
   { type: 'i94',           label: 'I-94',                             placeholder: '12345678901',
     hint: 'Arrival/Departure Record — download from cbp.dhs.gov.', hasExpiry: true },
-  { type: 'us_visa',       label: 'US Visa',                          placeholder: 'A12345678',
+  { type: 'us_visa',       label: 'Visa',                             placeholder: 'A12345678',
     hint: 'Copy of the US visa stamp in your passport (H-1B, F-1, L-1, etc.).', hasExpiry: true },
   { type: 'resume',        label: 'Resume',                           placeholder: '',
     hint: 'Your most recent resume.' },
@@ -164,7 +164,9 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
   green_card: ['h1b', 'opt', 'stem_opt'],
   i140_questionnaire: ['opt', 'h1b', 'stem_opt'],
   perm_questionnaire: ['opt', 'h1b', 'stem_opt'],
-  us_visa: ['opt'],
+  // us_visa was hidden for OPT here. It is now part of HR's mandatory set for
+  // every work-visa holder, so hiding it would demand a document the employee
+  // has no way to upload - onboarding could never reach 100%.
   // H1B uses I-797 (below) instead of the single-file EAD row — per HR
   // feedback, H1B employees accumulate multiple I-797 approval/extension
   // notices over time, which the single-file EAD slot can't hold.
@@ -178,15 +180,25 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
 // Finish Onboarding for anyone. W-4 is here (not in VISA_REQUIRED_EXTRA)
 // because it's a payroll form every US employee files, not a visa-specific
 // document — per HR, it's common to H1B/OPT/STEM OPT and everyone else alike.
-export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4'] as const;
+// Insurance Waiver Form joined this list per HR: it is a company form every
+// employee files, independent of immigration status, so a US citizen can
+// complete it just as readily as an H-1B holder.
+export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4', 'insurance_waiver'] as const;
 
-// Passport and I-94 are only relevant to non-immigrant work-visa holders — an
-// I-94 is an arrival/departure record issued at US entry to visa entrants, and
-// many employees (US citizens, green card holders) legitimately have neither
-// document. These used to be unconditionally required for everyone, which
-// permanently blocked "Finish onboarding" for anyone who could never provide
-// them. Combine with REQUIRED_IDENTITY_TYPES via getRequiredIdentityTypes().
-const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
+// Passport, visa stamp and I-94 are only relevant to non-immigrant work-visa
+// holders — an I-94 is an arrival/departure record issued at US entry to visa
+// entrants, and many employees (US citizens, green card holders) legitimately
+// have none of them. These used to be unconditionally required for everyone,
+// which permanently blocked "Finish onboarding" for anyone who could never
+// provide them, so the gate stays visa-type-scoped.
+//
+// HR's mandatory set is Passport, SSN, Visa, I-94, W-4, Insurance Waiver and
+// Resume. The four that everyone can produce live in
+// REQUIRED_IDENTITY_TYPES; the three below are added for work-visa holders
+// only. Green Card holders get Passport through VISA_REQUIRED_EXTRA.gc
+// instead, since they hold one but have no visa stamp or I-94.
+const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
+const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 
 // Additional identity-doc types required for specific visa types, on top of
 // REQUIRED_IDENTITY_TYPES and the passport/I-94 conditional above. Sourced
@@ -199,7 +211,7 @@ const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
 };
 
 export function getRequiredIdentityTypes(visaType?: string | null): string[] {
-  const conditional = visaType && VISA_TYPES_REQUIRING_PASSPORT_I94.has(visaType) ? ['passport', 'i94'] : [];
+  const conditional = visaType && WORK_VISA_TYPES.has(visaType) ? [...WORK_VISA_REQUIRED_DOCS] : [];
   const extra = visaType ? (VISA_REQUIRED_EXTRA[visaType] ?? []) : [];
   return [...new Set([...REQUIRED_IDENTITY_TYPES, ...conditional, ...extra])];
 }
@@ -260,7 +272,32 @@ export const IDENTITY_OWNED_DOC_LABELS = new Set([...IDENTITY_DOC_ROWS, ...EMPLO
 // historical rows in the documents table.
 const LEGACY_LABEL_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
+  // Renamed per HR - the row is just "the visa" in the H-1B checklist, and
+  // "US Visa" read as a separate document. Anything already uploaded under
+  // the old label must keep counting, or employees who have completed this
+  // row would silently show as missing it.
+  Visa: ['US Visa'],
 };
+
+// Display-only label overrides, by row type then visa type.
+//
+// A row's `label` is the STORAGE key: it is written as the document's `type`
+// on upload and is what docMatchesRow() compares against, so it must never
+// vary by visa type or uploads would stop matching their own row. This
+// changes only what the employee reads.
+//
+// An OPT holder's EAD is physically the OPT card, so showing an
+// "Employment Authorization Document" row and a separate "OPT Card" row asked
+// for the same card twice - and only the first was required, so the checklist
+// never mentioned the one people were looking for.
+const ROW_LABEL_BY_VISA: Record<string, Record<string, string>> = {
+  ead: { opt: 'EAD / OPT Card', stem_opt: 'EAD / STEM OPT Card' },
+};
+
+/** What to SHOW for an identity row, given the employee's visa type. */
+export function identityRowLabel(row: { type: string; label: string }, visaType?: string | null): string {
+  return (visaType && ROW_LABEL_BY_VISA[row.type]?.[visaType]) || row.label;
+}
 
 /** Does an uploaded document (by its stored `type`) belong to this identity row? */
 export function docMatchesRow(doc: { type?: string }, row: { label: string }): boolean {

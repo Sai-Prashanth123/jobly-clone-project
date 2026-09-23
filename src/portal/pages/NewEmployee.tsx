@@ -29,6 +29,7 @@ import { LANGUAGES } from '../lib/languages';
 import {
   DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, EMPLOYER_DOC_ROWS, ROW_VISA_GATE, ROW_VISA_EXCLUDE, EMPLOYER_ROW_VISA_GATE,
   getRequiredIdentityTypes, getMinFiles, IDENTITY_OWNED_DOC_LABELS, docMatchesRow, docsMatchingRow,
+  identityRowLabel,
   type IdentityDocRow,
 } from '../lib/documentTypes';
 import { LanguagesMultiSelect } from '../components/shared/LanguagesMultiSelect';
@@ -834,7 +835,7 @@ export default function NewEmployee() {
       <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
         <div>
           <p className="text-sm font-semibold text-gray-800">
-            {row.label}
+            {identityRowLabel(row, form.visaType)}
             {isRequired && <span className="text-red-500 ml-0.5">*</span>}
             {isRequired && !fileOrUploaded && isOnboarding && (
               <span className="ml-2 text-[10px] font-semibold text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Required</span>
@@ -940,7 +941,7 @@ export default function NewEmployee() {
     (existingEmployee?.documents ?? []).some(d => docMatchesRow(d, row)),
   ).length;
   const requiredIdentityLabels = getRequiredIdentityTypes(form.visaType)
-    .map(t => IDENTITY_DOC_ROWS.find(r => r.type === t)?.label)
+    .map(t => { const r = IDENTITY_DOC_ROWS.find(x => x.type === t); return r ? identityRowLabel(r, form.visaType) : undefined; })
     .filter((l): l is string => !!l);
 
   // ── Education + work-history row mutations ────────────────────────────────
@@ -2219,10 +2220,15 @@ export default function NewEmployee() {
                 if (row.type === 'i20') {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
-                // OPT Card stays OPT/STEM-OPT only — H-1B holders use the
-                // generic I-797/employer paperwork instead.
-                if (row.type === 'opt_card') {
-                  return form.visaType === 'opt' || form.visaType === 'stem_opt';
+                // OPT Card / STEM OPT Card are merged into the EAD row, which
+                // is relabelled "EAD / OPT Card" for these visa types — the
+                // OPT card IS the EAD, and having both rows asked for the
+                // same physical card twice while only the EAD one was
+                // required, so the checklist never listed the row people were
+                // hunting for. Kept visible only where something was already
+                // uploaded against them, so historical uploads don't vanish.
+                if (row.type === 'opt_card' || row.type === 'stem_opt_card') {
+                  return (existingEmployee?.documents ?? []).some(d => docMatchesRow(d, row));
                 }
                 // Rows explicitly hidden for specific visa types (e.g.
                 // Permanent Resident Card is irrelevant for H-1B/OPT) — an

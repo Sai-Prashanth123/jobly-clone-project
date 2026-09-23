@@ -30,6 +30,9 @@ export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
   'Social Security Card',
   'W-4',
+  // Company form every employee files regardless of immigration status, so
+  // it sits here rather than in the visa-conditional list below.
+  'Insurance Waiver Form',
 ] as const;
 
 // Passport and I-94 are only relevant to non-immigrant work-visa holders — an
@@ -38,15 +41,24 @@ export const ONBOARDING_REQUIRED_DOCS = [
 // document. Mirrors getRequiredIdentityTypes() in
 // src/portal/lib/documentTypes.ts on the frontend — keep the visa-type list
 // in sync between the two.
+// HR's mandatory set is Passport, SSN, Visa, I-94, W-4, Insurance Waiver and
+// Resume. The ones every employee can produce are in ONBOARDING_REQUIRED_DOCS
+// above; Passport, Visa and I-94 are added for work-visa holders only, since a
+// US citizen has none of them and would otherwise never finish onboarding.
 const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn']);
-const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'I-94'] as const;
+const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
 // Maps the doc label above to its identity_documents[].type key (lowercase,
 // matches IDENTITY_DOC_ROWS in src/portal/lib/documentTypes.ts) so the
 // expiry-date check below can look up the right entry.
-const CONDITIONAL_DOC_IDENTITY_KEYS: Record<string, string> = { Passport: 'passport', 'I-94': 'i94' };
+const CONDITIONAL_DOC_IDENTITY_KEYS: Record<string, string> = { Passport: 'passport', Visa: 'us_visa', 'I-94': 'i94' };
 
 const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
+  // Row renamed from "US Visa" per HR. Mirrors LEGACY_LABEL_ALIASES in
+  // src/portal/lib/documentTypes.ts - documents uploaded under the old label
+  // must still satisfy the requirement, or employees who already provided it
+  // would be blocked from finishing.
+  Visa: ['US Visa'],
 };
 
 export interface OnboardingItem {
