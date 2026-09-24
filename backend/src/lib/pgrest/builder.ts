@@ -263,14 +263,14 @@ export class QueryBuilder implements PromiseLike<PgrestResult> {
 
     let q;
     if (this.mode === 'insert') {
-      q = compileInsert(this.table, this.payload, returning);
+      q = compileInsert(this.table, this.payload, returning, undefined, schema);
     } else if (this.mode === 'upsert') {
       const target = this.onConflict !== undefined && this.onConflict !== ''
         ? this.onConflict
         : pk.join(',');
-      q = compileInsert(this.table, this.payload, returning, target);
+      q = compileInsert(this.table, this.payload, returning, target, schema);
     } else if (this.mode === 'update') {
-      q = compileUpdate(this.table, this.patch, this.filters, returning);
+      q = compileUpdate(this.table, this.patch, this.filters, returning, schema);
     } else {
       q = compileDelete(this.table, this.filters, returning);
     }

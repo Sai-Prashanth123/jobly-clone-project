@@ -12,6 +12,7 @@ import { resolveEmployeeEmailRecipients } from '../lib/employeeCommunication';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery, RaiseLegalRequestInput } from '../schemas/employee.schema';
 import * as casesService from './cases.service';
 import { storageProvider } from '../lib/storage';
+import { generateTempPassword } from '../lib/tempPassword';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
 function serializeEmployee(emp: any) {
@@ -181,7 +182,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
   const personalEmail = (input.email ?? '').trim();
   const workEmail = (input.workEmail ?? '').trim();
   const portalLoginEmail = workEmail || personalEmail;
-  const tempPassword = 'Jobly@' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  const tempPassword = generateTempPassword();
   let credentialsReady = false;
   let credentialsError: any = null;
 

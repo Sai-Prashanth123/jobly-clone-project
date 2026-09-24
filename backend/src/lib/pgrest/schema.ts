@@ -25,6 +25,22 @@ export interface SchemaInfo {
   fks: FkEdge[];
   /** table -> primary key columns, in key order. */
   pks: Map<string, string[]>;
+  /**
+   * table -> columns declared json/jsonb.
+   *
+   * Needed because node-postgres serialises a JS array as a POSTGRES ARRAY
+   * literal, not as JSON: ['a','b'] is sent as {"a","b"}, which Postgres then
+   * refuses to parse into a json column ("invalid input syntax for type json:
+   * Expected ":", but found ","). Worse, [] is sent as {}, which Postgres
+   * accepts as an empty JSON OBJECT - silently storing {} where the
+   * application wrote [], and later breaking every `for...of` over that
+   * column.
+   *
+   * PostgREST had no such problem: it received JSON over HTTP and handed it
+   * straight to Postgres. To behave the same we must JSON.stringify values
+   * bound to these columns, which means knowing which columns they are.
+   */
+  jsonColumns: Map<string, Set<string>>;
 }
 
 /**
@@ -76,10 +92,23 @@ const PK_QUERY = `
    ORDER BY rel.relname, c.ord
 `;
 
+const JSON_COLUMN_QUERY = `
+  SELECT c.relname AS table,
+         a.attname AS column
+    FROM pg_attribute a
+    JOIN pg_class c ON c.oid = a.attrelid
+    JOIN pg_type t  ON t.oid = a.atttypid
+   WHERE c.relnamespace = 'public'::regnamespace
+     AND c.relkind IN ('r', 'p', 'v', 'm')
+     AND a.attnum > 0
+     AND NOT a.attisdropped
+     AND t.typname IN ('json', 'jsonb')
+`;
+
 let cached: Promise<SchemaInfo> | null = null;
 
 /**
- * Run the two introspection queries, retrying a few times on a cold pool.
+ * Run the three introspection queries, retrying a few times on a cold pool.
  *
  * Two separate problems are being handled here, both seen in production:
  *
@@ -98,12 +127,13 @@ let cached: Promise<SchemaInfo> | null = null;
  *    few hundred milliseconds on the rare bad start and avoids failing the
  *    request outright.
  */
-async function introspect(pool: Pool, attempts = 3): Promise<[QueryResult, QueryResult]> {
+async function introspect(pool: Pool, attempts = 3): Promise<[QueryResult, QueryResult, QueryResult]> {
   let lastErr: unknown;
   for (let i = 0; i < attempts; i++) {
-    const [fk, pk] = await Promise.allSettled([pool.query(FK_QUERY), pool.query(PK_QUERY)]);
-    if (fk.status === 'fulfilled' && pk.status === 'fulfilled') return [fk.value, pk.value];
-    lastErr = fk.status === 'rejected' ? fk.reason : (pk as PromiseRejectedResult).reason;
+    const [fk, pk, js] = await Promise.allSettled([pool.query(FK_QUERY), pool.query(PK_QUERY), pool.query(JSON_COLUMN_QUERY)]);
+    if (fk.status === 'fulfilled' && pk.status === 'fulfilled' && js.status === 'fulfilled') return [fk.value, pk.value, js.value];
+    const rejected = [fk, pk, js].find(r => r.status === 'rejected') as PromiseRejectedResult | undefined;
+    if (rejected) lastErr = rejected.reason;
     if (i < attempts - 1) {
       // Short backoff: 200ms then 600ms. Long enough for a cold ENI or a
       // re-dialled proxy connection, short enough that the user just sees a
@@ -119,7 +149,7 @@ export function loadSchema(pool: Pool): Promise<SchemaInfo> {
   // share one round trip instead of each firing their own introspection.
   if (!cached) {
     cached = (async () => {
-      const [fkRes, pkRes] = await introspect(pool);
+      const [fkRes, pkRes, jsonRes] = await introspect(pool);
 
       const fks: FkEdge[] = fkRes.rows.map(r => ({
         table: r.table,
@@ -136,7 +166,14 @@ export function loadSchema(pool: Pool): Promise<SchemaInfo> {
         pks.set(r.table, list);
       }
 
-      return { fks, pks };
+      const jsonColumns = new Map<string, Set<string>>();
+      for (const r of jsonRes.rows) {
+        const set = jsonColumns.get(r.table) ?? new Set<string>();
+        set.add(r.column);
+        jsonColumns.set(r.table, set);
+      }
+
+      return { fks, pks, jsonColumns };
     })().catch(err => {
       // Don't cache a failure - a transient error at boot would otherwise
       // poison every later query for the life of the process.

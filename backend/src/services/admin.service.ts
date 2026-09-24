@@ -3,6 +3,7 @@ import { authProvider } from '../lib/auth';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
+import { generateTempPassword } from '../lib/tempPassword';
 
 const VALID_ROLES = ['admin', 'hr', 'operations', 'finance', 'employee', 'legal'];
 
@@ -79,7 +80,7 @@ export async function deactivateUser(userId: string, actorId: string) {
 }
 
 export async function resetUserPassword(userId: string, actorId?: string): Promise<string> {
-  const tempPassword = 'Jobly@' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  const tempPassword = generateTempPassword();
   await authProvider.setPassword(userId, tempPassword);
 
   // The reset is one-time: force a fresh first-login password reset so the temp

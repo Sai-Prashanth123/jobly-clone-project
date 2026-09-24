@@ -16,22 +16,22 @@ afterEach(() => {
 describe('schema introspection resilience', () => {
   it('succeeds first time when the pool is healthy', async () => {
     const pool = fakePool(() => Promise.resolve(ok));
-    await expect(loadSchema(pool)).resolves.toEqual({ fks: [], pks: new Map() });
-    expect(pool.query).toHaveBeenCalledTimes(2); // FK + PK, one attempt
+    await expect(loadSchema(pool)).resolves.toEqual({ fks: [], pks: new Map(), jsonColumns: new Map() });
+    expect(pool.query).toHaveBeenCalledTimes(3); // FK + PK + json columns, one attempt
   });
 
   it('retries a cold-start connection failure and then succeeds', async () => {
     let call = 0;
-    // Both queries of the first attempt fail, exactly as a connection blip
+    // All queries of the first attempt fail, exactly as a connection blip
     // takes out the whole pool; the second attempt is fine.
     const pool = fakePool(() => {
       call++;
-      return call <= 2
+      return call <= 3
         ? Promise.reject(new Error('Connection terminated due to connection timeout'))
         : Promise.resolve(ok);
     });
-    await expect(loadSchema(pool)).resolves.toEqual({ fks: [], pks: new Map() });
-    expect(pool.query).toHaveBeenCalledTimes(4); // 2 failed + 2 retried
+    await expect(loadSchema(pool)).resolves.toEqual({ fks: [], pks: new Map(), jsonColumns: new Map() });
+    expect(pool.query).toHaveBeenCalledTimes(6); // 3 failed + 3 retried
   });
 
   // The regression that took pages down: Promise.all adopts only the first
@@ -56,6 +56,6 @@ describe('schema introspection resilience', () => {
     const pool = fakePool(() => (fail ? Promise.reject(new Error('boom')) : Promise.resolve(ok)));
     await expect(loadSchema(pool)).rejects.toThrow('boom');
     fail = false;
-    await expect(loadSchema(pool)).resolves.toEqual({ fks: [], pks: new Map() });
+    await expect(loadSchema(pool)).resolves.toEqual({ fks: [], pks: new Map(), jsonColumns: new Map() });
   });
 });

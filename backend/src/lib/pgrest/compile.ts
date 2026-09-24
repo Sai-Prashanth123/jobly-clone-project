@@ -15,6 +15,35 @@ export interface OrderTerm {
   ascending: boolean;
 }
 
+/**
+ * Bind a write value, JSON-encoding anything headed for a json/jsonb column.
+ *
+ * node-postgres serialises a JS array as a POSTGRES ARRAY literal, not as
+ * JSON. Bound straight to a json column that means:
+ *
+ *   ['a', 'b']  ->  {"a","b"}  ->  ERROR 22P02 invalid input syntax for json
+ *   [{...}]     ->  {"{...}"}  ->  ERROR 22P02
+ *   []          ->  {}         ->  accepted, and silently stores an OBJECT
+ *
+ * The first two broke "Save" on the onboarding form outright (a 500 the user
+ * saw as "internal server error"). The third is worse for being quiet: it is
+ * how an employee ended up with identity_documents = {} instead of [], which
+ * later crashed every `for...of` over that column and took down the Expiring
+ * Documents page for everyone.
+ *
+ * PostgREST never hit this - it received JSON over HTTP and passed it through.
+ * Stringifying restores that behaviour. Objects already serialise correctly,
+ * but they go through the same path so the encoding is explicit either way.
+ *
+ * Columns NOT declared json/jsonb are left alone, so genuine Postgres arrays
+ * (text[] and friends) keep their array-literal encoding.
+ */
+function bindWrite(p: Params, table: string, column: string, value: unknown, schema?: SchemaInfo): string {
+  const isJsonColumn = schema?.jsonColumns.get(table)?.has(column) ?? false;
+  const needsEncoding = isJsonColumn && value !== null && value !== undefined && typeof value === 'object';
+  return p.add(needsEncoding ? JSON.stringify(value) : value);
+}
+
 export interface QuerySpec {
   table: string;
   nodes: SelectNode[];
@@ -145,6 +174,7 @@ export function compileInsert(
   rows: Row[],
   returning: string,
   onConflict?: string,
+  schema?: SchemaInfo,
 ): CompiledQuery {
   const p = new Params();
   const cols = unionColumns(rows);
@@ -153,7 +183,7 @@ export function compileInsert(
   const tuples = rows.map(r => {
     // A key missing from this row but present in another must still get a
     // placeholder, or the tuple arity would not match the column list.
-    const vals = cols.map(c => (c in r ? p.add(r[c]) : 'DEFAULT'));
+    const vals = cols.map(c => (c in r ? bindWrite(p, table, c, r[c], schema) : 'DEFAULT'));
     return `(${vals.join(', ')})`;
   });
 
@@ -179,12 +209,13 @@ export function compileUpdate(
   patch: Row,
   filters: Filter[],
   returning: string,
+  schema?: SchemaInfo,
 ): CompiledQuery {
   const p = new Params();
   const cols = Object.keys(patch);
   if (cols.length === 0) throw new Error('pgrest: update with no columns');
 
-  const sets = cols.map(c => `${ident(c)} = ${p.add(patch[c])}`);
+  const sets = cols.map(c => `${ident(c)} = ${bindWrite(p, table, c, patch[c], schema)}`);
   // No alias: UPDATE ... SET uses bare column names on the left-hand side.
   const where = filters.length
     ? ' WHERE ' + filters.map(f => compileFilter(f, ident(table), p)).join(' AND ')

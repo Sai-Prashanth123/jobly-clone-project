@@ -700,12 +700,20 @@ Resources:
             MinLength: '36'
             MaxLength: '36'
       Policies:
+        # Per HR: 8-12 characters with upper, lower and a number. The symbol
+        # requirement was dropped - it rejected otherwise-reasonable passwords
+        # and caused a failed reset that surfaced with no explanation.
+        #
+        # Mirrors strongPassword in backend/src/schemas/auth.schema.ts. Note
+        # Cognito has NO maximum-length setting (hard limit 256), so the "12"
+        # half of the range is enforced only by that schema and the two
+        # frontend screens - not here.
         PasswordPolicy:
-          MinimumLength: 12
+          MinimumLength: 8
           RequireLowercase: true
           RequireUppercase: true
           RequireNumbers: true
-          RequireSymbols: true
+          RequireSymbols: false
       AccountRecoverySetting:
         RecoveryMechanisms:
           - Name: verified_email

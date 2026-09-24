@@ -25,6 +25,12 @@ const schema: SchemaInfo = {
     ['case_notes', ['id']],
     ['employees', ['id']],
   ]),
+  // Mirrors the live schema closely enough for the write tests: these are the
+  // jsonb columns whose values must be JSON-encoded rather than handed to
+  // node-postgres as-is (which would send a Postgres array literal).
+  jsonColumns: new Map([
+    ['employees', new Set(['identity_documents', 'education'])],
+  ]),
 };
 
 const sql = (b: { text: string }) => b.text.replace(/\s+/g, ' ').trim();
@@ -300,5 +306,50 @@ describe('result shape', () => {
       .update({ status: 'x' }).eq('id', '1');
     expect(r.data).toBeNull();
     expect(r.error).toBeNull();
+  });
+});
+
+// Regression: writing a JS array to a jsonb column.
+//
+// node-postgres turns an array parameter into a POSTGRES ARRAY literal, so
+// ['a','b'] reaches Postgres as {"a","b"} and a jsonb column rejects it with
+// 22P02 "invalid input syntax for type json". Empty arrays are worse: [] is
+// sent as {}, which Postgres happily stores as an empty JSON OBJECT - that is
+// how an employee ended up with identity_documents = {} and broke every
+// `for...of` over that column.
+describe('json column encoding on writes', () => {
+  const docs = [{ type: 'passport', expiry: '2030-12-30' }];
+
+  it('JSON-encodes an array bound to a jsonb column on update', () => {
+    const q = compileUpdate('employees', { identity_documents: docs }, [], '*', schema);
+    expect(q.values[0]).toBe(JSON.stringify(docs));
+    expect(typeof q.values[0]).toBe('string');
+  });
+
+  it('keeps an empty array an ARRAY, not an object', () => {
+    const q = compileUpdate('employees', { identity_documents: [] }, [], '*', schema);
+    // '[]' not '{}' — the whole point.
+    expect(q.values[0]).toBe('[]');
+  });
+
+  it('JSON-encodes on insert too', () => {
+    const q = compileInsert('employees', [{ identity_documents: docs }], '*', undefined, schema);
+    expect(q.values[0]).toBe(JSON.stringify(docs));
+  });
+
+  it('leaves non-json columns alone so real Postgres arrays still work', () => {
+    const q = compileUpdate('employees', { tags: ['a', 'b'] }, [], '*', schema);
+    // Untouched: node-postgres must encode this one as an array literal.
+    expect(q.values[0]).toEqual(['a', 'b']);
+  });
+
+  it('passes null through unchanged', () => {
+    const q = compileUpdate('employees', { identity_documents: null }, [], '*', schema);
+    expect(q.values[0]).toBeNull();
+  });
+
+  it('does not encode scalars in a json column', () => {
+    const q = compileUpdate('employees', { identity_documents: 'already-a-string' }, [], '*', schema);
+    expect(q.values[0]).toBe('already-a-string');
   });
 });

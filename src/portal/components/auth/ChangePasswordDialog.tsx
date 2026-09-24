@@ -30,7 +30,19 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr('');
-    if (next.length < 8) { setErr('New password must be at least 8 characters.'); return; }
+    // Same rules as the forced-reset screen and the API's changePasswordSchema:
+    // 8-12 characters, upper + lower + number. This screen previously checked
+    // only the length, so it accepted alphanumeric passwords the backend then
+    // rejected - the user got a server error for a form that had just told
+    // them everything was fine.
+    const missing = ([
+      [next.length >= 8, 'be at least 8 characters'],
+      [next.length <= 12, 'be no more than 12 characters'],
+      [/[A-Z]/.test(next), 'contain an uppercase letter'],
+      [/[a-z]/.test(next), 'contain a lowercase letter'],
+      [/[0-9]/.test(next), 'contain a number'],
+    ] as const).filter(([ok]) => !ok).map(([, label]) => label);
+    if (missing.length) { setErr(`New password must ${missing.join(', ')}.`); return; }
     if (next !== confirm) { setErr('New password and confirmation do not match.'); return; }
     if (next === current) { setErr('New password must be different from your current password.'); return; }
     try {
@@ -50,7 +62,7 @@ export function ChangePasswordDialog({ open, onOpenChange }: Props) {
         <DialogHeader>
           <DialogTitle>Change Password</DialogTitle>
           <DialogDescription>
-            Enter your current password, then choose a new one (at least 8 characters).
+            Enter your current password, then choose a new one — 8–12 characters with an uppercase letter, a lowercase letter and a number.
           </DialogDescription>
         </DialogHeader>
 
