@@ -3,6 +3,27 @@ import { NotFoundError, ForbiddenError } from '../lib/errors';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import { storageProvider } from '../lib/storage';
+import { isEmployerManagedDoc } from '../lib/employerDocs';
+
+/**
+ * Ownership alone is not enough. An employee may read their own documents,
+ * EXCEPT the employer-managed ones (E-Verify letter, I-129, LCA...), which are
+ * attached to their record but belong to HR. The wizard hides those, but
+ * hiding is not access control - these endpoints take a document UUID
+ * directly.
+ */
+function assertEmployeeMayRead(
+  doc: { entity_type?: string | null; entity_id?: string | null; type?: string | null },
+  user: { role: string; employeeId?: string | null },
+): void {
+  if (user.role !== 'employee') return;
+  const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
+  // Same wording for both refusals: saying "restricted" rather than "not
+  // yours" would confirm the document exists.
+  if (!ownsIt || isEmployerManagedDoc(doc)) {
+    throw new ForbiddenError('You may only access your own documents');
+  }
+}
 
 const BUCKET_MAP: Record<string, string> = {
   employee: 'employee-docs',
@@ -215,10 +236,7 @@ export async function getDocumentSignedUrl(
   // employee record. Staff (admin/hr/operations/finance) may fetch any document.
   // Without this check, any authenticated user could mint a signed URL for any
   // document (incl. SSN/ID scans in the private employee-docs bucket) by UUID.
-  if (user.role === 'employee') {
-    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
-    if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
-  }
+  assertEmployeeMayRead(doc, user);
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
@@ -247,10 +265,7 @@ export async function getDocumentPreviewUrl(
 
   if (error || !doc) throw new NotFoundError('Document not found');
 
-  if (user.role === 'employee') {
-    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
-    if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
-  }
+  assertEmployeeMayRead(doc, user);
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
@@ -275,10 +290,7 @@ export async function renderDocument(
 
   if (error || !doc) throw new NotFoundError('Document not found');
 
-  if (user.role === 'employee') {
-    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
-    if (!ownsIt) throw new ForbiddenError('You may only access your own documents');
-  }
+  assertEmployeeMayRead(doc, user);
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const name: string = doc.name ?? 'document';

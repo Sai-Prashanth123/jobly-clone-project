@@ -12,6 +12,7 @@ import { resolveEmployeeEmailRecipients } from '../lib/employeeCommunication';
 import type { CreateEmployeeInput, UpdateEmployeeInput, ListEmployeesQuery, RaiseLegalRequestInput } from '../schemas/employee.schema';
 import * as casesService from './cases.service';
 import { storageProvider } from '../lib/storage';
+import { withoutEmployerManagedDocs } from '../lib/employerDocs';
 import { generateTempPassword } from '../lib/tempPassword';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
@@ -55,14 +56,25 @@ const LEGAL_ALLOWED_EMPLOYEE_FIELDS = new Set([
 
 export function redactEmployee(emp: any, viewerRole?: string, isOwn = false): any {
   if (!emp) return emp;
-  if (viewerRole === 'admin' || viewerRole === 'hr' || isOwn) return emp;
+
+  // Employer-managed paperwork (E-Verify letter, I-129, LCA...) hangs off the
+  // employee's own record, so it survived the `isOwn` shortcut below and was
+  // listed on the employee's own Documents page with working Preview and
+  // Download buttons. Strip it before anything else, so the shortcut cannot
+  // hand it back. storage.service enforces the same rule on the access
+  // endpoints - this is the listing half.
+  const self = viewerRole === 'employee' && Array.isArray(emp.documents)
+    ? { ...emp, documents: withoutEmployerManagedDocs(emp.documents) }
+    : emp;
+
+  if (viewerRole === 'admin' || viewerRole === 'hr' || isOwn) return self;
   if (viewerRole === 'legal') {
     const out: any = {};
-    for (const key of Object.keys(emp)) out[key] = LEGAL_ALLOWED_EMPLOYEE_FIELDS.has(key) ? emp[key] : null;
+    for (const key of Object.keys(self)) out[key] = LEGAL_ALLOWED_EMPLOYEE_FIELDS.has(key) ? self[key] : null;
     out.pay_rate = 0; // serializeEmployee coerces null→0; keep the shape numeric
     return out;
   }
-  const out = { ...emp };
+  const out = { ...self };
   for (const f of SENSITIVE_EMPLOYEE_FIELDS) out[f] = null;
   out.pay_rate = 0; // serializeEmployee coerces null→0; keep the shape numeric
   return out;
