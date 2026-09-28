@@ -94,14 +94,22 @@ export async function resetUserPassword(userId: string, actorId?: string): Promi
   const { data: target } = await supabaseAdmin
     .from('portal_users').select('email, name').eq('id', userId).single();
 
-  // Email the temp credentials so the admin doesn't have to relay them by hand.
-  // Fire-and-forget: never block the HTTP response on the (sometimes slow) SMTP
-  // send — a hung send was causing 504 gateway timeouts on reset, which rotated
-  // the password WITHOUT returning the new value (orphaning the account). The
-  // temp is still returned below for the admin UI regardless of email success.
+  // Email the temp credentials so the admin does not have to relay them by hand.
+  // MUST be awaited on Lambda. lambda.ts sets
+  // context.callbackWaitsForEmptyEventLoop = false (it has to - the pg pool
+  // keeps idle sockets open, so the event loop is never empty), which means
+  // the container FREEZES the moment the response is returned. A fire-and-
+  // forget promise is suspended mid-flight and never finishes, so the work
+  // below silently never happened. That is why "forgot password sends no
+  // email" - the log said "sending email" and nothing followed it.
+  //
+  // The original reasoning (do not block the response on a slow SMTP
+  // roundtrip) was sound on a long-running server. On Lambda it just drops
+  // the work. SES is an API call of a couple of hundred ms, and every callee
+  // here swallows its own errors, so awaiting cannot fail the request.
   if (target?.email && mailerConfigured) {
     const parts = (target.name ?? '').trim().split(/\s+/);
-    void sendWelcomeEmail({
+    await sendWelcomeEmail({
       to: target.email,
       firstName: parts[0] || 'there',
       lastName: parts.slice(1).join(' '),

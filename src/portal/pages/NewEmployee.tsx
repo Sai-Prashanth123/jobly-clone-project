@@ -2208,6 +2208,22 @@ export default function NewEmployee() {
             description={`Upload your identity and hiring documents. Required: ${requiredIdentityLabels.join(', ')}.${applicableEmployerRows.length > 0 && !isDocsAdmin ? ' Some sponsorship documents for your visa type are managed by HR — see below.' : ''}`}
             icon={<BadgeCheck className="h-4 w-4 text-[#4069FF]" />}
           >
+            {!form.visaType ? (
+              // Which documents are required, and which are even relevant, is
+              // decided entirely by visa type - an OPT holder needs an I-20 and
+              // an EAD, a US citizen needs neither. With no visa type selected
+              // the list falls back to "show everything ungated", so people were
+              // uploading documents that did not apply to them and the required
+              // list understated what they actually owed. Ask for the visa type
+              // first rather than collecting files against an unknown checklist.
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <p className="font-medium">Select your visa / work authorization type first.</p>
+                <p className="mt-1 text-[13px] text-amber-700">
+                  The documents you need depend on it, so this section stays locked until
+                  it is set — you&apos;ll find it in <span className="font-medium">Immigration &amp; Work Authorization</span> above.
+                </p>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {IDENTITY_DOC_ROWS.filter(row => {
                 // I-983 / STEM OPT Card apply only to OPT / STEM OPT candidates.
@@ -2243,6 +2259,7 @@ export default function NewEmployee() {
                 return true;
               }).map(row => renderIdentityDocRow(row))}
             </div>
+            )}
           </SectionCard>
 
           {/* Employer / Admin Documents — sponsorship paperwork HR/immigration

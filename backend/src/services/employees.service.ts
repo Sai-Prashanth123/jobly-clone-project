@@ -288,11 +288,12 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
       loginEmail: portalLoginEmail, tempPassword,
     };
   }
-  // Fire-and-forget the welcome email — a slow SMTP roundtrip (500-3000ms +
+  // Awaited, not fire-and-forget (see admin.service.resetUserPassword): Lambda
+  // freezes on response, so an unawaited send never completes. Welcome email — a slow SMTP roundtrip (500-3000ms +
   // retries) was making the entire create-employee response wait on mail
   // delivery. The credentials row is already persisted; HR has a "Resend
   // Welcome Email" button on the detail page if delivery fails.
-  void sendWelcomeEmail({
+  await sendWelcomeEmail({
     to: recipients,
     firstName: input.firstName,
     lastName: input.lastName,
@@ -312,7 +313,7 @@ async function issueCredentials(empId: string, emp: any, input: CreateEmployeeIn
         code: err?.code, responseCode: err?.responseCode, response: err?.response,
         rejected: err?.rejected, message: err?.message,
       });
-      // Fire-and-forget means the create-employee response already said
+      // The response may already have said
       // emailSent:true — without this, a failed send is invisible to
       // everyone (the console log above is easy to miss/lose). Surface it
       // as an in-app notification so HR/admin actually see it and know to
@@ -489,7 +490,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     return { ...serializeEmployee(emp), _credentials: credsResult };
   }
 
-  // Notify HR/admin about the new onboarding employee — TRULY fire-and-forget,
+  // Notify HR/admin about the new onboarding employee — awaited - Lambda drops unawaited work,
   // and fan out the inserts in parallel (was sequential `await` per user). The
   // employee + auth + portal_users are already persisted, so create response
   // returns immediately. Mirrors invoices.service generateInvoice notify block.
@@ -792,7 +793,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   if (error) throw error;
 
   // HR approved onboarding (onboarding → active): notify the employee in-app so
-  // they're not stuck on the "awaiting review" screen. Fire-and-forget.
+  // they're not stuck on the "awaiting review" screen. Awaited: Lambda freezes on response and would drop it.
   if (input.status === 'active' && existing.status === 'onboarding') {
     void (async () => {
       try {
@@ -916,7 +917,8 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
 }
 
 // Notify HR + admin that an employee finished onboarding — in-app notification
-// + email. Fire-and-forget: callers must NOT await this (it must never block or
+// + email. Callers MUST await this: on Lambda an unawaited promise is frozen
+// and dropped. It
 // fail onboarding completion). Internally swallows its own errors.
 async function notifyOnboardingCompleted(emp: any): Promise<void> {
   const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
@@ -1023,8 +1025,8 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
   );
 
   // Tell HR an employee submitted onboarding and is awaiting review (in-app + email).
-  // Fire-and-forget so a slow mailer can never delay/504 the employee's "Finish".
-  void notifyOnboardingCompleted(updated);
+  // Awaited: on Lambda an unawaited send is frozen on response and never runs.
+  await notifyOnboardingCompleted(updated);
 
   // Build the full documents list from rows we ALREADY fetched above — no
   // second round-trip. The `docs` query selected only `type`; for the response
@@ -1092,8 +1094,8 @@ export async function requestOnboardingChanges(
     event: 'onboarding_changes_requested',
   });
 
-  // Fire-and-forget: notify the employee in-app + by email.
-  void notifyOnboardingChangesRequested(updated, message);
+  // Awaited (Lambda drops unawaited work): notify the employee in-app + by email.
+  await notifyOnboardingChangesRequested(updated, message);
 
   return updated;
 }
@@ -1192,7 +1194,7 @@ export async function requestEmployeeDocuments(id: string, message: string, acto
     event: 'documents_requested',
   });
 
-  void notifyDocumentsRequested(emp, message);
+  await notifyDocumentsRequested(emp, message);
 
   return { employee: emp };
 }
@@ -1395,7 +1397,9 @@ async function disableEmployeeLogin(empId: string): Promise<void> {
   }
 }
 
-// Fire-and-forget: notify the employee's portal user (if any) in-app.
+// Swallows its own errors so callers can await it safely. Callers MUST await:
+// on Lambda an unawaited promise is frozen on response and never runs.
+// Notifies the employee's portal user (if any) in-app.
 async function notifyEmployeeUser(empId: string, title: string, body: string, type: 'info' | 'success' | 'warning' = 'info'): Promise<void> {
   try {
     const { data: pu } = await supabaseAdmin
@@ -1423,7 +1427,7 @@ export async function findPortalUserIdByEmployeeEmail(email: string): Promise<st
   return getPortalUserByEmployeeId(emp.id);
 }
 
-// Fire-and-forget: notify all HR + admin users in-app.
+// Same contract as notifyEmployeeUser above - await it. Notifies all HR + admin users in-app.
 async function notifyHrAdmin(title: string, body: string, empId: string, type: 'info' | 'success' | 'warning' = 'info'): Promise<void> {
   try {
     const [hrIds, adminIds] = await Promise.all([getUserIdsByRole('hr'), getUserIdsByRole('admin')]);
@@ -1435,7 +1439,7 @@ async function notifyHrAdmin(title: string, body: string, empId: string, type: '
   }
 }
 
-// Fire-and-forget: notify HR + admin whenever a document is uploaded to an
+// Same contract as notifyEmployeeUser above - await it. Notifies HR + admin whenever a document is uploaded to an
 // employee's record, regardless of onboarding/active status — HR previously
 // only got this signal during onboarding (status==='onboarding'), which
 // meant a document uploaded by an already-active employee (e.g. a renewed
@@ -1503,7 +1507,7 @@ export async function placeOnExtendedLeave(
   logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
     event: 'placed_on_leave', returnDate: input.returnDate,
   });
-  void notifyEmployeeUser(id, 'You have been placed on extended leave',
+  await notifyEmployeeUser(id, 'You have been placed on extended leave',
     `Your account is inactive until your scheduled return on ${input.returnDate}. It will reactivate automatically.`, 'info');
   return serializeEmployee(updated);
 }
@@ -1526,7 +1530,7 @@ export async function returnFromLeave(id: string, actorId?: string) {
   if (updErr) throw updErr;
 
   logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'returned_from_leave' });
-  void notifyEmployeeUser(id, 'Welcome back from leave', 'Your account is active again — you now have full portal access.', 'success');
+  await notifyEmployeeUser(id, 'Welcome back from leave', 'Your account is active again — you now have full portal access.', 'success');
   return serializeEmployee(updated);
 }
 
@@ -1554,8 +1558,8 @@ export async function reactivateReturnedEmployees(): Promise<number> {
     if (updErr) { console.error('[scheduler] auto-reactivate failed for', emp.id, updErr); continue; }
     count++;
     logActivity(null, 'updated', 'employee', emp.id, emp.display_id ?? emp.id.slice(0, 8), { event: 'auto_returned_from_leave' });
-    void notifyEmployeeUser(emp.id, 'Welcome back from leave', 'Your scheduled return date has arrived — your account is active again.', 'success');
-    void notifyHrAdmin('Employee returned from leave',
+    await notifyEmployeeUser(emp.id, 'Welcome back from leave', 'Your scheduled return date has arrived — your account is active again.', 'success');
+    await notifyHrAdmin('Employee returned from leave',
       `${emp.display_id ?? `${emp.first_name} ${emp.last_name}`} has returned from extended leave (auto-reactivated).`, emp.id, 'info');
   }
   return count;
@@ -1600,7 +1604,7 @@ export async function terminateEmployee(
   logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
     event: 'terminated', effectiveDate, reason: input.reason ?? undefined,
   });
-  void notifyHrAdmin('Employee terminated',
+  await notifyHrAdmin('Employee terminated',
     `${emp.display_id ?? `${emp.first_name} ${emp.last_name}`} has been terminated (effective ${effectiveDate}). Their portal login is disabled; the record is retained.`, id, 'warning');
   return serializeEmployee(updated);
 }
@@ -1626,7 +1630,7 @@ export async function rehireEmployee(id: string, actorId?: string) {
   // Re-issue login + send fresh credentials. Surface the credentials result so
   // the controller can report email/login status (mirrors resend-credentials).
   const creds = await resendCredentials(id, actorId);
-  void notifyHrAdmin('Employee re-hired', `${updated.display_id ?? id.slice(0, 8)} has been re-hired and their access restored.`, id, 'success');
+  await notifyHrAdmin('Employee re-hired', `${updated.display_id ?? id.slice(0, 8)} has been re-hired and their access restored.`, id, 'success');
   return { ...serializeEmployee(updated), _credentials: creds };
 }
 
