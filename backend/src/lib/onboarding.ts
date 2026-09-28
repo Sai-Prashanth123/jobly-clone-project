@@ -115,7 +115,14 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
     { id: 'start_date',         label: 'Start date',                                          done: nonEmpty(emp.start_date) },
     { id: 'work_location',      label: 'Work location',                                       done: nonEmpty(emp.work_location) },
 
-    // Immigration — visa fields are optional; only SSN is required
+    // Immigration — visa TYPE is required, the rest of the visa fields are not.
+    // Everything about the document checklist hangs off visa_type: which
+    // documents are mandatory, and which are even shown. With it blank the
+    // required list silently collapses to the four universal documents, so an
+    // employee could finish onboarding without ever being asked for their
+    // passport, visa or I-94. Mirrors the 'visa_type' item in the frontend
+    // checklist in src/portal/pages/NewEmployee.tsx.
+    { id: 'visa_type',          label: 'Visa / Work Authorization Type',                      done: nonEmpty(emp.visa_type) },
     { id: 'ssn',                label: 'Social Security Number',                              done: /^\d{3}-\d{2}-\d{4}$/.test(String(emp.ssn ?? '')) },
 
     // Bank details — required for ACH direct deposit setup

@@ -574,7 +574,7 @@ export default function NewEmployee() {
       [SECTION_IDS.presentAddr]:  presentFilled,
       [SECTION_IDS.permanentAddr]: permFilled,
       [SECTION_IDS.employment]:   !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim(),
-      [SECTION_IDS.immigration]:  /^\d{3}-\d{2}-\d{4}$/.test(form.ssn),
+      [SECTION_IDS.immigration]:  !!form.visaType && /^\d{3}-\d{2}-\d{4}$/.test(form.ssn),
       [SECTION_IDS.education]:    educationDone,
       [SECTION_IDS.emergency]:    !!form.emergencyContact.name.trim() && !!form.emergencyContact.relationship.trim() && !!form.emergencyContact.phone.trim() && (isOnboarding ? (!!form.emergencyContact.address.trim() && !!form.emergencyContact.city.trim() && !!form.emergencyContact.state.trim() && !!form.emergencyContact.zip.trim()) : true),
       [SECTION_IDS.payroll]:      isOnboarding ? (!!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim()) : (parseNumberInput(form.payRate) ?? 0) > 0,
@@ -623,6 +623,11 @@ export default function NewEmployee() {
       // "Social Security Number" chip (that one is the uploaded proof
       // document; this one is typing the number itself) — near-identical
       // labels made these two separate requirements look like one duplicated.
+      // Visa type gates the whole document checklist — which documents are
+      // required, and which even appear, is decided by it — so onboarding
+      // cannot be complete without it. Mirrors the `visa_type` check in
+      // backend/src/lib/onboarding.ts.
+      { id: 'visa_type',   label: 'Visa / Work Authorization Type', section: SECTION_IDS.immigration, done: !!form.visaType },
       { id: 'immigration', label: 'SSN Number (typed)',   section: SECTION_IDS.immigration,   done: /^\d{3}-\d{2}-\d{4}$/.test(form.ssn) },
       // Bank details — required for ACH direct deposit
       { id: 'bank',        label: 'Bank details (name, account number, routing number)', section: SECTION_IDS.payroll, done: !!form.bankName.trim() && !!form.bankRoutingNumber.trim() && !!form.bankAccountNumber.trim() },
@@ -2116,7 +2121,7 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Visa Type</Label>
+                <Label>Visa Type <span className="text-red-500">*</span></Label>
                 <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
