@@ -69,6 +69,11 @@ export async function uploadDocument(
   docTypeOverride?: string,
   expiryDate?: string | null,
   category?: string | null,
+  // Single-slot rows (Offer Letter, W-4, I-20...) are a REPLACEMENT, not a
+  // second copy: re-uploading is how someone corrects a wrong or outdated
+  // file. Without this the old row stayed and admins saw both, with no way to
+  // tell which one counts. Multi-file rows (passport pages) never pass this.
+  replaceExisting?: boolean,
 ) {
   const bucket = BUCKET_MAP[entityType];
   // Strip everything but alphanumerics/dot/dash/underscore (incl. slashes and
@@ -102,6 +107,32 @@ export async function uploadDocument(
     .single();
 
   if (error) throw error;
+
+  // Retire the previous file(s) for this slot, but only AFTER the new row is
+  // safely stored — deleting first would lose the old document if the upload
+  // then failed, leaving the employee with neither.
+  //
+  // Best-effort: the replacement has already succeeded and been returned, so a
+  // failure to tidy up must not fail the request. The worst case is the old
+  // behaviour (a leftover duplicate), which is visible and fixable by hand.
+  if (replaceExisting && doc?.id) {
+    const slotType = docTypeOverride || file.mimetype;
+    try {
+      const { data: superseded } = await supabaseAdmin
+        .from('documents')
+        .select('id')
+        .eq('entity_type', entityType)
+        .eq('entity_id', entityId)
+        .eq('type', slotType)
+        .neq('id', doc.id);
+      for (const old of superseded ?? []) {
+        await deleteDocument(old.id);
+      }
+    } catch (err) {
+      console.error('[storage] failed to remove superseded documents for', entityId, slotType, err);
+    }
+  }
+
   return doc;
 }
 

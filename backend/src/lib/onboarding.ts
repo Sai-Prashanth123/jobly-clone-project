@@ -51,6 +51,34 @@ export const ONBOARDING_REQUIRED_DOCS = [
 // Mirrors WORK_VISA_TYPES in src/portal/lib/documentTypes.ts.
 const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
 const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
+
+// Documents required for a SPECIFIC visa type, on top of the universal list
+// and the passport/visa/I-94 conditional above.
+//
+// This existed only on the frontend (VISA_REQUIRED_EXTRA in
+// src/portal/lib/documentTypes.ts), so the server-side gate was strictly
+// weaker than the wizard: it never asked a STEM OPT employee for an I-9, an
+// I-20 or an EAD, and never asked a Green Card holder for any of their
+// petition paperwork. Anything that got past the wizard - a stale tab, a
+// direct POST, or a wizard checklist that passed for a different reason -
+// finished onboarding with those documents missing. HR reported exactly that:
+// a STEM OPT employee onboarding without an I-9.
+//
+// Keyed BY LABEL, because documents.type stores the row's label. Mirrors
+// VISA_REQUIRED_EXTRA - keep the two in step.
+const VISA_REQUIRED_EXTRA_DOCS: Record<string, readonly string[]> = {
+  opt: ['I-9 Form', 'I-20', 'Employment Authorization Document'],
+  stem_opt: ['I-9 Form', 'I-20', 'Employment Authorization Document', 'Visa'],
+  gc: [
+    'Passport',
+    'Education Documents & Academic Credentials',
+    'Experience / Reference Letters',
+    'I-140',
+    'I-140 Approval Notice',
+    'Labor Certificate (PERM)',
+    'I-797',
+  ],
+};
 // Maps the doc label above to its identity_documents[].type key (lowercase,
 // matches IDENTITY_DOC_ROWS in src/portal/lib/documentTypes.ts) so the
 // expiry-date check below can look up the right entry.
@@ -176,6 +204,20 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
         done: uploaded && nonEmpty(expiry),
       };
     }) : []),
+
+    // Visa-type-specific documents (I-9 / I-20 / EAD for OPT and STEM OPT, the
+    // petition paperwork for Green Card). Upload only - unlike the conditional
+    // block above these carry no expiry requirement, matching the wizard.
+    // Skips anything already demanded above so a document cannot appear twice
+    // in the missing list (Visa for STEM OPT, Passport for Green Card).
+    ...((VISA_REQUIRED_EXTRA_DOCS[String(emp.visa_type ?? '')] ?? [])
+      .filter(t => !(VISA_TYPES_REQUIRING_PASSPORT_I94.has(String(emp.visa_type ?? ''))
+        && (VISA_CONDITIONAL_REQUIRED_DOCS as readonly string[]).includes(t)))
+      .map(t => ({
+        id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+        label: `${t} (upload required)`,
+        done: docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias)),
+      }))),
   ];
 
   const done = checks.filter(c => c.done).length;

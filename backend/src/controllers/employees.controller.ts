@@ -221,9 +221,18 @@ export async function uploadDoc(req: Request, res: Response, next: NextFunction)
     if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
       throw new ForbiddenError('Employees may only manage their own documents');
     }
-    const { name, docType, expiryDate } = req.body as { name?: string; docType?: string; expiryDate?: string };
-    const data = await storageSvc.uploadDocument('employee', req.params.id, file, req.user!.id, name, docType, expiryDate);
-    void svc.notifyEmployeeDocumentUpload(req.params.id, data); // fire-and-forget, never blocks the response
+    const { name, docType, expiryDate, replace } = req.body as {
+      name?: string; docType?: string; expiryDate?: string; replace?: string;
+    };
+    // multipart/form-data carries everything as a string, so compare loosely.
+    const replaceExisting = replace === 'true' || replace === '1';
+    const data = await storageSvc.uploadDocument(
+      'employee', req.params.id, file, req.user!.id, name, docType, expiryDate, null, replaceExisting,
+    );
+    // Awaited, not fire-and-forget: Lambda freezes the container on response,
+    // so an unawaited notify never runs (see admin.service.resetUserPassword).
+    // notifyEmployeeDocumentUpload swallows its own errors.
+    await svc.notifyEmployeeDocumentUpload(req.params.id, data);
     res.status(201).json({ success: true, data });
   } catch (err) { next(err); }
 }

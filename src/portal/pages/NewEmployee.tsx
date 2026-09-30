@@ -1145,19 +1145,19 @@ export default function NewEmployee() {
 
       const uploadedDocTypes: string[] = [];
       const uploadedMultiDocTypes: string[] = [];
-      const uploads: { file: File; name: string; docType: string }[] = [];
+      const uploads: { file: File; name: string; docType: string; replace: boolean }[] = [];
       for (const row of [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS]) {
         if (row.multi) {
           const files = form.multiIdentityDocFiles[row.type] ?? [];
           if (files.length > 0) {
-            for (const file of files) uploads.push({ file, name: file.name, docType: row.label });
+            for (const file of files) uploads.push({ file, name: file.name, docType: row.label, replace: false });
             uploadedMultiDocTypes.push(row.type);
           }
           continue;
         }
         const file = form.identityDocFiles[row.type];
         if (file) {
-          uploads.push({ file, name: file.name, docType: row.label });
+          uploads.push({ file, name: file.name, docType: row.label, replace: true });
           uploadedDocTypes.push(row.type);
         }
       }
@@ -1166,6 +1166,9 @@ export default function NewEmployee() {
         fd.append('file', u.file);
         fd.append('name', u.name);
         fd.append('docType', u.docType);
+        // Single-slot rows replace what was there; re-uploading is how a wrong
+        // file gets corrected, and leaving both made it unclear which counts.
+        if (u.replace) fd.append('replace', 'true');
         tasks.push(apiClient.post(`/employees/${emp.id}/documents`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         }));
@@ -1333,24 +1336,27 @@ export default function NewEmployee() {
 
       const uploadedDocTypes: string[] = [];
       const uploadedMultiDocTypes: string[] = [];
-      const uploads: { file: File; name: string; docType: string }[] = [];
+      const uploads: { file: File; name: string; docType: string; replace: boolean }[] = [];
       for (const row of [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS]) {
         if (row.multi) {
           const files = form.multiIdentityDocFiles[row.type] ?? [];
           if (files.length > 0) {
-            for (const file of files) uploads.push({ file, name: file.name, docType: row.label });
+            for (const file of files) uploads.push({ file, name: file.name, docType: row.label, replace: false });
             uploadedMultiDocTypes.push(row.type);
           }
           continue;
         }
         const file = form.identityDocFiles[row.type];
-        if (file) { uploads.push({ file, name: file.name, docType: row.label }); uploadedDocTypes.push(row.type); }
+        if (file) { uploads.push({ file, name: file.name, docType: row.label, replace: true }); uploadedDocTypes.push(row.type); }
       }
       for (const u of uploads) {
         const fd = new FormData();
         fd.append('file', u.file);
         fd.append('name', u.name);
         fd.append('docType', u.docType);
+        // Single-slot rows replace what was there; re-uploading is how a wrong
+        // file gets corrected, and leaving both made it unclear which counts.
+        if (u.replace) fd.append('replace', 'true');
         tasks.push(apiClient.post(`/employees/${emp.id}/documents`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         }));

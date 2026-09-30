@@ -32,9 +32,24 @@ if (!existsSync('dist/index.html')) {
   process.exit(1);
 }
 
-const run = (args, label) => {
+// `capture` only for the one step whose output we need (the invalidation id).
+// Everything else streams straight through: piping the sync steps buffered
+// megabytes of "Completed 7.7 MiB/24.6 MiB..." progress, and on failure that
+// buffer is what got dumped — burying the one line that said what went wrong
+// (an expired SSO token) under thousands of progress updates.
+const run = (args, label, capture = false) => {
   console.log(`\n▸ ${label}`);
-  return execFileSync(AWS, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'inherit'] });
+  try {
+    return execFileSync(AWS, args, {
+      encoding: 'utf8',
+      stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
+    });
+  } catch (err) {
+    console.error(`\n✗ ${label} failed (exit ${err.status}).`);
+    console.error('  If this mentions SSO or credentials, re-run:');
+    console.error('  aws sso login --profile jobly');
+    process.exit(err.status ?? 1);
+  }
 };
 
 // 1. Hashed assets first, so every chunk index.html can name already exists
@@ -68,6 +83,7 @@ const out = run(
     '--paths', '/', '/index.html', '--profile', PROFILE,
     '--query', 'Invalidation.Id', '--output', 'text'],
   'Invalidating index.html',
+  true,
 );
 
 console.log(`\n✅ deployed — invalidation ${out.trim()}`);
