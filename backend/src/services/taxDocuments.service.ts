@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { logActivity } from '../lib/activityLogger';
 import { NotFoundError } from '../lib/errors';
+import { notifyEmployeeById } from './notifications.service';
 
 const SEL = `id, employee_id, tax_year, document_type, file_url, notes, generated_at, sent_at, created_by, created_at, updated_at, employee:employees!employee_id(id, first_name, last_name, display_id)`;
 
@@ -20,6 +21,18 @@ export async function createTaxDocument(input: { employeeId: string; taxYear: nu
     .select(SEL).single();
   if (error || !data) throw error ?? new Error('Insert failed');
   void logActivity(actorId, 'created', 'tax_document', (data as any).id, `Tax doc ${input.documentType} ${input.taxYear}`);
+
+  // The employee is the whole audience for a tax document — they need it to
+  // file. Nothing told them one existed; they had to go looking.
+  await notifyEmployeeById(input.employeeId, {
+    title: `Your ${input.documentType} for ${input.taxYear} is ready`,
+    message: `Your ${input.documentType} for tax year ${input.taxYear} has been added to your documents.`,
+    type: 'success',
+    entityType: 'tax_document',
+    entityId: (data as { id: string }).id,
+    link: '/portal/tax-documents',
+    excludeUserId: actorId,
+  });
   return data as any;
 }
 

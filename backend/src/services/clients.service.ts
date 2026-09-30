@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ConflictError, ValidationError } from '../lib/errors';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import type { CreateClientInput, UpdateClientInput, ListClientsQuery } from '../schemas/client.schema';
+import { notifyRoles } from './notifications.service';
 
 export async function listClients(query: ListClientsQuery) {
   let q = supabaseAdmin.from('clients').select('*, portal_users!created_by(name, role)', { count: 'exact' }).is('deleted_at', null);
@@ -179,6 +180,18 @@ export async function patchOnboardingStatus(id: string, status: string, actorId?
     .select()
     .single();
   if (error || !data) throw new NotFoundError('Client not found');
+
+  // Client onboarding completing is what unblocks billing, so finance needs it
+  // as much as the operations/admin side that did the work.
+  await notifyRoles(['admin', 'operations', 'finance'], {
+    title: status === 'completed' ? 'Client onboarding complete' : 'Client onboarding status changed',
+    message: `${data.company_name ?? 'A client'} is now: ${status}.`,
+    type: status === 'completed' ? 'success' : 'info',
+    entityType: 'client',
+    entityId: id,
+    link: `/portal/clients/${id}`,
+    excludeUserId: actorId,
+  });
   return data;
 }
 

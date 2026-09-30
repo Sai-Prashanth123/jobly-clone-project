@@ -2,6 +2,7 @@ import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import type { CreatePaymentInput } from '../schemas/payment.schema';
+import { notifyRoles } from './notifications.service';
 
 // Manual payment recording (no processor). Each payment is a row; the invoice's
 // amount_paid = Σ payments, and its status is recomputed: paid (≥ total),
@@ -70,6 +71,23 @@ export async function recordPayment(invoiceId: string, input: CreatePaymentInput
   if (error) throw error;
 
   await reconcileInvoice(invoiceId);
+
+  // Finance and admin track receivables, and a payment landing is the event
+  // they care about most — nothing announced it before.
+  const outstanding = round2((Number(inv.total_amount) || 0) - ((Number(inv.amount_paid) || 0) + input.amount));
+  const settled = outstanding <= 0.01;
+  await notifyRoles(['finance', 'admin'], {
+    title: settled ? 'Invoice paid in full' : 'Payment recorded',
+    message: settled
+      ? `${inv.invoice_number ?? 'Invoice'} is now fully paid.`
+      : `${input.amount} received against ${inv.invoice_number ?? 'invoice'} — ${outstanding} still outstanding.`,
+    type: 'success',
+    entityType: 'invoice',
+    entityId: invoiceId,
+    link: `/portal/invoices/${invoiceId}`,
+    excludeUserId: actorId,
+  });
+
   logActivity(actorId ?? null, 'created', 'payment', payment.id, inv.invoice_number ?? invoiceId.slice(0, 8),
     { amount: input.amount, method: input.method });
   return payment;

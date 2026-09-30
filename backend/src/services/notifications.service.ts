@@ -462,3 +462,61 @@ export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number }> {
 
   return { sent };
 }
+
+// ── Shared fan-out helpers ────────────────────────────────────────────────────
+//
+// Every service that notified anyone had grown its own copy of "look up the
+// user ids for these roles, dedupe, create one notification each, swallow
+// errors". These are that pattern, once, so the areas that had no
+// notifications at all can be filled in without each reinventing it — and so
+// the audience rule (tell the people it affects) is expressed in one place.
+//
+// Both swallow their own errors, like createNotification: a notification is
+// never important enough to fail the action that triggered it. Callers MUST
+// still await them — on Lambda an unawaited promise is frozen when the
+// response returns and never runs (see admin.service.resetUserPassword).
+
+export type NotificationType = 'info' | 'warning' | 'error' | 'success';
+
+export interface NotifyPayload {
+  title: string;
+  message: string;
+  type?: NotificationType;
+  /** Entity the notification points at, e.g. 'case', 'client', 'invoice'. */
+  entityType?: string;
+  entityId?: string;
+  /** In-portal link. Must be a route the recipient's role can actually open. */
+  link?: string;
+  /** Usually the actor — nobody needs telling about their own action. */
+  excludeUserId?: string | null;
+}
+
+/** Notify every user holding any of these roles, once each. */
+export async function notifyRoles(roles: string[], n: NotifyPayload): Promise<void> {
+  try {
+    const idLists = await Promise.all(roles.map(r => getUserIdsByRole(r)));
+    const recipients = [...new Set(idLists.flat())].filter(id => id !== n.excludeUserId);
+    await Promise.all(recipients.map(uid =>
+      createNotification(uid, n.title, n.message, n.type ?? 'info', n.entityType, n.entityId, n.link),
+    ));
+  } catch (err) {
+    console.error('[notifications.service] notifyRoles failed for', roles.join('/'), err);
+  }
+}
+
+/**
+ * Notify the portal user attached to an employee record.
+ *
+ * Silently does nothing when the employee has no login yet — candidates added
+ * through the quick-add flow deliberately have none, and that is not an error.
+ */
+export async function notifyEmployeeById(employeeId: string, n: NotifyPayload): Promise<void> {
+  try {
+    const { data: pu } = await supabaseAdmin
+      .from('portal_users').select('id').eq('employee_id', employeeId).maybeSingle();
+    if (!pu?.id || pu.id === n.excludeUserId) return;
+    await createNotification(pu.id, n.title, n.message, n.type ?? 'info', n.entityType, n.entityId, n.link);
+  } catch (err) {
+    console.error('[notifications.service] notifyEmployeeById failed for', employeeId, err);
+  }
+}

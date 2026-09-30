@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { logActivity } from '../lib/activityLogger';
+import { notifyRoles } from './notifications.service';
 
 export async function listTemplates() {
   const { data, error } = await supabaseAdmin
@@ -62,6 +63,18 @@ export async function generateTasksForEmployee(employeeId: string, actorId: stri
   const { error } = await supabaseAdmin.from('offboarding_tasks').insert(rows);
   if (error) throw error;
   void logActivity(actorId, 'created', 'offboarding_task', employeeId, `Generated ${rows.length} offboarding tasks`);
+
+  // Offboarding starting is something HR and admin act on — returning assets,
+  // closing access, final pay. Nothing announced it before.
+  await notifyRoles(['hr', 'admin'], {
+    title: 'Offboarding started',
+    message: `${rows.length} offboarding tasks have been created and are awaiting completion.`,
+    type: 'warning',
+    entityType: 'employee',
+    entityId: employeeId,
+    link: `/portal/employees/${employeeId}`,
+    excludeUserId: actorId,
+  });
 }
 
 export async function addTask(employeeId: string, input: any, actorId: string) {

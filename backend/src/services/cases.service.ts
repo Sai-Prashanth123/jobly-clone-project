@@ -4,6 +4,7 @@ import { logActivity } from '../lib/activityLogger';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
 import * as storageSvc from './storage.service';
 import { isValidCaseDocumentCategory } from '../lib/caseDocumentCategories';
+import { notifyRoles, notifyEmployeeById } from './notifications.service';
 import type { UpsertWageInput, UpsertTaxReturnInput } from '../schemas/caseWages.schema';
 import type { UpsertPermDetailsInput } from '../schemas/casePerm.schema';
 import { CASE_STATUS_STEPS, isValidCaseStatusStepKey } from '../lib/caseStatusSteps';
@@ -131,6 +132,30 @@ export async function createCase(input: CreateCaseInput, actorId?: string) {
     CASE_STATUS_STEPS.map(s => ({ case_id: data.id, step_key: s.key, step_order: s.order })),
   );
 
+  // Legal owns casework and HR/admin track it, so both need to know a case was
+  // opened. The employee is told too — it is their petition, and previously
+  // nothing told them it had started.
+  await notifyRoles(['legal', 'hr', 'admin'], {
+    title: 'New case opened',
+    message: `${data.display_id} (${data.case_type}) has been opened.`,
+    entityType: 'case',
+    entityId: data.id,
+    link: `/portal/cases/${data.id}`,
+    excludeUserId: actorId,
+  });
+  if (data.employee_id) {
+    await notifyEmployeeById(data.employee_id, {
+      title: 'A case has been opened for you',
+      message: `Your ${data.case_type} case (${data.display_id}) has been opened. Your HR team will keep you updated.`,
+      entityType: 'case',
+      entityId: data.id,
+      // Employees do not have the staff case routes, so point at the view
+      // they can actually open.
+      link: '/portal/profile',
+      excludeUserId: actorId,
+    });
+  }
+
   return data;
 }
 
@@ -147,6 +172,13 @@ export async function updateCase(id: string, input: UpdateCaseInput, actorId?: s
   if (input.petitionerId !== undefined) updateData.petitioner_id = input.petitionerId;
   if (input.classification !== undefined) updateData.classification = input.classification;
 
+  // Read the current status before writing, so the notification below fires on
+  // a real transition rather than on every save that happens to include the
+  // same status. Editing an attorney name should not tell everyone the case
+  // "moved".
+  const { data: prior } = await supabaseAdmin
+    .from('cases').select('status').eq('id', id).is('deleted_at', null).maybeSingle();
+
   const { data, error } = await supabaseAdmin
     .from('cases')
     .update(updateData)
@@ -157,6 +189,28 @@ export async function updateCase(id: string, input: UpdateCaseInput, actorId?: s
 
   if (error || !data) throw new NotFoundError('Case not found');
   logActivity(actorId ?? null, 'updated', 'case', data.id, data.display_id, {});
+
+  if (input.status !== undefined && prior?.status !== data.status) {
+    const moved = `${data.display_id} moved from ${prior?.status ?? 'unknown'} to ${data.status}.`;
+    await notifyRoles(['legal', 'hr', 'admin'], {
+      title: 'Case status changed',
+      message: moved,
+      entityType: 'case',
+      entityId: data.id,
+      link: `/portal/cases/${data.id}`,
+      excludeUserId: actorId,
+    });
+    if (data.employee_id) {
+      await notifyEmployeeById(data.employee_id, {
+        title: 'Your case status has changed',
+        message: `Your ${data.case_type} case (${data.display_id}) is now: ${data.status}.`,
+        entityType: 'case',
+        entityId: data.id,
+        link: '/portal/profile',
+        excludeUserId: actorId,
+      });
+    }
+  }
   return data;
 }
 
