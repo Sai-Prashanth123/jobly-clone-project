@@ -38,7 +38,7 @@ export async function uploadReceipt(id: string, file: Express.Multer.File, actor
     .select(SELECT)
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
-  void logActivity(actorId, 'updated', 'expense_report', id, `Attached receipt to expense: ${expense.title}`);
+  await logActivity(actorId, 'updated', 'expense_report', id, `Attached receipt to expense: ${expense.title}`);
   return resolveReceiptUrl(data);
 }
 
@@ -105,7 +105,7 @@ export async function createExpense(input: CreateExpenseInput, employeeId: strin
     .single();
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
-  void logActivity(actorId, 'created', 'expense_report', row.id, `Created expense: ${row.title}`);
+  await logActivity(actorId, 'created', 'expense_report', row.id, `Created expense: ${row.title}`);
   return resolveReceiptUrl(row);
 }
 
@@ -132,7 +132,7 @@ export async function updateExpense(id: string, input: UpdateExpenseInput, actor
     .select(SELECT)
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
-  void logActivity(actorId, 'updated', 'expense_report', id, `Updated expense: ${expense.title}`);
+  await logActivity(actorId, 'updated', 'expense_report', id, `Updated expense: ${expense.title}`);
   return resolveReceiptUrl(data);
 }
 
@@ -151,7 +151,7 @@ export async function submitExpense(id: string, actorId: string, actorEmployeeId
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
 
-  void logActivity(actorId, 'status_changed', 'expense_report', id, `Submitted expense: ${expense.title}`);
+  await logActivity(actorId, 'status_changed', 'expense_report', id, `Submitted expense: ${expense.title}`);
 
   // Notify finance + admin + hr
   const adminFinanceIds = await getUserIdsByRole('finance');
@@ -159,7 +159,7 @@ export async function submitExpense(id: string, actorId: string, actorEmployeeId
   const hrIds = await getUserIdsByRole('hr');
   const notifyIds = [...new Set([...adminFinanceIds, ...adminIds, ...hrIds])];
   for (const uid of notifyIds) {
-    void createNotification(uid, 'New Expense Submitted', `${expense.title} submitted for review`, 'info', 'expense_report', id, '/portal/expenses');
+    await createNotification(uid, 'New Expense Submitted', `${expense.title} submitted for review`, 'info', 'expense_report', id, '/portal/expenses');
   }
 
   return data as any;
@@ -186,7 +186,7 @@ export async function reviewExpense(id: string, input: ReviewExpenseInput, revie
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
 
-  void logActivity(reviewerId, 'status_changed', 'expense_report', id, `${input.action} expense: ${expense.title}`);
+  await logActivity(reviewerId, 'status_changed', 'expense_report', id, `${input.action} expense: ${expense.title}`);
   bustNavBadgeCache();
 
   // Notify the employee
@@ -195,7 +195,7 @@ export async function reviewExpense(id: string, input: ReviewExpenseInput, revie
     const msg = input.action === 'approved'
       ? `Your expense "${expense.title}" was approved`
       : `Your expense "${expense.title}" was rejected${input.rejectionReason ? `: ${input.rejectionReason}` : ''}`;
-    void createNotification(empUserId, `Expense ${input.action}`, msg, input.action === 'approved' ? 'success' : 'warning', 'expense_report', id, '/portal/expenses');
+    await createNotification(empUserId, `Expense ${input.action}`, msg, input.action === 'approved' ? 'success' : 'warning', 'expense_report', id, '/portal/expenses');
   }
 
   return data as any;
@@ -213,12 +213,12 @@ export async function markPaid(id: string, actorId: string) {
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
 
-  void logActivity(actorId, 'status_changed', 'expense_report', id, `Marked expense paid: ${expense.title}`);
+  await logActivity(actorId, 'status_changed', 'expense_report', id, `Marked expense paid: ${expense.title}`);
 
   // Notify the employee
   const empUserId2 = await getPortalUserByEmployeeId(expense.employee_id);
   if (empUserId2) {
-    void createNotification(empUserId2, 'Expense Paid', `Your expense "${expense.title}" has been paid`, 'success', 'expense_report', id, '/portal/expenses');
+    await createNotification(empUserId2, 'Expense Paid', `Your expense "${expense.title}" has been paid`, 'success', 'expense_report', id, '/portal/expenses');
   }
 
   return data as any;
@@ -236,5 +236,5 @@ export async function deleteExpense(id: string, actorId: string, actorRole: stri
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'expense_report', id, `Deleted expense: ${expense.title}`);
+  await logActivity(actorId, 'deleted', 'expense_report', id, `Deleted expense: ${expense.title}`);
 }

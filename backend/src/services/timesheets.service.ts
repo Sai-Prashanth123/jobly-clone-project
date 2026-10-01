@@ -346,7 +346,7 @@ export async function patchTimesheetStatus(
   if (error) throw error;
 
   const label = ts.display_id ?? id.slice(0, 8);
-  logActivity(actorId ?? null, 'status_changed', 'timesheet', id, label, { from: ts.status, to: input.status });
+  await logActivity(actorId ?? null, 'status_changed', 'timesheet', id, label, { from: ts.status, to: input.status });
   bustNavBadgeCache();
 
   const actorIsOwner = actorEmployeeId != null && actorEmployeeId === ts.employee_id;
@@ -593,7 +593,7 @@ export async function uploadWeeklyClientProof(
     .eq('id', id).select().single();
   if (dbErr) throw dbErr;
 
-  logActivity(actorId ?? null, 'uploaded_client_proof', 'timesheet', id, ts.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'uploaded_client_proof', 'timesheet', id, ts.display_id ?? id.slice(0, 8));
   return updated;
 }
 
@@ -626,7 +626,7 @@ export async function deleteWeeklyClientProof(
     .update({ client_signed_url: null, client_signed_filename: null })
     .eq('id', id).select().single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'removed_client_proof', 'timesheet', id, ts.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'removed_client_proof', 'timesheet', id, ts.display_id ?? id.slice(0, 8));
   return updated;
 }
 
@@ -670,7 +670,7 @@ export async function reopenTimesheet(
   if (error) throw error;
 
   const label = ts.display_id ?? id.slice(0, 8);
-  logActivity(actorId ?? null, 'updated', 'timesheet', id, label, { event: 'timesheet_reopened', from: ts.status, reason });
+  await logActivity(actorId ?? null, 'updated', 'timesheet', id, label, { event: 'timesheet_reopened', from: ts.status, reason });
   bustNavBadgeCache();
 
   const ownerPortalId = await getPortalUserByEmployeeId(ts.employee_id);

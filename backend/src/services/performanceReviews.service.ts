@@ -68,7 +68,7 @@ export async function createPerformanceReview(input: CreatePerformanceReviewInpu
   if (error || !data) throw error ?? new Error('Insert failed');
 
   const empName = `${(data as any).employees?.first_name ?? ''} ${(data as any).employees?.last_name ?? ''}`.trim();
-  void logActivity(actorId ?? null, 'created', 'performance_review', data.id, `Performance review: ${empName || data.display_id}`);
+  await logActivity(actorId ?? null, 'created', 'performance_review', data.id, `Performance review: ${empName || data.display_id}`);
   return data;
 }
 
@@ -96,7 +96,7 @@ export async function updatePerformanceReview(id: string, input: UpdatePerforman
     .from('performance_reviews').update(patch).eq('id', id).select(`*, ${EMP_JOIN}`).single();
   if (error || !data) throw error ?? new Error('Update failed');
 
-  void logActivity(actorId ?? null, 'updated', 'performance_review', id, data.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'updated', 'performance_review', id, data.display_id ?? id.slice(0, 8));
   return data;
 }
 
@@ -107,7 +107,7 @@ export async function deletePerformanceReview(id: string, actorId?: string) {
   }
   const { error } = await supabaseAdmin.from('performance_reviews').delete().eq('id', id);
   if (error) throw error;
-  void logActivity(actorId ?? null, 'deleted', 'performance_review', id, existing.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'deleted', 'performance_review', id, existing.display_id ?? id.slice(0, 8));
 }
 
 function buildPdfData(row: any): PerformanceReviewPDFData {
@@ -196,12 +196,12 @@ export async function sendPerformanceReviewToEmployee(id: string, recipientEmail
   if (error) throw error;
 
   if (emailSent) {
-    void logActivity(null, 'sent', 'performance_review', id, `Sent to ${recipientEmail}`);
+    await logActivity(null, 'sent', 'performance_review', id, `Sent to ${recipientEmail}`);
     try {
       const { data: portalUser } = await supabaseAdmin
         .from('portal_users').select('id').eq('employee_id', row.employee_id).maybeSingle();
       if (portalUser) {
-        void createNotification(
+        await createNotification(
           portalUser.id, 'Performance Review Available',
           `Your performance review for ${row.period_start} to ${row.period_end} is ready.`,
           'info', 'performance_review', id, '/portal/my-reviews',
@@ -209,7 +209,7 @@ export async function sendPerformanceReviewToEmployee(id: string, recipientEmail
       }
       const hrIds = await getUserIdsByRole('hr');
       for (const uid of hrIds) {
-        void createNotification(uid, 'Performance Review Sent', `Review ${row.display_id} emailed to ${recipientEmail}.`, 'info', 'performance_review', id, `/portal/reviews/${id}`);
+        await createNotification(uid, 'Performance Review Sent', `Review ${row.display_id} emailed to ${recipientEmail}.`, 'info', 'performance_review', id, `/portal/reviews/${id}`);
       }
     } catch (err) {
       console.error('[performanceReviews.service] notification failed for review', id, err);

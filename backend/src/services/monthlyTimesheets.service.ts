@@ -220,7 +220,7 @@ export async function upsertMonthlyTimesheet(
       })
       .eq('id', existing.id).select().single();
     if (error) throw error;
-    logActivity(actorId ?? null, 'updated', 'monthly_timesheet', existing.id, existing.display_id ?? existing.id.slice(0, 8));
+    await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', existing.id, existing.display_id ?? existing.id.slice(0, 8));
     return data;
   }
 
@@ -255,14 +255,14 @@ export async function upsertMonthlyTimesheet(
             })
             .eq('id', now.id).select().single();
           if (updErr) throw updErr;
-          logActivity(actorId ?? null, 'updated', 'monthly_timesheet', now.id, now.display_id ?? now.id.slice(0, 8));
+          await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', now.id, now.display_id ?? now.id.slice(0, 8));
           return updated;
         }
         throw new ConflictError('A timesheet already exists for this employee and month.');
       }
       throw error;
     }
-    logActivity(actorId ?? null, 'created', 'monthly_timesheet', data.id, data.display_id ?? data.id.slice(0, 8));
+    await logActivity(actorId ?? null, 'created', 'monthly_timesheet', data.id, data.display_id ?? data.id.slice(0, 8));
     return data;
   }
 }
@@ -291,7 +291,7 @@ export async function updateMonthlyTimesheet(id: string, input: UpdateMonthlyTim
     })
     .eq('id', id).select().single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
   return data;
 }
 
@@ -334,7 +334,7 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
   if (error) throw error;
 
   const label = row.display_id ?? id.slice(0, 8);
-  logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: 'submitted' });
+  await logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: 'submitted' });
   bustNavBadgeCache();
 
   // Awaited, and the REAL result is returned.
@@ -392,7 +392,7 @@ export async function patchMonthlyStatus(id: string, input: PatchMonthlyStatusIn
   if (error) throw error;
 
   const label = row.display_id ?? id.slice(0, 8);
-  logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: input.status });
+  await logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: input.status });
   bustNavBadgeCache();
 
   // Notify the owner (fire-and-forget).
@@ -607,7 +607,7 @@ export async function uploadMonthlyClientProof(
     .eq('id', id).select().single();
   if (dbErr) throw dbErr;
 
-  logActivity(actorId ?? null, 'uploaded_client_proof', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'uploaded_client_proof', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
   return updated;
 }
 
@@ -619,7 +619,7 @@ export async function patchEntriesByAdmin(id: string, entries: MonthlyEntry[], n
     .update({ entries, notes: notes ?? row.notes ?? null, ...summary })
     .eq('id', id).select(EMP_JOIN).single();
   if (error || !data) throw new NotFoundError('Monthly timesheet not found');
-  logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
   return data;
 }
 
@@ -660,6 +660,6 @@ export async function deleteMonthlyClientProof(
     .update({ client_signed_url: null, client_signed_filename: null })
     .eq('id', id).select().single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'removed_client_proof', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'removed_client_proof', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
   return updated;
 }

@@ -66,7 +66,7 @@ export async function createMessage(caseId: string, input: CreateCaseMessageInpu
     .select('*, portal_users!author_id(name)')
     .single();
   if (error) throw error;
-  logActivity(actor.id, 'created', 'case', caseId, parent.display_id, { event: 'case_message_posted' });
+  await logActivity(actor.id, 'created', 'case', caseId, parent.display_id, { event: 'case_message_posted' });
 
   if (actor.role === 'employee') {
     // Notify the case-handling team a reply came in, on their existing

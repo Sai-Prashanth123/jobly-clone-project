@@ -44,7 +44,7 @@ export async function updateUserRole(userId: string, role: string, actorId: stri
 
   if (error || !data) throw new NotFoundError('User not found');
 
-  logActivity(actorId, 'updated', 'portal_user', userId, data.email ?? userId.slice(0, 8), {
+  await logActivity(actorId, 'updated', 'portal_user', userId, data.email ?? userId.slice(0, 8), {
     event: 'role_changed',
     previousRole: prev?.role,
     newRole: role,
@@ -73,7 +73,7 @@ export async function deactivateUser(userId: string, actorId: string) {
   await authProvider.deleteUser(userId);
   await supabaseAdmin.from('portal_users').delete().eq('id', userId);
 
-  logActivity(actorId, 'deleted', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
+  await logActivity(actorId, 'deleted', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
     event: 'deactivated',
     role: target?.role,
   });
@@ -121,7 +121,7 @@ export async function resetUserPassword(userId: string, actorId?: string): Promi
   }
 
   // Audit: capture WHO reset WHOSE password, but never log the new password.
-  logActivity(actorId ?? null, 'updated', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
+  await logActivity(actorId ?? null, 'updated', 'portal_user', userId, target?.email ?? userId.slice(0, 8), {
     event: 'password_reset',
   });
   return tempPassword;

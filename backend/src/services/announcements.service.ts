@@ -83,10 +83,11 @@ export async function createAnnouncement(input: CreateAnnouncementInput, authorI
     .single();
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
-  void logActivity(authorId, 'created', 'announcement', row.id, `Created announcement: ${row.title}`);
+  await logActivity(authorId, 'created', 'announcement', row.id, `Created announcement: ${row.title}`);
 
-  // Fire-and-forget: email all targeted users
-  void (async () => {
+  // Awaited: on Lambda the container freezes when the response returns, so an
+  // unawaited loop like this one sends batch 1 at best and silently drops the rest.
+  await (async () => {
     try {
       if (!mailerConfigured) return;
       let q = supabaseAdmin.from('portal_users').select('email');
@@ -129,7 +130,7 @@ export async function updateAnnouncement(id: string, input: UpdateAnnouncementIn
     .select(SELECT)
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
-  void logActivity(actorId, 'updated', 'announcement', id, `Updated announcement: ${existing.title}`);
+  await logActivity(actorId, 'updated', 'announcement', id, `Updated announcement: ${existing.title}`);
   return data as any;
 }
 
@@ -173,5 +174,5 @@ export async function deleteAnnouncement(id: string, actorId: string) {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'announcement', id, `Deleted announcement: ${existing.title}`);
+  await logActivity(actorId, 'deleted', 'announcement', id, `Deleted announcement: ${existing.title}`);
 }

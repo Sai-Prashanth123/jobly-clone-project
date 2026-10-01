@@ -36,7 +36,7 @@ export async function createPetitioner(input: CreatePetitionerInput, actorId?: s
     .select()
     .single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'created', 'petitioner', data.id, data.name, {});
+  await logActivity(actorId ?? null, 'created', 'petitioner', data.id, data.name, {});
   return data;
 }
 
@@ -53,7 +53,7 @@ export async function updatePetitioner(id: string, input: UpdatePetitionerInput,
   const { data, error } = await supabaseAdmin
     .from('petitioners').update(updateData).eq('id', id).select().single();
   if (error || !data) throw new NotFoundError('Petitioner not found');
-  logActivity(actorId ?? null, 'updated', 'petitioner', id, data.name, {});
+  await logActivity(actorId ?? null, 'updated', 'petitioner', id, data.name, {});
   return data;
 }
 
@@ -61,5 +61,5 @@ export async function deletePetitioner(id: string, actorId?: string) {
   const { data, error } = await supabaseAdmin
     .from('petitioners').update({ deleted_at: new Date().toISOString() }).eq('id', id).select().single();
   if (error || !data) throw new NotFoundError('Petitioner not found');
-  logActivity(actorId ?? null, 'deleted', 'petitioner', id, data.name, {});
+  await logActivity(actorId ?? null, 'deleted', 'petitioner', id, data.name, {});
 }

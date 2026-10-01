@@ -58,7 +58,7 @@ export async function createTicket(input: CreateTicketInput, actorId: string) {
     .single();
 
   if (error) throw error;
-  logActivity(actorId, 'created', 'support_ticket', data.id, data.display_id, {});
+  await logActivity(actorId, 'created', 'support_ticket', data.id, data.display_id, {});
 
   const legalIds = await getUserIdsByRole('legal');
   for (const uid of legalIds) {
@@ -81,7 +81,7 @@ export async function resolveTicket(id: string, input: ResolveTicketInput, actor
     .single();
 
   if (error || !data) throw new NotFoundError('Support ticket not found');
-  logActivity(actorId, 'updated', 'support_ticket', data.id, data.display_id, { event: 'resolved' });
+  await logActivity(actorId, 'updated', 'support_ticket', data.id, data.display_id, { event: 'resolved' });
 
   await createNotification(
     data.created_by,

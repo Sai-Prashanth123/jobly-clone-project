@@ -462,7 +462,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     throw err;
   }
 
-  logActivity(actorId ?? null, 'created', 'employee', emp.id, emp.display_id ?? `${input.firstName} ${input.lastName}`);
+  await logActivity(actorId ?? null, 'created', 'employee', emp.id, emp.display_id ?? `${input.firstName} ${input.lastName}`);
 
   // A candidate record gets nothing beyond the bare row: no onboarding
   // checklist, no portal login/welcome email, no HR "new hire" notification.
@@ -502,7 +502,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     await supabaseAdmin.from('employees')
       .update({ deleted_at: new Date().toISOString() })
       .eq('id', emp.id);
-    logActivity(actorId ?? null, 'deleted', 'employee', emp.id, emp.display_id ?? input.email, { reason: 'auth_setup_failed' });
+    await logActivity(actorId ?? null, 'deleted', 'employee', emp.id, emp.display_id ?? input.email, { reason: 'auth_setup_failed' });
     return { ...serializeEmployee(emp), _credentials: credsResult };
   }
 
@@ -510,7 +510,7 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
   // and fan out the inserts in parallel (was sequential `await` per user). The
   // employee + auth + portal_users are already persisted, so create response
   // returns immediately. Mirrors invoices.service generateInvoice notify block.
-  void (async () => {
+  await (async () => {
     try {
       const [hrIds, adminIds] = await Promise.all([
         getUserIdsByRole('hr'),
@@ -578,7 +578,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
         warning = `Info letter could not be sent (${err?.code ?? ''} ${err?.message ?? 'send failed'}).`;
       }
     }
-    logActivity(actorId ?? null, 'updated', 'employee', emp.id, emp.display_id ?? `${emp.first_name} ${emp.last_name}`, { event: 'resent_welcome_info' });
+    await logActivity(actorId ?? null, 'updated', 'employee', emp.id, emp.display_id ?? `${emp.first_name} ${emp.last_name}`, { event: 'resent_welcome_info' });
     return { credentialsReady: true, emailSent, warning, loginEmail };
   }
 
@@ -626,7 +626,7 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
   };
 
   const result = await issueCredentials(emp.id, emp, input);
-  logActivity(actorId ?? null, 'updated', 'employee', emp.id, emp.display_id ?? `${emp.first_name} ${emp.last_name}`, { event: 'resent_credentials' });
+  await logActivity(actorId ?? null, 'updated', 'employee', emp.id, emp.display_id ?? `${emp.first_name} ${emp.last_name}`, { event: 'resent_credentials' });
   return result;
 }
 
@@ -811,7 +811,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   // HR approved onboarding (onboarding → active): notify the employee in-app so
   // they're not stuck on the "awaiting review" screen. Awaited: Lambda freezes on response and would drop it.
   if (input.status === 'active' && existing.status === 'onboarding') {
-    void (async () => {
+    await (async () => {
       try {
         const { data: pu } = await supabaseAdmin
           .from('portal_users').select('id').eq('employee_id', id).maybeSingle();
@@ -904,7 +904,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   }
 
   const blockPersonalEmailChanged = input.blockPersonalEmail !== undefined && input.blockPersonalEmail !== !!(existing as any).block_personal_email;
-  logActivity(
+  await logActivity(
     actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8),
     blockPersonalEmailChanged ? { event: input.blockPersonalEmail ? 'blocked_personal_email' : 'unblocked_personal_email' } : undefined,
   );
@@ -912,7 +912,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   // Notify the employee in-app when their personal-email communications are
   // blocked (not on unblock — that's not something they need to be warned about).
   if (blockPersonalEmailChanged && input.blockPersonalEmail) {
-    void (async () => {
+    await (async () => {
       try {
         const { data: pu } = await supabaseAdmin
           .from('portal_users').select('id').eq('employee_id', id).maybeSingle();
@@ -1034,7 +1034,7 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
       .is('resolved_at', null);
   }
 
-  logActivity(
+  await logActivity(
     actorId ?? null, 'updated', 'employee', id,
     updated.display_id ?? id.slice(0, 8),
     { event: wasChangeRequested ? 'onboarding_resubmitted' : 'onboarding_submitted' },
@@ -1106,7 +1106,7 @@ export async function requestOnboardingChanges(
     employee_id: id, message, requested_by: actorId ?? null,
   });
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
+  await logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
     event: 'onboarding_changes_requested',
   });
 
@@ -1190,7 +1190,7 @@ export async function raiseLegalRequest(id: string, input: RaiseLegalRequestInpu
     );
   }
 
-  logActivity(actorId ?? null, 'created', 'employee', id, emp.display_id ?? id.slice(0, 8), {
+  await logActivity(actorId ?? null, 'created', 'employee', id, emp.display_id ?? id.slice(0, 8), {
     event: 'legal_request_raised', caseId: created.id,
   });
 
@@ -1206,7 +1206,7 @@ export async function requestEmployeeDocuments(id: string, message: string, acto
     .from('employees').select('*').eq('id', id).is('deleted_at', null).single();
   if (error || !emp) throw new NotFoundError('Employee not found');
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8), {
+  await logActivity(actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8), {
     event: 'documents_requested',
   });
 
@@ -1268,7 +1268,7 @@ export async function reopenOnboarding(
   const { data: updated, error: updErr } = await supabaseAdmin
     .from('employees').update({ onboarding_completed_at: null }).eq('id', id).select().single();
   if (updErr) throw updErr;
-  logActivity(actorEmployeeId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8), {
+  await logActivity(actorEmployeeId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8), {
     event: 'onboarding_reopened',
   });
   return updated;
@@ -1384,7 +1384,7 @@ export async function deleteEmployee(id: string, actorId?: string) {
   if (findErr || !existing) throw new NotFoundError('Employee not found');
 
   await purgeEmployeeData(id, existing.email);
-  logActivity(actorId ?? null, 'deleted', 'employee', id, existing.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'deleted', 'employee', id, existing.display_id ?? id.slice(0, 8));
 }
 
 // ── extended leave & termination ───────────────────────────────────────────────
@@ -1520,7 +1520,7 @@ export async function placeOnExtendedLeave(
     .eq('id', id).select().single();
   if (updErr) throw updErr;
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
+  await logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
     event: 'placed_on_leave', returnDate: input.returnDate,
   });
   await notifyEmployeeUser(id, 'You have been placed on extended leave',
@@ -1545,7 +1545,7 @@ export async function returnFromLeave(id: string, actorId?: string) {
     .eq('id', id).select().single();
   if (updErr) throw updErr;
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'returned_from_leave' });
+  await logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'returned_from_leave' });
   await notifyEmployeeUser(id, 'Welcome back from leave', 'Your account is active again — you now have full portal access.', 'success');
   return serializeEmployee(updated);
 }
@@ -1573,7 +1573,7 @@ export async function reactivateReturnedEmployees(): Promise<number> {
       .eq('id', emp.id);
     if (updErr) { console.error('[scheduler] auto-reactivate failed for', emp.id, updErr); continue; }
     count++;
-    logActivity(null, 'updated', 'employee', emp.id, emp.display_id ?? emp.id.slice(0, 8), { event: 'auto_returned_from_leave' });
+    await logActivity(null, 'updated', 'employee', emp.id, emp.display_id ?? emp.id.slice(0, 8), { event: 'auto_returned_from_leave' });
     await notifyEmployeeUser(emp.id, 'Welcome back from leave', 'Your scheduled return date has arrived — your account is active again.', 'success');
     await notifyHrAdmin('Employee returned from leave',
       `${emp.display_id ?? `${emp.first_name} ${emp.last_name}`} has returned from extended leave (auto-reactivated).`, emp.id, 'info');
@@ -1617,7 +1617,7 @@ export async function terminateEmployee(
     .eq('id', id).select().single();
   if (updErr) throw updErr;
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
+  await logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), {
     event: 'terminated', effectiveDate, reason: input.reason ?? undefined,
   });
   await notifyHrAdmin('Employee terminated',
@@ -1641,7 +1641,7 @@ export async function rehireEmployee(id: string, actorId?: string) {
     .eq('id', id).select().single();
   if (updErr) throw updErr;
 
-  logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'rehired' });
+  await logActivity(actorId ?? null, 'updated', 'employee', id, updated.display_id ?? id.slice(0, 8), { event: 'rehired' });
 
   // Re-issue login + send fresh credentials. Surface the credentials result so
   // the controller can report email/login status (mirrors resend-credentials).

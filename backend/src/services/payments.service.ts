@@ -88,7 +88,7 @@ export async function recordPayment(invoiceId: string, input: CreatePaymentInput
     excludeUserId: actorId,
   });
 
-  logActivity(actorId ?? null, 'created', 'payment', payment.id, inv.invoice_number ?? invoiceId.slice(0, 8),
+  await logActivity(actorId ?? null, 'created', 'payment', payment.id, inv.invoice_number ?? invoiceId.slice(0, 8),
     { amount: input.amount, method: input.method });
   return payment;
 }
@@ -100,5 +100,5 @@ export async function deletePayment(paymentId: string, actorId?: string) {
   const { error } = await supabaseAdmin.from('payments').delete().eq('id', paymentId);
   if (error) throw error;
   await reconcileInvoice(payment.invoice_id);
-  logActivity(actorId ?? null, 'deleted', 'payment', paymentId, paymentId.slice(0, 8));
+  await logActivity(actorId ?? null, 'deleted', 'payment', paymentId, paymentId.slice(0, 8));
 }

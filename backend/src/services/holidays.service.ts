@@ -57,7 +57,7 @@ export async function createHoliday(input: { name: string; date: string; isRecur
     .insert({ name: input.name, date: input.date, is_recurring: input.isRecurring ?? false, country_code: input.countryCode ?? 'US' })
     .select().single();
   if (error || !data) throw error ?? new Error('Insert failed');
-  void logActivity(actorId, 'created', 'holiday', (data as any).id, `Holiday: ${input.name}`);
+  await logActivity(actorId, 'created', 'holiday', (data as any).id, `Holiday: ${input.name}`);
   return data as any;
 }
 
@@ -69,12 +69,12 @@ export async function updateHoliday(id: string, input: { name?: string; date?: s
   if (input.countryCode !== undefined) patch.country_code = input.countryCode;
   const { data, error } = await supabaseAdmin.from('company_holidays').update(patch).eq('id', id).select().single();
   if (error || !data) throw new NotFoundError('Holiday not found');
-  void logActivity(actorId, 'updated', 'holiday', id, `Updated holiday`);
+  await logActivity(actorId, 'updated', 'holiday', id, `Updated holiday`);
   return data as any;
 }
 
 export async function deleteHoliday(id: string, actorId: string) {
   const { error } = await supabaseAdmin.from('company_holidays').delete().eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'holiday', id, 'Deleted holiday');
+  await logActivity(actorId, 'deleted', 'holiday', id, 'Deleted holiday');
 }

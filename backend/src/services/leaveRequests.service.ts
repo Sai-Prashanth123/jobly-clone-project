@@ -153,7 +153,7 @@ export async function createLeaveRequest(
 
   const empName = `${emp.first_name} ${emp.last_name}`.trim();
   const label = lr.display_id ?? lr.id.slice(0, 8);
-  logActivity(actorId ?? null, 'created', 'leave_request', lr.id, label, { employee: emp.display_id });
+  await logActivity(actorId ?? null, 'created', 'leave_request', lr.id, label, { employee: emp.display_id });
 
   // Notify HR + admin that a request is awaiting review.
   const reviewers = [...new Set([...(await getUserIdsByRole('admin')), ...(await getUserIdsByRole('hr'))])];
@@ -219,7 +219,7 @@ export async function reviewLeaveRequest(
   if (error) throw error;
 
   const label = lr.display_id ?? id.slice(0, 8);
-  logActivity(reviewerUserId ?? null, 'status_changed', 'leave_request', id, label, { to: input.status });
+  await logActivity(reviewerUserId ?? null, 'status_changed', 'leave_request', id, label, { to: input.status });
   bustNavBadgeCache();
 
   // Notify the employee of the decision.
@@ -267,6 +267,6 @@ export async function cancelLeaveRequest(
     .select(SELECT)
     .single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'status_changed', 'leave_request', id, lr.display_id ?? id.slice(0, 8), { to: 'cancelled' });
+  await logActivity(actorId ?? null, 'status_changed', 'leave_request', id, lr.display_id ?? id.slice(0, 8), { to: 'cancelled' });
   return updated;
 }

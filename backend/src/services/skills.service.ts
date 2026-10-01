@@ -34,7 +34,7 @@ export async function addSkill(employeeId: string, input: { skillName: string; p
     if ((error as any).code === '23505') throw new ConflictError('Skill already exists for this employee');
     throw error;
   }
-  void logActivity(actorId, 'created', 'skill', (data as any).id, `Added skill: ${input.skillName}`);
+  await logActivity(actorId, 'created', 'skill', (data as any).id, `Added skill: ${input.skillName}`);
   return data as any;
 }
 
@@ -45,14 +45,14 @@ export async function updateSkill(id: string, input: { proficiency?: string; las
   if (input.isPrimary !== undefined) patch.is_primary = input.isPrimary;
   const { data, error } = await supabaseAdmin.from('employee_skills').update(patch).eq('id', id).select(SEL).single();
   if (error || !data) throw error ?? new Error('Not found');
-  void logActivity(actorId, 'updated', 'skill', id, 'Updated skill');
+  await logActivity(actorId, 'updated', 'skill', id, 'Updated skill');
   return data as any;
 }
 
 export async function deleteSkill(id: string, actorId: string) {
   const { error } = await supabaseAdmin.from('employee_skills').delete().eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'skill', id, 'Deleted skill');
+  await logActivity(actorId, 'deleted', 'skill', id, 'Deleted skill');
 }
 
 /**

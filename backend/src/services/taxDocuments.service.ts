@@ -20,7 +20,7 @@ export async function createTaxDocument(input: { employeeId: string; taxYear: nu
     .insert({ employee_id: input.employeeId, tax_year: input.taxYear, document_type: input.documentType, file_url: input.fileUrl ?? null, notes: input.notes ?? null, generated_at: new Date().toISOString(), created_by: actorId })
     .select(SEL).single();
   if (error || !data) throw error ?? new Error('Insert failed');
-  void logActivity(actorId, 'created', 'tax_document', (data as any).id, `Tax doc ${input.documentType} ${input.taxYear}`);
+  await logActivity(actorId, 'created', 'tax_document', (data as any).id, `Tax doc ${input.documentType} ${input.taxYear}`);
 
   // The employee is the whole audience for a tax document — they need it to
   // file. Nothing told them one existed; they had to go looking.
@@ -43,12 +43,12 @@ export async function updateTaxDocument(id: string, input: { fileUrl?: string; n
   if (input.sentAt !== undefined) patch.sent_at = input.sentAt;
   const { data, error } = await supabaseAdmin.from('tax_documents').update(patch).eq('id', id).select(SEL).single();
   if (error || !data) throw new NotFoundError('Tax document not found');
-  void logActivity(actorId, 'updated', 'tax_document', id, 'Updated tax document');
+  await logActivity(actorId, 'updated', 'tax_document', id, 'Updated tax document');
   return data as any;
 }
 
 export async function deleteTaxDocument(id: string, actorId: string) {
   const { error } = await supabaseAdmin.from('tax_documents').delete().eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'tax_document', id, 'Deleted tax document');
+  await logActivity(actorId, 'deleted', 'tax_document', id, 'Deleted tax document');
 }

@@ -74,7 +74,7 @@ export async function createAsset(input: CreateAssetInput, actorId: string) {
     .single();
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
-  void logActivity(actorId, 'created', 'asset', row.id, `Created asset: ${row.name}`);
+  await logActivity(actorId, 'created', 'asset', row.id, `Created asset: ${row.name}`);
   return row;
 }
 
@@ -101,7 +101,7 @@ export async function updateAsset(id: string, input: UpdateAssetInput, actorId: 
     .select(SELECT)
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
-  void logActivity(actorId, 'updated', 'asset', id, `Updated asset: ${asset.name}`);
+  await logActivity(actorId, 'updated', 'asset', id, `Updated asset: ${asset.name}`);
   return data as any;
 }
 
@@ -125,12 +125,12 @@ export async function assignAsset(id: string, input: AssignAssetInput, actorId: 
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
 
-  void logActivity(actorId, 'updated', 'asset', id, `Assigned asset ${asset.name} to employee ${input.employeeId}`);
+  await logActivity(actorId, 'updated', 'asset', id, `Assigned asset ${asset.name} to employee ${input.employeeId}`);
 
   // Notify employee
   const empUserId = await getPortalUserByEmployeeId(input.employeeId);
   if (empUserId) {
-    void createNotification(empUserId, 'Equipment Assigned', `${asset.name} has been assigned to you`, 'info', 'asset', id, '/portal/assets');
+    await createNotification(empUserId, 'Equipment Assigned', `${asset.name} has been assigned to you`, 'info', 'asset', id, '/portal/assets');
   }
 
   return data as any;
@@ -155,12 +155,12 @@ export async function unassignAsset(id: string, actorId: string) {
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
 
-  void logActivity(actorId, 'updated', 'asset', id, `Unassigned asset ${asset.name}`);
+  await logActivity(actorId, 'updated', 'asset', id, `Unassigned asset ${asset.name}`);
 
   if (prevEmployee) {
     const empUserId = await getPortalUserByEmployeeId(prevEmployee);
     if (empUserId) {
-      void createNotification(empUserId, 'Equipment Returned', `${asset.name} has been returned`, 'info', 'asset', id, '/portal/assets');
+      await createNotification(empUserId, 'Equipment Returned', `${asset.name} has been returned`, 'info', 'asset', id, '/portal/assets');
     }
   }
 
@@ -176,5 +176,5 @@ export async function deleteAsset(id: string, actorId: string) {
     .update({ deleted_at: new Date().toISOString() })
     .eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'asset', id, `Deleted asset: ${asset.name}`);
+  await logActivity(actorId, 'deleted', 'asset', id, `Deleted asset: ${asset.name}`);
 }

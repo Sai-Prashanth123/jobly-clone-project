@@ -73,13 +73,13 @@ export async function createEnrollmentForm(input: CreateEnrollmentFormInput, act
   if (error || !data) throw error ?? new Error('Insert failed');
 
   const empName = `${employee.first_name ?? ''} ${employee.last_name ?? ''}`.trim();
-  void logActivity(actorId ?? null, 'created', 'enrollment_form', data.id, `Enrollment form: ${empName || data.display_id}`);
+  await logActivity(actorId ?? null, 'created', 'enrollment_form', data.id, `Enrollment form: ${empName || data.display_id}`);
 
   try {
     const { data: portalUser } = await supabaseAdmin
       .from('portal_users').select('id').eq('employee_id', input.employeeId).maybeSingle();
     if (portalUser) {
-      void createNotification(
+      await createNotification(
         portalUser.id, 'Benefits Enrollment Form Assigned',
         'A benefits enrollment form has been assigned to you — please complete it in the portal.',
         'info', 'enrollment_form', data.id, `/portal/enrollment-forms/${data.id}`,
@@ -106,7 +106,7 @@ export async function updateEnrollmentForm(id: string, input: UpdateEnrollmentFo
     .single();
   if (error || !data) throw error ?? new Error('Update failed');
 
-  void logActivity(actorId ?? null, 'updated', 'enrollment_form', id, data.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'updated', 'enrollment_form', id, data.display_id ?? id.slice(0, 8));
   return data;
 }
 
@@ -140,7 +140,7 @@ export async function submitEnrollmentForm(id: string, input: SubmitEnrollmentFo
     .single();
   if (error || !data) throw error ?? new Error('Submit failed');
 
-  void logActivity(actorId ?? null, 'submitted', 'enrollment_form', id, data.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'submitted', 'enrollment_form', id, data.display_id ?? id.slice(0, 8));
 
   try {
     await generateAndStoreEnrollmentFormPdf(data);
@@ -154,7 +154,7 @@ export async function submitEnrollmentForm(id: string, input: SubmitEnrollmentFo
     const hrIds = await getUserIdsByRole('hr');
     const adminIds = await getUserIdsByRole('admin');
     for (const uid of [...hrIds, ...adminIds]) {
-      void createNotification(
+      await createNotification(
         uid, 'Benefits Enrollment Form Submitted',
         `${empName} submitted their Benefits Enrollment Form.`,
         'info', 'enrollment_form', id, `/portal/enrollment-forms/${id}`,
@@ -174,7 +174,7 @@ export async function deleteEnrollmentForm(id: string, actorId?: string) {
   }
   const { error } = await supabaseAdmin.from('enrollment_forms').delete().eq('id', id);
   if (error) throw error;
-  void logActivity(actorId ?? null, 'deleted', 'enrollment_form', id, existing.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'deleted', 'enrollment_form', id, existing.display_id ?? id.slice(0, 8));
 }
 
 function buildPdfData(row: any): EnrollmentFormPDFData {

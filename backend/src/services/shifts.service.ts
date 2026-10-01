@@ -20,7 +20,7 @@ export async function createShift(input: { employeeId: string; date: string; sta
     .insert({ employee_id: input.employeeId, date: input.date, start_time: input.startTime, end_time: input.endTime, shift_type: input.shiftType ?? 'morning', notes: input.notes ?? null, created_by: actorId })
     .select(SEL).single();
   if (error || !data) throw error ?? new Error('Insert failed');
-  void logActivity(actorId, 'created', 'shift', (data as any).id, `Shift on ${input.date}`);
+  await logActivity(actorId, 'created', 'shift', (data as any).id, `Shift on ${input.date}`);
   return data as any;
 }
 
@@ -33,12 +33,12 @@ export async function updateShift(id: string, input: { date?: string; startTime?
   if (input.notes !== undefined) patch.notes = input.notes ?? null;
   const { data, error } = await supabaseAdmin.from('shifts').update(patch).eq('id', id).select(SEL).single();
   if (error || !data) throw new NotFoundError('Shift not found');
-  void logActivity(actorId, 'updated', 'shift', id, 'Updated shift');
+  await logActivity(actorId, 'updated', 'shift', id, 'Updated shift');
   return data as any;
 }
 
 export async function deleteShift(id: string, actorId: string) {
   const { error } = await supabaseAdmin.from('shifts').delete().eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'shift', id, 'Deleted shift');
+  await logActivity(actorId, 'deleted', 'shift', id, 'Deleted shift');
 }

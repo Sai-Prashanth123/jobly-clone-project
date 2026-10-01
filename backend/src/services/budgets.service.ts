@@ -20,14 +20,14 @@ export async function upsertBudget(input: { department: string; fiscalYear: numb
     }, { onConflict: 'department,fiscal_year,budget_type' })
     .select().single();
   if (error || !data) throw error ?? new Error('Upsert failed');
-  void logActivity(actorId, 'updated', 'budget', (data as any).id, `Budget for ${input.department} ${input.fiscalYear}`);
+  await logActivity(actorId, 'updated', 'budget', (data as any).id, `Budget for ${input.department} ${input.fiscalYear}`);
   return data as any;
 }
 
 export async function deleteBudget(id: string, actorId: string) {
   const { error } = await supabaseAdmin.from('department_budgets').delete().eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'budget', id, 'Deleted budget');
+  await logActivity(actorId, 'deleted', 'budget', id, 'Deleted budget');
 }
 
 export async function getBudgetSummary(fiscalYear: number) {

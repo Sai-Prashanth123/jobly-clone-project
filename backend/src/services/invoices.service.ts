@@ -286,12 +286,12 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
     throw junctionErr;
   }
 
-  logActivity(actorId ?? null, 'created', 'invoice', invoice.id, invoice.invoice_number ?? invoice.id.slice(0, 8));
+  await logActivity(actorId ?? null, 'created', 'invoice', invoice.id, invoice.invoice_number ?? invoice.id.slice(0, 8));
 
   // Notify finance + admin — fire-and-forget so notification latency never
   // delays the create response (the invoice + line items + junction are already
   // persisted above). Mirrors employees.service notifyOnboardingCompleted.
-  void (async () => {
+  await (async () => {
     try {
       const [finIds, admIds] = await Promise.all([
         getUserIdsByRole('finance'),
@@ -376,7 +376,7 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
   const itemsWithInvoiceId = lineItems.map(li => ({ ...li, invoice_id: invoice.id }));
   await supabaseAdmin.from('invoice_line_items').insert(itemsWithInvoiceId);
 
-  logActivity(actorId ?? null, 'created', 'invoice', invoice.id, invoice.invoice_number ?? invoice.id.slice(0, 8),
+  await logActivity(actorId ?? null, 'created', 'invoice', invoice.id, invoice.invoice_number ?? invoice.id.slice(0, 8),
     { doc_type: input.docType });
 
   return getInvoice(invoice.id);
@@ -436,7 +436,7 @@ export async function convertEstimate(estimateId: string, actorId?: string) {
     .update({ estimate_status: 'converted', converted_invoice_id: invoice.id })
     .eq('id', estimateId);
 
-  logActivity(actorId ?? null, 'updated', 'invoice', estimateId, est.invoice_number ?? estimateId.slice(0, 8),
+  await logActivity(actorId ?? null, 'updated', 'invoice', estimateId, est.invoice_number ?? estimateId.slice(0, 8),
     { event: 'estimate_converted', invoice_id: invoice.id });
 
   return getInvoice(invoice.id);
@@ -578,9 +578,7 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
   }
 
   if (inv.status !== 'draft' && input.lineItems !== undefined) {
-    void import('../lib/activityLogger').then(({ logActivity }) =>
-      logActivity(null, 'updated', 'invoice', id, inv.invoice_number ?? id.slice(0, 8)),
-    );
+    await logActivity(null, 'updated', 'invoice', id, inv.invoice_number ?? id.slice(0, 8));
   }
 
   return getInvoice(id);

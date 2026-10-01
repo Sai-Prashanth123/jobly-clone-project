@@ -124,7 +124,7 @@ export async function createCase(input: CreateCaseInput, actorId?: string) {
     .single();
 
   if (error) throw error;
-  logActivity(actorId ?? null, 'created', 'case', data.id, data.display_id, {});
+  await logActivity(actorId ?? null, 'created', 'case', data.id, data.display_id, {});
 
   // Seed the 11 fixed status-timeline steps (all uncompleted) — additive to
   // the coarse `status` column above, not a replacement for it.
@@ -188,7 +188,7 @@ export async function updateCase(id: string, input: UpdateCaseInput, actorId?: s
     .single();
 
   if (error || !data) throw new NotFoundError('Case not found');
-  logActivity(actorId ?? null, 'updated', 'case', data.id, data.display_id, {});
+  await logActivity(actorId ?? null, 'updated', 'case', data.id, data.display_id, {});
 
   if (input.status !== undefined && prior?.status !== data.status) {
     const moved = `${data.display_id} moved from ${prior?.status ?? 'unknown'} to ${data.status}.`;
@@ -224,7 +224,7 @@ export async function deleteCase(id: string, actorId?: string) {
     .single();
 
   if (error || !data) throw new NotFoundError('Case not found');
-  logActivity(actorId ?? null, 'deleted', 'case', data.id, data.display_id, {});
+  await logActivity(actorId ?? null, 'deleted', 'case', data.id, data.display_id, {});
 }
 
 export async function assertCaseExists(caseId: string) {
@@ -252,7 +252,7 @@ export async function createFiling(caseId: string, input: CreateFilingInput, act
     .single();
 
   if (error) throw error;
-  logActivity(actorId ?? null, 'created', 'case_filing', data.id, `${parent.display_id} / ${data.display_id}`, {});
+  await logActivity(actorId ?? null, 'created', 'case_filing', data.id, `${parent.display_id} / ${data.display_id}`, {});
   return data;
 }
 
@@ -276,7 +276,7 @@ export async function updateFiling(caseId: string, filingId: string, input: Upda
     .single();
 
   if (error || !data) throw new NotFoundError('Filing not found');
-  logActivity(actorId ?? null, 'updated', 'case_filing', data.id, data.display_id, {});
+  await logActivity(actorId ?? null, 'updated', 'case_filing', data.id, data.display_id, {});
   return data;
 }
 
@@ -291,7 +291,7 @@ export async function removeFiling(caseId: string, filingId: string, actorId?: s
     .single();
 
   if (error || !data) throw new NotFoundError('Filing not found');
-  logActivity(actorId ?? null, 'deleted', 'case_filing', data.id, data.display_id, {});
+  await logActivity(actorId ?? null, 'deleted', 'case_filing', data.id, data.display_id, {});
 }
 
 const NOTE_SELECT = '*, portal_users!author_id(name), tagged_to_user:portal_users!tagged_to(name)';
@@ -308,7 +308,7 @@ export async function createNote(caseId: string, input: CreateNoteInput, actorId
     .single();
 
   if (error) throw error;
-  logActivity(actorId ?? null, 'created', 'case_note', data.id, parent.display_id, {});
+  await logActivity(actorId ?? null, 'created', 'case_note', data.id, parent.display_id, {});
   return data;
 }
 
@@ -326,7 +326,7 @@ export async function updateNote(caseId: string, noteId: string, input: CreateNo
     .single();
 
   if (error || !data) throw new NotFoundError('Note not found');
-  logActivity(actorId ?? null, 'updated', 'case_note', data.id, caseId, {});
+  await logActivity(actorId ?? null, 'updated', 'case_note', data.id, caseId, {});
   return data;
 }
 
@@ -341,7 +341,7 @@ export async function removeNote(caseId: string, noteId: string, actorId?: strin
     .single();
 
   if (error || !data) throw new NotFoundError('Note not found');
-  logActivity(actorId ?? null, 'deleted', 'case_note', data.id, caseId, {});
+  await logActivity(actorId ?? null, 'deleted', 'case_note', data.id, caseId, {});
 }
 
 // ── Case Documents ──────────────────────────────────────────────────────────
@@ -373,7 +373,7 @@ export async function uploadCaseDocument(
     throw new ValidationError('Invalid document category');
   }
   const doc = await storageSvc.uploadDocument('case', caseId, file, uploadedBy, undefined, category, null, category);
-  logActivity(uploadedBy, 'created', 'case_document', doc.id, caseId, { category });
+  await logActivity(uploadedBy, 'created', 'case_document', doc.id, caseId, { category });
   return doc;
 }
 
@@ -384,7 +384,7 @@ export async function removeCaseDocument(caseId: string, docId: string, actorId?
     throw new NotFoundError('Document not found on this case');
   }
   await storageSvc.deleteDocument(docId);
-  logActivity(actorId ?? null, 'deleted', 'case_document', docId, caseId, {});
+  await logActivity(actorId ?? null, 'deleted', 'case_document', docId, caseId, {});
 }
 
 // ── Wages as per W2 / Tax Returns ────────────────────────────────────────────
@@ -410,7 +410,7 @@ export async function upsertWage(caseId: string, input: UpsertWageInput, actorId
     .select()
     .single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'updated', 'case', caseId, String(input.wageYear), { event: 'wage_upserted' });
+  await logActivity(actorId ?? null, 'updated', 'case', caseId, String(input.wageYear), { event: 'wage_upserted' });
   return data;
 }
 
@@ -433,7 +433,7 @@ export async function upsertTaxReturn(caseId: string, input: UpsertTaxReturnInpu
     .select()
     .single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'updated', 'case', caseId, String(input.taxYear), { event: 'tax_return_upserted' });
+  await logActivity(actorId ?? null, 'updated', 'case', caseId, String(input.taxYear), { event: 'tax_return_upserted' });
   return data;
 }
 
@@ -475,7 +475,7 @@ export async function upsertPermDetails(caseId: string, input: UpsertPermDetails
     .select()
     .single();
   if (error) throw error;
-  logActivity(actorId ?? null, 'updated', 'case', caseId, 'PERM', { event: 'perm_details_upserted' });
+  await logActivity(actorId ?? null, 'updated', 'case', caseId, 'PERM', { event: 'perm_details_upserted' });
   return data;
 }
 

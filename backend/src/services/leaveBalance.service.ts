@@ -46,7 +46,7 @@ export async function createLeaveType(input: CreateLeaveTypeInput, actorId: stri
     .single();
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
-  void logActivity(actorId, 'created', 'leave_type', row.id, `Created leave type: ${row.name}`);
+  await logActivity(actorId, 'created', 'leave_type', row.id, `Created leave type: ${row.name}`);
   return data as any;
 }
 
@@ -65,7 +65,7 @@ export async function updateLeaveType(id: string, input: UpdateLeaveTypeInput, a
 
   const { data, error } = await supabaseAdmin.from('leave_types').update(patch).eq('id', id).select('*').single();
   if (error || !data) throw error ?? new Error('Update returned no data');
-  void logActivity(actorId, 'updated', 'leave_type', id, `Updated leave type: ${(data as any).name}`);
+  await logActivity(actorId, 'updated', 'leave_type', id, `Updated leave type: ${(data as any).name}`);
   return data as any;
 }
 
@@ -74,7 +74,7 @@ export async function deleteLeaveType(id: string, actorId: string) {
   // Soft-disable instead of hard-delete to preserve historical references
   const { error } = await supabaseAdmin.from('leave_types').update({ is_active: false }).eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'leave_type', id, `Deactivated leave type: ${lt.name}`);
+  await logActivity(actorId, 'deleted', 'leave_type', id, `Deactivated leave type: ${lt.name}`);
 }
 
 // ─── Balances ────────────────────────────────────────────────────────────────
@@ -202,6 +202,6 @@ export async function setEntitlement(employeeId: string, input: SetEntitlementIn
     .select('*')
     .single();
   if (error) throw error;
-  void logActivity(actorId, 'updated', 'leave_entitlement', employeeId, `Set leave entitlement for employee ${employeeId}, year ${input.year}`);
+  await logActivity(actorId, 'updated', 'leave_entitlement', employeeId, `Set leave entitlement for employee ${employeeId}, year ${input.year}`);
   return data;
 }

@@ -42,7 +42,7 @@ export async function createTemplate(input: CreateTemplateInput, actorId: string
     .single();
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
-  void logActivity(actorId, 'created', 'onboarding_template', row.id, `Created checklist template: ${row.title}`);
+  await logActivity(actorId, 'created', 'onboarding_template', row.id, `Created checklist template: ${row.title}`);
   return row;
 }
 
@@ -63,7 +63,7 @@ export async function updateTemplate(id: string, input: UpdateTemplateInput, act
     .select('*')
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
-  void logActivity(actorId, 'updated', 'onboarding_template', id, `Updated checklist template`);
+  await logActivity(actorId, 'updated', 'onboarding_template', id, `Updated checklist template`);
   return data as any;
 }
 
@@ -74,7 +74,7 @@ export async function deleteTemplate(id: string, actorId: string) {
     .update({ is_active: false })
     .eq('id', id);
   if (error) throw error;
-  void logActivity(actorId, 'deleted', 'onboarding_template', id, `Deactivated checklist template: ${t.title}`);
+  await logActivity(actorId, 'deleted', 'onboarding_template', id, `Deactivated checklist template: ${t.title}`);
 }
 
 // ── Employee Tasks ──────────────────────────────────────────────────────────────
@@ -106,7 +106,7 @@ export async function addCustomTask(employeeId: string, input: AddCustomTaskInpu
     .single();
   if (error || !data) throw error ?? new Error('Insert returned no data');
   const row = data as any;
-  void logActivity(actorId, 'created', 'onboarding_task', row.id, `Added custom task: ${row.title}`);
+  await logActivity(actorId, 'created', 'onboarding_task', row.id, `Added custom task: ${row.title}`);
   return row;
 }
 
@@ -130,7 +130,7 @@ export async function toggleTask(taskId: string, actorId: string) {
     .select('*')
     .single();
   if (error || !data) throw error ?? new Error('Update returned no data');
-  void logActivity(actorId, 'updated', 'onboarding_task', taskId, `${nowComplete ? 'Completed' : 'Uncompleted'} task: ${(existing as any).title}`);
+  await logActivity(actorId, 'updated', 'onboarding_task', taskId, `${nowComplete ? 'Completed' : 'Uncompleted'} task: ${(existing as any).title}`);
   return data as any;
 }
 
