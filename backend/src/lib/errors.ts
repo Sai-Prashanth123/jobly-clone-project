@@ -17,8 +17,17 @@ export class AppError extends Error {
 }
 
 export class NotFoundError extends AppError {
+  // 78 of the ~90 call sites pass a message that already ends in "not found"
+  // ("Invoice not found", "Case not found"), so the old unconditional suffix
+  // produced "Invoice not found not found" — which is what the API actually
+  // returned to users on every one of those 404s. Appending only when it is
+  // missing fixes all of them at once and keeps both call styles working, so
+  // nobody has to remember which one this class expects.
+  // Matched anywhere, not just at the end: several call sites pass a whole
+  // sentence ("Document not found on this case"), which an end-anchored check
+  // would turn into "...on this case not found".
   constructor(resource = 'Resource') {
-    super(`${resource} not found`, 404);
+    super(/not found/i.test(resource) ? resource : `${resource} not found`, 404);
   }
 }
 
