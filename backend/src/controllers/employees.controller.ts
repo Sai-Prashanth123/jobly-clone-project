@@ -287,7 +287,10 @@ export async function deleteDoc(req: Request, res: Response, next: NextFunction)
         throw new ForbiddenError('Document does not belong to this employee');
       }
     }
-    await storageSvc.deleteDocument(req.params.docId);
+    // Pass the viewer too: the explicit check above covers the employee case,
+    // and this additionally stops an employee deleting an employer-managed
+    // document that happens to hang off their own record.
+    await storageSvc.deleteDocument(req.params.docId, req.user!);
     res.json({ success: true });
   } catch (err) { next(err); }
 }

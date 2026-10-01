@@ -229,3 +229,34 @@ export async function deleteClient(id: string) {
 
   if (error) throw error;
 }
+
+/**
+ * What an `employee` is allowed to see of a client.
+ *
+ * Employees legitimately need client NAMES — the employee dashboard shows
+ * "assigned to <client>" and Assignment Detail displays the client of their own
+ * placement. But `listClients`/`getClient` are `select('*')` with no viewer
+ * argument, so the whole row was reaching them: tax_id, default_bill_rate,
+ * internal_notes, the billing contact block, and in getClient every client
+ * document as well.
+ *
+ * Removing the role would have been the wrong fix — it breaks both of those
+ * live screens. This is the redactEmployee pattern instead: a whitelist of the
+ * fields the UI actually consumes, everything else nulled.
+ */
+const EMPLOYEE_VISIBLE_CLIENT_FIELDS = new Set([
+  'id', 'company_name', 'display_id', 'status', 'created_at', 'updated_at',
+]);
+
+export function redactClient(client: unknown, viewerRole?: string): unknown {
+  if (!client || typeof client !== 'object' || viewerRole !== 'employee') return client;
+  const row = client as Record<string, unknown>;
+  const out: Record<string, unknown> = {};
+  for (const key of Object.keys(row)) {
+    out[key] = EMPLOYEE_VISIBLE_CLIENT_FIELDS.has(key) ? row[key] : null;
+  }
+  // getClient attaches the client's documents; an employee has no business
+  // with a client's signed contracts.
+  if ('documents' in row) out.documents = [];
+  return out;
+}

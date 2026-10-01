@@ -6,22 +6,45 @@ import { storageProvider } from '../lib/storage';
 import { isEmployerManagedDoc } from '../lib/employerDocs';
 
 /**
- * Ownership alone is not enough. An employee may read their own documents,
- * EXCEPT the employer-managed ones (E-Verify letter, I-129, LCA...), which are
- * attached to their record but belong to HR. The wizard hides those, but
- * hiding is not access control - these endpoints take a document UUID
- * directly.
+ * Who may read a given document.
+ *
+ * These endpoints take a document UUID directly, so this is the only gate —
+ * whatever the UI does or does not show is irrelevant.
+ *
+ * - `admin` / `hr` — everything. They are the custodians of employee records.
+ * - `employee`   — their own documents only, and NOT the employer-managed ones
+ *                  (E-Verify letter, I-129, LCA...) which hang off their record
+ *                  but belong to HR.
+ * - `operations` / `finance` — everything EXCEPT employee documents. This is
+ *                  the rule that was missing: the function used to return early
+ *                  for every role except `employee`, so these two could mint a
+ *                  signed URL for any SSN card, passport scan or bank letter by
+ *                  UUID. That directly contradicted `redactEmployee`, which
+ *                  deliberately blinds the same two roles to `ssn` and `bank_*`
+ *                  on the JSON path — one door locked, the other wide open.
+ *                  They keep client/invoice/case documents, which is what they
+ *                  actually work with (contracts, invoice attachments).
+ * - `legal`      — case-scoped, enforced separately by
+ *                  assertLegalCanAccessDocument at each call site.
  */
-function assertEmployeeMayRead(
+function assertMayReadDocument(
   doc: { entity_type?: string | null; entity_id?: string | null; type?: string | null },
   user: { role: string; employeeId?: string | null },
 ): void {
-  if (user.role !== 'employee') return;
-  const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
-  // Same wording for both refusals: saying "restricted" rather than "not
+  // Same wording for every refusal: saying "restricted" rather than "not
   // yours" would confirm the document exists.
-  if (!ownsIt || isEmployerManagedDoc(doc)) {
+  const refuse = (): never => {
     throw new ForbiddenError('You may only access your own documents');
+  };
+
+  if (user.role === 'employee') {
+    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
+    if (!ownsIt || isEmployerManagedDoc(doc)) refuse();
+    return;
+  }
+
+  if ((user.role === 'operations' || user.role === 'finance') && doc.entity_type === 'employee') {
+    refuse();
   }
 }
 
@@ -267,7 +290,7 @@ export async function getDocumentSignedUrl(
   // employee record. Staff (admin/hr/operations/finance) may fetch any document.
   // Without this check, any authenticated user could mint a signed URL for any
   // document (incl. SSN/ID scans in the private employee-docs bucket) by UUID.
-  assertEmployeeMayRead(doc, user);
+  assertMayReadDocument(doc, user);
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
@@ -296,7 +319,7 @@ export async function getDocumentPreviewUrl(
 
   if (error || !doc) throw new NotFoundError('Document not found');
 
-  assertEmployeeMayRead(doc, user);
+  assertMayReadDocument(doc, user);
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
@@ -321,7 +344,7 @@ export async function renderDocument(
 
   if (error || !doc) throw new NotFoundError('Document not found');
 
-  assertEmployeeMayRead(doc, user);
+  assertMayReadDocument(doc, user);
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const name: string = doc.name ?? 'document';
@@ -424,7 +447,17 @@ export async function setDocumentLegalReview(
   return data;
 }
 
-export async function deleteDocument(docId: string) {
+/**
+ * `user` is optional ONLY for internal callers that have already established
+ * the right to delete — the supersede path in uploadDocument, which is
+ * replacing a document the caller just proved they may write. Every route must
+ * pass it: without a viewer this function deleted ANY document by UUID, so
+ * `operations` could destroy a client contract or a case document outright.
+ */
+export async function deleteDocument(
+  docId: string,
+  user?: { role: string; employeeId?: string | null },
+) {
   const { data: doc, error } = await supabaseAdmin
     .from('documents')
     .select('*')
@@ -432,6 +465,10 @@ export async function deleteDocument(docId: string) {
     .single();
 
   if (error || !doc) throw new NotFoundError('Document not found');
+
+  // Deleting is strictly more dangerous than reading, so it reuses the read
+  // policy rather than inventing a second, looser one.
+  if (user) assertMayReadDocument(doc, user);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
   await storageProvider.remove(bucket, [doc.storage_path]);

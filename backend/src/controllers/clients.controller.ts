@@ -6,14 +6,19 @@ import type { ListClientsQuery, CreateClientInput, UpdateClientInput } from '../
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const result = await svc.listClients(req.query as unknown as ListClientsQuery);
-    res.json({ success: true, ...result });
+    // Employees need client names for their own assignment; nothing else.
+    res.json({
+      success: true,
+      ...result,
+      data: (result.data ?? []).map((c: unknown) => svc.redactClient(c, req.user!.role)),
+    });
   } catch (err) { next(err); }
 }
 
 export async function getOne(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.getClient(req.params.id);
-    res.json({ success: true, data });
+    res.json({ success: true, data: svc.redactClient(data, req.user!.role) });
   } catch (err) { next(err); }
 }
 

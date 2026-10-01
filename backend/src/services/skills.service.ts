@@ -54,3 +54,21 @@ export async function deleteSkill(id: string, actorId: string) {
   if (error) throw error;
   void logActivity(actorId, 'deleted', 'skill', id, 'Deleted skill');
 }
+
+/**
+ * Which employee a skill row belongs to, or null if it does not exist.
+ *
+ * PUT/DELETE address a skill by its own id, so the route cannot tell whether
+ * the caller owns it without this lookup. Returning null (rather than throwing)
+ * lets the caller decide between 403 and 404 — and an employee asking about a
+ * row that is not theirs gets the same refusal either way, so the absence of a
+ * row is not disclosed.
+ */
+export async function getSkillOwner(skillId: string): Promise<string | null> {
+  const { data } = await supabaseAdmin
+    .from('employee_skills')
+    .select('employee_id')
+    .eq('id', skillId)
+    .maybeSingle();
+  return (data as { employee_id?: string } | null)?.employee_id ?? null;
+}

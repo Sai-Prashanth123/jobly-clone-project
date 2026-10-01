@@ -26,7 +26,14 @@ function serializeEmployee(emp: any) {
 // Identity + financial fields that only admin/HR (or the employee themselves)
 // may see. Operations/finance manage staffing but must not read SSN, bank
 // details, or pay rate. Redaction happens at the API boundary (list + getOne).
-const SENSITIVE_EMPLOYEE_FIELDS = ['ssn', 'bank_routing_number', 'bank_account_number', 'pay_rate'] as const;
+//
+// `dependents` joined this list on review: it is a JSONB block holding the
+// employee's spouse and children by name plus their passport numbers, expiry
+// dates and stored file paths. It was passing through to finance/operations
+// untouched while the dedicated dependent-passport route
+// (employees.routes.ts) deliberately excludes finance — the same data class
+// with two different answers depending on which door you used.
+const SENSITIVE_EMPLOYEE_FIELDS = ['ssn', 'bank_routing_number', 'bank_account_number', 'pay_rate', 'dependents'] as const;
 
 // Legal reviews immigration paperwork + case Beneficiary Info — no financial
 // (SSN/bank/pay) or org-management (manager) data. Allowlist (not denylist)

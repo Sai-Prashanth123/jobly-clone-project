@@ -40,7 +40,7 @@ export async function renderDocument(req: Request, res: Response, next: NextFunc
 
 export async function remove(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    await storageSvc.deleteDocument(req.params.id);
+    await storageSvc.deleteDocument(req.params.id, req.user!);
     res.json({ success: true });
   } catch (err) { next(err); }
 }
