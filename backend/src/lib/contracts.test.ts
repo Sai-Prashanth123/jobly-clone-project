@@ -22,6 +22,7 @@ import {
   VISA_CONDITIONAL_REQUIRED_DOCS as BACKEND_CONDITIONAL_DOCS,
   VISA_REQUIRED_EXTRA_DOCS as BACKEND_VISA_EXTRAS,
   DOC_TYPE_LEGACY_ALIASES as BACKEND_LEGACY_ALIASES,
+  EXPIRY_REQUIRED_DOC_KEYS as BACKEND_EXPIRY_KEYS,
 } from './onboarding';
 import {
   REQUIRED_IDENTITY_TYPES,
@@ -66,6 +67,34 @@ describe('frontend/backend document rules agree', () => {
     for (const label of Object.keys(LEGACY_LABEL_ALIASES)) {
       expect(sorted(LEGACY_LABEL_ALIASES[label]), `aliases for "${label}"`)
         .toEqual(sorted(BACKEND_LEGACY_ALIASES[label]));
+    }
+  });
+
+  // The backend gate was weaker than the wizard here: the wizard demands an
+  // expiry for EVERY required row with hasExpiry (which includes I-20, the EAD
+  // and I-797 via the per-visa extras), while onboarding.ts required one only
+  // for Passport/Visa/I-94. So onboarding could be finished with an I-20 on
+  // file and no expiry — and that date is what drives the visa-expiry alerts.
+  it('demands an expiry for exactly the required rows that have hasExpiry', () => {
+    // Every label that can appear in a required list, from either side.
+    const requiredLabels = new Set<string>([
+      ...ONBOARDING_REQUIRED_DOCS,
+      ...BACKEND_CONDITIONAL_DOCS,
+      ...Object.values(BACKEND_VISA_EXTRAS).flat(),
+    ]);
+    const shouldNeedExpiry = IDENTITY_DOC_ROWS
+      .filter(r => r.hasExpiry && requiredLabels.has(r.label))
+      .map(r => r.label);
+    expect(sorted(Object.keys(BACKEND_EXPIRY_KEYS))).toEqual(sorted(shouldNeedExpiry));
+  });
+
+  it('maps each expiry-bearing label to the row type the wizard stores', () => {
+    // The lookup reads identity_documents[].type, so a wrong key silently
+    // finds no entry and the requirement can never be satisfied.
+    for (const [label, key] of Object.entries(BACKEND_EXPIRY_KEYS)) {
+      const row = IDENTITY_DOC_ROWS.find(r => r.label === label);
+      expect(row, `no IDENTITY_DOC_ROWS row labelled "${label}"`).toBeDefined();
+      expect(row!.type, `expiry key for "${label}"`).toBe(key);
     }
   });
 

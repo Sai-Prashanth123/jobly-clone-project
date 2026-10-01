@@ -27,6 +27,17 @@ export function getPool(): Pool {
   }
 
   pool = new Pool({
+    // Pin the session time zone. Both the scalar path and the to_jsonb embed
+    // path render timestamptz in the SESSION zone, so if this is ever not UTC
+    // every timestamp in the API silently shifts — the same class of bug as
+    // the Date-vs-string and numeric-vs-string divergences already fixed.
+    //
+    // Verified correct today: the RDS parameter group has timezone=UTC and
+    // the live API returns +00:00 offsets. But that is implicit, one
+    // parameter-group edit (or a restore into a differently configured
+    // instance) away from changing under us, with no test that would catch
+    // it. Stating it on the connection makes it independent of the default.
+    options: '-c TimeZone=UTC',
     // Hand date/timestamp columns back as the strings PostgREST produced.
     // Without this node-postgres returns Date objects, which the ~500 call
     // sites written against supabase-js do not expect - see types-pg.ts.

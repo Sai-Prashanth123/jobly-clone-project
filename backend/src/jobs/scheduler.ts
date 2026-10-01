@@ -1,5 +1,6 @@
 import cron from 'node-cron';
 import { supabaseAdmin } from '../config/supabase';
+import { env } from '../config/env';
 import { todayUTC, daysBetween } from '../lib/dateUtils';
 import { sendInvoiceReminderEmail, mailerConfigured } from '../lib/mailer';
 import { reactivateReturnedEmployees } from '../services/employees.service';
@@ -9,7 +10,12 @@ import {
   triggerDocumentExpiryAlerts,
 } from '../services/notifications.service';
 
-const PORTAL_URL = process.env.FRONTEND_URL ?? 'https://yellow-sea-0a9088500.6.azurestaticapps.net';
+// env.FRONTEND_URL is schema-validated with its own default, so there is no
+// second default to keep in step here. The one that used to live on this line
+// pointed at the decommissioned Azure Static Web App — harmless only because
+// FRONTEND_URL happens to be set in production, i.e. one unset variable away
+// from mailing every employee a link to a dead host.
+const PORTAL_URL = env.FRONTEND_URL;
 
 // Reminder offsets (days relative to the due date). Negative = before due.
 //  -3 → "due in 3 days", 0 → "due today", +3/+7/+14 → overdue nudges.

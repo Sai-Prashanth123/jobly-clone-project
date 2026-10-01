@@ -110,22 +110,22 @@ let cached: Promise<SchemaInfo> | null = null;
 /**
  * Run the three introspection queries, retrying a few times on a cold pool.
  *
- * Two separate problems are being handled here, both seen in production:
+ * Why allSettled rather than Promise.all: it reports the outcome of every
+ * query, so a failure here can say which of the three failed instead of only
+ * the first to reject. An earlier version of this comment claimed Promise.all
+ * leaves later rejections unhandled and that this was the cause of the
+ * production Runtime.UnhandledPromiseRejection — that reasoning is WRONG.
+ * Promise.all attaches a handler to every element synchronously, so none of
+ * them can dangle. Do not reuse that argument anywhere else.
  *
- * 1. Promise.all adopts only the FIRST rejection. A connection blip takes out
- *    BOTH queries, so the second rejection had no handler attached and Node
- *    reported an unhandledRejection - which the Lambda runtime treats as
- *    fatal and kills the whole invocation. So a brief network hiccup during
- *    cold start turned into a hard 500 on whatever page the user was opening
- *    (Enrollment Form, Templates, Expiring Documents...). allSettled attaches
- *    a handler to both, so neither can dangle.
- *
- * 2. This runs once per Lambda container, on its very first query, when the
- *    VPC ENI and the pooled TLS connection to RDS Proxy are both cold. The
- *    database itself is idle when this happens - 7 connections, 5% CPU - so
- *    it is a transient connection-layer failure, not load. Retrying costs a
- *    few hundred milliseconds on the rare bad start and avoids failing the
- *    request outright.
+ * The retry is the part that earns its keep, and it is the verified one:
+ * this runs once per Lambda container, on its very first query, when the VPC
+ * ENI and the pooled TLS connection to RDS Proxy are both cold. The database
+ * is idle when it happens — 7 connections, 5% CPU — so it is a transient
+ * connection-layer failure, not load. Retrying costs a few hundred
+ * milliseconds on a rare bad start and avoids failing the request outright;
+ * without it a brief cold-start hiccup became a hard 500 on whatever page the
+ * user was opening (Enrollment Form, Templates, Expiring Documents...).
  */
 async function introspect(pool: Pool, attempts = 3): Promise<[QueryResult, QueryResult, QueryResult]> {
   let lastErr: unknown;

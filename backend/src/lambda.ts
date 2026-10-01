@@ -47,7 +47,21 @@ process.on('unhandledRejection', reason => {
   // Deliberately no process.exit() here, unlike server.ts: killing the process
   // would take down a container that Lambda may still be using for other
   // in-flight requests. Log it and let Lambda decide.
+  //
+  // Note this does NOT stop the AWS runtime aborting the invocation. The
+  // runtime installs its own listener and ours does not displace it, so
+  // production still shows Runtime.UnhandledPromiseRejection followed by
+  // "LAMBDA_RUNTIME Failed to post handler success response". The value here is
+  // the log line naming the reason, which is otherwise lost.
   console.error('[unhandledRejection]', reason);
+});
+
+// server.ts had this and lambda.ts did not, so a synchronous throw outside the
+// Express error path left only the runtime's own terse message with no stack of
+// ours — which is how several "internal server error" reports had nothing in
+// CloudWatch to explain them. Same reasoning as above: log, never exit.
+process.on('uncaughtException', err => {
+  console.error('[uncaughtException]', err);
 });
 
 function isScheduledEvent(event: unknown): event is EventBridgeEvent<string, unknown> {

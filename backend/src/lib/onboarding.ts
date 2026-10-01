@@ -2,21 +2,17 @@
 // Used to (a) gate dashboard access, (b) show HR a completion % + what's missing,
 // (c) validate the "Finish onboarding" action server-side.
 //
-// Identity documents (DL, State ID, Passport, Green Card, EAD) are optional.
-// Employment documents in ONBOARDING_REQUIRED_DOCS are mandatory.
-// Strict checklist covers personal details (no photo — optional), addresses,
-// employment, immigration status + full SSN, bank details, education, emergency
-// contact, declaration, and the required document uploads. US visa is optional.
-
-export const COMPLIANCE_REQUIRED_DOC_TYPES = [
-  "Driver's License",
-  'State-Issued ID',
-  'Passport',
-  'Visa / Work Authorization',
-  'I-94',
-  'Offer Letter',
-  'Resume',
-] as const;
+// Employment documents in ONBOARDING_REQUIRED_DOCS are mandatory for everyone.
+// Identity documents are conditional, not optional: a visa type is required, and
+// VISA_TYPES_REQUIRING_PASSPORT_I94 / VISA_REQUIRED_EXTRA_DOCS then demand
+// Passport, Visa and I-94 plus the per-visa extras (I-20 and EAD for OPT and
+// STEM OPT, the Green Card paperwork for gc).
+//
+// These lists are mirrored in src/portal/lib/documentTypes.ts and the two are
+// held in step by backend/src/lib/contracts.test.ts — change one and that test
+// fails until the other matches. A third copy used to live in this file
+// (COMPLIANCE_REQUIRED_DOC_TYPES), was imported by nothing, and had drifted to
+// carry two rules that were wrong by the time it was deleted.
 
 // MUST mirror REQUIRED_IDENTITY_TYPES in src/portal/lib/documentTypes.ts
 // (by row label, not row type) — the wizard computes its progress from that
@@ -79,10 +75,29 @@ export const VISA_REQUIRED_EXTRA_DOCS: Record<string, readonly string[]> = {
     'I-797',
   ],
 };
-// Maps the doc label above to its identity_documents[].type key (lowercase,
-// matches IDENTITY_DOC_ROWS in src/portal/lib/documentTypes.ts) so the
-// expiry-date check below can look up the right entry.
-const CONDITIONAL_DOC_IDENTITY_KEYS: Record<string, string> = { Passport: 'passport', Visa: 'us_visa', 'I-94': 'i94' };
+// Maps a doc label to its identity_documents[].type key (lowercase, matches
+// IDENTITY_DOC_ROWS in src/portal/lib/documentTypes.ts) for every document
+// whose EXPIRY DATE is also required.
+//
+// This covers the per-visa extras too, not just Passport/Visa/I-94. The
+// wizard computes its required set as REQUIRED_IDENTITY_TYPES + conditional
+// + per-visa extras and then demands an expiry for every one of them with
+// hasExpiry — which includes I-20, the EAD and I-797. This file required an
+// expiry for only the first three, so the server-side gate was strictly
+// weaker than the wizard and "Finish onboarding" could pass with an I-20 or
+// EAD on file and no expiry date. Those dates are what feed the visa-expiry
+// alerts and the Expiring Documents page, so a blank one is not cosmetic:
+// the document silently never expires and nobody is ever warned.
+//
+// Held in step with the frontend by contracts.test.ts.
+export const EXPIRY_REQUIRED_DOC_KEYS: Record<string, string> = {
+  Passport: 'passport',
+  Visa: 'us_visa',
+  'I-94': 'i94',
+  'I-20': 'i20',
+  'Employment Authorization Document': 'ead',
+  'I-797': 'i797',
+};
 
 export const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
@@ -107,6 +122,23 @@ export interface OnboardingResult {
 }
 
 const nonEmpty = (v: unknown): boolean => typeof v === 'string' && v.trim() !== '';
+
+/** One row of the employee's `identity_documents` jsonb array. */
+interface IdentityDocEntry { type?: string; expiry?: string }
+
+/**
+ * The expiry date the employee entered for a given identity-document row, or
+ * undefined when the row carries no expiry requirement (`key` undefined) or
+ * nothing has been entered.
+ *
+ * Shared by the conditional and per-visa-extra blocks below, which previously
+ * each re-derived this inline.
+ */
+function expiryFor(identityDocuments: unknown, key: string | undefined): string | undefined {
+  if (!key) return undefined;
+  const docs: IdentityDocEntry[] = Array.isArray(identityDocuments) ? identityDocuments : [];
+  return docs.find(d => d?.type === key)?.expiry;
+}
 const numPositive = (v: unknown): boolean => v != null && !Number.isNaN(Number(v)) && Number(v) > 0;
 
 export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingResult {
@@ -196,8 +228,7 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
     // letting "Finish onboarding" pass with a doc on file but no expiry.
     ...(VISA_TYPES_REQUIRING_PASSPORT_I94.has(String(emp.visa_type ?? '')) ? VISA_CONDITIONAL_REQUIRED_DOCS.map(t => {
       const uploaded = docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias));
-      const identityDocs: any[] = Array.isArray(emp.identity_documents) ? emp.identity_documents : [];
-      const expiry = identityDocs.find((d: any) => d?.type === CONDITIONAL_DOC_IDENTITY_KEYS[t])?.expiry;
+      const expiry = expiryFor(emp.identity_documents, EXPIRY_REQUIRED_DOC_KEYS[t]);
       return {
         id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
         label: `${t} (upload required)`,
@@ -206,18 +237,27 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
     }) : []),
 
     // Visa-type-specific documents (I-9 / I-20 / EAD for OPT and STEM OPT, the
-    // petition paperwork for Green Card). Upload only - unlike the conditional
-    // block above these carry no expiry requirement, matching the wizard.
+    // petition paperwork for Green Card). Those with an entry in
+    // EXPIRY_REQUIRED_DOC_KEYS need an expiry date as well as an upload — the
+    // wizard demands one for every required row with hasExpiry, and I-20, the
+    // EAD and I-797 are among them. This block used to accept the upload
+    // alone, which made the server gate weaker than the form the employee had
+    // just filled in.
     // Skips anything already demanded above so a document cannot appear twice
     // in the missing list (Visa for STEM OPT, Passport for Green Card).
     ...((VISA_REQUIRED_EXTRA_DOCS[String(emp.visa_type ?? '')] ?? [])
       .filter(t => !(VISA_TYPES_REQUIRING_PASSPORT_I94.has(String(emp.visa_type ?? ''))
         && (VISA_CONDITIONAL_REQUIRED_DOCS as readonly string[]).includes(t)))
-      .map(t => ({
-        id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
-        label: `${t} (upload required)`,
-        done: docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias)),
-      }))),
+      .map(t => {
+        const uploaded = docTypes.has(t) || (DOC_TYPE_LEGACY_ALIASES[t] ?? []).some(alias => docTypes.has(alias));
+        const key = EXPIRY_REQUIRED_DOC_KEYS[t];
+        const expiry = expiryFor(emp.identity_documents, key);
+        return {
+          id: `doc_${t.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
+          label: `${t} (upload required)`,
+          done: uploaded && (!key || nonEmpty(expiry)),
+        };
+      })),
   ];
 
   const done = checks.filter(c => c.done).length;

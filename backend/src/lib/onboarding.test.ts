@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeOnboarding } from './onboarding';
+import { computeOnboarding, ONBOARDING_REQUIRED_DOCS } from './onboarding';
 
 // HR reported a STEM OPT employee finishing onboarding without an I-9. The
 // per-visa-type requirements (I-9 / I-20 / EAD, and the Green Card petition
@@ -82,5 +82,70 @@ describe('computeOnboarding document requirements', () => {
 
     // Upload under the legacy label but no expiry -> still outstanding.
     expect(missingDocs('stem_opt', ['US Visa'])).toContain('Visa (upload required)');
+  });
+});
+
+// The expiry half of the same gap. The wizard demands an expiry date for
+// every required row with hasExpiry — which, through the per-visa extras,
+// includes I-20, the EAD and I-797 — while this file required one only for
+// Passport/Visa/I-94. So "Finish onboarding" accepted an I-20 with no expiry.
+// Those dates are what the visa-expiry alerts and Expiring Documents read, so
+// a blank one means the document silently never expires and nobody is warned.
+describe('computeOnboarding expiry requirements', () => {
+  // The universal set as well, so what is left in `missing` is only ever
+  // about expiry dates rather than documents this fixture forgot to upload.
+  const STEM_DOCS = [
+    ...ONBOARDING_REQUIRED_DOCS,
+    'I-9 Form', 'I-20', 'Employment Authorization Document',
+    'Passport', 'Visa', 'I-94',
+  ];
+  const missingWith = (identityDocuments: unknown[]) =>
+    computeOnboarding({ visa_type: 'stem_opt', identity_documents: identityDocuments }, new Set(STEM_DOCS))
+      .missing.filter(l => l.endsWith('(upload required)'));
+
+  it('still demands the I-20 when it is uploaded but has no expiry', () => {
+    const missing = missingWith([
+      { type: 'passport', expiry: '2030-01-01' },
+      { type: 'us_visa', expiry: '2030-01-01' },
+      { type: 'i94', expiry: '2030-01-01' },
+      { type: 'ead', expiry: '2030-01-01' },
+      { type: 'i20' },                              // uploaded, no expiry
+    ]);
+    expect(missing).toContain('I-20 (upload required)');
+  });
+
+  it('demands the EAD expiry too', () => {
+    const missing = missingWith([
+      { type: 'passport', expiry: '2030-01-01' },
+      { type: 'us_visa', expiry: '2030-01-01' },
+      { type: 'i94', expiry: '2030-01-01' },
+      { type: 'i20', expiry: '2030-01-01' },
+      { type: 'ead', expiry: '' },                  // blank counts as missing
+    ]);
+    expect(missing).toContain('Employment Authorization Document (upload required)');
+  });
+
+  it('is satisfied once every expiry is present', () => {
+    const missing = missingWith([
+      { type: 'passport', expiry: '2030-01-01' },
+      { type: 'us_visa', expiry: '2030-01-01' },
+      { type: 'i94', expiry: '2030-01-01' },
+      { type: 'i20', expiry: '2030-01-01' },
+      { type: 'ead', expiry: '2030-01-01' },
+    ]);
+    expect(missing).toEqual([]);
+  });
+
+  it('does not demand an expiry for a document that has no expiry field', () => {
+    // I-9 Form is a required STEM OPT extra but carries no hasExpiry row, so
+    // the upload alone must satisfy it.
+    const missing = missingWith([
+      { type: 'passport', expiry: '2030-01-01' },
+      { type: 'us_visa', expiry: '2030-01-01' },
+      { type: 'i94', expiry: '2030-01-01' },
+      { type: 'i20', expiry: '2030-01-01' },
+      { type: 'ead', expiry: '2030-01-01' },
+    ]);
+    expect(missing).not.toContain('I-9 Form (upload required)');
   });
 });

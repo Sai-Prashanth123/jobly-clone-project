@@ -1,6 +1,28 @@
 import { z } from 'zod';
 import { CASE_TYPES } from './case.schema';
 
+// Phone and ZIP were validated only in the browser: the wizard FORMATS them as
+// you type (formatUsPhone / formatZip in src/portal/lib/utils.ts) and the
+// server accepted whatever arrived, so anything reaching the API another way
+// — a direct call, a stale tab, a paste that dodged the formatter — stored
+// unchecked text in a field the UI later renders as a phone number.
+//
+// Deliberately PERMISSIVE, following the precedent already set by
+// client.schema.ts. The goal is to reject obvious garbage, not to enforce a
+// US-only shape: these records include international addresses (there is a
+// country field, defaulting to US) and ZIP+4 both with and without the dash.
+// A strict 5-digit rule would start 400ing real employees HR needs to save,
+// which is a worse failure than a loosely formatted phone number.
+// Character classes only, with NO minimum length. The onboarding wizard saves
+// the form as the employee works through it, so a half-typed "(555" or a ZIP
+// mid-entry has to be storable — a length floor here would turn an autosave
+// into a 400 and reproduce exactly the "internal server error when I save"
+// class of bug this audit exists to remove. What these reject is input that
+// can never become valid: letters in a phone number, punctuation in a ZIP.
+const phoneField = z.string().refine(v => !v || /^[+\d\s().-]{1,25}$/.test(v), { message: 'Invalid phone number format' });
+const zipField = z.string().refine(v => !v || /^[A-Za-z\d\s-]{1,12}$/.test(v), { message: 'Invalid postal code format' });
+
+
 // Education + work-history rows stored as JSONB. Loose validation here —
 // the UI is the source of truth for required fields per row and we don't
 // want partial data on an existing employee to block an update.
@@ -49,26 +71,26 @@ const permanentAddressSchema = z.object({
   street: z.string().optional().default(''),
   city: z.string().optional().default(''),
   state: z.string().optional().default(''),
-  zip: z.string().optional().default(''),
+  zip: zipField.optional().default(''),
   country: z.string().optional().default('US'),
 }).optional().nullable();
 
 const emergencyContactSchema = z.object({
   name: z.string().optional().default(''),
   relationship: z.string().optional().default(''),
-  phone: z.string().optional().default(''),
-  altPhone: z.string().optional().default(''),
+  phone: phoneField.optional().default(''),
+  altPhone: phoneField.optional().default(''),
   address: z.string().optional().default(''),
   city: z.string().optional().default(''),
   state: z.string().optional().default(''),
-  zip: z.string().optional().default(''),
+  zip: zipField.optional().default(''),
 }).optional().nullable();
 
 export const createEmployeeSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   email: z.string().email(),
-  phone: z.string().optional().default(''),
+  phone: phoneField.optional().default(''),
   // HR only needs to provide first name, last name, and personal email at
   // creation — every other field is optional and is completed by the employee
   // during self-onboarding (or by HR later).
@@ -84,7 +106,7 @@ export const createEmployeeSchema = z.object({
     street: z.string().optional().default(''),
     city: z.string().optional().default(''),
     state: z.string().optional().default(''),
-    zip: z.string().optional().default(''),
+    zip: zipField.optional().default(''),
     country: z.string().optional().default('US'),
   }).optional(),
   department: z.string().optional().default('').transform(v => v.trim()),
@@ -138,13 +160,13 @@ export const updateEmployeeSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
   email: z.string().email().optional(),
-  phone: z.string().optional(),
+  phone: phoneField.optional(),
   dob: z.string().optional().transform(v => v || undefined),
   address: z.object({
     street: z.string().optional().default(''),
     city: z.string().optional().default(''),
     state: z.string().optional().default(''),
-    zip: z.string().optional().default(''),
+    zip: zipField.optional().default(''),
     country: z.string().optional().default('US'),
   }).optional(),
   department: z.string().optional().transform(v => v?.trim()),

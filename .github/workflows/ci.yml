@@ -81,8 +81,8 @@ jobs:
       - name: Lint backend (no NEW errors)
         run: |
           COUNT=$(npx eslint backend/src -f json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s||'[]').reduce((n,f)=>n+f.errorCount,0)))")
-          echo "backend eslint errors: $COUNT (baseline 190)"
-          [ "$COUNT" -le 190 ] || { echo "::error::backend eslint errors increased to $COUNT (baseline 190)"; exit 1; }
+          echo "backend eslint errors: $COUNT (baseline 188)"
+          [ "$COUNT" -le 188 ] || { echo "::error::backend eslint errors increased to $COUNT (baseline 188)"; exit 1; }
 
       - name: Build
         run: npm run build
