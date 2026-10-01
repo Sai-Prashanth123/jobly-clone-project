@@ -8,6 +8,11 @@ name: CI
 #
 # This runs the checks that would have caught them, in particular the contract
 # and role-parity tests in backend/src/lib.
+#
+# Note the split: eslint is installed and configured ONLY at the repo root
+# (eslint.config.js; backend/package.json has no eslint dependency and no
+# config of its own). So linting BOTH trees belongs to the root job — running
+# it from backend/ fails to resolve its plugins.
 
 on:
   push:
@@ -17,7 +22,7 @@ on:
 
 jobs:
   backend:
-    name: Backend — types, lint, tests
+    name: Backend — types and tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -38,21 +43,9 @@ jobs:
         # reach the API), schemaTypes.test.ts (every column type has a decided
         # JS representation).
         run: npx vitest run
-      - name: Lint (no NEW errors)
-        # The backend carries 190 pre-existing no-explicit-any errors in 37
-        # files. Failing on zero would mean this job never passes, so the gate
-        # is "no more than today" — tighten the number as the debt is paid
-        # down, never loosen it.
-        run: |
-          COUNT=$(npx eslint src -f json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).reduce((n,f)=>n+f.errorCount,0)))")
-          echo "eslint errors: $COUNT (baseline 190)"
-          if [ "$COUNT" -gt 190 ]; then
-            echo "::error::eslint errors increased to $COUNT (baseline 190)"
-            exit 1
-          fi
 
-  frontend:
-    name: Frontend — types, lint, build
+  root:
+    name: Frontend — types, build; lint both trees
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,26 +54,35 @@ jobs:
           node-version: '22'
           cache: npm
       - run: npm ci
-      - name: Type check (no NEW errors)
+
+      - name: Frontend type check (no NEW errors)
         # NOT `tsc --noEmit`: the root tsconfig is `"files": []` plus project
         # references, so that form checks ZERO files and passes unconditionally.
         # It silently "passed" over a file with a broken JSX tag. The project
         # form is the only one that actually checks src.
         run: |
           COUNT=$(npx tsc -p tsconfig.app.json --noEmit 2>&1 | grep -c "error TS" || true)
-          echo "tsc errors: $COUNT (baseline 4)"
+          echo "frontend tsc errors: $COUNT (baseline 4)"
           if [ "$COUNT" -gt 4 ]; then
-            echo "::error::frontend type errors increased to $COUNT (baseline 4)"
             npx tsc -p tsconfig.app.json --noEmit 2>&1 | grep "error TS" || true
+            echo "::error::frontend type errors increased to $COUNT (baseline 4)"
             exit 1
           fi
-      - name: Lint (no NEW errors)
+
+      # Gates are "no worse than today", not zero: both trees carry real
+      # pre-existing debt, and a gate that can never pass gets switched off.
+      # Lower these numbers as the debt is paid down; never raise them.
+      - name: Lint frontend (no NEW errors)
         run: |
-          COUNT=$(npx eslint src -f json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).reduce((n,f)=>n+f.errorCount,0)))")
-          echo "eslint errors: $COUNT (baseline 120)"
-          if [ "$COUNT" -gt 120 ]; then
-            echo "::error::eslint errors increased to $COUNT (baseline 120)"
-            exit 1
-          fi
+          COUNT=$(npx eslint src -f json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s||'[]').reduce((n,f)=>n+f.errorCount,0)))")
+          echo "frontend eslint errors: $COUNT (baseline 120)"
+          [ "$COUNT" -le 120 ] || { echo "::error::frontend eslint errors increased to $COUNT (baseline 120)"; exit 1; }
+
+      - name: Lint backend (no NEW errors)
+        run: |
+          COUNT=$(npx eslint backend/src -f json | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s||'[]').reduce((n,f)=>n+f.errorCount,0)))")
+          echo "backend eslint errors: $COUNT (baseline 190)"
+          [ "$COUNT" -le 190 ] || { echo "::error::backend eslint errors increased to $COUNT (baseline 190)"; exit 1; }
+
       - name: Build
         run: npm run build
