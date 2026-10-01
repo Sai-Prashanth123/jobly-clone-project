@@ -337,12 +337,20 @@ export async function submitMonthlyTimesheet(id: string, actorRole: string, acto
   logActivity(actorId ?? null, 'status_changed', 'monthly_timesheet', id, label, { from: row.status, to: 'submitted' });
   bustNavBadgeCache();
 
-  // Side-effects (PDF generation + manager/HR notification email) never block
-  // the submit response — a slow PDF/SMTP must not delay (or 504) the employee's
-  // submission. Fire-and-forget; failures are logged.
-  void runSubmitSideEffects(updated).catch(err =>
-    console.error('[monthlyTimesheets] submit side-effects failed for', id, err));
-  return { row: updated, emailSent: true, warning: undefined };
+  // Awaited, and the REAL result is returned.
+  //
+  // This was detached with a hardcoded `emailSent: true`, which was wrong twice
+  // over. On Lambda the container freezes when the response returns, so the PDF
+  // render, the pdf_url write, the manager and HR notifications and the email to
+  // HR were all abandoned at their first await — and the employee was told
+  // their timesheet had been emailed to HR when nothing had been sent and no
+  // PDF existed.
+  //
+  // runSubmitSideEffects wraps each step in its own try/catch and reports back
+  // through emailSent/warning, so awaiting it cannot fail the submission; it
+  // just makes the response honest.
+  const sideEffects = await runSubmitSideEffects(updated);
+  return { row: updated, emailSent: sideEffects.emailSent, warning: sideEffects.warning };
 }
 
 export async function patchMonthlyStatus(id: string, input: PatchMonthlyStatusInput, actorRole: string, actorId: string) {

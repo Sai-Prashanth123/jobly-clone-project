@@ -456,10 +456,14 @@ export async function deleteTimesheet(id: string, userRole: string, userId: stri
 export async function exportTimesheetsCSV(query: { status?: string; employeeId?: string; clientId?: string }): Promise<string> {
   let q = supabaseAdmin
     .from('timesheets')
+    // No `!inner` — see exportInvoicesCSV. The shim reads `!x` as an FK hint,
+    // "inner" matches none, and this export was a hard 500. Safe because both
+    // timesheets.employee_id and timesheets.client_id are NOT NULL, so INNER
+    // and LEFT return the same rows, and each pair has exactly one FK.
     .select(`
       display_id, week_start_date, week_end_date, total_hours, status, submitted_at, notes,
-      employees!inner(first_name, last_name, display_id),
-      clients!inner(company_name, display_id)
+      employees(first_name, last_name, display_id),
+      clients(company_name, display_id)
     `)
     .order('week_start_date', { ascending: false });
   if (query.status) q = q.eq('status', query.status);
@@ -579,9 +583,9 @@ export async function uploadWeeklyClientProof(
 
   const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
   const path = `weekly/${id}/${Date.now()}-${safeName}`;
-  await storageProvider.upload(WEEKLY_PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
+  await storageProvider.upload(WEEKLY_PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
 
-  const signed = await storageProvider.signedUrl(WEEKLY_PROOF_BUCKET, path, WEEKLY_PROOF_URL_TTL_SECONDS);
+  const signed = await storageProvider.signedUrl(WEEKLY_PROOF_BUCKET, path, WEEKLY_PROOF_URL_TTL_SECONDS);
 
   const { data: updated, error: dbErr } = await supabaseAdmin
     .from('timesheets')

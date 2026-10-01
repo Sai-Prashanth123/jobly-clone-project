@@ -20,6 +20,10 @@ import { useAuth } from '../hooks/useAuth';
 
 export default function Reports() {
   const { user } = useAuth();
+  // Must match reports.routes.ts: the financial endpoints are admin/finance
+  // only. HR and operations get the operational tabs; showing them the
+  // Financial tab would render panels where every request 403s.
+  const seesFinancial = user?.role === 'admin' || user?.role === 'finance';
   return (
     <div>
       <PageHeader
@@ -28,11 +32,11 @@ export default function Reports() {
       />
 
       <Tabs defaultValue="employees">
-        <TabsList className={`mb-6 grid w-full h-auto gap-1 ${user?.role === 'operations' ? 'grid-cols-3' : 'grid-cols-2 sm:grid-cols-4'}`}>
+        <TabsList className={`mb-6 grid w-full h-auto gap-1 ${seesFinancial ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
           <TabsTrigger value="employees">Employees</TabsTrigger>
           <TabsTrigger value="clients">Clients</TabsTrigger>
           <TabsTrigger value="timesheets">Timesheets</TabsTrigger>
-          {user?.role !== 'operations' && <TabsTrigger value="financial">Financial</TabsTrigger>}
+          {seesFinancial && <TabsTrigger value="financial">Financial</TabsTrigger>}
         </TabsList>
 
         {/* ── EMPLOYEE REPORTS ───────────────────────────────────────────── */}
@@ -121,7 +125,7 @@ export default function Reports() {
         </TabsContent>
 
         {/* ── FINANCIAL REPORTS ──────────────────────────────────────────── */}
-        {user?.role !== 'operations' && (
+        {seesFinancial && (
           <TabsContent value="financial">
             <div className="space-y-8">
               <section>

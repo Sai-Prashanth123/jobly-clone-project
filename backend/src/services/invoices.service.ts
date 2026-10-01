@@ -816,7 +816,12 @@ export async function bulkSendInvoices(ids: string[]) {
 export async function exportInvoicesCSV(query: { status?: string; clientId?: string }): Promise<string> {
   let q = supabaseAdmin
     .from('invoices')
-    .select(`invoice_number, issue_date, due_date, subtotal, tax_rate, tax_amount, total_amount, status, paid_at, clients!inner(company_name, display_id)`)
+    // No `!inner`: the pgrest shim reads `!x` as an FK column/constraint hint,
+    // and "inner" matches no FK, so resolveEmbed threw and this export was a
+    // hard 500. Dropping it is provably safe rather than merely probably safe —
+    // invoices.client_id is NOT NULL, so INNER and LEFT return identical rows.
+    // There is exactly one FK from invoices to clients, so no hint is needed.
+    .select(`invoice_number, issue_date, due_date, subtotal, tax_rate, tax_amount, total_amount, status, paid_at, clients(company_name, display_id)`)
     .order('issue_date', { ascending: false });
   if (query.status) q = q.eq('status', query.status);
   if (query.clientId) q = q.eq('client_id', query.clientId);
@@ -959,7 +964,7 @@ async function renderAndStoreInvoicePDF(id: string): Promise<{ buffer: Buffer; s
   const buffer = await generateInvoicePDF(buildInvoicePdfData(inv, client), theme);
 
   const fileName = `${inv.invoice_number}.pdf`;
-  await storageProvider.upload('invoices', fileName, buffer, { contentType: 'application/pdf', upsert: true });
+  await storageProvider.upload('invoices', fileName, buffer, { contentType: 'application/pdf', upsert: true });
 
   // 7-day signed URL — the link is embedded in the invoice email and must
   // survive spam-folder delays.

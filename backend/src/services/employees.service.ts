@@ -479,7 +479,16 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
     return { ...serializeEmployee(emp) };
   }
 
-  void generateTasksForEmployee(emp.id);
+  // MUST be awaited. Detached, this raced the response: on Lambda the
+  // container freezes the moment the response returns, so the bulk insert of
+  // the employee's onboarding tasks could be abandoned mid-flight. It usually
+  // won — the `await issueCredentials` below bought it time — but production
+  // has employees with zero task rows who consequently cannot complete
+  // onboarding at all, because their checklist page is empty.
+  //
+  // This is also the only one of these that can reject (listTemplates throws on
+  // a DB error), and an unhandled rejection aborts the invocation.
+  await generateTasksForEmployee(emp.id);
 
   // Issue credentials and send welcome email — capture status so the controller
   // can surface email failures back to the HR user instead of silently dropping them.

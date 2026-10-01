@@ -12,6 +12,8 @@ const schema: SchemaInfo = {
     { table: 'leave_requests', column: 'employee_id', refTable: 'employees', refColumn: 'id', constraint: 'lr_emp_fk' },
     { table: 'timesheet_entries', column: 'timesheet_id', refTable: 'timesheets', refColumn: 'id', constraint: 'te_ts_fk' },
     { table: 'timesheets', column: 'employee_id', refTable: 'employees', refColumn: 'id', constraint: 'ts_emp_fk' },
+    { table: 'timesheets', column: 'client_id', refTable: 'clients', refColumn: 'id', constraint: 'ts_cli_fk' },
+    { table: 'invoices', column: 'client_id', refTable: 'clients', refColumn: 'id', constraint: 'inv_cli_fk' },
     { table: 'case_notes', column: 'case_id', refTable: 'cases', refColumn: 'id', constraint: 'cn_case_fk' },
     { table: 'case_notes', column: 'author_id', refTable: 'portal_users', refColumn: 'id', constraint: 'cn_author_fk' },
     { table: 'case_notes', column: 'tagged_to', refTable: 'portal_users', refColumn: 'id', constraint: 'cn_tagged_fk' },
@@ -24,6 +26,8 @@ const schema: SchemaInfo = {
     ['cases', ['id']],
     ['case_notes', ['id']],
     ['employees', ['id']],
+    ['invoices', ['id']],
+    ['clients', ['id']],
   ]),
   // Mirrors the live schema closely enough for the write tests: these are the
   // jsonb columns whose values must be JSON-encoded rather than handed to
@@ -351,5 +355,44 @@ describe('json column encoding on writes', () => {
   it('does not encode scalars in a json column', () => {
     const q = compileUpdate('employees', { identity_documents: 'already-a-string' }, [], '*', schema);
     expect(q.values[0]).toBe('already-a-string');
+  });
+});
+
+// Regression: the CSV exports were hard-500 in production.
+//
+// They used `clients!inner(...)`. The shim reads `!x` as an FK column or
+// constraint hint, "inner" matches neither, and resolveEmbed throws — so both
+// exports returned "Internal server error". Nothing exercised these select
+// strings, which is exactly why it reached users.
+//
+// `!inner` was redundant anyway: invoices.client_id, timesheets.client_id and
+// timesheets.employee_id are all NOT NULL, so INNER and LEFT return identical
+// rows.
+describe('CSV export select strings compile', () => {
+  const build = (table: string, select: string) =>
+    compileSelectQuery(
+      { table, nodes: parseSelect(select), filters: [], orders: [] },
+      schema,
+    );
+
+  it('compiles the invoices export select', () => {
+    const q = build('invoices',
+      'invoice_number, issue_date, due_date, subtotal, tax_rate, tax_amount, total_amount, status, paid_at, clients(company_name, display_id)');
+    expect(sql(q)).toContain('AS "clients"');
+    expect(sql(q)).toContain('_t0."id" = _r."client_id"');
+  });
+
+  it('compiles the timesheets export select', () => {
+    const q = build('timesheets',
+      'display_id, week_start_date, week_end_date, total_hours, status, submitted_at, notes, employees(first_name, last_name, display_id), clients(company_name, display_id)');
+    expect(sql(q)).toContain('AS "employees"');
+    expect(sql(q)).toContain('AS "clients"');
+  });
+
+  // Pin the actual failure, so re-introducing !inner fails here rather than in
+  // production.
+  it('rejects an !inner hint rather than silently mis-joining', () => {
+    expect(() => build('invoices', 'invoice_number, clients!inner(company_name)'))
+      .toThrow(/no foreign key relates/);
   });
 });
