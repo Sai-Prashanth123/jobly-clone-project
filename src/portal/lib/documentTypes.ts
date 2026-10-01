@@ -202,14 +202,14 @@ export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4', 'insurance_waiver
 // the checklist demands them. US citizens remain the only exclusion - they
 // have no visa stamp or I-94 to produce at all, and requiring them would leave
 // onboarding permanently short of 100%.
-const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
-const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
+export const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
+export const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 
 // Additional identity-doc types required for specific visa types, on top of
 // REQUIRED_IDENTITY_TYPES and the passport/I-94 conditional above. Sourced
 // directly from the per-visa-type document checklists (items without an
 // "(if any)" / "(Optional)" hedge become required).
-const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
+export const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
   opt: ['i9_form', 'i20', 'ead'],
   stem_opt: ['i9_form', 'i20', 'ead', 'us_visa'],
   gc: ['passport', 'education_documents', 'experience_letters', 'i140', 'i140_approval_notice', 'labor_certificate', 'i797'],
@@ -280,7 +280,7 @@ export const IDENTITY_OWNED_DOC_LABELS = new Set([...IDENTITY_DOC_ROWS, ...EMPLO
 // Documents already uploaded under a row's PREVIOUS label — keeps them
 // recognized as "on file" after a label rename, without needing to rewrite
 // historical rows in the documents table.
-const LEGACY_LABEL_ALIASES: Record<string, string[]> = {
+export const LEGACY_LABEL_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
   // Renamed per HR - the row is just "the visa" in the H-1B checklist, and
   // "US Visa" read as a separate document. Anything already uploaded under

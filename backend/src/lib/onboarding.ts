@@ -49,8 +49,8 @@ export const ONBOARDING_REQUIRED_DOCS = [
 // and both are kept on file. US citizens stay out: they have neither, so
 // requiring them would block onboarding permanently.
 // Mirrors WORK_VISA_TYPES in src/portal/lib/documentTypes.ts.
-const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
-const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
+export const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
+export const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
 
 // Documents required for a SPECIFIC visa type, on top of the universal list
 // and the passport/visa/I-94 conditional above.
@@ -66,7 +66,7 @@ const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
 //
 // Keyed BY LABEL, because documents.type stores the row's label. Mirrors
 // VISA_REQUIRED_EXTRA - keep the two in step.
-const VISA_REQUIRED_EXTRA_DOCS: Record<string, readonly string[]> = {
+export const VISA_REQUIRED_EXTRA_DOCS: Record<string, readonly string[]> = {
   opt: ['I-9 Form', 'I-20', 'Employment Authorization Document'],
   stem_opt: ['I-9 Form', 'I-20', 'Employment Authorization Document', 'Visa'],
   gc: [
@@ -84,7 +84,7 @@ const VISA_REQUIRED_EXTRA_DOCS: Record<string, readonly string[]> = {
 // expiry-date check below can look up the right entry.
 const CONDITIONAL_DOC_IDENTITY_KEYS: Record<string, string> = { Passport: 'passport', Visa: 'us_visa', 'I-94': 'i94' };
 
-const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
+export const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
   // Row renamed from "US Visa" per HR. Mirrors LEGACY_LABEL_ALIASES in
   // src/portal/lib/documentTypes.ts - documents uploaded under the old label
