@@ -37,6 +37,38 @@ export interface PgrestResult<T = any> {
 type Row = Record<string, unknown>;
 type Mode = 'select' | 'insert' | 'update' | 'upsert' | 'delete';
 
+/**
+ * SQLSTATE classes (and node-postgres error codes) that mean "the database was
+ * not reachable or the session died", as opposed to "the query was rejected".
+ *
+ * Class 08 is connection_exception, 57P01/02/03 are admin shutdown and
+ * cannot_connect_now, 53300 is too_many_connections. node-postgres surfaces
+ * socket-level failures with no SQLSTATE at all, so those are matched by the
+ * Node errno codes instead.
+ */
+export const INFRA_SQLSTATES = new Set([
+  '08000', '08001', '08003', '08004', '08006', '08007', '08P01',
+  '57P01', '57P02', '57P03', '53300',
+]);
+const INFRA_ERRNOS = new Set([
+  'ECONNREFUSED', 'ECONNRESET', 'ETIMEDOUT', 'EHOSTUNREACH', 'ENETUNREACH',
+  'EPIPE', 'ENOTFOUND', 'EAI_AGAIN', 'ERR_SOCKET_CONNECTION_TIMEOUT',
+]);
+
+export function isInfrastructureError(err: unknown): boolean {
+  if (!err || typeof err !== 'object') return false;
+  const code = (err as { code?: unknown }).code;
+  if (typeof code === 'string' && (INFRA_SQLSTATES.has(code) || INFRA_ERRNOS.has(code))) return true;
+  // pg's own pool/connection messages carry no code worth matching on.
+  const message = (err as { message?: unknown }).message;
+  return typeof message === 'string' && (
+    message.includes('Connection terminated')
+    || message.includes('timeout exceeded when trying to connect')
+    || message.includes('Client has encountered a connection error')
+    || message.includes('server closed the connection unexpectedly')
+  );
+}
+
 function toPgrestError(err: unknown): PgrestError {
   const e = err as { message?: string; code?: string; detail?: string; hint?: string };
   return {
@@ -205,6 +237,23 @@ export class QueryBuilder implements PromiseLike<PgrestResult> {
   }
 
   private fail(err: unknown): PgrestResult {
+    // Infrastructure failures are RETHROWN rather than returned as a result.
+    //
+    // supabase-js reports query errors in the result, and ~500 call sites are
+    // written for that. But ~128 of them read `if (error || !data) throw new
+    // NotFoundError(...)`, which conflates "this row does not exist" with "the
+    // database could not be reached" — so when every connection started failing
+    // during this audit, the API answered a clean 404 "Invoice not found" in
+    // under 4ms for every record in the app, with nothing logged. It looked
+    // exactly like an empty database rather than a broken one.
+    //
+    // A connection failure is never something a call site can handle
+    // meaningfully, so throwing is strictly better: it skips those 128 checks
+    // entirely and lands in errorHandler, which maps it (via lib/dbErrors.ts)
+    // to a 503 that says the database is unreachable. Query-level errors —
+    // PGRST116, constraint violations, bad filters — keep the existing
+    // in-result contract, because call sites genuinely branch on those.
+    if (isInfrastructureError(err)) throw err;
     return { data: null, error: toPgrestError(err), count: null, status: 400 };
   }
 

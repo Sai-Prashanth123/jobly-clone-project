@@ -93,12 +93,22 @@ export function appErrorFromDbError(err: unknown): AppError | null {
     case '53300': // too_many_connections
     case '53400': // configuration_limit_exceeded
       return new AppError('The service is briefly at capacity. Please try again in a moment.', 503);
+    // Class 08 — connection_exception. These are rethrown by the shim (see
+    // isInfrastructureError in lib/pgrest/builder.ts) rather than returned in
+    // the result, so they must all be mapped here or they become opaque 500s;
+    // infraErrors.test.ts iterates that list and fails if one is missing.
     case '08000': // connection_exception
+    case '08001': // sqlclient_unable_to_establish_sqlconnection
     case '08003': // connection_does_not_exist
+    case '08004': // sqlserver_rejected_establishment_of_sqlconnection
     case '08006': // connection_failure
-    case '08001':
-    case '08004':
+    case '08007': // transaction_resolution_unknown
+    case '08P01': // protocol_violation
       return new AppError('Could not reach the database. Please try again.', 503);
+    case '57P01': // admin_shutdown
+    case '57P02': // crash_shutdown
+    case '57P03': // cannot_connect_now
+      return new AppError('The database is restarting. Please try again in a moment.', 503);
     case '42501': // insufficient_privilege
       return new AppError('The server is not permitted to perform that action.', 500);
 

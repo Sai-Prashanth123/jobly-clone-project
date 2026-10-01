@@ -27,17 +27,22 @@ export function getPool(): Pool {
   }
 
   pool = new Pool({
-    // Pin the session time zone. Both the scalar path and the to_jsonb embed
-    // path render timestamptz in the SESSION zone, so if this is ever not UTC
-    // every timestamp in the API silently shifts — the same class of bug as
-    // the Date-vs-string and numeric-vs-string divergences already fixed.
+    // DO NOT add `options: '-c TimeZone=UTC'` here. It was tried and reverted:
+    // RDS Proxy rejects startup parameters it does not recognise, so every
+    // connection failed. Because ~128 call sites read `if (error || !data)
+    // throw new NotFoundError(...)`, that connection failure surfaced as a
+    // clean, fast 404 on every record in the app rather than as an error —
+    // reads returned "Invoice not found" in under 4ms with nothing in
+    // CloudWatch to explain it.
     //
-    // Verified correct today: the RDS parameter group has timezone=UTC and
-    // the live API returns +00:00 offsets. But that is implicit, one
-    // parameter-group edit (or a restore into a differently configured
-    // instance) away from changing under us, with no test that would catch
-    // it. Stating it on the connection makes it independent of the default.
-    options: '-c TimeZone=UTC',
+    // The underlying concern is real: both the scalar and the to_jsonb embed
+    // path render timestamptz in the SESSION zone, so a non-UTC session would
+    // silently shift every timestamp in the API. It is currently correct, and
+    // enforced at the server rather than the connection — the RDS parameter
+    // group sets timezone=UTC and live responses carry +00:00. If that ever
+    // needs pinning per-session, do it with `SET TIME ZONE` on the pool's
+    // 'connect' event (which the proxy allows), not with a startup parameter.
+    //
     // Hand date/timestamp columns back as the strings PostgREST produced.
     // Without this node-postgres returns Date objects, which the ~500 call
     // sites written against supabase-js do not expect - see types-pg.ts.

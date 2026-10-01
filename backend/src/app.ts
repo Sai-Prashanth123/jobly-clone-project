@@ -1,4 +1,5 @@
 import express from 'express';
+import type { Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
@@ -51,14 +52,35 @@ app.use('/api', apiLimiter);
 app.use('/api', originVerify);
 
 // Health check
-app.get('/health', async (_req, res) => {
+// This checks the database, which makes it the only honest post-deploy signal.
+//
+// Registered at BOTH paths deliberately. CloudFront only forwards /api/* to the
+// Lambda, so a request to the bare /health at the edge is served the SPA's
+// index.html with a 200 — which is what made `curl /health` look like a passing
+// health check while the API underneath was returning a 404 for every record in
+// the app. Verification has to use /api/v1/health.
+const healthHandler = async (_req: Request, res: Response): Promise<void> => {
   try {
     const { error } = await supabaseAdmin.from('portal_users').select('id').limit(1);
-    res.json({ status: error ? 'degraded' : 'ok', db: error ? 'error' : 'connected', timestamp: new Date().toISOString(), env: env.NODE_ENV });
-  } catch {
-    res.status(503).json({ status: 'error', db: 'unreachable', timestamp: new Date().toISOString() });
+    res.status(error ? 503 : 200).json({
+      status: error ? 'degraded' : 'ok',
+      db: error ? 'error' : 'connected',
+      ...(error && { dbError: error.message, dbCode: error.code }),
+      timestamp: new Date().toISOString(),
+      env: env.NODE_ENV,
+    });
+  } catch (err) {
+    res.status(503).json({
+      status: 'error',
+      db: 'unreachable',
+      dbError: (err as Error)?.message,
+      timestamp: new Date().toISOString(),
+    });
   }
-});
+};
+
+app.get('/health', healthHandler);
+app.get('/api/v1/health', healthHandler);
 
 // API routes
 app.use('/api/v1', router);
