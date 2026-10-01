@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Download, Loader2, AlertCircle, FileText } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -28,6 +28,34 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Put the page back where it was when the preview closes.
+  //
+  // Radix locks body scroll while a dialog is open and does not reliably
+  // restore the offset afterwards, so closing a preview dropped the user at
+  // the very top of the page. On a form as long as onboarding that means
+  // losing your place entirely and scrolling back to the row you were on.
+  //
+  // `wasOpen` guards the first render: without it the effect would "restore"
+  // position 0 on mount and scroll a freshly-loaded page to the top.
+  const scrollYRef = useRef(0);
+  const wasOpenRef = useRef(false);
+  useEffect(() => {
+    if (open) {
+      scrollYRef.current = window.scrollY;
+      wasOpenRef.current = true;
+      return;
+    }
+    if (!wasOpenRef.current) return;
+    wasOpenRef.current = false;
+    const target = scrollYRef.current;
+    // Two frames: the first lets Radix unmount, the second lets it remove the
+    // scroll-lock styles. Restoring any earlier is simply overwritten.
+    const outer = requestAnimationFrame(() => {
+      requestAnimationFrame(() => window.scrollTo(0, target));
+    });
+    return () => cancelAnimationFrame(outer);
+  }, [open]);
 
   useEffect(() => {
     if (!open || !docId) return;

@@ -702,7 +702,13 @@ export default function NewEmployee() {
   }, [isOnboarding, onbIncompleteSections, submitError]);
 
   // ── Validation ────────────────────────────────────────────────────────────
-  const validate = (): { ok: boolean; firstErrorSectionId?: string; missingItems?: { label: string; section: string }[] } => {
+  const validate = (): {
+    ok: boolean;
+    firstErrorSectionId?: string;
+    missingItems?: { label: string; section: string }[];
+    /** The actual messages, so the banner can say WHAT is wrong. */
+    fieldErrors?: string[];
+  } => {
     const e: Record<string, string> = {};
     let firstSection: string | undefined;
     const flag = (key: string, msg: string, section: string) => {
@@ -715,9 +721,14 @@ export default function NewEmployee() {
     if (!form.firstName.trim()) flag('firstName', 'First name is required', SECTION_IDS.personal);
     if (!form.lastName.trim())  flag('lastName',  'Last name is required',  SECTION_IDS.personal);
 
+    // Validate the TRIMMED value. The emptiness check above already trims, but
+    // the pattern did not — so an address pasted with a trailing space passed
+    // "is it present?" and then failed "is it valid?", and the banner fell
+    // back to the unhelpful "fix the highlighted fields". Pasting an email
+    // with surrounding whitespace is the single most common way to enter one.
     if (!form.email.trim())     flag('email',     'Personal email is required', SECTION_IDS.contact);
-    else if (!/^\S+@\S+\.\S+$/.test(form.email)) flag('email', 'Enter a valid email', SECTION_IDS.contact);
-    if (form.workEmail && !/^\S+@\S+\.\S+$/.test(form.workEmail)) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
+    else if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) flag('email', 'Enter a valid email', SECTION_IDS.contact);
+    if (form.workEmail.trim() && !/^\S+@\S+\.\S+$/.test(form.workEmail.trim())) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
     if (isOnboarding && !form.linkedinUrl.trim()) flag('linkedinUrl', 'LinkedIn URL is required', SECTION_IDS.contact);
 
     if (form.phone && !/^\(\d{3}\) \d{3}-\d{4}$/.test(form.phone)) flag('phone', 'Enter a valid 10-digit phone number', SECTION_IDS.contact);
@@ -756,7 +767,14 @@ export default function NewEmployee() {
     }
 
     setErrors(e);
-    return { ok: Object.keys(e).length === 0, firstErrorSectionId: firstSection, missingItems };
+    return {
+      ok: Object.keys(e).length === 0,
+      firstErrorSectionId: firstSection,
+      missingItems,
+      // Skip the __onb_ markers — those are the checklist labels already
+      // surfaced via missingItems, and listing them twice reads as noise.
+      fieldErrors: Object.entries(e).filter(([k]) => !k.startsWith('__onb_')).map(([, v]) => v),
+    };
   };
 
   // Scroll to a specific section. Used after validation failure.
@@ -1062,7 +1080,7 @@ export default function NewEmployee() {
     if (submittingRef.current) return;
     setSubmitError('');
     setSubmitMissing([]);
-    const { ok, firstErrorSectionId, missingItems } = validate();
+    const { ok, firstErrorSectionId, missingItems, fieldErrors } = validate();
     if (!ok) {
       // Build a specific, human-readable list of what's missing so the toast
       // and persistent banner say WHAT to fix — not just "fix the highlighted
@@ -1079,9 +1097,14 @@ export default function NewEmployee() {
         if (!form.firstName.trim()) missing.push('First Name');
         if (!form.lastName.trim()) missing.push('Last Name');
         if (!form.email.trim()) missing.push('Personal Email');
+        // Fall back to the actual messages rather than "fix the highlighted
+        // fields", which named nothing and left HR hunting the form for a
+        // field that might be well off-screen.
         msg = missing.length
           ? `Please fill required fields: ${missing.join(', ')}.`
-          : 'Please fix the highlighted fields before submitting.';
+          : fieldErrors && fieldErrors.length
+            ? `Please fix: ${fieldErrors.join(' ')}`
+            : 'Please fix the highlighted fields before submitting.';
       }
       setSubmitError(msg);
       // Let React flush the error banner update, then scroll so the banner is
@@ -2127,7 +2150,12 @@ export default function NewEmployee() {
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <Label>Visa Type <span className="text-red-500">*</span></Label>
+                {/* Required during self-onboarding only, like SSN beside it.
+                    HR/admin create deliberately asks for name + email and
+                    nothing else, so the employee can be invited immediately
+                    and fill the rest themselves. An unconditional asterisk
+                    here told HR the field was mandatory when it is not. */}
+                <Label>Visa Type {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
