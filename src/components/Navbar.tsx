@@ -114,6 +114,19 @@ const Navbar = () => {
                   </div>
 
                   <div className="header-right d-flex align-items-center">
+                    {/* Employee/staff portal. A router Link rather than an <a>:
+                        /portal/* is served by this same React app (lazily
+                        loaded in App.tsx), so an absolute href would throw away
+                        the loaded bundle and do a full round trip for nothing.
+                        Hidden below xl, where it lives in the mobile menu
+                        instead — the header has no room for it next to the
+                        hamburger. */}
+                    <Link
+                      to="/portal/login"
+                      className="theme-btn btn-sm d-none d-xl-inline-flex align-items-center"
+                    >
+                      <i className="fas fa-user-circle mr-10"></i> Login
+                    </Link>
                     <div className="mobile-nav-bar d-block ml-3 ml-sm-5 d-xl-none">
                       <div className="mobile-nav-wrap">
                         <div id="hamburger" className="color-primary" onClick={() => setMobileOpen(true)}>
@@ -156,6 +169,9 @@ const Navbar = () => {
                 <li><Link to="/technology" onClick={() => setMobileOpen(false)}>Technology</Link></li>
                 <li><Link to="/clients" onClick={() => setMobileOpen(false)}>Clients</Link></li>
                 <li><Link to="/contact" onClick={() => setMobileOpen(false)}>Contact</Link></li>
+                {/* The desktop header button is hidden below xl, so the portal
+                    needs its own entry here or it is unreachable on a phone. */}
+                <li><Link to="/portal/login" onClick={() => setMobileOpen(false)}>Login</Link></li>
               </ul>
             </div>
             <div className="sidebar-nav__bottom mt-20">
