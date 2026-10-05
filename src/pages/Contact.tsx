@@ -7,7 +7,7 @@ const Contact = () => {
   return (
     <PageLayout>
       <PageBanner
-        bgImage="/assets/img/page-banner/page-banner-1.jpg"
+        bgImage="/assets/img/page-banner/page-banner-1.webp"
         transparentText="Contact"
         title={<>Contact <span>With Us</span></>}
         breadcrumb="Contact Us"

@@ -7,7 +7,7 @@ const About = () => {
   return (
     <PageLayout>
       <PageBanner
-        bgImage="/assets/img/page-banner/page-banner.jpg"
+        bgImage="/assets/img/page-banner/page-banner.webp"
         transparentText="About Us"
         title={<>About <span>Company</span></>}
         breadcrumb="About Us"
@@ -118,7 +118,7 @@ const About = () => {
             <div className="col-xl-6">
               <div className="company-skill__media-wrapper d-flex flex-column mt-lg-60 mt-md-50 mt-sm-45 mt-xs-40 align-items-center">
                 <div className="company-skill__media">
-                  <img src="/assets/img/about/company-skill-meida.png" alt="" className="img-fluid" loading="lazy" decoding="async" />
+                  <img src="/assets/img/about/company-skill-meida.webp" alt="" className="img-fluid" loading="lazy" decoding="async" />
                 </div>
               </div>
             </div>

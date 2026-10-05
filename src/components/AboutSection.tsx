@@ -5,7 +5,7 @@ const AboutSection = () => {
   useCounterUp();
   const sectionRef = useInViewReveal<HTMLElement>();
   return (
-    <section ref={sectionRef} className="reveal our-company pb-xs-80 pb-100 overflow-hidden">
+    <section ref={sectionRef} className="reveal our-company pb-xs-80 pb-70 overflow-hidden">
       <div className="container">
         <div className="row">
           <div className="col-lg-3 col-sm-6">

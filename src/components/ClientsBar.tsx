@@ -59,7 +59,7 @@ const ClientsBar = () => {
   }, []);
 
   return (
-    <div className="client-brand pb-xs-80 pb-md-100 pb-sm-100 pb-lg-100 pb-105 overflow-hidden">
+    <div className="client-brand pb-xs-80 pb-md-100 pb-sm-100 pb-lg-100 pb-70 overflow-hidden">
       <div className="container">
         <div className="row">
           <div className="col-12">

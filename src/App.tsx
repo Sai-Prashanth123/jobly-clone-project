@@ -10,6 +10,7 @@ import Index from "./pages/Index.tsx";
 import About from "./pages/About.tsx";
 import CareerGuidance from "./pages/CareerGuidance.tsx";
 import StaffingConsulting from "./pages/StaffingConsulting.tsx";
+import SupplyChainPlanning from "./pages/SupplyChainPlanning.tsx";
 import Clients from "./pages/Clients.tsx";
 import Contact from "./pages/Contact.tsx";
 import Technology from "./pages/Technology.tsx";
@@ -36,6 +37,7 @@ const App = () => (
           <Route path="/about" element={<About />} />
           <Route path="/career-guidance" element={<CareerGuidance />} />
           <Route path="/staffing-and-consulting" element={<StaffingConsulting />} />
+          <Route path="/supply-chain-planning" element={<SupplyChainPlanning />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/technology" element={<Technology />} />

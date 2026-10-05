@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router-dom';
 const servicesSub = [
   { label: 'Consulting Services', path: '/career-guidance' },
   { label: 'Staffing And Consulting Services', path: '/staffing-and-consulting' },
+  { label: 'Supply Chain Planning', path: '/supply-chain-planning' },
 ];
 
 const Navbar = () => {

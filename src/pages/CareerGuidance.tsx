@@ -53,7 +53,7 @@ const CareerGuidance = () => {
                 <p>Why choose Jobly for workforce consulting?</p>
                 <p>Building and scaling a high-performing workforce is hard. Hiring plans go sideways, contractors stretch into year-long engagements without governance, and compliance gaps surface only during an audit. Our consulting practice exists to bring structure, predictability and measurable ROI to every part of your talent operation.</p>
                 <div className="media mb-40 mb-md-35 mb-sm-30 mb-xs-25">
-                  <img src="/assets/img/project-details/1a.png" alt="Workforce consulting" loading="lazy" decoding="async" />
+                  <img src="/assets/img/project-details/1a.webp" alt="Workforce consulting" loading="lazy" decoding="async" />
                 </div>
                 <p>Jobly partners with growing technology companies, enterprise IT teams, and staffing firms to design talent strategies, optimize delivery operations, and stand up the systems that support sustainable growth. Whether you need a fractional talent leader for 90 days or a multi-year transformation roadmap, our advisors bring deep domain experience across staffing, vendor management, and software training.</p>
                 <p>Every engagement is outcome-driven. We start with the business problem — not a generic framework — and deliver crisp recommendations, hands-on execution support, and the operating cadences your team will continue to use long after we leave.</p>

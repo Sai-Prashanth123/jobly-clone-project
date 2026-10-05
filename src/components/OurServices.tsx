@@ -3,17 +3,19 @@ import { useScrollReveal } from '@/hooks/useScrollReveal';
 import { useInViewReveal } from '@/hooks/useInViewReveal';
 
 const services = [
-  { img: '/assets/img/home/our2.png', title: 'Consulting Services', desc: 'Outcome-driven workforce strategy, talent operations and compliance advisory for growing teams.', href: '/career-guidance' },
-  { img: '/assets/img/home/our-portfolio-home__item-2.png', title: 'Staffing And Consulting', desc: 'Staffing and consulting services have a major role in the functioning of an organization', href: '/staffing-and-consulting' },
+  { img: '/assets/img/home/our2.webp', title: 'Consulting Services', desc: 'Outcome-driven workforce strategy, talent operations and compliance advisory for growing teams.', href: '/career-guidance' },
+  { img: '/assets/img/home/our-portfolio-home__item-2.webp', title: 'Staffing And Consulting', desc: 'Contract, contract-to-hire and direct placement — sourced, screened and placed by people who do this every day.', href: '/staffing-and-consulting' },
+  { img: '/assets/img/project-details/1a.webp', title: 'Supply Chain Planning', desc: 'S&OP, demand and supply planning, and the platform work behind it — implemented, tested and supported.', href: '/supply-chain-planning' },
 ];
 
 const OurServices = () => {
   const ref1 = useScrollReveal('animate__fadeInUp', 0.15, '0s');
   const ref2 = useScrollReveal('animate__fadeInUp', 0.15, '0.15s');
-  const refs = [ref1, ref2];
+  const ref3 = useScrollReveal('animate__fadeInUp', 0.15, '0.3s');
+  const refs = [ref1, ref2, ref3];
   const sectionRef = useInViewReveal<HTMLElement>();
   return (
-  <section ref={sectionRef} className="reveal our-portfolio-home pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden">
+  <section ref={sectionRef} className="reveal our-portfolio-home pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-80 pb-80 overflow-hidden">
     <div className="container">
       <div className="row align-items-center">
         <div className="col-12">

@@ -17,13 +17,13 @@ const Careers = () => {
           <div className="row">
             <div className="col-lg-3 col-sm-6">
               <div className="our-company__meida">
-                <img src="/assets/img/about/2b.png" alt="" className="img-fluid" loading="lazy" decoding="async" />
+                <img src="/assets/img/about/2b.webp" alt="" className="img-fluid" loading="lazy" decoding="async" />
               </div>
             </div>
 
             <div className="col-lg-3 col-sm-6">
               <div className="our-company__meida border-radius">
-                <img src="/assets/img/about/2a.png" alt="" className="img-fluid" loading="lazy" decoding="async" />
+                <img src="/assets/img/about/2a.webp" alt="" className="img-fluid" loading="lazy" decoding="async" />
                 <div className="horizental-bar"></div>
               </div>
             </div>

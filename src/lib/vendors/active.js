@@ -47,7 +47,11 @@ Author: RRDevs
 		$(".consulter-mobile-nav ul li ul").parent().addClass("dropdown");
 		
 		$(".main-menu ul li ul").parent().addClass("dropdown");
-		$('.main-menu li.dropdown > a').append("<i class='fas fa-caret-down'></i>");
+		// REMOVED: this appended a caret to every dropdown link, but Navbar.tsx
+		// already renders one in JSX — so "Services" showed TWO carets. It also
+		// mutated DOM that React owns, which is fragile regardless. The React
+		// caret is the one to keep; it carries the sizing/spacing styles.
+		// $('.main-menu li.dropdown > a').append("<i class='fas fa-caret-down'></i>");
 
         /** Sidr submenu */
         function consulterMobileMenu() {

@@ -18,6 +18,9 @@ const ServiceSidebar = ({ active, haveAnyImg }: ServiceSidebarProps) => {
             <li className={active === '/staffing-and-consulting' ? 'active' : ''}>
               <Link to="/staffing-and-consulting">Staffing And Consulting <i className="fas fa-long-arrow-alt-right"></i></Link>
             </li>
+            <li className={active === '/supply-chain-planning' ? 'active' : ''}>
+              <Link to="/supply-chain-planning">Supply Chain Planning <i className="fas fa-long-arrow-alt-right"></i></Link>
+            </li>
           </ul>
         </div>
       </div>

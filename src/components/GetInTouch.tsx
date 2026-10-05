@@ -7,7 +7,7 @@ const GetInTouch = () => {
   return (
   <section
     ref={revealRef}
-    className="reveal grain-overlay can-help can-help-home-1 pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-120 overflow-hidden"
+    className="reveal grain-overlay can-help can-help-home-1 pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-80 pb-80 overflow-hidden"
     style={{
       background:
         'linear-gradient(135deg, hsl(218 47% 20%) 0%, hsl(213 54% 12%) 60%, hsl(216 50% 7%) 100%)',
@@ -16,7 +16,7 @@ const GetInTouch = () => {
       <div
         className="can-help-background"
         style={{
-          backgroundImage: 'url(/assets/img/home/can-help-background.png)',
+          backgroundImage: 'url(/assets/img/home/can-help-background.webp)',
           opacity: 0.18,
           mixBlendMode: 'screen',
         }}

@@ -8,8 +8,8 @@ const CareersSection = () => {
   return (
   <section
     ref={revealRef}
-    className="reveal planning-success pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-120 pb-130 overflow-hidden"
-    style={{ backgroundImage: 'url(/assets/img/home/planning-success-bg.png)' }}
+    className="reveal planning-success pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-80 pb-80 overflow-hidden"
+    style={{ backgroundImage: 'url(/assets/img/home/planning-success-bg.webp)' }}
   >
     <div ref={sectionRef} className="container">
       <div className="row align-items-center">
