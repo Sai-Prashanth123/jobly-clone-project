@@ -155,7 +155,7 @@ export default function CaseDetail() {
                   <Field label="Filed Date" value={legalCase.filedDate ? formatDate(legalCase.filedDate) : undefined} />
                   <Field label="Decision Date" value={legalCase.decisionDate ? formatDate(legalCase.decisionDate) : undefined} />
                   <div className="min-w-0">
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Employee Visa Expiry</p>
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Employee Work Status Expiry</p>
                     <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
                       <span>{legalCase.employeeVisaExpiry ? formatDate(legalCase.employeeVisaExpiry) : '—'}</span>
                       <ExpiryBadge date={legalCase.employeeVisaExpiry} />

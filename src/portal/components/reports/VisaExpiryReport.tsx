@@ -68,7 +68,7 @@ export function VisaExpiryReport() {
               <TableRow className="bg-gray-50">
                 <TableHead className="font-semibold">Employee</TableHead>
                 <TableHead className="font-semibold">Department</TableHead>
-                <TableHead className="font-semibold">Visa Type</TableHead>
+                <TableHead className="font-semibold">Work Status</TableHead>
                 <TableHead className="font-semibold">Expiry Date</TableHead>
                 <TableHead className="font-semibold">Status</TableHead>
                 <TableHead className="text-right font-semibold">Days Remaining</TableHead>

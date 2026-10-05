@@ -57,8 +57,13 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
     hint: 'Full SSN. Stored securely; only the last 4 are shown after save.' },
   { type: 'driver_license', label: "Driver's License",           placeholder: 'D1234567',
     hint: 'Primary photo ID for I-9 List B.', hasState: true, hasExpiry: true },
+  // Carries an expiry for the same reason Driver's License does — it is the
+  // alternative to it for non-drivers, and state IDs expire too. It had no
+  // expiry field at all, so the card showed only an Upload button (HR raised
+  // this). Not in any required list, so this adds a field without adding a
+  // requirement: nobody is newly blocked from finishing onboarding.
   { type: 'state_id',       label: 'State-Issued ID',            placeholder: 'S1234567',
-    hint: 'Alternative to driver license for non-drivers.', hasState: true },
+    hint: 'Alternative to driver license for non-drivers.', hasState: true, hasExpiry: true },
   { type: 'passport',       label: 'Passport',                   placeholder: '123456789',
     hint: 'I-9 List A — proves identity AND work authorization on its own. Upload all pages (except blank ones). Up to 10 files.',
     hasExpiry: true, multi: true, maxFiles: 10 },

@@ -69,7 +69,7 @@ export default function Cases() {
     },
     {
       key: 'visaExpiry',
-      header: 'Visa Expiry',
+      header: 'Work Status Expiry',
       hideOnMobile: true,
       render: c => (
         <div className="flex items-center gap-2 flex-wrap">

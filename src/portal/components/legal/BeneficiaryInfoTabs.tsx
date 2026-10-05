@@ -41,7 +41,7 @@ export function BeneficiaryInfoTabs({ beneficiary }: { beneficiary?: Partial<Emp
         <Field label="I-9 Status" value={b.i9Status} />
         <Field label="E-Verify Status" value={b.eVerifyStatus} />
         <div className="min-w-0">
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Visa Expiry</p>
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Work Status Expiry</p>
           <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
             <span>{b.visaExpiry ? formatDate(b.visaExpiry) : '—'}</span>
             <ExpiryBadge date={b.visaExpiry} />

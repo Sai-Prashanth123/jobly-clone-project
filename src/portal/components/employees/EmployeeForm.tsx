@@ -85,8 +85,8 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
     if (!form.address.state.trim()) errs.addrState = 'State is required';
     if (!form.address.zip.trim()) errs.addrZip = 'ZIP code is required';
     if (!form.startDate) errs.startDate = 'Start date (Joining Date) is required';
-    if (!form.visaType) errs.visaType = 'Visa type is required';
-    if (!form.visaExpiry) errs.visaExpiry = 'Visa expiry is required';
+    if (!form.visaType) errs.visaType = 'Work status is required';
+    if (!form.visaExpiry) errs.visaExpiry = 'Work status expiry is required';
     if (!form.i9Status) errs.i9Status = 'I-9 status is required';
     if (!form.ssn || !/^\d{4}$/.test(form.ssn)) errs.ssn = 'SSN must be exactly 4 digits';
     if (form.payRate <= 0) errs.payRate = 'Pay rate must be greater than 0';
@@ -314,9 +314,9 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
         <TabsContent value="immigration">
           <Card><CardContent className="pt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Visa Type *</Label>
+              <Label>Work Status *</Label>
               <Select value={form.visaType ?? ''} onValueChange={v => set('visaType', v as VisaType)}>
-                <SelectTrigger><SelectValue placeholder="Select visa type" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Select work status" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="citizen">US Citizen</SelectItem>
                   <SelectItem value="gc">Green Card</SelectItem>
@@ -331,7 +331,7 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
               {errors.visaType && <p className="text-xs text-red-500">{errors.visaType}</p>}
             </div>
             <div className="space-y-2">
-              <Label>Visa Expiry *</Label>
+              <Label>Work Status Expiry *</Label>
               <UsDateInput value={form.visaExpiry ?? ''} onChange={iso => { set('visaExpiry', iso); setErrors(p => ({ ...p, visaExpiry: '' })); }} />
               {errors.visaExpiry && <p className="text-xs text-red-500">{errors.visaExpiry}</p>}
             </div>

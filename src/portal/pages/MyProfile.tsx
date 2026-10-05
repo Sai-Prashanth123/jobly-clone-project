@@ -165,7 +165,7 @@ export default function MyProfile() {
           <Card>
             <CardHeader><CardTitle className="text-base">Immigration & I-9</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-              <Field label="Visa Type" value={employee.visaType?.toUpperCase()} />
+              <Field label="Work Status" value={employee.visaType?.toUpperCase()} />
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Authorization Expiry</p>
                 <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">

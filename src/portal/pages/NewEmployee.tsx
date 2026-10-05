@@ -2155,7 +2155,7 @@ export default function NewEmployee() {
                     nothing else, so the employee can be invited immediately
                     and fill the rest themselves. An unconditional asterisk
                     here told HR the field was mandatory when it is not. */}
-                <Label>Visa Type {isOnboarding && <RequiredMark />}</Label>
+                <Label>Work Status {isOnboarding && <RequiredMark />}</Label>
                 <Select value={form.visaType || ''} onValueChange={v => set('visaType', v as FormState['visaType'])}>
                   <SelectTrigger><SelectValue placeholder="Select" /></SelectTrigger>
                   <SelectContent>
@@ -2165,7 +2165,7 @@ export default function NewEmployee() {
                 <FieldError msg={errors.visaType} />
               </div>
               <div>
-                <Label>Visa Expiry</Label>
+                <Label>Work Status Expiry</Label>
                 <UsDateInput value={form.visaExpiry} onChange={iso => set('visaExpiry', iso)} />
                 {form.visaExpiry && <div className="mt-1"><ExpiryBadge date={form.visaExpiry} /></div>}
                 <FieldError msg={errors.visaExpiry} />

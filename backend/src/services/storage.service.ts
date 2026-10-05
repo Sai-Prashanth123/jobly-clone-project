@@ -3,7 +3,7 @@ import { NotFoundError, ForbiddenError } from '../lib/errors';
 import mammoth from 'mammoth';
 import * as XLSX from 'xlsx';
 import { storageProvider } from '../lib/storage';
-import { isEmployerManagedDoc } from '../lib/employerDocs';
+import { mayReadDocument, type AccessibleDoc, type DocViewer } from '../lib/documentAccess';
 
 /**
  * Who may read a given document.
@@ -27,24 +27,13 @@ import { isEmployerManagedDoc } from '../lib/employerDocs';
  * - `legal`      — case-scoped, enforced separately by
  *                  assertLegalCanAccessDocument at each call site.
  */
-function assertMayReadDocument(
-  doc: { entity_type?: string | null; entity_id?: string | null; type?: string | null },
-  user: { role: string; employeeId?: string | null },
-): void {
-  // Same wording for every refusal: saying "restricted" rather than "not
-  // yours" would confirm the document exists.
-  const refuse = (): never => {
+// The policy itself lives in lib/documentAccess.ts so the tests can import the
+// real rule instead of re-stating it. This wrapper only turns it into the
+// refusal. Same wording for every refusal: saying "restricted" rather than "not
+// yours" would confirm the document exists.
+function assertMayReadDocument(doc: AccessibleDoc, user: DocViewer): void {
+  if (!mayReadDocument(doc, user)) {
     throw new ForbiddenError('You may only access your own documents');
-  };
-
-  if (user.role === 'employee') {
-    const ownsIt = doc.entity_type === 'employee' && doc.entity_id === user.employeeId;
-    if (!ownsIt || isEmployerManagedDoc(doc)) refuse();
-    return;
-  }
-
-  if ((user.role === 'operations' || user.role === 'finance') && doc.entity_type === 'employee') {
-    refuse();
   }
 }
 

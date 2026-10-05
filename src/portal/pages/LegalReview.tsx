@@ -65,13 +65,13 @@ export function LegalReview() {
     },
     {
       key: 'visaType',
-      header: 'Visa Type',
+      header: 'Work Status',
       render: (e) => e.visaType ? <Badge variant="outline">{e.visaType.toUpperCase()}</Badge> : <span className="text-xs text-gray-400">—</span>,
       getValue: (e) => e.visaType ?? '',
     },
     {
       key: 'visaExpiry',
-      header: 'Visa Expiry',
+      header: 'Work Status Expiry',
       render: (e) => (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="text-sm">{e.visaExpiry ? formatDate(e.visaExpiry) : '—'}</span>
