@@ -2,58 +2,11 @@ import type { PortalUser, Employee, Client, Assignment, Timesheet, Invoice } fro
 
 // ─── Demo Users ───────────────────────────────────────────────────────────────
 
-export const DEMO_USERS: (PortalUser & { password: string })[] = [
-  {
-    id: 'usr-001',
-    email: 'admin@joblysolutions.com',
-    password: 'Jbly#Adm!n2026',
-    name: 'Sarah Mitchell',
-    role: 'admin',
-    avatarInitials: 'SM',
-  },
-  {
-    id: 'usr-002',
-    email: 'hr@joblysolutions.com',
-    password: 'Jbly#Hr!2026',
-    name: 'Priya Sharma',
-    role: 'hr',
-    avatarInitials: 'PS',
-  },
-  {
-    id: 'usr-003',
-    email: 'ops@joblysolutions.com',
-    password: 'Jbly#0ps!2026',
-    name: 'James Rodriguez',
-    role: 'operations',
-    avatarInitials: 'JR',
-  },
-  {
-    id: 'usr-004',
-    email: 'finance@joblysolutions.com',
-    password: 'Jbly#F!n2026',
-    name: 'Rachel Chen',
-    role: 'finance',
-    avatarInitials: 'RC',
-  },
-  {
-    id: 'usr-005',
-    email: 'john.doe@joblysolutions.com',
-    password: 'Jbly#Emp!2026',
-    name: 'John Doe',
-    role: 'employee',
-    employeeId: 'EMP-0001',
-    avatarInitials: 'JD',
-  },
-  {
-    id: 'usr-006',
-    email: 'jane.smith@joblysolutions.com',
-    password: 'Jbly#Emp!2026',
-    name: 'Jane Smith',
-    role: 'employee',
-    employeeId: 'EMP-0002',
-    avatarInitials: 'JS',
-  },
-];
+// DEMO_USERS removed. It held five real account emails AND their plaintext
+// passwords, was imported by nothing, and still shipped in the public bundle
+// because this module is pulled in for the SEED_* data below — so the admin
+// password was downloadable from the live site. Treat those credentials as
+// compromised; deleting this does not un-publish them.
 
 // ─── Seed Employees ───────────────────────────────────────────────────────────
 

@@ -9,13 +9,18 @@ import {
 import { Eye, EyeOff, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 import { AuroraBackground } from '@/components/ui/aurora-background';
 
-const ACCOUNTS = [
-  { role: 'Admin',      email: 'admin@joblysolutions.com',   password: 'Jbly#Adm!n2026', color: '#4069FF' },
-  { role: 'HR',         email: 'hr@joblysolutions.com',      password: 'Jbly#Hr!2026',   color: '#8B5CF6' },
-  { role: 'Operations', email: 'ops@joblysolutions.com',     password: 'Jbly#0ps!2026',  color: '#F59E0B' },
-  { role: 'Finance',    email: 'finance@joblysolutions.com', password: 'Jbly#F!n2026',   color: '#10B981' },
-  { role: 'Legal',      email: 'legal@joblysolutions.com',   password: 'Jbly#Lgl!2026',  color: '#E11D48' },
-];
+// REMOVED: a "Demo accounts" chip row that auto-filled one of five real
+// accounts and their passwords.
+//
+// Those passwords were literals in this file, which means they shipped inside
+// the public JavaScript bundle — anyone could download the chunk and read the
+// admin password without ever clicking anything. Deleting the UI stops it
+// being advertised, but it does NOT undo the exposure: the credentials were
+// publicly served and must be treated as compromised and rotated.
+//
+// Never put a working credential in frontend source. If role-based test logins
+// are wanted again, they belong in a non-production environment with throwaway
+// passwords, not on the live sign-in page.
 
 // ── Clean × Elegant tokens — minimal, delicate type, generous whitespace ──
 const TEXT = '#111827';     // near-black headings/text
@@ -30,7 +35,6 @@ export default function Login() {
   const [showPw, setShowPw]     = useState(false);
   const [error, setError]       = useState('');
   const [loading, setLoading]   = useState(false);
-  const [active, setActive]     = useState<string | null>(null);
 
   const forgot = useForgotPassword();
   const [fpOpen, setFpOpen]     = useState(false);
@@ -54,12 +58,6 @@ export default function Login() {
     }
   };
 
-  const quickFill = (a: typeof ACCOUNTS[0]) => {
-    setEmail(a.email);
-    setPassword(a.password);
-    setError('');
-    setActive(a.role);
-  };
 
   // Elegant input — white, hairline border, gentle blue focus ring, smooth transition.
   const inputCls =
@@ -153,7 +151,7 @@ export default function Login() {
                 type="email"
                 autoComplete="email"
                 value={email}
-                onChange={e => { setEmail(e.target.value); setActive(null); }}
+                onChange={e => setEmail(e.target.value)}
                 placeholder="you@joblysolutions.com"
                 required
                 className={inputCls}
@@ -216,42 +214,6 @@ export default function Login() {
             </button>
           </form>
 
-          {/* Account switcher — minimal demo chips */}
-          <div className="mt-9">
-            <div className="flex items-center gap-3 mb-5">
-              <span className="h-px flex-1 bg-gray-100" />
-              <p className="text-[11px] text-gray-400 uppercase tracking-[0.14em] font-medium">
-                Demo accounts
-              </p>
-              <span className="h-px flex-1 bg-gray-100" />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {ACCOUNTS.map(a => {
-                const isActive = active === a.role;
-                return (
-                  <button
-                    key={a.role}
-                    type="button"
-                    onClick={() => quickFill(a)}
-                    className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-[13px] font-medium text-left border transition-all duration-200"
-                    style={{
-                      borderColor: isActive ? BRAND : '#E5E7EB',
-                      background: isActive ? 'rgba(64,105,255,0.05)' : '#ffffff',
-                      color: isActive ? BRAND : '#374151',
-                    }}
-                    onMouseEnter={e => { if (!isActive) { e.currentTarget.style.background = '#F9FAFB'; e.currentTarget.style.borderColor = '#D1D5DB'; } }}
-                    onMouseLeave={e => { if (!isActive) { e.currentTarget.style.background = '#ffffff'; e.currentTarget.style.borderColor = '#E5E7EB'; } }}
-                  >
-                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: a.color }} />
-                    {a.role}
-                  </button>
-                );
-              })}
-            </div>
-            <p className="text-[12px] text-gray-400 text-center mt-4">
-              Click a role to auto-fill credentials, then sign in.
-            </p>
-          </div>
 
         </div>
       </div>
