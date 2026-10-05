@@ -1,6 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import * as svc from '../services/admin.service';
 
+// Creates a STAFF login (admin/hr/operations/finance/legal). Returns the
+// one-time password so the administrator can pass it on; it is also emailed.
+// The password stops working as soon as the user sets their own, which the
+// portal forces on first sign-in.
+export async function createUser(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { email, name, role } = req.body as { email: string; name: string; role: string };
+    const data = await svc.createStaffUser({ email, name, role }, req.user!.id);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function listUsers(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const data = await svc.listPortalUsers();

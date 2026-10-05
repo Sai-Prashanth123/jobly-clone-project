@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '../config/supabase';
 import { authProvider } from '../lib/auth';
-import { NotFoundError, ForbiddenError } from '../lib/errors';
+import { NotFoundError, ForbiddenError, ValidationError, ConflictError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, mailerConfigured } from '../lib/mailer';
 import { generateTempPassword } from '../lib/tempPassword';
@@ -17,6 +17,77 @@ export async function listPortalUsers() {
 
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * Create a STAFF portal login (admin / hr / operations / finance / legal).
+ *
+ * This did not exist. The only way to get a portal login was to create an
+ * employee, which always produces role 'employee' and an employee record —
+ * wrong for an HR manager or an administrator, who need an account without a
+ * timesheet attached. Staff logins were therefore being created by hand, or
+ * not at all, which is how the hardcoded "demo accounts" ended up on the
+ * sign-in page standing in for real ones.
+ *
+ * The temp password is first-login-only: must_reset_password forces the user
+ * to set their own before they can do anything, so the password this returns
+ * stops working the moment they use it.
+ */
+export async function createStaffUser(
+  input: { email: string; name: string; role: string },
+  actorId: string,
+): Promise<{ id: string; email: string; name: string; role: string; tempPassword: string }> {
+  const email = input.email.trim().toLowerCase();
+  const role = input.role.trim().toLowerCase();
+
+  if (!VALID_ROLES.includes(role)) {
+    throw new ValidationError(`Invalid role "${input.role}". Expected one of: ${VALID_ROLES.join(', ')}`);
+  }
+  // 'employee' belongs to the employee-creation flow, which also builds the
+  // employee record this path deliberately does not.
+  if (role === 'employee') {
+    throw new ValidationError('Create employees through Employees → New Employee, not here.');
+  }
+
+  const { data: existing } = await supabaseAdmin
+    .from('portal_users').select('id').eq('email', email).maybeSingle();
+  if (existing) throw new ConflictError('A portal user with this email already exists.', { field: 'email' });
+
+  const tempPassword = generateTempPassword();
+  const created = await authProvider.createUser({ email, password: tempPassword });
+  if (!created?.userId) throw new Error('Auth provider did not return a user id');
+
+  const parts = input.name.trim().split(/\s+/);
+  const initials = ((parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '')).toUpperCase() || email[0].toUpperCase();
+
+  const { error: insertErr } = await supabaseAdmin.from('portal_users').insert({
+    id: created.userId,
+    email,
+    name: input.name.trim(),
+    role,
+    avatar_initials: initials,
+    must_reset_password: true,
+    temp_password_issued_at: new Date().toISOString(),
+  });
+  if (insertErr) throw insertErr;
+
+  // Awaited, not fire-and-forget: the Lambda container freezes the moment the
+  // response returns, so an unawaited send is abandoned mid-flight.
+  if (mailerConfigured) {
+    await sendWelcomeEmail({
+      to: email,
+      firstName: parts[0] || 'there',
+      lastName: parts.slice(1).join(' '),
+      loginEmail: email,
+      tempPassword,
+      subject: 'Your Jobly Portal account',
+      bodyIntro: 'An account has been created for you on the Jobly Portal. Use the temporary password below to sign in &mdash; you will be asked to set your own password straight away.',
+    }).catch(err => console.error('[admin.createStaffUser] welcome email failed for', email, err));
+  }
+
+  await logActivity(actorId, 'created', 'portal_user', created.userId, email, { event: 'staff_user_created', role });
+
+  return { id: created.userId, email, name: input.name.trim(), role, tempPassword };
 }
 
 export async function updateUserRole(userId: string, role: string, actorId: string) {
