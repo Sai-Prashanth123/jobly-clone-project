@@ -5,7 +5,7 @@ import { useInViewReveal } from '@/hooks/useInViewReveal';
 const services = [
   { img: '/assets/img/home/our2.webp', title: 'Consulting Services', desc: 'Outcome-driven workforce strategy, talent operations and compliance advisory for growing teams.', href: '/career-guidance' },
   { img: '/assets/img/home/our-portfolio-home__item-2.webp', title: 'Staffing And Consulting', desc: 'Contract, contract-to-hire and direct placement — sourced, screened and placed by people who do this every day.', href: '/staffing-and-consulting' },
-  { img: '/assets/img/project-details/1a.webp', title: 'Supply Chain Planning', desc: 'S&OP, demand and supply planning, and the platform work behind it — implemented, tested and supported.', href: '/supply-chain-planning' },
+  { img: '/assets/img/project-details/1a.webp', title: 'Kinaxis', desc: 'Kinaxis implementation, upgrades and support — plus the S&OP, demand and supply planning around it.', href: '/kinaxis' },
 ];
 
 const OurServices = () => {

@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { ScrollToTop } from './components/ScrollToTop';
 import { ChunkErrorBoundary } from './components/ChunkErrorBoundary';
 import { Toaster as Sonner } from "@/components/ui/sonner";
@@ -37,7 +37,11 @@ const App = () => (
           <Route path="/about" element={<About />} />
           <Route path="/career-guidance" element={<CareerGuidance />} />
           <Route path="/staffing-and-consulting" element={<StaffingConsulting />} />
-          <Route path="/supply-chain-planning" element={<SupplyChainPlanning />} />
+          <Route path="/kinaxis" element={<SupplyChainPlanning />} />
+          {/* The page shipped briefly at this path before being renamed to
+              /kinaxis. Kept as a redirect so any link already shared still
+              lands somewhere, rather than 404ing. */}
+          <Route path="/supply-chain-planning" element={<Navigate to="/kinaxis" replace />} />
           <Route path="/clients" element={<Clients />} />
           <Route path="/contact" element={<Contact />} />
           <Route path="/technology" element={<Technology />} />

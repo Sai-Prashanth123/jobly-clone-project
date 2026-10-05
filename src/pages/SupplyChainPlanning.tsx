@@ -8,8 +8,8 @@ const SupplyChainPlanning = () => {
       <PageBanner
         bgImage="/assets/img/page-banner/page-banner1.jpg"
         transparentText="Services"
-        title={<>Supply Chain <span>Planning</span></>}
-        breadcrumb="Supply Chain Planning"
+        title={<><span>Kinaxis</span> Supply Chain Planning</>}
+        breadcrumb="Kinaxis"
       />
 
       {/* services-details start */}
@@ -18,8 +18,8 @@ const SupplyChainPlanning = () => {
           <div className="row">
             <div className="col-xl-8">
               <div className="services-details__content">
-                <h2>Supply Chain Planning</h2>
-                <p>Most supply chain problems are not really planning problems. They are visibility problems that only show up as planning problems — a demand signal nobody trusted, a constraint nobody modelled, a plan that was already out of date by the time it reached the people expected to act on it. Jobly helps organisations close that gap, combining supply chain planning expertise with the staffing depth to keep the capability running long after go-live.</p>
+                <h2>Kinaxis Supply Chain Planning</h2>
+                <p>Most supply chain problems are not really planning problems. They are visibility problems that only show up as planning problems — a demand signal nobody trusted, a constraint nobody modelled, a plan that was already out of date by the time it reached the people expected to act on it. Jobly helps organisations close that gap on <strong>Kinaxis</strong>, combining supply chain planning expertise with the staffing depth to keep the capability running long after go-live.</p>
 
                 <div className="media mb-40 mb-md-35 mb-sm-30 mb-xs-25">
                   <img src="/assets/img/project-details/1a.webp" alt="Supply chain planning consulting" loading="lazy" decoding="async" />
@@ -36,15 +36,31 @@ const SupplyChainPlanning = () => {
                   <li><strong>Inventory strategy</strong> — segmentation and buffer placement, so working capital sits where it absorbs variability.</li>
                 </ul>
 
-                <h5>Implementation and platform work</h5>
-                <p>We implement, configure and support planning platforms, and we integrate them with the ERP you already run rather than asking you to replace it. Our teams cover configuration and deployment, upgrades and release testing, and the data integration work that decides whether any of it survives contact with reality.</p>
+                <h5>Kinaxis implementation and support</h5>
+                <p>Our planning work centres on <strong>Kinaxis</strong> — Maestro, and the RapidResponse deployments many organisations are still running. Kinaxis sits alongside the ERP you already have rather than replacing it, which is what makes concurrent planning practical: demand, supply and capacity are modelled together, so a change in one is reflected across the plan immediately instead of at the next planning cycle.</p>
+                <p>We cover the full lifecycle rather than implementation alone:</p>
                 <ul>
-                  <li>Platform configuration, deployment and upgrade delivery</li>
-                  <li>ERP and data integration, including master data readiness</li>
-                  <li>Test strategy and execution across configuration, integration and upgrades</li>
-                  <li>Reporting and analytics on top of the planning data</li>
-                  <li>Knowledge transfer, so your planners are not dependent on us</li>
+                  <li><strong>Implementation and deployment</strong> — configuration, workbook and scenario design, and go-live support</li>
+                  <li><strong>Upgrades and release testing</strong> — including RapidResponse to Maestro transitions</li>
+                  <li><strong>ERP and data integration</strong> — SAP, Oracle and others, plus the master data readiness work that decides whether the model is trustworthy</li>
+                  <li><strong>Testing</strong> — configuration, integration and upgrade test strategy and execution</li>
+                  <li><strong>Analytics and reporting</strong> on top of the planning data</li>
+                  <li><strong>Application support</strong> and day-to-day planning operations</li>
+                  <li><strong>Knowledge transfer</strong>, so your planners are not dependent on us</li>
                 </ul>
+                <p>Where an existing Kinaxis implementation has stalled or is not being used as intended, we also take on recovery and re-adoption work — usually a faster route to value than starting again.</p>
+
+                <h5>Kinaxis Maestro</h5>
+                <p>Maestro is the current generation of the platform, and what most new implementations are built on. We deliver end-to-end: solution design and configuration, scenario and workbook build, integration, testing, go-live and the application support that follows. For organisations already live, we also run post-go-live value realisation — measuring whether the planning process is actually delivering the forecast accuracy, service and inventory outcomes the business case assumed, and fixing it where it is not.</p>
+
+                <h5>Kinaxis Planning One</h5>
+                <p>Planning One is the pre-configured, cloud-native option aimed at mid-market organisations that need planning capability without a multi-year programme. It goes live in weeks rather than quarters, using templates and standard integrations rather than a bespoke build. We handle implementation and go-live, ERP data onboarding, user enablement and ongoing support — and, when the business outgrows it, the upgrade path onto Maestro.</p>
+
+                <h5>Migrating from SAP APO or IBP, and from RapidResponse</h5>
+                <p>Two migrations come up repeatedly. Organisations leaving <strong>SAP APO</strong> — long past end of mainstream maintenance — or weighing <strong>IBP</strong> against Kinaxis need the planning logic carried across rather than rebuilt from a blank sheet, which is where most of the risk and cost sits. Separately, existing <strong>RapidResponse</strong> estates need moving onto Maestro without losing years of accumulated configuration. We do both, starting with an assessment of what should be migrated, what should be retired, and what was never working in the first place.</p>
+
+                <h5>Kinaxis health check</h5>
+                <p>If you are already live and something is not right — plans nobody trusts, planners back in spreadsheets, an upgrade that keeps slipping — we will run a short review of the configuration, data quality and how the system is actually being used, and give you a written view of what is worth fixing and in what order. No obligation to engage us for the work that follows.</p>
 
                 <h5>Support that does not disappear at go-live</h5>
                 <p>Planning capability decays quietly. Parameters drift, the people who were trained move on, and within a year the organisation is back to spreadsheets alongside the system it paid for. We provide certified, experienced resources for day-to-day planning operations and application support — our staffing heritage is the reason we can sustain this rather than hand over a document and leave.</p>
@@ -62,13 +78,23 @@ const SupplyChainPlanning = () => {
 
                 <h5>Why Jobly</h5>
                 <p>Planning programmes fail for people reasons more often than technical ones — the wrong skills at the wrong moment, a key consultant swapped out mid-build, or no one left to run the process once the implementation team rolls off. Resourcing is what Jobly has always done. Pairing that with supply chain planning delivery means we can staff an engagement properly, keep the same team on it, and support the capability for as long as you need it.</p>
-                <p>If you are planning an implementation, recovering one that has stalled, or simply want an honest assessment of what your current setup is capable of, we are happy to take a look.</p>
+                <p>If you are planning a Kinaxis implementation, recovering one that has stalled, or simply want an honest assessment of what your current setup is capable of, we are happy to take a look.</p>
+
+                {/* Nominative use: naming the platform we work on is fine, but
+                    the mark belongs to Kinaxis and the page should say so. This
+                    makes no claim of partnership, certification or endorsement —
+                    add one only if it is genuinely held. */}
+                <p className="font-la" style={{ fontSize: '13px', opacity: 0.7, marginTop: '28px' }}>
+                  Kinaxis, Maestro and RapidResponse are trademarks of Kinaxis Inc. Jobly Solutions is an
+                  independent services provider; references to these products describe the platforms we work
+                  with and do not imply any affiliation with or endorsement by Kinaxis Inc.
+                </p>
               </div>
             </div>
 
             <div className="col-xl-4">
               <ServiceSidebar
-                active="/supply-chain-planning"
+                active="/kinaxis"
                 haveAnyImg="/assets/img/services-details/have-any.png"
               />
             </div>
