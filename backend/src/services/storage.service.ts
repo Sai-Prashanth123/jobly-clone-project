@@ -15,15 +15,18 @@ import { mayReadDocument, type AccessibleDoc, type DocViewer } from '../lib/docu
  * - `employee`   — their own documents only, and NOT the employer-managed ones
  *                  (E-Verify letter, I-129, LCA...) which hang off their record
  *                  but belong to HR.
- * - `operations` / `finance` — everything EXCEPT employee documents. This is
- *                  the rule that was missing: the function used to return early
- *                  for every role except `employee`, so these two could mint a
- *                  signed URL for any SSN card, passport scan or bank letter by
- *                  UUID. That directly contradicted `redactEmployee`, which
- *                  deliberately blinds the same two roles to `ssn` and `bank_*`
- *                  on the JSON path — one door locked, the other wide open.
- *                  They keep client/invoice/case documents, which is what they
- *                  actually work with (contracts, invoice attachments).
+ * - `operations` / `finance` — everything, including employee documents.
+ *                  Reviewing an employee's documents is ordinary work for an
+ *                  operations manager. These two were briefly refused employee
+ *                  documents on the reasoning that `redactEmployee` blinds them
+ *                  to `ssn` and `bank_*` on the JSON path, so a signed URL for
+ *                  an SSN card was inconsistent. Nobody had asked for that, and
+ *                  it broke document preview outright for them — /render and
+ *                  /url both 403'd, so the dialog said "Could not load this
+ *                  document" with Download greyed out, reading as a broken file
+ *                  rather than a permission decision. If specific TYPES should
+ *                  be withheld, scope it to the type in lib/documentAccess.ts
+ *                  rather than refusing the whole entity_type.
  * - `legal`      — case-scoped, enforced separately by
  *                  assertLegalCanAccessDocument at each call site.
  */
