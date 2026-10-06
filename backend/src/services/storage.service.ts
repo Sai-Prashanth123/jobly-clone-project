@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import mammoth from 'mammoth';
+import WordExtractor from 'word-extractor';
 import * as XLSX from 'xlsx';
 import { storageProvider } from '../lib/storage';
 import { mayReadDocument, type AccessibleDoc, type DocViewer } from '../lib/documentAccess';
@@ -386,8 +387,23 @@ export async function renderDocument(
         return { html: '', kind: 'passthrough', name };
       }
     }
-    // Legacy .doc (or anything else that is not OOXML): nothing here can render
-    // it, so return the download prompt instead of an error.
+    // Legacy .doc (OLE2). mammoth cannot read these, but word-extractor can
+    // pull the text out of the binary format. It is text only — images are
+    // dropped and table layout is flattened — but for the questionnaires and
+    // letters that actually arrive as .doc, the content is the point, and
+    // reading it beats a download prompt.
+    if (isOle2) {
+      try {
+        const extracted = await new WordExtractor().extract(buffer);
+        const body = extracted.getBody();
+        if (body && body.trim()) {
+          return { html: wrapHtml(legacyDocHtml(body), name), kind: 'docx', name };
+        }
+      } catch (err) {
+        console.warn('[renderDocument] legacy .doc extraction failed for', name, err);
+      }
+    }
+    // Not OOXML, not readable OLE2 — fall back to the download prompt.
     return { html: '', kind: 'passthrough', name };
   }
 
@@ -427,6 +443,32 @@ export async function renderDocument(
 
   // Unsupported — return empty so client shows download prompt.
   return { html: '', kind: 'passthrough', name };
+}
+
+/**
+ * Render extracted legacy-.doc text as readable HTML.
+ *
+ * word-extractor returns plain text with the original line breaks, so the
+ * structure of a form or questionnaire survives even though the formatting
+ * does not. Blank-line runs become paragraph breaks; single newlines are kept
+ * as line breaks, which matters for the numbered questions these documents are
+ * mostly made of.
+ */
+function legacyDocHtml(text: string): string {
+  const paragraphs = text
+    .replace(/\r\n/g, '\n')
+    .split(/\n{2,}/)
+    .map(p => p.trim())
+    .filter(Boolean)
+    .map(p => `<p>${escHtml(p).replace(/\n/g, '<br>')}</p>`)
+    .join('\n');
+
+  // A quiet note that this is a converted legacy file, so nobody mistakes the
+  // missing formatting for a damaged document.
+  return `<div style="border-left:3px solid #d0d7e8;background:#f7f9fc;padding:8px 12px;margin:0 0 20px;font-family:sans-serif;font-size:12px;color:#5a6a85">
+Converted from a legacy Word (.doc) file &mdash; text only. Images and exact layout are not preserved. Download the file to see the original.
+</div>
+${paragraphs}`;
 }
 
 function escHtml(s: string): string {

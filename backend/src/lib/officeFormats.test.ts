@@ -24,8 +24,12 @@ const isZip = (b: Buffer) => b.length >= 2 && b[0] === 0x50 && b[1] === 0x4b;
 const isOle2 = (b: Buffer) =>
   b.length >= 4 && b[0] === 0xd0 && b[1] === 0xcf && b[2] === 0x11 && b[3] === 0xe0;
 
-/** Would renderDocument hand this to mammoth? */
-const wouldRenderAsWord = (buf: Buffer) => isZip(buf);
+/** Would renderDocument hand this to mammoth (the OOXML renderer)? */
+const wouldUseMammoth = (buf: Buffer) => isZip(buf);
+/** Would renderDocument hand this to word-extractor (the legacy reader)? */
+const wouldUseLegacyExtractor = (buf: Buffer) => !isZip(buf) && isOle2(buf);
+/** Can it be previewed at all, by either route? */
+const wouldRenderAsWord = (buf: Buffer) => wouldUseMammoth(buf) || wouldUseLegacyExtractor(buf);
 
 describe('office container sniffing', () => {
   it('recognises a .docx as a zip', () => {
@@ -38,9 +42,22 @@ describe('office container sniffing', () => {
     expect(isZip(OLE2_HEADER)).toBe(false);
   });
 
-  // The actual regression: a legacy .doc must NOT reach mammoth.
-  it('does not send a legacy .doc to the Word renderer', () => {
-    expect(wouldRenderAsWord(OLE2_HEADER)).toBe(false);
+  // The original regression: a legacy .doc must never reach mammoth, which
+  // cannot read it and throws.
+  it('does not send a legacy .doc to mammoth', () => {
+    expect(wouldUseMammoth(OLE2_HEADER)).toBe(false);
+  });
+
+  // ...but it must still be previewable, via the legacy text extractor. The
+  // first fix only made the failure graceful; MR still could not read the
+  // document, which was the actual complaint.
+  it('sends a legacy .doc to the text extractor instead', () => {
+    expect(wouldUseLegacyExtractor(OLE2_HEADER)).toBe(true);
+    expect(wouldRenderAsWord(OLE2_HEADER)).toBe(true);
+  });
+
+  it('does not send a real .docx to the legacy extractor', () => {
+    expect(wouldUseLegacyExtractor(ZIP_HEADER)).toBe(false);
   });
 
   it('does send a real .docx to the Word renderer', () => {
@@ -53,9 +70,10 @@ describe('office container sniffing', () => {
     expect(wouldRenderAsWord(ZIP_HEADER)).toBe(true);
   });
 
-  it('refuses a .doc that is really RTF', () => {
+  it('refuses a .doc that is really RTF — neither renderer reads it', () => {
+    expect(wouldUseMammoth(RTF_HEADER)).toBe(false);
+    expect(wouldUseLegacyExtractor(RTF_HEADER)).toBe(false);
     expect(wouldRenderAsWord(RTF_HEADER)).toBe(false);
-    expect(isOle2(RTF_HEADER)).toBe(false);
   });
 
   // The bound must match what the check reads (bytes 0-3), not an arbitrary

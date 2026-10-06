@@ -166,7 +166,10 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
                   pre-2007 binary formats that no browser-side renderer reads.
                   Saying so beats leaving people to wonder if the file is
                   broken — it downloads and opens perfectly well. */}
-              {['doc', 'xls', 'ppt'].includes((fileName.split('.').pop() ?? '').toLowerCase()) && (
+              {/* .doc is no longer listed: legacy Word is extracted and rendered
+                  server-side now. .xls and .ppt still have no renderer, so the
+                  hint stays useful for those. */}
+              {['xls', 'ppt'].includes((fileName.split('.').pop() ?? '').toLowerCase()) && (
                 <p className="text-xs text-muted-foreground">
                   This is an older Office format. Re-saving it as
                   {' '}<strong>.{(fileName.split('.').pop() ?? '').toLowerCase()}x</strong>{' '}
