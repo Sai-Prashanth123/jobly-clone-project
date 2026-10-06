@@ -226,7 +226,8 @@ export default function Login() {
           <DialogHeader>
             <DialogTitle style={{ color: TEXT }}>Reset your password</DialogTitle>
             <DialogDescription>
-              Enter your personal or work email and we'll send reset instructions.
+              Enter the email your account uses — personal or work — and we'll send reset
+              instructions. It has to match the address on file exactly.
             </DialogDescription>
           </DialogHeader>
           {fpSent ? (
@@ -235,6 +236,18 @@ export default function Login() {
                 If an account exists for <strong>{fpEmail}</strong>, we've emailed reset
                 instructions. Check your inbox (and spam) for a temporary password, then sign
                 in — you'll be asked to set a new password.
+              </p>
+              {/* The response above is deliberately the same whether or not the
+                  account exists, so nobody can use this screen to discover which
+                  addresses are registered. The cost is that a typo looks exactly
+                  like success: one user tried "sydulu.vemula@" (not on file),
+                  got this message, no email, and then failed to sign in five
+                  more times before trying the right address. This nudges them to
+                  check the spelling without confirming anything either way. */}
+              <p className="text-sm text-gray-500 leading-relaxed mt-3">
+                Nothing after a few minutes? Check the spelling — we can only email an
+                address we already have on file. Try your other work or personal address,
+                or ask HR which one your account uses.
               </p>
               <div className="flex justify-end pt-4">
                 <button
