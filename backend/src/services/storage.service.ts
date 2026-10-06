@@ -354,22 +354,68 @@ export async function renderDocument(
 
   const buffer = fileData;
 
-  // DOCX → HTML via mammoth (preserves headings, bold, lists, tables).
+  // Sniff the container instead of trusting the file extension.
+  //
+  // mammoth reads ONLY .docx — Office Open XML, which is a zip archive. The
+  // legacy .doc format is an entirely different thing (an OLE2 compound file),
+  // and handing one to mammoth throws. Both extensions were being routed to it,
+  // so every .doc failed preview with "Could not load this document" while
+  // downloading worked, because downloading just streams the bytes back.
+  // Reported against "H-4 Beneficiary Questionnaire_Gouthami.doc".
+  //
+  // Extensions also lie in both directions — a .docx saved as .doc, or a .doc
+  // that is really RTF — so the magic bytes decide, not the name.
+  // Bounds match what each check actually reads (bytes 0-1 and 0-3), so a file
+  // that is exactly header-length is still classified rather than skipped.
+  const isZip = buffer.length >= 2
+    && buffer[0] === 0x50 && buffer[1] === 0x4b;                       // "PK"  → OOXML
+  const isOle2 = buffer.length >= 4
+    && buffer[0] === 0xd0 && buffer[1] === 0xcf
+    && buffer[2] === 0x11 && buffer[3] === 0xe0;                       // legacy Office
+
+  // Word → HTML via mammoth (preserves headings, bold, lists, tables).
   if (ext === 'docx' || ext === 'doc') {
-    const result = await mammoth.convertToHtml({ buffer });
-    return { html: wrapHtml(result.value, name), kind: 'docx', name };
+    if (isZip) {
+      try {
+        const result = await mammoth.convertToHtml({ buffer });
+        return { html: wrapHtml(result.value, name), kind: 'docx', name };
+      } catch (err) {
+        // Corrupt or unexpected contents: fall through to the download prompt
+        // rather than failing the whole dialog.
+        console.warn('[renderDocument] mammoth failed for', name, err);
+        return { html: '', kind: 'passthrough', name };
+      }
+    }
+    // Legacy .doc (or anything else that is not OOXML): nothing here can render
+    // it, so return the download prompt instead of an error.
+    return { html: '', kind: 'passthrough', name };
   }
 
-  // XLSX / XLS / CSV → HTML table via SheetJS.
+  // Excel → HTML table via SheetJS. SheetJS DOES read legacy .xls, so OLE2 is
+  // fine here — unlike Word above.
   if (['xlsx', 'xls', 'csv', 'ods'].includes(ext)) {
-    const wb = XLSX.read(buffer, { type: 'buffer' });
-    let html = '';
-    for (const sheetName of wb.SheetNames) {
-      const ws = wb.Sheets[sheetName];
-      const table = XLSX.utils.sheet_to_html(ws, { id: `sheet-${sheetName}`, editable: false });
-      html += `<h3 style="margin:1em 0 0.3em;font-family:sans-serif;font-size:13px;color:#555">${escHtml(sheetName)}</h3>${table}`;
+    try {
+      const wb = XLSX.read(buffer, { type: 'buffer' });
+      let html = '';
+      for (const sheetName of wb.SheetNames) {
+        const ws = wb.Sheets[sheetName];
+        const table = XLSX.utils.sheet_to_html(ws, { id: `sheet-${sheetName}`, editable: false });
+        html += `<h3 style="margin:1em 0 0.3em;font-family:sans-serif;font-size:13px;color:#555">${escHtml(sheetName)}</h3>${table}`;
+      }
+      return { html: wrapHtml(html, name, true), kind: 'sheet', name };
+    } catch (err) {
+      console.warn('[renderDocument] sheet parse failed for', name, err);
+      return { html: '', kind: 'passthrough', name };
     }
-    return { html: wrapHtml(html, name, true), kind: 'sheet', name };
+  }
+
+  // A file whose extension is unknown but whose bytes are OOXML — e.g. a .docx
+  // renamed to something else — is still worth trying.
+  if (isZip && !isOle2) {
+    try {
+      const result = await mammoth.convertToHtml({ buffer });
+      if (result.value.trim()) return { html: wrapHtml(result.value, name), kind: 'docx', name };
+    } catch { /* not a Word file; fall through */ }
   }
 
   // Plain text / markdown / JSON / XML → escaped <pre>.

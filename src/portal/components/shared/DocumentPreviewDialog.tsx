@@ -161,6 +161,18 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
               <p className="text-xs text-muted-foreground">
                 .{(fileName.split('.').pop() ?? 'unknown')} files cannot be previewed.
               </p>
+              {/* Legacy Office formats are the common case and the one the
+                  uploader can actually do something about: .doc/.xls/.ppt are
+                  pre-2007 binary formats that no browser-side renderer reads.
+                  Saying so beats leaving people to wonder if the file is
+                  broken — it downloads and opens perfectly well. */}
+              {['doc', 'xls', 'ppt'].includes((fileName.split('.').pop() ?? '').toLowerCase()) && (
+                <p className="text-xs text-muted-foreground">
+                  This is an older Office format. Re-saving it as
+                  {' '}<strong>.{(fileName.split('.').pop() ?? '').toLowerCase()}x</strong>{' '}
+                  and re-uploading will make it previewable.
+                </p>
+              )}
               <Button onClick={handleDownload} disabled={!downloadUrl} className="gap-2 mt-2">
                 <Download className="h-4 w-4" /> Download to view
               </Button>
