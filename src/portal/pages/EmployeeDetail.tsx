@@ -203,7 +203,12 @@ export default function EmployeeDetail() {
           flex-wrap lets the identity block and the action buttons sit side by
           side when there is room and stack when there is not, instead of the
           buttons squeezing the name down to an ellipsis. */}
-      <div className="sticky top-14 md:top-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-100 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+      {/* Sticky from sm up only. All eight actions wrap onto as many rows as
+          they need so none is hidden, which on a phone makes the header ~40% of
+          the viewport — sticky at that size leaves no room to read the page, so
+          below sm it scrolls away normally. top-14 clears the fixed mobile top
+          bar on tablets, which is h-14 and md:hidden. */}
+      <div className="max-sm:static sticky top-14 md:top-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-100 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
         {/* basis-full on small screens so the identity block owns a whole row
             and the name is never competing with the buttons for width. */}
         <div className="flex items-center gap-3 min-w-0 basis-full lg:basis-auto lg:flex-1">
@@ -270,12 +275,19 @@ export default function EmployeeDetail() {
             </div>
           </div>
         </div>
-        {/* On phones these are a single horizontally scrollable strip, not eight
-            stacked full-width buttons — stacked, they filled the viewport, and a
-            sticky header that leaves no room for the page is worse than no
-            sticky header. -mx/px pull the strip to the screen edges so the
-            scroll affordance is obvious. From sm up they wrap normally. */}
-        <div className="flex flex-nowrap overflow-x-auto sm:overflow-x-visible sm:flex-wrap justify-start sm:justify-end min-w-0 basis-full lg:basis-auto gap-2 -mx-3 px-3 sm:mx-0 sm:px-0 [&>*]:flex-shrink-0 [&>*]:w-auto">
+        {/* Wraps onto as many rows as it needs, so every action is visible. On
+            phones it becomes a single horizontally scrollable strip instead —
+            stacked full-width they filled the whole viewport, and a sticky
+            header that leaves no room for the page is worse than none.
+
+            NOTE the arbitrary [flex-wrap:…] rather than Tailwind's flex-wrap /
+            flex-nowrap: the legacy Bootstrap stylesheet this app still loads
+            declares `.flex-nowrap{flex-wrap:nowrap!important}`, and that
+            !important beat `sm:flex-wrap`. The row therefore never wrapped at
+            ANY width — measured 8 buttons with 1 cut off at 1600px, rising to 5
+            cut off at 768px, which is the "options are missing" report. Using
+            class names Bootstrap does not define side-steps it entirely. */}
+        <div className="flex [flex-wrap:wrap] justify-start sm:justify-end min-w-0 basis-full lg:basis-auto gap-2 [&>*]:flex-shrink-0 [&>*]:w-auto">
           {(employee.status === 'onboarding' || isPlainInactive) && canManage && (() => {
             const onboardingComplete = isPlainInactive || (employee.onboarding?.complete === true);
             const pct = employee.onboarding?.percent ?? 0;
