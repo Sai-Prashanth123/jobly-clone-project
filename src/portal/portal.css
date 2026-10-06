@@ -160,8 +160,22 @@ input[type="password"]::-ms-clear {
   /* Horizontal-overflow guard lives here, not on body/html/#root — see the
      matching comment in src/index.css for why (nested-scroll-container
      conflict with html's own explicit overflow-y, which broke Radix
-     Select's scroll lock). */
-  overflow-x: hidden;
+     Select's scroll lock).
+
+     `clip`, NOT `hidden`. Per spec, when one axis is `hidden` and the other is
+     `visible`, the visible one computes to `auto` — so `overflow-x: hidden`
+     silently made this element `overflow: hidden auto`, i.e. a scroll
+     container. Every `position: sticky` inside the portal then stuck to THIS
+     element rather than the viewport, and because it is as tall as its content
+     it never scrolls internally, so sticky headers simply scrolled away.
+     Measured on the employee page: the header went from top:139 to top:-460
+     after a 600px scroll.
+
+     `clip` pairs with `visible` without forcing `auto` and creates no scroll
+     container, so it guards horizontal overflow exactly as before while
+     letting sticky resolve against the viewport. `main` already uses
+     overflow-x-clip for the same reason. */
+  overflow-x: clip;
 }
 
 /* ── Keyframe Animations ─────────────────────────────────────── */

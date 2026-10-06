@@ -128,6 +128,11 @@ export default function EmployeeDetail() {
     return null;
   }
 
+  // Built once: used for the heading, its tooltip and the avatar, which were
+  // each assembling it slightly differently.
+  const fullName = [employee.firstName, employee.middleName, employee.lastName]
+    .filter(Boolean).join(' ');
+
   const empAssignments = assignmentsData?.data ?? [];
   const empTimesheets = timesheetsData?.data ?? [];
   const totalHours = empTimesheets.reduce((s, t) => s + t.totalHours, 0);
@@ -192,21 +197,44 @@ export default function EmployeeDetail() {
           </p>
         </div>
       )}
-      <div className="sticky top-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-100 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
-        <div className="flex items-center gap-3 min-w-0">
+      {/* Sticky header. Needs `.portal-scope` to use overflow-x:clip rather
+          than hidden — see the note in portal.css; `hidden` made that element a
+          scroll container and this stuck to it instead of the viewport.
+          flex-wrap lets the identity block and the action buttons sit side by
+          side when there is room and stack when there is not, instead of the
+          buttons squeezing the name down to an ellipsis. */}
+      <div className="sticky top-14 md:top-0 z-20 -mx-3 sm:-mx-4 md:-mx-6 px-3 sm:px-4 md:px-6 py-3 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/85 border-b border-gray-100 flex flex-wrap items-start justify-between gap-3 sm:gap-4">
+        {/* basis-full on small screens so the identity block owns a whole row
+            and the name is never competing with the buttons for width. */}
+        <div className="flex items-center gap-3 min-w-0 basis-full lg:basis-auto lg:flex-1">
           <Button variant="ghost" size="sm" onClick={() => navigate('/portal/employees')} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
-          {/* Profile photo, or a default human silhouette when none is set */}
-          <EmployeeAvatar
-            photoUrl={employee.profilePhotoUrl}
-            name={`${employee.firstName} ${employee.lastName}`}
-            size="md"
-          />
-          <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-semibold truncate">
-              {employee.firstName}{employee.middleName ? ` ${employee.middleName}` : ''} {employee.lastName}
+          {/* Profile photo, or a default human silhouette when none is set.
+              Hidden on phones: it costs ~60px of a 390px row, which is the
+              difference between the name fitting on two lines and four. */}
+          <div className="hidden sm:block flex-shrink-0">
+            <EmployeeAvatar
+              photoUrl={employee.profilePhotoUrl}
+              name={fullName}
+              size="md"
+            />
+          </div>
+          <div className="min-w-0 flex-1">
+            {/* Wraps instead of truncating. `truncate` forces a single line, and
+                with the action buttons taking most of the row the name box was
+                down to 289px against 647px of text — so a long name rendered as
+                "C…", which is useless on a page whose whole purpose is telling
+                you which employee you are looking at. Long single tokens still
+                need break-words so they cannot push the layout wide. */}
+            {/* break-words, NOT overflow-wrap:anywhere. `anywhere` also shrinks
+                the flex item's min-content width, so the box collapsed below the
+                longest word and split "Subrahmanyam" into "Subrahmanya / m".
+                `break-word` keeps the longest word intact unless it genuinely
+                cannot fit. */}
+            <h1 className="text-lg sm:text-xl md:text-2xl font-semibold leading-tight break-words" title={fullName}>
+              {fullName}
             </h1>
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 mt-1.5">
               <span className="text-xs font-mono text-blue-600 whitespace-nowrap">{employee.displayId ?? employee.id.slice(0, 8)}</span>
@@ -242,7 +270,12 @@ export default function EmployeeDetail() {
             </div>
           </div>
         </div>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:justify-end min-w-0 gap-2 [&>*]:w-full sm:[&>*]:w-auto">
+        {/* On phones these are a single horizontally scrollable strip, not eight
+            stacked full-width buttons — stacked, they filled the viewport, and a
+            sticky header that leaves no room for the page is worse than no
+            sticky header. -mx/px pull the strip to the screen edges so the
+            scroll affordance is obvious. From sm up they wrap normally. */}
+        <div className="flex flex-nowrap overflow-x-auto sm:overflow-x-visible sm:flex-wrap justify-start sm:justify-end min-w-0 basis-full lg:basis-auto gap-2 -mx-3 px-3 sm:mx-0 sm:px-0 [&>*]:flex-shrink-0 [&>*]:w-auto">
           {(employee.status === 'onboarding' || isPlainInactive) && canManage && (() => {
             const onboardingComplete = isPlainInactive || (employee.onboarding?.complete === true);
             const pct = employee.onboarding?.percent ?? 0;
