@@ -586,8 +586,25 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
 
 export async function deleteInvoice(id: string) {
   const inv = await getInvoice(id);
-  if (inv.status !== 'draft') {
-    throw new ForbiddenError('Only draft invoices can be deleted');
+
+  // Previously this allowed drafts only, which meant an invoice sent in error
+  // could never be removed — the Delete button simply never appeared for it.
+  // The real thing worth protecting is not the draft/sent distinction but
+  // MONEY: an invoice with payments against it is an accounting record, and
+  // deleting it would orphan those payment rows and silently change reported
+  // revenue. Anything with no payments recorded is just a document, and
+  // removing a mistake is reasonable.
+  const { data: pays, error: payErr } = await supabaseAdmin
+    .from('payments').select('id, amount').eq('invoice_id', id);
+  if (payErr) throw payErr;
+
+  if (pays && pays.length > 0) {
+    const total = pays.reduce((s: number, p: { amount: number }) => s + Number(p.amount || 0), 0);
+    throw new ForbiddenError(
+      `This invoice has ${pays.length} payment${pays.length === 1 ? '' : 's'} recorded against it `
+      + `(${total.toFixed(2)}). Remove the payments first if it really needs deleting — otherwise `
+      + 'it is a financial record and should be kept.',
+    );
   }
 
   // Best-effort: remove the cached PDF from Supabase Storage so deleted

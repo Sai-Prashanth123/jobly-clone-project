@@ -137,10 +137,16 @@ export default function InvoiceDetail() {
           <Button variant="outline" size="sm" onClick={() => navigate(`/portal/invoices/${invoice.id}/edit`)}>
             Edit
           </Button>
-          {invoice.status === 'draft' && user?.role === 'admin' && (
+          {/* Was draft-only, so an invoice sent in error could never be removed
+              — the button simply never appeared. The server now refuses only
+              when PAYMENTS exist against the invoice, which is the thing worth
+              protecting; everything else is just a document. Shown to finance
+              as well as admin, matching what the API actually allows. */}
+          {(user?.role === 'admin' || user?.role === 'finance') && (
             <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
+              title="Delete this invoice"
               className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
-              <Trash2 className="h-4 w-4" />
+              <Trash2 className="h-4 w-4" /> Delete
             </Button>
           )}
         </div>
@@ -243,7 +249,16 @@ export default function InvoiceDetail() {
         open={deleteOpen}
         onOpenChange={setDeleteOpen}
         title="Delete Invoice?"
-        description={`Delete ${invoice.invoiceNumber}? This cannot be undone.`}
+        description={
+          invoice.status === 'draft'
+            ? `Delete ${invoice.invoiceNumber}? This cannot be undone.`
+            // A sent invoice the client may already have seen is a different
+            // decision from binning a draft, so say so rather than using the
+            // same bland wording for both.
+            : `Delete ${invoice.invoiceNumber}? It is marked "${invoice.status}", so the client may `
+              + 'already have received it. The invoice, its PDF and any attachments are removed '
+              + 'permanently. If payments have been recorded against it the server will refuse.'
+        }
         confirmLabel="Delete Invoice"
         loading={deleteInvoice.isPending}
         onConfirm={async () => {

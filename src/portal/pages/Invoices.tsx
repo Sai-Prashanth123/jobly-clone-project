@@ -23,7 +23,8 @@ export default function Invoices() {
   const [deleteTarget, setDeleteTarget] = useState<Invoice | null>(null);
   const [selected, setSelected] = useState<Invoice[]>([]);
   const canEdit = user?.role === 'admin' || user?.role === 'finance';
-  const canDelete = user?.role === 'admin';
+  // Matches the API, which allows finance as well as admin.
+  const canDelete = user?.role === 'admin' || user?.role === 'finance';
 
   const sendSelected = async () => {
     const ids = selected.map(i => i.id);
@@ -122,7 +123,10 @@ export default function Invoices() {
           >
             <Pencil className="h-3.5 w-3.5" />
           </Button>
-          {canDelete && i.status === 'draft' && (
+          {/* No longer draft-only: an invoice sent in error could never be
+              removed because the button never appeared. The server refuses
+              only when payments are recorded against it. */}
+          {canDelete && (
             <Button
               variant="ghost"
               size="icon"
