@@ -1,3 +1,4 @@
+import { roleLabel } from '@/portal/lib/roleLabels';
 import { useMemo } from 'react';
 import { Briefcase, Clock, CheckCircle, XCircle, PlusCircle, Inbox, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -94,7 +95,7 @@ export function OperationsDashboard() {
   return (
     <div className="space-y-6">
       <DashboardHeader
-        eyebrow="Operations"
+        eyebrow={roleLabel('operations')}
         title="Assignments & Approvals"
         subtitle="Approval velocity, active assignments and timesheets awaiting review."
       />

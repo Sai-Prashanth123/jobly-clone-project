@@ -65,7 +65,7 @@ export function useCreateSupportTicket() {
     },
     onSuccess: (created) => {
       qc.setQueryData(['support-tickets', created.id], created);
-      qc.invalidateQueries({ queryKey: ['support-tickets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['support-tickets'] });
     },
   });
 }
@@ -79,7 +79,7 @@ export function useResolveSupportTicket(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['support-tickets', id], updated);
-      qc.invalidateQueries({ queryKey: ['support-tickets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['support-tickets'] });
     },
   });
 }

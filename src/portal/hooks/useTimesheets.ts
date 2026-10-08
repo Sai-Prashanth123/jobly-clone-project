@@ -136,7 +136,7 @@ export function useCreateTimesheet() {
     },
     onSuccess: (created) => {
       qc.setQueryData(['timesheets', created.id], created);
-      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
     },
   });
 }
@@ -159,7 +159,7 @@ export function useUpdateTimesheetEntries(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['timesheets', id], updated);
-      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
     },
   });
 }
@@ -178,7 +178,7 @@ export function useUploadWeeklyClientProof(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['timesheets', id], updated);
-      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
     },
   });
 }
@@ -192,7 +192,7 @@ export function useDeleteWeeklyClientProof(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['timesheets', id], updated);
-      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
     },
   });
 }
@@ -206,8 +206,8 @@ export function usePatchTimesheetStatus(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['timesheets', id], updated);
-      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
-      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       qc.invalidateQueries({ queryKey: ['nav-badges'] });
     },
   });
@@ -222,8 +222,8 @@ export function useReopenTimesheet(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['timesheets', id], updated);
-      qc.invalidateQueries({ queryKey: ['timesheets'], refetchType: 'none' });
-      qc.invalidateQueries({ queryKey: ['reports'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['timesheets'] });
+      qc.invalidateQueries({ queryKey: ['reports'] });
       qc.invalidateQueries({ queryKey: ['nav-badges'] });
     },
   });

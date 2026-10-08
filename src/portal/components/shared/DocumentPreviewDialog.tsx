@@ -49,12 +49,52 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
     if (!wasOpenRef.current) return;
     wasOpenRef.current = false;
     const target = scrollYRef.current;
-    // Two frames: the first lets Radix unmount, the second lets it remove the
-    // scroll-lock styles. Restoring any earlier is simply overwritten.
-    const outer = requestAnimationFrame(() => {
-      requestAnimationFrame(() => window.scrollTo(0, target));
-    });
-    return () => cancelAnimationFrame(outer);
+    if (target <= 0) return;
+
+    // Keep restoring until it sticks, rather than guessing how many frames
+    // Radix needs. The previous version used exactly two requestAnimationFrames
+    // — enough on a fast machine, not enough when the unmount and the
+    // scroll-lock cleanup land in different frames, which is why the page still
+    // jumped to the top for some people. Radix removes `overflow:hidden` (and
+    // on some paths a `position:fixed`) from <body> on close, and the browser
+    // resets scrollY as that happens; whichever frame that falls on, one of
+    // these attempts lands after it.
+    //
+    // Gives up after ~500ms so this can never fight a user who has deliberately
+    // scrolled somewhere else in the meantime.
+    let cancelled = false;
+    let raf = 0;
+    const deadline = performance.now() + 500;
+
+    const restore = () => {
+      if (cancelled) return;
+      if (Math.abs(window.scrollY - target) > 2) {
+        // behavior:'instant' is essential. The legacy Bootstrap stylesheet sets
+        // `scroll-behavior: smooth` on :root, so a plain scrollTo ANIMATES —
+        // and re-issuing it each frame kept restarting the animation, which
+        // sailed past the target (measured: asked for 900, landed on 1036).
+        // Jumping straight there also looks right: the user never perceives
+        // having left the spot.
+        window.scrollTo({ top: target, left: 0, behavior: 'instant' as ScrollBehavior });
+      }
+      if (performance.now() < deadline) raf = requestAnimationFrame(restore);
+    };
+    raf = requestAnimationFrame(restore);
+
+    // Stop early the moment the user scrolls themselves — otherwise the loop
+    // would drag them back for up to half a second.
+    const onUserScroll = () => {
+      if (Math.abs(window.scrollY - target) > 40) { cancelled = true; }
+    };
+    window.addEventListener('wheel', onUserScroll, { passive: true });
+    window.addEventListener('touchmove', onUserScroll, { passive: true });
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      window.removeEventListener('wheel', onUserScroll);
+      window.removeEventListener('touchmove', onUserScroll);
+    };
   }, [open]);
 
   useEffect(() => {

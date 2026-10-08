@@ -1,3 +1,4 @@
+import { roleLabel } from '@/portal/lib/roleLabels';
 import { useState, useRef, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -352,7 +353,7 @@ export function PortalSidebar() {
               {user?.name ?? 'User'}
             </p>
             <p className="text-[11px] text-gray-400 truncate capitalize mt-0.5">
-              {user?.role ?? 'member'} · {user?.email}
+              {roleLabel(user?.role)} · {user?.email}
             </p>
           </div>
         </div>

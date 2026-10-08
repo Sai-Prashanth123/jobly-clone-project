@@ -1,3 +1,4 @@
+import { roleLabel } from '@/portal/lib/roleLabels';
 import { useState, useEffect } from 'react';
 import { Plus, Pencil, Trash2, AlertCircle, Info, Calendar, BookOpen, Pin, PinOff } from 'lucide-react';
 import { toast } from 'sonner';
@@ -31,7 +32,7 @@ const TYPE_OPTIONS: { value: AnnouncementType; label: string; icon: React.ReactN
 const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
   { value: 'admin',      label: 'Admin' },
   { value: 'hr',         label: 'HR' },
-  { value: 'operations', label: 'Operations' },
+  { value: 'operations', label: roleLabel('operations') },
   { value: 'finance',    label: 'Finance' },
   { value: 'employee',   label: 'Employee' },
 ];

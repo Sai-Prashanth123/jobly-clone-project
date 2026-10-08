@@ -109,7 +109,7 @@ export function useCreateClient() {
     },
     onSuccess: (created) => {
       qc.setQueryData(['clients', created.id], created);
-      qc.invalidateQueries({ queryKey: ['clients'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['clients'] });
     },
   });
 }
@@ -123,7 +123,7 @@ export function useUpdateClient(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['clients', id], updated);
-      qc.invalidateQueries({ queryKey: ['clients'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['clients'] });
     },
   });
 }
@@ -145,7 +145,7 @@ export function usePatchOnboardingStatus(id: string) {
     },
     onSuccess: (updated) => {
       qc.setQueryData(['clients', id], updated);
-      qc.invalidateQueries({ queryKey: ['clients'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['clients'] });
     },
   });
 }

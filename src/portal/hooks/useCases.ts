@@ -198,7 +198,7 @@ export function useCreateCase() {
     },
     onSuccess: (created) => {
       qc.setQueryData(['cases', created.id], created);
-      qc.invalidateQueries({ queryKey: ['cases'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['cases'] });
     },
   });
 }
@@ -212,7 +212,7 @@ export function useUpdateCase(id: string) {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['cases', id] });
-      qc.invalidateQueries({ queryKey: ['cases'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['cases'] });
     },
   });
 }

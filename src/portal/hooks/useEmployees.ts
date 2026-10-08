@@ -213,7 +213,7 @@ export function useUpdateEmployee(id: string) {
         documents: updated.documents?.length ? updated.documents : (old?.documents ?? []),
       }));
       qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
     meta: { silentError: true },
   });
@@ -272,7 +272,7 @@ export function usePlaceOnLeave(id: string) {
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
       qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }
@@ -288,7 +288,7 @@ export function useReturnFromLeave(id: string) {
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
       qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }
@@ -305,7 +305,7 @@ export function useTerminateEmployee(id: string) {
     onSuccess: (updated) => {
       qc.setQueryData(['employees', id], updated);
       qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }
@@ -328,7 +328,7 @@ export function useRehireEmployee(id: string) {
     onSuccess: ({ employee }) => {
       qc.setQueryData(['employees', id], employee);
       qc.invalidateQueries({ queryKey: ['employees'] });
-      qc.invalidateQueries({ queryKey: ['assignments'], refetchType: 'none' });
+      qc.invalidateQueries({ queryKey: ['assignments'] });
     },
   });
 }

@@ -1,3 +1,4 @@
+import { roleLabel } from '@/portal/lib/roleLabels';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -170,7 +171,7 @@ function UsersTab() {
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="hr">HR</SelectItem>
-                            <SelectItem value="operations">Operations</SelectItem>
+                            <SelectItem value="operations">{roleLabel('operations')}</SelectItem>
                             <SelectItem value="finance">Finance</SelectItem>
                             <SelectItem value="employee">Employee</SelectItem>
                             <SelectItem value="legal">Legal</SelectItem>
