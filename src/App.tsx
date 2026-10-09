@@ -11,6 +11,7 @@ import About from "./pages/About.tsx";
 import CareerGuidance from "./pages/CareerGuidance.tsx";
 import StaffingConsulting from "./pages/StaffingConsulting.tsx";
 import SupplyChainPlanning from "./pages/SupplyChainPlanning.tsx";
+import Guidewire from "./pages/Guidewire.tsx";
 import Clients from "./pages/Clients.tsx";
 import Contact from "./pages/Contact.tsx";
 import Technology from "./pages/Technology.tsx";
@@ -38,6 +39,7 @@ const App = () => (
           <Route path="/career-guidance" element={<CareerGuidance />} />
           <Route path="/staffing-and-consulting" element={<StaffingConsulting />} />
           <Route path="/kinaxis" element={<SupplyChainPlanning />} />
+          <Route path="/guidewire" element={<Guidewire />} />
           {/* The page shipped briefly at this path before being renamed to
               /kinaxis. Kept as a redirect so any link already shared still
               lands somewhere, rather than 404ing. */}

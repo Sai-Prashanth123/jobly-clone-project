@@ -6,13 +6,15 @@ const services = [
   { img: '/assets/img/home/our2.webp', title: 'Consulting Services', desc: 'Outcome-driven workforce strategy, talent operations and compliance advisory for growing teams.', href: '/career-guidance' },
   { img: '/assets/img/home/our-portfolio-home__item-2.webp', title: 'Staffing And Consulting', desc: 'Contract, contract-to-hire and direct placement — sourced, screened and placed by people who do this every day.', href: '/staffing-and-consulting' },
   { img: '/assets/img/project-details/1a.webp', title: 'Kinaxis', desc: 'Kinaxis implementation, upgrades and support — plus the S&OP, demand and supply planning around it.', href: '/kinaxis' },
+  { img: '/assets/img/project-details/1c.webp', title: 'Guidewire', desc: 'PolicyCenter, ClaimCenter and BillingCenter delivery, and the Cloud Data Access analytics layer behind them.', href: '/guidewire' },
 ];
 
 const OurServices = () => {
   const ref1 = useScrollReveal('animate__fadeInUp', 0.15, '0s');
   const ref2 = useScrollReveal('animate__fadeInUp', 0.15, '0.15s');
   const ref3 = useScrollReveal('animate__fadeInUp', 0.15, '0.3s');
-  const refs = [ref1, ref2, ref3];
+  const ref4 = useScrollReveal('animate__fadeInUp', 0.15, '0.45s');
+  const refs = [ref1, ref2, ref3, ref4];
   const sectionRef = useInViewReveal<HTMLElement>();
   return (
   <section ref={sectionRef} className="reveal our-portfolio-home pb-xs-80 pt-xs-80 pt-sm-100 pb-sm-100 pt-md-100 pb-md-100 pt-80 pb-80 overflow-hidden">
@@ -29,7 +31,7 @@ const OurServices = () => {
       </div>
       <div className="row mb-minus-30">
         {services.map((s, i) => (
-          <div key={s.title} className="col-xl-4 col-md-6 col-12" ref={refs[i]}>
+          <div key={s.title} className="col-xl-3 col-lg-6 col-md-6 col-12" ref={refs[i]}>
             <div className="our-portfolio-home__item hover-lift mb-30">
               <div className="featured-thumb">
                 <div className="media overflow-hidden">

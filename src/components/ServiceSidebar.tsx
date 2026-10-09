@@ -21,6 +21,9 @@ const ServiceSidebar = ({ active, haveAnyImg }: ServiceSidebarProps) => {
             <li className={active === '/kinaxis' ? 'active' : ''}>
               <Link to="/kinaxis">Kinaxis <i className="fas fa-long-arrow-alt-right"></i></Link>
             </li>
+            <li className={active === '/guidewire' ? 'active' : ''}>
+              <Link to="/guidewire">Guidewire <i className="fas fa-long-arrow-alt-right"></i></Link>
+            </li>
           </ul>
         </div>
       </div>

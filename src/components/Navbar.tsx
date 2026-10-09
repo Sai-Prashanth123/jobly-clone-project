@@ -5,6 +5,7 @@ const servicesSub = [
   { label: 'Consulting Services', path: '/career-guidance' },
   { label: 'Staffing And Consulting Services', path: '/staffing-and-consulting' },
   { label: 'Kinaxis', path: '/kinaxis' },
+  { label: 'Guidewire', path: '/guidewire' },
 ];
 
 const Navbar = () => {
