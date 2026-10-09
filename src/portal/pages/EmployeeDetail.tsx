@@ -1,3 +1,4 @@
+import { formatAddress } from '@/portal/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -167,7 +168,11 @@ export default function EmployeeDetail() {
     employee.permanentAddress.street || employee.permanentAddress.city || employee.permanentAddress.state
   );
   const ec = employee.emergencyContact;
-  const hasEC = !!ec && (ec.name || ec.phone);
+  // Any emergency-contact detail is worth showing. Gating on name/phone alone
+  // meant a contact with only an address rendered nothing — the card vanished
+  // and the data looked lost rather than merely partial.
+  const hasEC = !!ec && !!(ec.name || ec.phone || ec.relationship || ec.altPhone
+    || ec.address || ec.city || ec.state || ec.zip);
   const identityDocs = (employee.identityDocuments ?? []).filter(d => (d.number ?? '').trim() !== '');
   const educationList = employee.education ?? [];
   const workList = employee.workHistory ?? [];
@@ -682,10 +687,16 @@ export default function EmployeeDetail() {
               <Field label="Relationship" value={ec!.relationship} />
               <Field label="Phone" value={ec!.phone} />
               <Field label="Alternate Phone" value={ec!.altPhone} />
-              {ec!.address && (
+              {/* Was `{ec.address && ...}` rendering the street alone, so city,
+                  state and zip were collected during onboarding and then never
+                  shown. The guard was wrong too: an address with a city but no
+                  street line rendered nothing at all. */}
+              {formatAddress(ec!.address, ec!.city, ec!.state, ec!.zip) && (
                 <div className="sm:col-span-2">
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</p>
-                  <p className="text-sm text-gray-900 mt-0.5">{ec!.address}</p>
+                  <p className="text-sm text-gray-900 mt-0.5">
+                    {formatAddress(ec!.address, ec!.city, ec!.state, ec!.zip)}
+                  </p>
                 </div>
               )}
             </CardContent>

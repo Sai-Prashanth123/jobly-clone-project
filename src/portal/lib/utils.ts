@@ -184,3 +184,19 @@ export function computeDiscount(
   const raw = discountType === 'percentage' ? subtotal * (discountValue / 100) : discountValue;
   return Math.round(Math.min(Math.max(raw, 0), subtotal) * 100) / 100;
 }
+
+/**
+ * Join address parts into one readable line, skipping the blanks.
+ *
+ * Added because the emergency-contact card rendered ONLY the street and
+ * silently dropped city, state and zip — employees filled them in and HR
+ * could not see them. The same card in the legal view composed the full
+ * address correctly, and the present-address block three hundred lines up in
+ * the same file did too; the emergency block was simply an older copy that
+ * never caught up. One function so the next field added shows up everywhere.
+ */
+export function formatAddress(
+  ...parts: (string | null | undefined)[]
+): string {
+  return parts.map(p => (p ?? '').trim()).filter(Boolean).join(', ');
+}

@@ -80,7 +80,14 @@ export function mapEmployee(raw: any): Employee {
           country: raw.permanent_address_country ?? 'US',
         }
       : undefined,
-    emergencyContact: (raw.emergency_contact_name || raw.emergency_contact_phone)
+    // Built when ANY emergency field is present. Gating on name/phone alone
+    // discarded the whole object — including a filled-in address — so the card
+    // never rendered and the data looked lost rather than partial. The UI
+    // decides what to show; the mapper should not silently drop records.
+    emergencyContact: (raw.emergency_contact_name || raw.emergency_contact_phone
+      || raw.emergency_contact_relationship || raw.emergency_contact_alt_phone
+      || raw.emergency_contact_address || raw.emergency_contact_city
+      || raw.emergency_contact_state || raw.emergency_contact_zip)
       ? {
           name: raw.emergency_contact_name ?? '',
           relationship: raw.emergency_contact_relationship ?? '',

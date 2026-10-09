@@ -1,3 +1,4 @@
+import { formatAddress } from '@/portal/lib/utils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -62,7 +63,11 @@ export default function MyProfile() {
     employee.permanentAddress.street || employee.permanentAddress.city || employee.permanentAddress.state
   );
   const ec = employee.emergencyContact;
-  const hasEC = !!ec && (ec.name || ec.phone);
+  // Any emergency-contact detail is worth showing. Gating on name/phone alone
+  // meant a contact with only an address rendered nothing — the card vanished
+  // and the data looked lost rather than merely partial.
+  const hasEC = !!ec && !!(ec.name || ec.phone || ec.relationship || ec.altPhone
+    || ec.address || ec.city || ec.state || ec.zip);
   const identityDocs = (employee.identityDocuments ?? []).filter(
     d => (d.number ?? '').trim() !== '' || (d.expiry ?? '').trim() !== ''
   );
@@ -201,10 +206,14 @@ export default function MyProfile() {
               <Field label="Relationship" value={ec!.relationship} />
               <Field label="Phone" value={ec!.phone} />
               <Field label="Alternate Phone" value={ec!.altPhone} />
-              {ec!.address && (
+              {/* Same fix as EmployeeDetail: the street alone was shown, so the
+                  employee could not see the city/state/zip they had entered. */}
+              {formatAddress(ec!.address, ec!.city, ec!.state, ec!.zip) && (
                 <div className="sm:col-span-2">
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Address</p>
-                  <p className="text-sm text-gray-900 mt-0.5">{ec!.address}</p>
+                  <p className="text-sm text-gray-900 mt-0.5">
+                    {formatAddress(ec!.address, ec!.city, ec!.state, ec!.zip)}
+                  </p>
                 </div>
               )}
             </CardContent>
