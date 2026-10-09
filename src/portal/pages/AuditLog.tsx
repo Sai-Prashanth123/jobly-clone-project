@@ -1,3 +1,4 @@
+import { Pagination } from '../components/shared/Pagination';
 import { useState } from 'react';
 import { Shield, Search, ChevronLeft, ChevronRight, Loader2, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -89,12 +90,13 @@ export default function AuditLog() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="flex items-center justify-between px-4 py-3 border-t">
-            <span className="text-sm text-gray-500">Page {page} of {totalPages}</span>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}><ChevronRight className="h-4 w-4" /></Button>
-            </div>
+          <div className="px-4 py-3 border-t">
+            <Pagination
+              page={page}
+              totalPages={totalPages}
+              onPageChange={setPage}
+              summary={`Page ${page} of ${totalPages} · ${total.toLocaleString()} entries`}
+            />
           </div>
         )}
       </div>

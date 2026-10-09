@@ -1,3 +1,4 @@
+import { Pagination } from '../components/shared/Pagination';
 import { roleLabel } from '@/portal/lib/roleLabels';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
@@ -373,18 +374,13 @@ function ActivityLogsTab() {
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between mt-4 pt-4 border-t">
-              <span className="text-xs text-muted-foreground">
-                Page {page} of {totalPages} ({total} entries)
-              </span>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <Button variant="outline" size="sm" onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
+            <div className="mt-4 pt-4 border-t">
+              <Pagination
+                page={page}
+                totalPages={totalPages}
+                onPageChange={setPage}
+                summary={`Page ${page} of ${totalPages} (${total} entries)`}
+              />
             </div>
           )}
         </CardContent>

@@ -1,3 +1,4 @@
+import { Pagination } from './Pagination';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -375,30 +376,14 @@ export function DataTable<T>({
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* Pagination — numbered, so page 9 is one click rather than six. */}
       {sorted.length > pageSize && (
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-sm text-gray-600">
-          <span className="text-xs sm:text-sm">
-            Showing {start + 1}–{Math.min(start + pageSize, sorted.length)} of {sorted.length}
-          </span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline" size="sm"
-              disabled={safePage === 1}
-              onClick={() => setPage(p => Math.max(1, p - 1))}
-            >
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="px-2 text-xs sm:text-sm">Page {safePage} of {totalPages}</span>
-            <Button
-              variant="outline" size="sm"
-              disabled={safePage === totalPages}
-              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            >
-              <ChevronRight className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
+        <Pagination
+          page={safePage}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          summary={`Showing ${start + 1}–${Math.min(start + pageSize, sorted.length)} of ${sorted.length}`}
+        />
       )}
     </div>
   );
