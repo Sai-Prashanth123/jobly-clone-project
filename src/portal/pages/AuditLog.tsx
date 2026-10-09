@@ -8,7 +8,8 @@ import { useAuditLog } from '../hooks/useAnalytics';
 import { UsDateInput } from '../components/shared/UsDateInput';
 import { format } from 'date-fns';
 
-const ACTIONS = ['created','updated','deleted','status_changed','sent','uploaded_client_proof','downloaded_pdf','requested_changes','reopened'];
+// Must stay in step with the action union in backend/src/lib/activityLogger.ts.
+const ACTIONS = ['created','updated','deleted','status_changed','sent','submitted','uploaded_client_proof','removed_client_proof','downloaded_pdf','requested_changes','reopened','logged_in','logged_out'];
 const ACTION_COLORS: Record<string, string> = { created:'bg-green-100 text-green-700', updated:'bg-blue-100 text-blue-700', deleted:'bg-red-100 text-red-700', status_changed:'bg-amber-100 text-amber-700' };
 
 export default function AuditLog() {

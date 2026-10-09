@@ -33,9 +33,11 @@ const ROLE_COLORS: Record<string, string> = {
 };
 
 function RoleBadge({ role }: { role: string }) {
+  // roleLabel, not `capitalize` on the raw value — that rendered "Hr" and
+  // showed "Operations" rather than the agreed "Project Manager".
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border capitalize ${ROLE_COLORS[role] ?? 'bg-gray-100 text-gray-700'}`}>
-      {role}
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium border ${ROLE_COLORS[role] ?? 'bg-gray-100 text-gray-700'}`}>
+      {roleLabel(role)}
     </span>
   );
 }
@@ -46,32 +48,44 @@ const ACTION_COLORS: Record<string, string> = {
   updated:        'bg-blue-100 text-blue-700',
   deleted:        'bg-red-100 text-red-700',
   status_changed: 'bg-amber-100 text-amber-700',
+  logged_in:      'bg-slate-100 text-slate-600',
+  logged_out:     'bg-slate-100 text-slate-600',
 };
 
 // ── Permission Matrix ─────────────────────────────────────────────────────────
+// The `legal` column was missing entirely, so a role that genuinely runs the
+// case workload appeared to have no permissions at all. Values below are taken
+// from the actual requireRole(...) guards on the routes and the sidebar's own
+// role lists — not estimated — so the matrix describes what the system really
+// enforces. Legal reaches cases, legal review, expiring documents and the
+// shared dashboard/announcements/notifications, and nothing else.
 const PERMISSIONS = [
-  { feature: 'Dashboard',                admin: true,  hr: true,  ops: true,  fin: true,  emp: true  },
-  { feature: 'View Employees',           admin: true,  hr: true,  ops: true,  fin: false, emp: false },
-  { feature: 'Create/Edit Employees',    admin: true,  hr: true,  ops: false, fin: false, emp: false },
-  { feature: 'Delete Employees',         admin: true,  hr: false, ops: false, fin: false, emp: false },
-  { feature: 'Approve Onboarding',       admin: true,  hr: true,  ops: false, fin: false, emp: false },
-  { feature: 'View Clients',             admin: true,  hr: false, ops: true,  fin: true,  emp: false },
-  { feature: 'Create/Edit Clients',      admin: true,  hr: false, ops: true,  fin: false, emp: false },
-  { feature: 'Delete Clients',           admin: true,  hr: false, ops: false, fin: false, emp: false },
-  { feature: 'View Assignments',         admin: true,  hr: false, ops: true,  fin: false, emp: true  },
-  { feature: 'Create/Edit Assignments',  admin: true,  hr: false, ops: true,  fin: false, emp: false },
-  { feature: 'View Timesheets',          admin: true,  hr: true,  ops: true,  fin: true,  emp: true  },
-  { feature: 'Submit Timesheets',        admin: true,  hr: false, ops: false, fin: false, emp: true  },
-  { feature: 'Approve Timesheets',       admin: true,  hr: true,  ops: true,  fin: true,  emp: false },
-  { feature: 'View Invoices',            admin: true,  hr: false, ops: false, fin: true,  emp: false },
-  { feature: 'Generate Invoices',        admin: true,  hr: false, ops: false, fin: true,  emp: false },
-  { feature: 'Send Invoices',            admin: true,  hr: false, ops: false, fin: true,  emp: false },
-  { feature: 'Update Invoice Status',    admin: true,  hr: false, ops: false, fin: true,  emp: false },
-  { feature: 'View Reports',             admin: true,  hr: false, ops: true,  fin: true,  emp: false },
-  { feature: 'Upload Documents',         admin: true,  hr: true,  ops: true,  fin: false, emp: false },
-  { feature: 'Admin Settings',           admin: true,  hr: false, ops: false, fin: false, emp: false },
-  { feature: 'User Management',          admin: true,  hr: false, ops: false, fin: false, emp: false },
-  { feature: 'Activity Logs',            admin: true,  hr: false, ops: false, fin: false, emp: false },
+  { feature: 'Dashboard',                admin: true,  hr: true,  ops: true,  fin: true,  emp: true,  legal: true  },
+  { feature: 'View Employees',           admin: true,  hr: true,  ops: true,  fin: false, emp: false, legal: true  },
+  { feature: 'Create/Edit Employees',    admin: true,  hr: true,  ops: false, fin: false, emp: false, legal: false },
+  { feature: 'Delete Employees',         admin: true,  hr: false, ops: false, fin: false, emp: false, legal: false },
+  { feature: 'Approve Onboarding',       admin: true,  hr: true,  ops: false, fin: false, emp: false, legal: false },
+  { feature: 'View Clients',             admin: true,  hr: false, ops: true,  fin: true,  emp: false, legal: false },
+  { feature: 'Create/Edit Clients',      admin: true,  hr: false, ops: true,  fin: false, emp: false, legal: false },
+  { feature: 'Delete Clients',           admin: true,  hr: false, ops: false, fin: false, emp: false, legal: false },
+  { feature: 'View Assignments',         admin: true,  hr: false, ops: true,  fin: false, emp: true,  legal: false },
+  { feature: 'Create/Edit Assignments',  admin: true,  hr: false, ops: true,  fin: false, emp: false, legal: false },
+  { feature: 'View Timesheets',          admin: true,  hr: true,  ops: true,  fin: true,  emp: true,  legal: false },
+  { feature: 'Submit Timesheets',        admin: true,  hr: false, ops: false, fin: false, emp: true,  legal: false },
+  { feature: 'Approve Timesheets',       admin: true,  hr: true,  ops: true,  fin: true,  emp: false, legal: false },
+  { feature: 'View Invoices',            admin: true,  hr: false, ops: false, fin: true,  emp: false, legal: false },
+  { feature: 'Generate Invoices',        admin: true,  hr: false, ops: false, fin: true,  emp: false, legal: false },
+  { feature: 'Send Invoices',            admin: true,  hr: false, ops: false, fin: true,  emp: false, legal: false },
+  { feature: 'Update Invoice Status',    admin: true,  hr: false, ops: false, fin: true,  emp: false, legal: false },
+  { feature: 'View Reports',             admin: true,  hr: false, ops: true,  fin: true,  emp: false, legal: false },
+  { feature: 'Upload Documents',         admin: true,  hr: true,  ops: true,  fin: false, emp: false, legal: false },
+  { feature: 'View Cases',               admin: true,  hr: true,  ops: false, fin: false, emp: true,  legal: true  },
+  { feature: 'Manage Cases',             admin: true,  hr: true,  ops: false, fin: false, emp: false, legal: true  },
+  { feature: 'Legal Review',             admin: true,  hr: false, ops: false, fin: false, emp: false, legal: true  },
+  { feature: 'Expiring Documents',       admin: true,  hr: true,  ops: false, fin: false, emp: false, legal: true  },
+  { feature: 'Admin Settings',           admin: true,  hr: false, ops: false, fin: false, emp: false, legal: false },
+  { feature: 'User Management',          admin: true,  hr: false, ops: false, fin: false, emp: false, legal: false },
+  { feature: 'Activity Logs',            admin: true,  hr: false, ops: false, fin: false, emp: false, legal: false },
 ];
 
 // ── Data Retention Policies ───────────────────────────────────────────────────
@@ -413,6 +427,7 @@ function PermissionsTab() {
                 <TableHead className="text-center font-semibold"><RoleBadge role="operations" /></TableHead>
                 <TableHead className="text-center font-semibold"><RoleBadge role="finance" /></TableHead>
                 <TableHead className="text-center font-semibold"><RoleBadge role="employee" /></TableHead>
+                <TableHead className="text-center font-semibold"><RoleBadge role="legal" /></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -424,6 +439,7 @@ function PermissionsTab() {
                   <TableCell className="text-center">{p.ops ? <Check /> : <Cross />}</TableCell>
                   <TableCell className="text-center">{p.fin ? <Check /> : <Cross />}</TableCell>
                   <TableCell className="text-center">{p.emp ? <Check /> : <Cross />}</TableCell>
+                  <TableCell className="text-center">{p.legal ? <Check /> : <Cross />}</TableCell>
                 </TableRow>
               ))}
             </TableBody>

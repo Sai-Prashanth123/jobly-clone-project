@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { supabaseAdmin, fetchPortalUser, fetchPortalUserByEmail, patchPortalUser } from '../config/supabase';
 import { authProvider, InvalidCredentialsError } from '../lib/auth';
+import { logActivity } from '../lib/activityLogger';
 import { UnauthorizedError } from '../lib/errors';
 import { resetUserPassword } from '../services/admin.service';
 import * as employeesSvc from '../services/employees.service';
@@ -104,6 +105,14 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
     const onboardingStatus = await computeOnboardingStatus(portalUser.role, portalUser.employee_id);
     const onboardingComplete = onboardingStatus === 'approved';
 
+    // Who signed in, and when. Sign-ins were not recorded at all, so the audit
+    // log could show what changed but never who was present — the first thing
+    // anyone asks when reviewing an account.
+    await logActivity(portalUser.id, 'logged_in', 'portal_user', portalUser.id, portalUser.email, {
+      role: portalUser.role,
+      ip: (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip,
+    });
+
     res.json({
       success: true,
       data: {
@@ -144,6 +153,9 @@ export async function logout(req: Request, res: Response, next: NextFunction): P
       try {
         const { userId } = await authProvider.verifyToken(token);
         await authProvider.signOut(userId);
+        // Pairs with the sign-in above, so a session has a start and an end.
+        const pu = await fetchPortalUser(userId).catch(() => null);
+        await logActivity(userId, 'logged_out', 'portal_user', userId, pu?.email ?? userId.slice(0, 8));
       } catch {
         // Expired or malformed token: nothing to revoke.
       }

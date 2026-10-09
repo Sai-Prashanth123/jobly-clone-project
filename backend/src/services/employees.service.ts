@@ -904,10 +904,39 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   }
 
   const blockPersonalEmailChanged = input.blockPersonalEmail !== undefined && input.blockPersonalEmail !== !!(existing as any).block_personal_email;
-  await logActivity(
-    actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8),
-    blockPersonalEmailChanged ? { event: input.blockPersonalEmail ? 'blocked_personal_email' : 'unblocked_personal_email' } : undefined,
-  );
+
+  // Log only REAL changes, and say what they were.
+  //
+  // This used to fire on every PUT with no detail at all, which is how the
+  // audit log reached 1,941 entries that read "updated / Employee / EMP-0143 /
+  // —" over and over. The onboarding wizard autosaves as the employee types,
+  // so a single sitting produced a row a minute, each one indistinguishable
+  // from the last and none of them saying what changed. That is worse than no
+  // log: the real events are buried in it.
+  //
+  // camelCase input keys are compared against their snake_case columns, and
+  // objects/arrays by value, so an autosave that re-submits identical data
+  // records nothing.
+  const toSnake = (k: string) => k.replace(/[A-Z]/g, c => '_' + c.toLowerCase());
+  const changedFields = Object.keys(input).filter(key => {
+    const before = (existing as Record<string, unknown>)[toSnake(key)];
+    const after = (input as Record<string, unknown>)[key];
+    if (after === undefined) return false;
+    if (before === null && after === '') return false;        // blank stays blank
+    if (typeof after === 'object' && after !== null) {
+      return JSON.stringify(before ?? null) !== JSON.stringify(after);
+    }
+    return String(before ?? '') !== String(after ?? '');
+  });
+
+  if (changedFields.length > 0 || blockPersonalEmailChanged) {
+    await logActivity(
+      actorId ?? null, 'updated', 'employee', id, emp.display_id ?? id.slice(0, 8),
+      blockPersonalEmailChanged
+        ? { event: input.blockPersonalEmail ? 'blocked_personal_email' : 'unblocked_personal_email', fields: changedFields }
+        : { fields: changedFields },
+    );
+  }
 
   // Notify the employee in-app when their personal-email communications are
   // blocked (not on unblock — that's not something they need to be warned about).
