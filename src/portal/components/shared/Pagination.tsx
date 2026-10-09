@@ -45,17 +45,55 @@ export function pageItems(current: number, total: number, windowSize = 1): (numb
   return out;
 }
 
+/** Rows-per-page choices. 10 is the default everywhere. */
+export const PAGE_SIZE_OPTIONS = [10, 20, 30, 40] as const;
+
 interface PaginationProps {
   page: number;
   totalPages: number;
   onPageChange: (page: number) => void;
   /** e.g. "Showing 1–25 of 240" — rendered on the left when provided. */
   summary?: React.ReactNode;
+  /** Omit both to hide the rows-per-page control. */
+  pageSize?: number;
+  onPageSizeChange?: (size: number) => void;
   className?: string;
 }
 
-export function Pagination({ page, totalPages, onPageChange, summary, className }: PaginationProps) {
-  if (totalPages <= 1) return summary ? <div className={className}>{summary}</div> : null;
+export function Pagination({
+  page, totalPages, onPageChange, summary, pageSize, onPageSizeChange, className,
+}: PaginationProps) {
+  const sizePicker = pageSize !== undefined && onPageSizeChange ? (
+    <label className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 whitespace-nowrap">
+      <span>Rows</span>
+      {/* A plain <select> on purpose. The portal's Radix Select has a standing
+          problem where reopening one with a value already chosen snaps the page
+          back to the top, which would be maddening on a control you use while
+          reading a long table. A native select also gives the vertical list and
+          keyboard behaviour for free. */}
+      <select
+        value={pageSize}
+        onChange={e => onPageSizeChange(Number(e.target.value))}
+        aria-label="Rows per page"
+        className="h-8 rounded-md border border-gray-200 bg-white px-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+      >
+        {PAGE_SIZE_OPTIONS.map(n => <option key={n} value={n}>{n}</option>)}
+      </select>
+    </label>
+  ) : null;
+
+  // With one page there is nothing to navigate, but the size picker still
+  // matters — it is how you get BACK to more rows after narrowing.
+  if (totalPages <= 1) {
+    return (summary || sizePicker)
+      ? (
+        <div className={className ?? 'flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600'}>
+          {summary && <span className="text-xs sm:text-sm">{summary}</span>}
+          {sizePicker}
+        </div>
+      )
+      : null;
+  }
 
   const go = (p: number) => onPageChange(Math.min(totalPages, Math.max(1, p)));
 
@@ -79,7 +117,10 @@ export function Pagination({ page, totalPages, onPageChange, summary, className 
 
   return (
     <div className={className ?? 'flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-gray-600'}>
-      {summary && <span className="text-xs sm:text-sm">{summary}</span>}
+      <div className="flex items-center gap-4">
+        {summary && <span className="text-xs sm:text-sm">{summary}</span>}
+        {sizePicker}
+      </div>
 
       <nav className="flex items-center gap-1" aria-label="Pagination">
         <Button

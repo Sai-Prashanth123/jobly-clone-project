@@ -1,4 +1,4 @@
-import { Pagination } from './Pagination';
+import { Pagination, PAGE_SIZE_OPTIONS } from './Pagination';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -55,7 +55,7 @@ export function DataTable<T>({
   columns,
   searchPlaceholder = 'Search...',
   searchKeys = [],
-  pageSize = 10,
+  pageSize: initialPageSize = 10,
   emptyTitle = 'No records found',
   emptyDescription,
   onRowClick,
@@ -68,6 +68,9 @@ export function DataTable<T>({
 }: DataTableProps<T>) {
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
+  // Rows per page is now the reader's choice, seeded from the prop. Ten was
+  // fixed, so a long table could only be walked a page at a time.
+  const [pageSize, setPageSize] = useState(initialPageSize);
   const [sortKey, setSortKey] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>(null);
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -377,12 +380,14 @@ export function DataTable<T>({
       </div>
 
       {/* Pagination — numbered, so page 9 is one click rather than six. */}
-      {sorted.length > pageSize && (
+      {(sorted.length > pageSize || sorted.length > PAGE_SIZE_OPTIONS[0]) && (
         <Pagination
           page={safePage}
           totalPages={totalPages}
           onPageChange={setPage}
           summary={`Showing ${start + 1}–${Math.min(start + pageSize, sorted.length)} of ${sorted.length}`}
+          pageSize={pageSize}
+          onPageSizeChange={n => { setPageSize(n); setPage(1); }}
         />
       )}
     </div>

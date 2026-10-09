@@ -767,7 +767,7 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string) {
     });
     emailSent = true;
   } catch (err: any) {
-    warning = `Invoice was prepared but the email could not be delivered (${err?.code ?? ''} ${err?.message ?? 'send failed'}). Check that AZURE_COMM_CONNECTION_STRING is set in Azure App Settings.`;
+    warning = `Invoice was prepared but the email could not be delivered (${err?.code ?? ''} ${err?.message ?? 'send failed'}). Check the mail transport configuration on the API.`;
     console.error('[invoices.service] sendInvoiceEmail failed for invoice', id, err);
   }
 

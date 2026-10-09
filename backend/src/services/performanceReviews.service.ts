@@ -144,7 +144,7 @@ export async function generateAndStorePerformanceReviewPdf(row: any): Promise<st
   const buffer = await generatePerformanceReviewPDF(buildPdfData(row));
 
   const fileName = `${row.display_id}.pdf`;
-  await storageProvider.upload('performance-reviews', fileName, buffer, { contentType: 'application/pdf', upsert: true });
+  await storageProvider.upload('performance-reviews', fileName, buffer, { contentType: 'application/pdf', upsert: true });
 
   const urlData = await storageProvider.signedUrl('performance-reviews', fileName, 7 * 24 * 60 * 60, { download: fileName });
 
@@ -171,7 +171,7 @@ export async function sendPerformanceReviewToEmployee(id: string, recipientEmail
   let emailSent = false;
   let warning: string | undefined;
   try {
-    if (!mailerConfigured) throw new Error('Email is not configured. Set AZURE_COMM_CONNECTION_STRING in Azure App Settings.');
+    if (!mailerConfigured) throw new Error('Email is not configured on the server. Ask an administrator to set up the mail transport.');
     await mailPerformanceReview({
       to: recipientEmail,
       employeeName: `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim() || 'Employee',
