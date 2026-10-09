@@ -220,7 +220,8 @@ export async function upsertMonthlyTimesheet(
       })
       .eq('id', existing.id).select().single();
     if (error) throw error;
-    await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', existing.id, existing.display_id ?? existing.id.slice(0, 8));
+    await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', existing.id, existing.display_id ?? existing.id.slice(0, 8),
+      { period: `${input.year}-${String(input.month).padStart(2, '0')}`, totalHours: summary.total_hours });
     return data;
   }
 
@@ -262,7 +263,8 @@ export async function upsertMonthlyTimesheet(
       }
       throw error;
     }
-    await logActivity(actorId ?? null, 'created', 'monthly_timesheet', data.id, data.display_id ?? data.id.slice(0, 8));
+    await logActivity(actorId ?? null, 'created', 'monthly_timesheet', data.id, data.display_id ?? data.id.slice(0, 8),
+      { period: `${input.year}-${String(input.month).padStart(2, '0')}`, totalHours: summary.total_hours });
     return data;
   }
 }
@@ -291,7 +293,8 @@ export async function updateMonthlyTimesheet(id: string, input: UpdateMonthlyTim
     })
     .eq('id', id).select().single();
   if (error) throw error;
-  await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8));
+  await logActivity(actorId ?? null, 'updated', 'monthly_timesheet', id, row.display_id ?? id.slice(0, 8),
+    { totalHours: summary.total_hours });
   return data;
 }
 
