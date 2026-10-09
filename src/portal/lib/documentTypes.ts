@@ -207,7 +207,7 @@ export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4', 'insurance_waiver
 // the checklist demands them. US citizens remain the only exclusion - they
 // have no visa stamp or I-94 to produce at all, and requiring them would leave
 // onboarding permanently short of 100%.
-export const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
+export const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'h4_ead', 'tn', 'gc']);
 export const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 
 // Additional identity-doc types required for specific visa types, on top of
@@ -217,6 +217,7 @@ export const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 export const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
   opt: ['i9_form', 'i20', 'ead'],
   stem_opt: ['i9_form', 'i20', 'ead', 'us_visa'],
+  h4_ead: ['i9_form', 'ead', 'i797'],
   gc: ['passport', 'education_documents', 'experience_letters', 'i140', 'i140_approval_notice', 'labor_certificate', 'i797'],
 };
 

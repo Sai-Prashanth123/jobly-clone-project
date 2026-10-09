@@ -79,6 +79,7 @@ const VISA_OPTIONS = [
   { value: 'l1',       label: 'L-1' },
   { value: 'opt',      label: 'OPT' },
   { value: 'stem_opt', label: 'STEM OPT' },
+  { value: 'h4_ead',   label: 'H-4 EAD' },
   { value: 'tn',       label: 'TN' },
   { value: 'other',    label: 'Other' },
 ];
@@ -570,7 +571,7 @@ export default function NewEmployee() {
     const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
     return {
       [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality.trim() && !!form.preferredLanguage.trim() && (!!form.profilePhotoFile || !!form.profilePhotoPreview),
-      [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim() && (isOnboarding ? !!form.linkedinUrl.trim() : true),
+      [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim() && ((isOnboarding || isEditMode) ? !!form.linkedinUrl.trim() : true),
       [SECTION_IDS.presentAddr]:  presentFilled,
       [SECTION_IDS.permanentAddr]: permFilled,
       [SECTION_IDS.employment]:   !!form.department.trim() && !!form.jobTitle.trim() && !!form.employmentType && !!form.startDate && !!form.workLocation.trim(),
@@ -729,7 +730,11 @@ export default function NewEmployee() {
     if (!form.email.trim())     flag('email',     'Personal email is required', SECTION_IDS.contact);
     else if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) flag('email', 'Enter a valid email', SECTION_IDS.contact);
     if (form.workEmail.trim() && !/^\S+@\S+\.\S+$/.test(form.workEmail.trim())) flag('workEmail', 'Enter a valid work email', SECTION_IDS.contact);
-    if (isOnboarding && !form.linkedinUrl.trim()) flag('linkedinUrl', 'LinkedIn URL is required', SECTION_IDS.contact);
+    // Every employee must end up with a LinkedIn URL. Enforced during
+    // self-onboarding AND when HR edits an existing record — but not on the
+    // initial quick add, which deliberately needs only a name and an email so
+    // a candidate can be entered straight off a CV.
+    if ((isOnboarding || isEditMode) && !form.linkedinUrl.trim()) flag('linkedinUrl', 'LinkedIn URL is required', SECTION_IDS.contact);
 
     if (form.phone && !/^\(\d{3}\) \d{3}-\d{4}$/.test(form.phone)) flag('phone', 'Enter a valid 10-digit phone number', SECTION_IDS.contact);
     if (form.altPhone && !/^\(\d{3}\) \d{3}-\d{4}$/.test(form.altPhone)) flag('altPhone', 'Enter a valid 10-digit phone number', SECTION_IDS.contact);
@@ -1961,7 +1966,7 @@ export default function NewEmployee() {
               </div>
 
               <div>
-                <Label>LinkedIn URL {isOnboarding && <RequiredMark />}</Label>
+                <Label>LinkedIn URL {(isOnboarding || isEditMode) && <RequiredMark />}</Label>
                 <Input
                   value={form.linkedinUrl}
                   onChange={e => set('linkedinUrl', e.target.value)}

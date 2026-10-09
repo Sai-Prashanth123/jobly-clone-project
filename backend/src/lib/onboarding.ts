@@ -45,7 +45,7 @@ export const ONBOARDING_REQUIRED_DOCS = [
 // and both are kept on file. US citizens stay out: they have neither, so
 // requiring them would block onboarding permanently.
 // Mirrors WORK_VISA_TYPES in src/portal/lib/documentTypes.ts.
-export const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'tn', 'gc']);
+export const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'h4_ead', 'tn', 'gc']);
 export const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
 
 // Documents required for a SPECIFIC visa type, on top of the universal list
@@ -65,6 +65,7 @@ export const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as co
 export const VISA_REQUIRED_EXTRA_DOCS: Record<string, readonly string[]> = {
   opt: ['I-9 Form', 'I-20', 'Employment Authorization Document'],
   stem_opt: ['I-9 Form', 'I-20', 'Employment Authorization Document', 'Visa'],
+  h4_ead: ['I-9 Form', 'Employment Authorization Document', 'I-797'],
   gc: [
     'Passport',
     'Education Documents & Academic Credentials',
