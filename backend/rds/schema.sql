@@ -276,6 +276,7 @@ CREATE TYPE public.visa_type AS ENUM (
     'l1',
     'opt',
     'stem_opt',
+    'h4_ead',
     'tn',
     'gc',
     'citizen',
