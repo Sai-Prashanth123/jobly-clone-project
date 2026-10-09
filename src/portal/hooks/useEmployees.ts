@@ -227,21 +227,45 @@ export function useUpdateEmployee(id: string) {
 export function useSendOfficialEmail(id: string) {
   const qc = useQueryClient();
   return useMutation({
+    // "Send Official Email" has to actually send one.
+    //
+    // It used to only PUT the work email, and the backend issues credentials
+    // solely when that address CHANGES. So submitting the address already on
+    // file did nothing, returned no warning, and the dialog fell through to a
+    // bare "Could not send official email." — which reads as a fault when in
+    // fact nothing was wrong and nothing was attempted. Reported against
+    // EMP-0031, whose work email was already the address being submitted.
+    //
+    // Now: PUT only when the address really is new (that path sends), and
+    // otherwise fall back to resend-credentials, which sends to the address on
+    // file. resendCredentials is the safe one to call repeatedly — it reissues
+    // a temp password only for someone still ON a temp, and sends a plain
+    // info letter to anyone who has already chosen their own password.
     mutationFn: async (workEmail: string) => {
-      const { data } = await apiClient.put(`/employees/${id}`, { workEmail });
+      const current = (qc.getQueryData(['employees', id]) as { workEmail?: string } | undefined)?.workEmail ?? '';
+      const changed = workEmail.trim() !== current.trim();
+
+      const { data } = changed
+        ? await apiClient.put(`/employees/${id}`, { workEmail })
+        : await apiClient.post(`/employees/${id}/resend-credentials`);
+
       return {
-        employee: mapEmployee(data.data),
+        employee: changed ? mapEmployee(data.data) : undefined,
         welcomeEmailSent: data.welcomeEmailSent as boolean,
         warning: data.warning as string | undefined,
         tempPassword: data.tempPassword as string | undefined,
-        loginEmail: data.loginEmail as string | undefined,
+        loginEmail: (data.loginEmail as string | undefined) ?? workEmail,
       };
     },
     onSuccess: ({ employee }) => {
-      qc.setQueryData(['employees', id], (old: any) => ({
-        ...employee,
-        documents: employee.documents?.length ? employee.documents : (old?.documents ?? []),
-      }));
+      // `employee` is only returned when the address changed; the
+      // resend-credentials path alters no employee fields.
+      if (employee) {
+        qc.setQueryData(['employees', id], (old: any) => ({
+          ...employee,
+          documents: employee.documents?.length ? employee.documents : (old?.documents ?? []),
+        }));
+      }
       qc.invalidateQueries({ queryKey: ['employees'] });
     },
     meta: { silentError: true },

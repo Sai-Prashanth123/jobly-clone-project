@@ -903,7 +903,13 @@ export default function EmployeeDetail() {
                       { duration: 30000 },
                     );
                   } else {
-                    toast.error(r.warning ?? 'Could not send official email.');
+                    // The old bare "Could not send official email." gave no
+                    // clue whether the send failed or was never attempted.
+                    toast.error(
+                      r.warning
+                      ?? 'No email was sent, and the server gave no reason. Check the address is correct, then try Resend Welcome Email.',
+                      { duration: 12000 },
+                    );
                   }
                 } catch {
                   /* failed-request toast raised centrally (queryClient.ts) */
