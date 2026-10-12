@@ -1797,8 +1797,14 @@ export async function listExpiringDocuments(days = 90, viewerRole = 'admin'): Pr
   const results: ExpiringDoc[] = [];
 
   for (const emp of data ?? []) {
-    // Check visa_expiry (work authorization) field
-    if (emp.visa_expiry && emp.visa_expiry >= today && emp.visa_expiry <= cutoffStr) {
+    // Check visa_expiry (work authorization) field.
+    //
+    // No `>= today` lower bound on any of the three checks below. The day a
+    // document lapsed it used to drop out of this list entirely, so an expired
+    // EAD — someone working without authorisation — was the one case nothing
+    // in the portal reported. `daysRemaining` goes negative and the existing
+    // ascending sort puts the most overdue at the top.
+    if (emp.visa_expiry && emp.visa_expiry <= cutoffStr) {
       const diff = Math.ceil((new Date(emp.visa_expiry).getTime() - new Date(today).getTime()) / 86400000);
       results.push({
         employeeId: emp.id, displayId: emp.display_id ?? '',
@@ -1816,7 +1822,11 @@ export async function listExpiringDocuments(days = 90, viewerRole = 'admin'): Pr
     const docs = (Array.isArray(emp.identity_documents) ? emp.identity_documents : []) as Array<{ type?: string; expiry?: string; label?: string }>;
     for (const doc of docs) {
       const expiry = doc.expiry;
-      if (!expiry || expiry < today || expiry > cutoffStr) continue;
+      if (!expiry || expiry > cutoffStr) continue;
+      // The wizard writes a row per field it renders, so blank and part-typed
+      // dates reach here; `new Date('')` is Invalid Date, which would report
+      // NaN days remaining.
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry)) continue;
       const diff = Math.ceil((new Date(expiry).getTime() - new Date(today).getTime()) / 86400000);
       const label = doc.label ?? doc.type ?? 'Document';
       results.push({
@@ -1833,7 +1843,6 @@ export async function listExpiringDocuments(days = 90, viewerRole = 'admin'): Pr
     .from('documents')
     .select('entity_id, type, expiry_date')
     .eq('entity_type', 'employee')
-    .gte('expiry_date', today)
     .lte('expiry_date', cutoffStr);
   if (scopedIds) uploadedDocsQuery = uploadedDocsQuery.in('entity_id', scopedIds);
   const { data: uploadedDocs } = await uploadedDocsQuery;
@@ -1864,7 +1873,8 @@ export async function listExpiringDocuments(days = 90, viewerRole = 'admin'): Pr
     }
   }
 
-  // Sort by soonest expiry first
+  // Most overdue first, then soonest to expire. Ascending on a value that can
+  // now be negative gives both at once.
   results.sort((a, b) => a.daysRemaining - b.daysRemaining);
   return results;
 }

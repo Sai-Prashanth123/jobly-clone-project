@@ -12,6 +12,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { useExpiringDocuments, useRequestEmployeeDocuments, type ExpiringDocEntry } from '../hooks/useEmployees';
 
 function urgencyBadge(days: number) {
+  // Lapsed documents reach this list now, so `days` can be negative — the old
+  // version would have rendered "-412d left".
+  if (days < 0) {
+    const ago = Math.abs(days);
+    return (
+      <Badge variant="destructive" className="font-semibold">
+        Expired {ago}d ago
+      </Badge>
+    );
+  }
+  if (days === 0) return <Badge variant="destructive" className="font-semibold">Expires today</Badge>;
   if (days <= 14) return <Badge variant="destructive">{days}d left</Badge>;
   if (days <= 30) return <Badge className="bg-amber-100 text-amber-800 border-amber-200">{days}d left</Badge>;
   return <Badge variant="secondary">{days}d left</Badge>;
@@ -34,6 +45,9 @@ export function ExpiringDocuments() {
   const requestDocuments = useRequestEmployeeDocuments();
   const [notifyTarget, setNotifyTarget] = useState<ExpiringDocEntry | null>(null);
   const [notifyMessage, setNotifyMessage] = useState('');
+  // Called out separately in the header: an expired document is a compliance
+  // problem now, not a reminder, and it would otherwise be just another row.
+  const expiredCount = docs.filter(d => d.daysRemaining < 0).length;
 
   const columns = [
     {
@@ -76,7 +90,12 @@ export function ExpiringDocuments() {
           <Button
             variant="ghost" size="sm" className="h-8 gap-1.5 text-blue-700 hover:bg-blue-50"
             onClick={() => {
-              setNotifyMessage(`Your ${r.documentType} is expiring on ${new Date(r.expiryDate + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })} — please upload a renewed copy from your profile page.`);
+              const on = new Date(r.expiryDate + 'T00:00:00Z').toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+              setNotifyMessage(
+                r.daysRemaining < 0
+                  ? `Your ${r.documentType} expired on ${on} — please upload a renewed copy from your profile page as soon as possible.`
+                  : `Your ${r.documentType} is expiring on ${on} — please upload a renewed copy from your profile page.`,
+              );
               setNotifyTarget(r);
             }}
           >
@@ -91,7 +110,11 @@ export function ExpiringDocuments() {
     <div className="space-y-6">
       <PageHeader
         title="Expiring Documents"
-        description={`Documents expiring within the next ${days} days.`}
+        description={
+          expiredCount > 0
+            ? `${expiredCount} already expired, plus anything expiring within the next ${days} days.`
+            : `Already-expired documents, plus anything expiring within the next ${days} days.`
+        }
         action={
           <Select value={String(days)} onValueChange={v => setDays(Number(v))}>
             <SelectTrigger className="w-36">
@@ -120,7 +143,7 @@ export function ExpiringDocuments() {
       ) : docs.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-gray-400 gap-3">
           <FileWarning className="h-10 w-10 text-gray-300" />
-          <p className="text-sm">No documents expiring in the next {days} days.</p>
+          <p className="text-sm">Nothing expired, and nothing expiring in the next {days} days.</p>
         </div>
       ) : (
         <DataTable

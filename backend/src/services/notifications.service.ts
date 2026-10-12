@@ -1,4 +1,8 @@
 import { supabaseAdmin } from '../config/supabase';
+import {
+  MAX_ALERT_INTERVAL_DAYS, shouldAlert, docAlertKey, parseDocAlertKey,
+  expiryUrgency, describeExpiry, daysBetween,
+} from '../lib/expiryAlerts';
 
 export async function createNotification(
   userId: string,
@@ -399,13 +403,33 @@ export async function triggerInvoiceReadinessReminders(): Promise<{ sent: number
   return { sent };
 }
 
+/** Titles this job writes. Used to find its own previous alerts. */
+const EXPIRY_ALERT_TITLES = [
+  'Document Expiring Soon',
+  'Document Expired',
+  'Your Document Is Expiring',
+  'Your Document Has Expired',
+];
+
 /**
- * Document expiry alerts — notifies employees whose visa, passport, OPT card,
- * EAD, or I-983 expires within 90 days, plus HR/admin for their records.
+ * Document expiry alerts — notifies admin and HR, plus the employee, about a
+ * visa, passport, EAD, I-20, I-94, OPT/STEM card, I-983, green card or photo
+ * ID that is expiring or has already lapsed.
+ *
+ * Two deliberate properties, both added after Gayathri asked what this rule
+ * actually does:
+ *
+ *  - **Lapsed documents are included.** The filter used to be
+ *    `expiry >= today`, so the day a document expired it dropped out of this
+ *    job and off the Expiring Documents page. An expired EAD means somebody is
+ *    working without authorisation — the most urgent case was the one case
+ *    nothing reported.
+ *  - **Alerts repeat on a cadence rather than nightly.** See lib/expiryAlerts.
  */
-export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number }> {
+export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number; skipped: number }> {
   const now = new Date();
   const todayStr = now.toISOString().split('T')[0];
+  const today = new Date(todayStr + 'T00:00:00Z');
   const cutoff = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 90));
   const cutoffStr = cutoff.toISOString().split('T')[0];
 
@@ -415,21 +439,60 @@ export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number }> {
     .is('deleted_at', null)
     .neq('status', 'terminated');
 
-  if (!employees || employees.length === 0) return { sent: 0 };
+  if (!employees || employees.length === 0) return { sent: 0, skipped: 0 };
 
   const adminIds = await getUserIdsByRole('admin');
   const hrIds = await getUserIdsByRole('hr');
   const hrAdminRecipients = [...new Set([...adminIds, ...hrIds])];
 
+  // Every alert this job has written in the last month, so the cadence can be
+  // judged without a query per document. One read instead of N.
+  //
+  // The window is the longest interval in alertIntervalDays(); anything older
+  // than that is due again regardless, so there is no point fetching it.
+  const lookback = new Date(today.getTime() - MAX_ALERT_INTERVAL_DAYS * 86_400_000);
+  const { data: priorAlerts } = await supabaseAdmin
+    .from('notifications')
+    .select('entity_id, message, created_at')
+    .eq('entity_type', 'employee')
+    .in('title', EXPIRY_ALERT_TITLES)
+    .gte('created_at', lookback.toISOString());
+
+  // entityId + document key → when we last said anything about that document.
+  //
+  // Keyed per document rather than per recipient, so all recipients are told
+  // on the same cadence. Someone added to the admin role mid-window waits for
+  // the next alert instead of receiving a backlog.
+  const lastAlertAt = new Map<string, Date>();
+  for (const row of priorAlerts ?? []) {
+    // The key is embedded in the message because `notifications` has no
+    // metadata column to put it in.
+    const docKey = parseDocAlertKey(String(row.message ?? ''));
+    if (!docKey) continue;
+    const at = new Date(row.created_at as string);
+    const key = `${row.entity_id}|${docKey}`;
+    const existing = lastAlertAt.get(key);
+    if (!existing || at > existing) lastAlertAt.set(key, at);
+  }
+
   let sent = 0;
+  let skipped = 0;
+
+  const daysLeftFor = (expiry: string) =>
+    Math.ceil((new Date(expiry + 'T00:00:00Z').getTime() - today.getTime()) / 86_400_000);
 
   for (const emp of employees) {
     const fullName = `${emp.first_name ?? ''} ${emp.last_name ?? ''}`.trim();
     const expiringDocs: { type: string; expiry: string; daysLeft: number }[] = [];
 
-    if (emp.visa_expiry && emp.visa_expiry >= todayStr && emp.visa_expiry <= cutoffStr) {
-      const daysLeft = Math.ceil((new Date(emp.visa_expiry + 'T00:00:00Z').getTime() - new Date(todayStr + 'T00:00:00Z').getTime()) / 86400000);
-      expiringDocs.push({ type: 'Visa / Work Authorization', expiry: emp.visa_expiry, daysLeft });
+    // No lower bound on either check now — only the 90-day ceiling, so a
+    // document that lapsed last year still reports.
+    if (emp.visa_expiry && emp.visa_expiry <= cutoffStr) {
+      expiringDocs.push({
+        type: 'Visa / Work Authorization',
+        expiry: emp.visa_expiry,
+        daysLeft: daysLeftFor(emp.visa_expiry),
+      });
     }
 
     // Array.isArray, not `?? []` - see listExpiringDocuments. A row holding a
@@ -438,29 +501,66 @@ export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number }> {
     // expiry-alert job rather than just skipping that employee.
     const docs = (Array.isArray(emp.identity_documents) ? emp.identity_documents : []) as Array<{ type?: string; label?: string; expiry?: string }>;
     for (const doc of docs) {
-      if (!doc.expiry || doc.expiry < todayStr || doc.expiry > cutoffStr) continue;
-      const daysLeft = Math.ceil((new Date(doc.expiry + 'T00:00:00Z').getTime() - new Date(todayStr + 'T00:00:00Z').getTime()) / 86400000);
-      expiringDocs.push({ type: doc.label ?? doc.type ?? 'Document', expiry: doc.expiry, daysLeft });
+      if (!doc.expiry || doc.expiry > cutoffStr) continue;
+      // Blank and malformed dates are written by the wizard for untouched
+      // fields; `new Date('')` is Invalid Date and would alert on NaN days.
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(doc.expiry)) continue;
+      expiringDocs.push({
+        type: doc.label ?? doc.type ?? 'Document',
+        expiry: doc.expiry,
+        daysLeft: daysLeftFor(doc.expiry),
+      });
     }
 
     if (expiringDocs.length === 0) continue;
 
     for (const doc of expiringDocs) {
-      const urgency: 'error' | 'warning' | 'info' = doc.daysLeft <= 14 ? 'error' : doc.daysLeft <= 30 ? 'warning' : 'info';
-      const hrMsg = `${fullName} (${emp.display_id}): ${doc.type} expires in ${doc.daysLeft} day${doc.daysLeft === 1 ? '' : 's'} on ${doc.expiry}.`;
+      const key = `${emp.id}|${docAlertKey(doc.type, doc.expiry)}`;
+      const last = lastAlertAt.get(key);
+      const daysSinceLast = last ? daysBetween(last, now) : null;
+      if (!shouldAlert(doc.daysLeft, daysSinceLast)) {
+        skipped++;
+        continue;
+      }
+
+      const lapsed = doc.daysLeft < 0;
+      const urgency = expiryUrgency(doc.daysLeft);
+      const phrase = describeExpiry(doc.daysLeft);
+      // docAlertKey() has to appear verbatim in the message — it is the only
+      // place the next run can read it back from.
+      const stable = docAlertKey(doc.type, doc.expiry);
+
+      const hrMsg = `${fullName} (${emp.display_id}): ${stable} — ${phrase}.`;
       for (const uid of hrAdminRecipients) {
-        await createNotification(uid, 'Document Expiring Soon', hrMsg, urgency, 'employee', emp.id, `/portal/employees/${emp.id}`);
+        await createNotification(
+          uid,
+          lapsed ? 'Document Expired' : 'Document Expiring Soon',
+          hrMsg,
+          urgency,
+          'employee',
+          emp.id,
+          `/portal/employees/${emp.id}`,
+        );
         sent++;
       }
+
       const empPortalUserId = await getPortalUserByEmployeeId(emp.id);
       if (empPortalUserId) {
-        await createNotification(empPortalUserId, 'Your Document Is Expiring', `Your ${doc.type} expires in ${doc.daysLeft} day${doc.daysLeft === 1 ? '' : 's'} on ${doc.expiry}. Please renew it and upload the updated copy.`, urgency, 'employee', emp.id, '/portal/profile');
+        await createNotification(
+          empPortalUserId,
+          lapsed ? 'Your Document Has Expired' : 'Your Document Is Expiring',
+          `Your ${stable} — ${phrase}. Please renew it and upload the updated copy.`,
+          urgency,
+          'employee',
+          emp.id,
+          '/portal/profile',
+        );
         sent++;
       }
     }
   }
 
-  return { sent };
+  return { sent, skipped };
 }
 
 // ── Shared fan-out helpers ────────────────────────────────────────────────────
