@@ -1,3 +1,4 @@
+import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { logActivity } from '../lib/activityLogger';
 import { createNotification } from './notifications.service';
@@ -27,7 +28,7 @@ async function resolveReceiptUrl(row: any): Promise<any> {
 
 export async function uploadReceipt(id: string, file: Express.Multer.File, actorId: string, actorRole: string, actorEmployeeId?: string | null) {
   const expense = await getExpense(id, actorRole, actorEmployeeId);
-  const storagePath = `${id}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const storagePath = uniqueObjectPath(id, file.originalname);
 
   await storageProvider.upload(RECEIPT_BUCKET, storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
 

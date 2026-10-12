@@ -1,3 +1,4 @@
+import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError } from '../lib/errors';
 import mammoth from 'mammoth';
@@ -92,10 +93,7 @@ export async function uploadDocument(
   replaceExisting?: boolean,
 ) {
   const bucket = BUCKET_MAP[entityType];
-  // Strip everything but alphanumerics/dot/dash/underscore (incl. slashes and
-  // "..") so a crafted originalname can't inject extra path segments into the
-  // storage key.
-  const storagePath = `${entityId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const storagePath = uniqueObjectPath(entityId, file.originalname);
 
   await storageProvider.upload(bucket, storagePath, file.buffer, {
       contentType: file.mimetype,
@@ -223,7 +221,7 @@ export async function uploadDependentPassport(
   const idx = dependents.findIndex(d => d.id === dependentId);
   if (idx === -1) throw new NotFoundError('Dependent not found');
 
-  const storagePath = `${employeeId}/dependents/${dependentId}/${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  const storagePath = uniqueObjectPath(`${employeeId}/dependents/${dependentId}`, file.originalname);
   await storageProvider.upload(bucket, storagePath, file.buffer, { contentType: file.mimetype, upsert: false });
 
   const nextDependents = dependents.map((d, i) =>

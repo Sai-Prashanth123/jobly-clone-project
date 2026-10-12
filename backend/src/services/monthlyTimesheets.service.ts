@@ -1,3 +1,4 @@
+import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
 import { isCurrentOrFutureMonthUTC, isMonthBeforeJoiningUTC, isWeekendUTC } from '../lib/dateUtils';
@@ -598,8 +599,7 @@ export async function uploadMonthlyClientProof(
     console.error('[monthlyTimesheets] old proof cleanup failed for', id, err);
   }
 
-  const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
-  const path = `monthly/${id}/${Date.now()}-${safeName}`;
+  const path = uniqueObjectPath(`monthly/${id}`, file.originalname);
   await storageProvider.upload(PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
 
   const signed = await storageProvider.signedUrl(PROOF_BUCKET, path, PROOF_URL_TTL_SECONDS);

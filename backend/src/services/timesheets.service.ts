@@ -1,3 +1,4 @@
+import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
 import { isWeekBeforeJoiningUTC, isFutureWeekUTC } from '../lib/dateUtils';
@@ -581,8 +582,7 @@ export async function uploadWeeklyClientProof(
     console.error('[timesheets] old proof cleanup failed for', id, err);
   }
 
-  const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 120);
-  const path = `weekly/${id}/${Date.now()}-${safeName}`;
+  const path = uniqueObjectPath(`weekly/${id}`, file.originalname);
   await storageProvider.upload(WEEKLY_PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
 
   const signed = await storageProvider.signedUrl(WEEKLY_PROOF_BUCKET, path, WEEKLY_PROOF_URL_TTL_SECONDS);

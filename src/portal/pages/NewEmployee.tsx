@@ -1144,10 +1144,14 @@ export default function NewEmployee() {
       // in a PUBLIC bucket and writes employees.profile_photo_url, so the avatar
       // renders everywhere. Identity-doc copies + generic docs go to /documents.
       const tasks: Promise<unknown>[] = [];
+      // Index-parallel to `tasks`, so a rejected upload can be named instead
+      // of being reported as "one or more files".
+      const taskLabels: string[] = [];
 
       if (form.profilePhotoFile) {
         const fd = new FormData();
         fd.append('file', form.profilePhotoFile);
+        taskLabels.push('Profile photo');
         tasks.push(apiClient.post(`/employees/${emp.id}/photo`, fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         }));
@@ -1164,6 +1168,7 @@ export default function NewEmployee() {
         if (file) {
           const fd = new FormData();
           fd.append('file', file);
+          taskLabels.push(`Dependent passport (${dep.firstName || dep.relationship || 'dependent'})`);
           tasks.push(apiClient.post(`/employees/${emp.id}/dependents/${dep.id}/passport`, fd, {
             headers: { 'Content-Type': 'multipart/form-data' },
           }));
@@ -1190,6 +1195,7 @@ export default function NewEmployee() {
         }
       }
       for (const u of uploads) {
+        taskLabels.push(u.docType);
         const fd = new FormData();
         fd.append('file', u.file);
         fd.append('name', u.name);
@@ -1206,8 +1212,15 @@ export default function NewEmployee() {
         setSubmitStep('uploading');
         setUploadProgress({ done: 0, total: tasks.length });
         const tracked = tasks.map(t => t.then(r => { setUploadProgress(p => ({ ...p, done: p.done + 1 })); return r; }));
-        try {
-          await Promise.all(tracked);
+        // allSettled, not all: Promise.all rejects on the FIRST failure, so the
+        // remaining uploads' outcomes were never inspected and the message
+        // could only ever say "one or more files".
+        const settled = await Promise.allSettled(tracked);
+        const failed = settled
+          .map((r, i) => (r.status === 'rejected' ? { label: taskLabels[i] ?? 'A file', reason: r.reason } : null))
+          .filter((x): x is { label: string; reason: any } => x !== null);
+
+        if (failed.length === 0) {
           // Clear staged file refs so a retry after a failed completeOnboarding()
           // call below (e.g. some other section still incomplete) won't re-upload
           // the same files again and create duplicate document rows.
@@ -1224,13 +1237,31 @@ export default function NewEmployee() {
               Object.entries(p.multiIdentityDocFiles).map(([k, v]) => [k, uploadedMultiDocTypes.includes(k) ? [] : v]),
             ),
           }));
-        } catch (uploadErr: any) {
-          // Don't fail the whole create just because an upload failed —
-          // HR can re-upload on the detail page.
-          toast.warning(
-            `Saved, but one or more files failed to upload: ${uploadErr?.response?.data?.error ?? 'unknown error'}`,
-            { duration: 8000 },
-          );
+        } else {
+          const names = [...new Set(failed.map(f => f.label))].join(', ');
+          const why = failed[0].reason?.response?.data?.error ?? failed[0].reason?.message ?? 'unknown error';
+
+          if (isOnboarding) {
+            // Going on to completeOnboarding() here is what produced the pair
+            // of red toasts an employee reported. The checklist counts a
+            // STAGED file as satisfied — correct for a form you are about to
+            // submit — so it read 100%, while the server, which only sees what
+            // actually stored, answered "Still required: ...". Neither message
+            // mentioned that an upload had failed.
+            //
+            // Staged files are deliberately NOT cleared here, so pressing
+            // Finish again retries exactly the ones that failed.
+            toast.error(
+              `Could not upload: ${names}. ${why}. Nothing else was lost — press Finish onboarding again to retry just these.`,
+              { duration: 12000 },
+            );
+            setSubmitStep(null);
+            return;
+          }
+
+          // HR creating or editing a record genuinely can re-upload from the
+          // detail page, so there the save still stands.
+          toast.warning(`Saved, but these files failed to upload: ${names}. ${why}`, { duration: 10000 });
         }
         // The photo/doc uploads happen after the create/update mutation already
         // invalidated its queries, so refresh again to pull the new photo URL.
