@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuditLog } from '../hooks/useAnalytics';
 import { UsDateInput } from '../components/shared/UsDateInput';
+import { roleLabel } from '../lib/roleLabels';
 import { format } from 'date-fns';
 
 // Must stay in step with the action union in backend/src/lib/activityLogger.ts.
@@ -75,7 +76,7 @@ export default function AuditLog() {
                     <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">{format(new Date(log.created_at), 'MMM d, yyyy HH:mm')}</td>
                     <td className="px-4 py-3">
                       <div className="font-medium text-gray-900">{log.actor?.name ?? 'System'}</div>
-                      <div className="text-xs text-gray-400 capitalize">{log.actor?.role}</div>
+                      <div className="text-xs text-gray-400">{log.actor?.role ? roleLabel(log.actor.role) : null}</div>
                     </td>
                     <td className="px-4 py-3">
                       <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${ACTION_COLORS[log.action] ?? 'bg-gray-100 text-gray-600'}`}>{log.action}</span>

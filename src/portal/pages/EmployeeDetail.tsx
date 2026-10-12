@@ -30,6 +30,7 @@ import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
+import { findIdentityDoc, hasIdentityDocDetail, photoIdOf, photoIdLabel } from '../lib/identityDocs';
 import { DetailField as Field } from '../components/shared/DetailField';
 
 const E_VERIFY_STATUS_LABELS: Record<string, string> = {
@@ -173,7 +174,9 @@ export default function EmployeeDetail() {
   // and the data looked lost rather than merely partial.
   const hasEC = !!ec && !!(ec.name || ec.phone || ec.relationship || ec.altPhone
     || ec.address || ec.city || ec.state || ec.zip);
-  const identityDocs = (employee.identityDocuments ?? []).filter(d => (d.number ?? '').trim() !== '');
+  const identityDocs = (employee.identityDocuments ?? []).filter(hasIdentityDocDetail);
+  const passport = findIdentityDoc(employee.identityDocuments, 'passport');
+  const photoId = photoIdOf(employee.identityDocuments);
   const educationList = employee.education ?? [];
   const workList = employee.workHistory ?? [];
 
@@ -645,7 +648,7 @@ export default function EmployeeDetail() {
           </CardContent>
         </Card>
 
-        {(employee.visaType || employee.ssn) && (
+        {(employee.visaType || employee.ssn || passport || photoId) && (
           <Card>
             <CardHeader><CardTitle className="text-base">Immigration & I-9</CardTitle></CardHeader>
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -657,6 +660,34 @@ export default function EmployeeDetail() {
                   <ExpiryBadge date={employee.visaExpiry} />
                 </p>
               </div>
+              {passport && (
+                <>
+                  <Field label="Passport Number" value={passport.number} mono />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Passport Expiry</p>
+                    <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
+                      <span>{formatDate(passport.expiry)}</span>
+                      <ExpiryBadge date={passport.expiry} />
+                    </p>
+                  </div>
+                </>
+              )}
+              {photoId && (
+                <>
+                  <Field
+                    label={photoIdLabel(photoId)}
+                    value={[photoId.number, photoId.state].filter(Boolean).join(' · ') || undefined}
+                    mono
+                  />
+                  <div className="min-w-0">
+                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{photoIdLabel(photoId)} Expiry</p>
+                    <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
+                      <span>{formatDate(photoId.expiry)}</span>
+                      <ExpiryBadge date={photoId.expiry} />
+                    </p>
+                  </div>
+                </>
+              )}
               <Field label="I-9 Status" value={employee.i9Status} />
               <Field label="E-Verify Status" value={employee.eVerifyStatus ? E_VERIFY_STATUS_LABELS[employee.eVerifyStatus] : undefined} />
               <Field label="E-Verify Case Number" value={employee.eVerifyCaseNumber} />

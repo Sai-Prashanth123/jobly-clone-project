@@ -1,4 +1,5 @@
 import { useAuth } from '../../hooks/useAuth';
+import { roleLabel } from '../../lib/roleLabels';
 
 // Single source of truth for the role→gradient mapping used by both this
 // brand mark's fallback icon and PortalSidebar's footer user-avatar.
@@ -43,7 +44,10 @@ export function PortalBrandMark({ compact = false }: PortalBrandMarkProps) {
       {!compact && (
         <div className="min-w-0">
           <p className="text-sm font-semibold text-gray-900 truncate">Jobly Portal</p>
-          <p className="text-xs text-gray-400 capitalize truncate">{user?.role ?? '—'}</p>
+          {/* roleLabel, not `capitalize` on the raw value: this line is what
+              still read "Operations" after the rename, while the user card at
+              the foot of the sidebar already read "Project Manager". */}
+          <p className="text-xs text-gray-400 truncate">{user ? roleLabel(user.role) : '—'}</p>
         </div>
       )}
     </div>

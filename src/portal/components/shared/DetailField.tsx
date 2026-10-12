@@ -5,11 +5,13 @@
 // email) would overflow instead of wrapping at narrow mobile widths on those
 // pages while wrapping fine on the other two. Consolidated here so all detail
 // pages render identically and can't drift again.
-export function DetailField({ label, value }: { label: string; value?: string | null }) {
+export function DetailField(
+  { label, value, mono }: { label: string; value?: string | null; mono?: boolean },
+) {
   return (
     <div className="min-w-0">
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className="text-sm text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]">{value || '—'}</p>
+      <p className={`text-sm text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]${mono ? ' font-mono' : ''}`}>{value || '—'}</p>
     </div>
   );
 }

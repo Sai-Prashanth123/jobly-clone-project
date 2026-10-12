@@ -70,9 +70,12 @@ const PERMISSIONS = [
   { feature: 'Delete Clients',           admin: true,  hr: false, ops: false, fin: false, emp: false, legal: false },
   { feature: 'View Assignments',         admin: true,  hr: false, ops: true,  fin: false, emp: true,  legal: false },
   { feature: 'Create/Edit Assignments',  admin: true,  hr: false, ops: true,  fin: false, emp: false, legal: false },
+  { feature: 'Delete Assignments',       admin: true,  hr: false, ops: false, fin: false, emp: false, legal: false },
   { feature: 'View Timesheets',          admin: true,  hr: true,  ops: true,  fin: true,  emp: true,  legal: false },
   { feature: 'Submit Timesheets',        admin: true,  hr: false, ops: false, fin: false, emp: true,  legal: false },
   { feature: 'Approve Timesheets',       admin: true,  hr: true,  ops: true,  fin: true,  emp: false, legal: false },
+  { feature: 'Delete Timesheets',        admin: true,  hr: false, ops: true,  fin: false, emp: true,  legal: false,
+    note: 'Drafts only — admin can delete at any status. Employees only their own.' },
   { feature: 'View Invoices',            admin: true,  hr: false, ops: false, fin: true,  emp: false, legal: false },
   { feature: 'Generate Invoices',        admin: true,  hr: false, ops: false, fin: true,  emp: false, legal: false },
   { feature: 'Send Invoices',            admin: true,  hr: false, ops: false, fin: true,  emp: false, legal: false },
@@ -137,7 +140,7 @@ function UsersTab() {
             <Card key={role}>
               <CardContent className="pt-4 pb-4 text-center">
                 <p className="text-2xl font-bold">{count}</p>
-                <p className="text-xs text-muted-foreground capitalize mt-1">{role}</p>
+                <p className="text-xs text-muted-foreground mt-1">{roleLabel(role)}</p>
               </CardContent>
             </Card>
           );
@@ -433,7 +436,12 @@ function PermissionsTab() {
             <TableBody>
               {PERMISSIONS.map(p => (
                 <TableRow key={p.feature}>
-                  <TableCell className="text-sm font-medium">{p.feature}</TableCell>
+                  <TableCell className="text-sm font-medium">
+                    {p.feature}
+                    {'note' in p && p.note && (
+                      <span className="block text-[11px] font-normal text-gray-500 mt-0.5">{p.note}</span>
+                    )}
+                  </TableCell>
                   <TableCell className="text-center">{p.admin ? <Check /> : <Cross />}</TableCell>
                   <TableCell className="text-center">{p.hr ? <Check /> : <Cross />}</TableCell>
                   <TableCell className="text-center">{p.ops ? <Check /> : <Cross />}</TableCell>

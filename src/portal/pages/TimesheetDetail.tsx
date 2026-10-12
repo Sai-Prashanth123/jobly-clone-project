@@ -271,7 +271,12 @@ export default function TimesheetDetail() {
             onReopen={handleReopen}
             isReopening={reopenTimesheet.isPending}
           />
-          {(user?.role === 'admin' || isOwner) && timesheet.status === 'draft' && (
+          {/* Who the backend lets through: DELETE /timesheets/:id is
+              requireRole('admin','operations','employee'), and the service
+              refuses a non-draft unless you are admin and refuses an employee
+              anyone else's sheet. Operations was missing here, so the Role
+              Permissions matrix promised a PM something with no button. */}
+          {(user?.role === 'admin' || user?.role === 'operations' || isOwner) && timesheet.status === 'draft' && (
             <Button variant="outline" size="sm" onClick={() => setDeleteOpen(true)}
               className="gap-2 text-red-600 hover:bg-red-50 border-red-200">
               <Trash2 className="h-4 w-4" />
