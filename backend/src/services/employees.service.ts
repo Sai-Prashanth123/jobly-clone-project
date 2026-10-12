@@ -4,7 +4,7 @@ import { ConflictError, NotFoundError, ForbiddenError, ValidationError } from '.
 import { logActivity } from '../lib/activityLogger';
 import { sendWelcomeEmail, sendOnboardingCompletedEmail, sendOnboardingChangesRequestedEmail, sendDocumentRequestEmail, mailerConfigured } from '../lib/mailer';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId } from './notifications.service';
-import { computeOnboarding } from '../lib/onboarding';
+import { computeOnboarding, identityDocLabel } from '../lib/onboarding';
 import { todayUTC } from '../lib/dateUtils';
 import { generateTasksForEmployee } from './onboardingChecklist.service';
 import { sanitizeForPostgrestFilter } from '../lib/postgrestSanitize';
@@ -1828,7 +1828,7 @@ export async function listExpiringDocuments(days = 90, viewerRole = 'admin'): Pr
       // NaN days remaining.
       if (!/^\d{4}-\d{2}-\d{2}$/.test(expiry)) continue;
       const diff = Math.ceil((new Date(expiry).getTime() - new Date(today).getTime()) / 86400000);
-      const label = doc.label ?? doc.type ?? 'Document';
+      const label = identityDocLabel(doc.type, doc.label);
       results.push({
         employeeId: emp.id, displayId: emp.display_id ?? '',
         firstName: emp.first_name ?? '', lastName: emp.last_name ?? '',

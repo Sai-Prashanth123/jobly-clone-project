@@ -100,6 +100,60 @@ export const EXPIRY_REQUIRED_DOC_KEYS: Record<string, string> = {
   'I-797': 'i797',
 };
 
+/**
+ * How each `identity_documents[].type` key is NAMED to a human.
+ *
+ * The Expiring Documents list was showing raw keys — HR was reading "i20",
+ * "opt_card" and "us_visa" — because those rows carry a `type` and only
+ * sometimes a `label`, and the fallback was the key itself.
+ *
+ * Mirrors IDENTITY_DOC_ROWS in src/portal/lib/documentTypes.ts, which is where
+ * these labels are authored. contracts.test.ts asserts the two agree, because
+ * a label that drifts here shows the wrong name on a compliance report.
+ */
+export const IDENTITY_DOC_TYPE_LABELS: Record<string, string> = {
+  ssn: 'Social Security Card',
+  driver_license: "Driver's License",
+  state_id: 'State-Issued ID',
+  passport: 'Passport',
+  green_card: 'Permanent Resident Card',
+  ead: 'Employment Authorization Document',
+  opt_card: 'OPT Card',
+  stem_opt_card: 'STEM OPT Card',
+  i983: 'I-983',
+  i20: 'I-20',
+  i94: 'I-94',
+  us_visa: 'Visa',
+  resume: 'Resume',
+  offer_letter: 'Offer Letter',
+  i9_form: 'I-9 Form',
+  w4: 'W-4',
+  insurance_waiver: 'Insurance Waiver Form',
+  i140_questionnaire: 'I-140 Beneficiary Questionnaire (EB2&3)',
+  perm_questionnaire: 'PERM Questionnaire - Employee',
+  h1b_employee_questionnaire: 'H-1B Employee Questionnaire',
+  h4_beneficiary_questionnaire: 'H-4 Beneficiary Questionnaire',
+  i797: 'I-797',
+  pay_stubs_w2_tax_returns: 'Pay Stubs, W-2s & Tax Returns',
+  vendor_letter: 'Vendor Letter',
+  project_documents: 'Project-Related Documents',
+  lca: 'LCA',
+  experience_letters: 'Experience / Reference Letters',
+  education_documents: 'Education Documents & Academic Credentials',
+  certificates: 'Certificates',
+  i140: 'I-140',
+  i140_approval_notice: 'I-140 Approval Notice',
+  labor_certificate: 'Labor Certificate (PERM)',
+  other: 'Other Documents',
+};
+
+/** Display name for an identity-document row. Falls back to the raw key. */
+export function identityDocLabel(type?: string | null, label?: string | null): string {
+  if (label && label.trim()) return label;
+  if (!type) return 'Document';
+  return IDENTITY_DOC_TYPE_LABELS[type] ?? type;
+}
+
 export const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
   'Social Security Card': ['Social Security Number'],
   // Row renamed from "US Visa" per HR. Mirrors LEGACY_LABEL_ALIASES in

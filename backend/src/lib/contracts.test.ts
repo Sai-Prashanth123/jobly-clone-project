@@ -23,6 +23,8 @@ import {
   VISA_REQUIRED_EXTRA_DOCS as BACKEND_VISA_EXTRAS,
   DOC_TYPE_LEGACY_ALIASES as BACKEND_LEGACY_ALIASES,
   EXPIRY_REQUIRED_DOC_KEYS as BACKEND_EXPIRY_KEYS,
+  IDENTITY_DOC_TYPE_LABELS as BACKEND_TYPE_LABELS,
+  identityDocLabel,
 } from './onboarding';
 import {
   REQUIRED_IDENTITY_TYPES,
@@ -110,5 +112,37 @@ describe('frontend/backend document rules agree', () => {
         expect(rowLabels.has(label), `"${label}" is required but matches no IDENTITY_DOC_ROWS row`).toBe(true);
       }
     }
+  });
+});
+
+// The Expiring Documents list and the nightly alert read
+// identity_documents[].type and have to turn it into a name. Those names are
+// authored on the frontend, in IDENTITY_DOC_ROWS, so a backend copy can drift
+// -- and a wrong name on a compliance report is worse than an ugly one. HR was
+// reading raw keys ("i20", "opt_card", "us_visa") before this map existed.
+describe('identity document type labels agree with the wizard', () => {
+  it('covers every row the wizard can write', () => {
+    const missing = IDENTITY_DOC_ROWS.map(r => r.type).filter(t => !(t in BACKEND_TYPE_LABELS));
+    expect(missing, 'types with no backend label').toEqual([]);
+  });
+
+  it('uses exactly the wizard label for each type', () => {
+    for (const row of IDENTITY_DOC_ROWS) {
+      expect(BACKEND_TYPE_LABELS[row.type], `label for ${row.type}`).toBe(row.label);
+    }
+  });
+
+  it('has no backend label for a type the wizard cannot produce', () => {
+    const rowTypes = new Set(IDENTITY_DOC_ROWS.map(r => r.type));
+    const extra = Object.keys(BACKEND_TYPE_LABELS).filter(t => !rowTypes.has(t));
+    expect(extra, 'backend labels for unknown types').toEqual([]);
+  });
+
+  it('prefers a label stored on the row, then the map, then the raw key', () => {
+    expect(identityDocLabel('i20', 'Custom Name')).toBe('Custom Name');
+    expect(identityDocLabel('i20', '   ')).toBe('I-20');
+    expect(identityDocLabel('i20')).toBe('I-20');
+    expect(identityDocLabel('something_new')).toBe('something_new');
+    expect(identityDocLabel(null)).toBe('Document');
   });
 });

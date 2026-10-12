@@ -1,4 +1,5 @@
 import { supabaseAdmin } from '../config/supabase';
+import { identityDocLabel } from '../lib/onboarding';
 import {
   MAX_ALERT_INTERVAL_DAYS, shouldAlert, docAlertKey, parseDocAlertKey,
   expiryUrgency, describeExpiry, daysBetween,
@@ -506,7 +507,7 @@ export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number; ski
       // fields; `new Date('')` is Invalid Date and would alert on NaN days.
       if (!/^\d{4}-\d{2}-\d{2}$/.test(doc.expiry)) continue;
       expiringDocs.push({
-        type: doc.label ?? doc.type ?? 'Document',
+        type: identityDocLabel(doc.type, doc.label),
         expiry: doc.expiry,
         daysLeft: daysLeftFor(doc.expiry),
       });
