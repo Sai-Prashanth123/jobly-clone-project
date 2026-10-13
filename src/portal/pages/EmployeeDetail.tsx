@@ -1,5 +1,4 @@
 import { identityDocLabel } from '../lib/documentTypes';
-import { canSeeSensitiveDocs } from '../lib/docVisibility';
 import { formatAddress } from '@/portal/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -143,8 +142,6 @@ export default function EmployeeDetail() {
   const allEmployees = allEmployeesData?.data ?? [];
   const reportingManager = allEmployees.find(e => e.id === employee?.reportingManagerId);
   const canManage = user?.role === 'admin' || user?.role === 'hr';
-  // Immigration and education paperwork: admin + Project Manager only.
-  const canSeeDocs = canSeeSensitiveDocs(user?.role);
 
   // Candidates quick-added from the New Case form deliberately get no portal
   // credentials (see createEmployee's isCandidate branch), so they can't sign
@@ -615,7 +612,7 @@ export default function EmployeeDetail() {
             <Field label="Start Date" value={formatDate(employee.startDate)} />
             <Field label="Work Location" value={employee.workLocation} />
             <Field label="Reporting Manager" value={reportingManager ? `${reportingManager.firstName} ${reportingManager.lastName}` : undefined} />
-            {canSeeDocs && usVisa && (
+            {usVisa && (
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Visa Expiry</p>
                 <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
@@ -624,7 +621,7 @@ export default function EmployeeDetail() {
                 </p>
               </div>
             )}
-            {canSeeDocs && i797 && (
+            {i797 && (
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">I-797 Expiry</p>
                 <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
@@ -633,7 +630,7 @@ export default function EmployeeDetail() {
                 </p>
               </div>
             )}
-            {canSeeDocs && lcaCount > 0 && (
+            {lcaCount > 0 && (
               <Field label="LCA" value={`${lcaCount} on file`} />
             )}
           </CardContent>
@@ -695,7 +692,7 @@ export default function EmployeeDetail() {
                   </div>
                 </>
               )}
-              {canSeeDocs && photoId && (
+              {photoId && (
                 <>
                   <Field
                     label={photoIdLabel(photoId)}
@@ -711,13 +708,9 @@ export default function EmployeeDetail() {
                   </div>
                 </>
               )}
-              {canSeeDocs && (
-                <>
-                  <Field label="I-9 Status" value={employee.i9Status} />
-                  <Field label="E-Verify Status" value={employee.eVerifyStatus ? E_VERIFY_STATUS_LABELS[employee.eVerifyStatus] : undefined} />
-                  <Field label="E-Verify Case Number" value={employee.eVerifyCaseNumber} />
-                </>
-              )}
+              <Field label="I-9 Status" value={employee.i9Status} />
+              <Field label="E-Verify Status" value={employee.eVerifyStatus ? E_VERIFY_STATUS_LABELS[employee.eVerifyStatus] : undefined} />
+              <Field label="E-Verify Case Number" value={employee.eVerifyCaseNumber} />
               {employee.ssn ? (
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Social Security Number</p>
@@ -762,7 +755,7 @@ export default function EmployeeDetail() {
         )}
       </div>
 
-      {canSeeDocs && identityDocs.length > 0 && (
+      {identityDocs.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Identity & Documents</CardTitle></CardHeader>
           <CardContent>
@@ -790,7 +783,7 @@ export default function EmployeeDetail() {
         </Card>
       )}
 
-      {canSeeDocs && educationList.length > 0 && (
+      {educationList.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Education ({educationList.length})</CardTitle></CardHeader>
           <CardContent>
@@ -847,7 +840,7 @@ export default function EmployeeDetail() {
         </Card>
       )}
 
-      {canSeeDocs && employee.documents.length > 0 && (
+      {employee.documents.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Documents</CardTitle></CardHeader>
           <CardContent>

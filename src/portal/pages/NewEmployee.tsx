@@ -395,6 +395,21 @@ export default function NewEmployee() {
   const { data: existingEmployee, isLoading: loadingEmployee, isError: employeeLoadError, refetch: refetchEmployee } = useEmployee(editId);
   const { data: employeesData } = useEmployees({ limit: 500 }, { enabled: canListEmployees });
 
+  // Managers to choose from: everyone except the person being edited, who
+  // cannot report to themselves. Sorted by name — 500 rows is why the Select's
+  // typeahead matters.
+  const managerOptions = useMemo(() => {
+    const rows = employeesData?.data ?? [];
+    return rows
+      .filter(e => e.id !== editId)
+      .map(e => ({
+        id: e.id,
+        name: `${e.firstName ?? ''} ${e.lastName ?? ''}`.trim() || e.displayId || 'Unnamed',
+        jobTitle: e.jobTitle,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name));
+  }, [employeesData, editId]);
+
   const [form, setForm] = useState<FormState>(defaultForm);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitError, setSubmitError] = useState<string>('');
@@ -2208,6 +2223,33 @@ export default function NewEmployee() {
                 />
                 <FieldError msg={errors.workLocation} />
               </div>
+              {/* Reporting Manager was displayed on the employee profile and
+                  collected nowhere — the field existed in form state, in the
+                  hydration and in the submit payload, but no control ever set
+                  it, so it read "—" for everyone.
+
+                  HR-side only: who someone reports to is an assignment the
+                  company makes, not something a new hire tells us. Same
+                  treatment as I-9 and E-Verify status below. */}
+              {!isOnboarding && (
+                <div className="sm:col-span-2">
+                  <Label>Reporting Manager</Label>
+                  <Select
+                    value={form.reportingManagerId || 'none'}
+                    onValueChange={v => set('reportingManagerId', v === 'none' ? '' : v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Select a manager" /></SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      <SelectItem value="none">— None —</SelectItem>
+                      {managerOptions.map(m => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.name}{m.jobTitle ? ` · ${m.jobTitle}` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
           </SectionCard>
 
