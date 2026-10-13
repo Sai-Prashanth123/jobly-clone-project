@@ -584,3 +584,73 @@ html:has(.portal-scope)::-webkit-scrollbar-thumb:hover {
   pointer-events: none;
   height: 0;
 }
+
+/* ── Organization chart ─────────────────────────────────────────────────────
+   A top-down tree drawn with CSS connectors rather than SVG, so the nodes stay
+   real DOM (searchable, focusable, clickable) and the lines cost nothing to
+   re-render when a branch collapses.
+
+   Each level is a <ul>; each person an <li>. The connectors are borders on
+   pseudo-elements: a stub rising from each child, a horizontal rule spanning
+   the row, and a stub dropping from the parent. The first and last child trim
+   the horizontal rule so it stops at the outermost sibling instead of running
+   off into space. */
+.portal-scope .org-tree ul {
+  display: flex;
+  justify-content: center;
+  padding-top: 22px;
+  position: relative;
+  margin: 0;
+  list-style: none;
+}
+.portal-scope .org-tree li {
+  position: relative;
+  padding: 22px 10px 0;
+  text-align: center;
+  list-style: none;
+}
+/* Vertical stub above each child, and the horizontal rule joining siblings. */
+.portal-scope .org-tree li::before,
+.portal-scope .org-tree li::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 50%;
+  border-top: 2px solid #dbe3f0;
+  width: 50%;
+  height: 22px;
+}
+.portal-scope .org-tree li::after {
+  right: auto;
+  left: 50%;
+  border-left: 2px solid #dbe3f0;
+}
+/* A lone child needs only the vertical stub, not a horizontal rule. */
+.portal-scope .org-tree li:only-child::after,
+.portal-scope .org-tree li:only-child::before {
+  display: none;
+}
+.portal-scope .org-tree li:only-child { padding-top: 0; }
+/* Trim the rule at the ends of a row. */
+.portal-scope .org-tree li:first-child::before,
+.portal-scope .org-tree li:last-child::after { border: 0 none; }
+.portal-scope .org-tree li:last-child::before {
+  border-right: 2px solid #dbe3f0;
+  border-radius: 0 6px 0 0;
+}
+.portal-scope .org-tree li:first-child::after { border-radius: 6px 0 0 0; }
+/* Stub dropping from a parent to its row of children. */
+.portal-scope .org-tree ul ul::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 50%;
+  border-left: 2px solid #dbe3f0;
+  width: 0;
+  height: 22px;
+}
+/* The root level has nothing above it to connect to. */
+.portal-scope .org-tree > ul { padding-top: 0; }
+.portal-scope .org-tree > ul > li { padding-top: 0; }
+.portal-scope .org-tree > ul > li::before,
+.portal-scope .org-tree > ul > li::after { display: none; }

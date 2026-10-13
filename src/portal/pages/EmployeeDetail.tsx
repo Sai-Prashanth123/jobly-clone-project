@@ -1,4 +1,5 @@
 import { identityDocLabel } from '../lib/documentTypes';
+import { canSeeRestrictedDocs, visibleIdentityDocs, visibleDocuments } from '../lib/docVisibility';
 import { formatAddress } from '@/portal/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -142,6 +143,10 @@ export default function EmployeeDetail() {
   const allEmployees = allEmployeesData?.data ?? [];
   const reportingManager = allEmployees.find(e => e.id === employee?.reportingManagerId);
   const canManage = user?.role === 'admin' || user?.role === 'hr';
+  // Nine named immigration/compliance documents are manager-only. Everything
+  // else — resume, W-4, offer letter, insurance waiver, SSN card, passport —
+  // stays visible to everyone who can open this page, which is what HR needs.
+  const canSeeRestricted = canSeeRestrictedDocs(user?.role);
 
   // Candidates quick-added from the New Case form deliberately get no portal
   // credentials (see createEmployee's isCandidate branch), so they can't sign
@@ -166,7 +171,10 @@ export default function EmployeeDetail() {
   // and the data looked lost rather than merely partial.
   const hasEC = !!ec && !!(ec.name || ec.phone || ec.relationship || ec.altPhone
     || ec.address || ec.city || ec.state || ec.zip);
-  const identityDocs = (employee.identityDocuments ?? []).filter(hasIdentityDocDetail);
+  const identityDocs = visibleIdentityDocs(
+    (employee.identityDocuments ?? []).filter(hasIdentityDocDetail),
+    user?.role,
+  );
   const passport = findIdentityDoc(employee.identityDocuments, 'passport');
   const photoId = photoIdOf(employee.identityDocuments);
   // Work-authorisation paperwork HR wants beside the job details rather than
@@ -612,7 +620,7 @@ export default function EmployeeDetail() {
             <Field label="Start Date" value={formatDate(employee.startDate)} />
             <Field label="Work Location" value={employee.workLocation} />
             <Field label="Reporting Manager" value={reportingManager ? `${reportingManager.firstName} ${reportingManager.lastName}` : undefined} />
-            {usVisa && (
+            {canSeeRestricted && usVisa && (
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Visa Expiry</p>
                 <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
@@ -621,7 +629,7 @@ export default function EmployeeDetail() {
                 </p>
               </div>
             )}
-            {i797 && (
+            {canSeeRestricted && i797 && (
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">I-797 Expiry</p>
                 <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
@@ -630,7 +638,7 @@ export default function EmployeeDetail() {
                 </p>
               </div>
             )}
-            {lcaCount > 0 && (
+            {canSeeRestricted && lcaCount > 0 && (
               <Field label="LCA" value={`${lcaCount} on file`} />
             )}
           </CardContent>
@@ -692,7 +700,7 @@ export default function EmployeeDetail() {
                   </div>
                 </>
               )}
-              {photoId && (
+              {canSeeRestricted && photoId && (
                 <>
                   <Field
                     label={photoIdLabel(photoId)}
@@ -708,9 +716,13 @@ export default function EmployeeDetail() {
                   </div>
                 </>
               )}
-              <Field label="I-9 Status" value={employee.i9Status} />
-              <Field label="E-Verify Status" value={employee.eVerifyStatus ? E_VERIFY_STATUS_LABELS[employee.eVerifyStatus] : undefined} />
-              <Field label="E-Verify Case Number" value={employee.eVerifyCaseNumber} />
+              {canSeeRestricted && (
+                <>
+                  <Field label="I-9 Status" value={employee.i9Status} />
+                  <Field label="E-Verify Status" value={employee.eVerifyStatus ? E_VERIFY_STATUS_LABELS[employee.eVerifyStatus] : undefined} />
+                  <Field label="E-Verify Case Number" value={employee.eVerifyCaseNumber} />
+                </>
+              )}
               {employee.ssn ? (
                 <div className="min-w-0">
                   <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Social Security Number</p>
@@ -783,7 +795,7 @@ export default function EmployeeDetail() {
         </Card>
       )}
 
-      {educationList.length > 0 && (
+      {canSeeRestricted && educationList.length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Education ({educationList.length})</CardTitle></CardHeader>
           <CardContent>
@@ -840,12 +852,12 @@ export default function EmployeeDetail() {
         </Card>
       )}
 
-      {employee.documents.length > 0 && (
+      {visibleDocuments(employee.documents, user?.role).length > 0 && (
         <Card>
           <CardHeader><CardTitle className="text-base">Documents</CardTitle></CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {employee.documents.map(doc => (
+              {visibleDocuments(employee.documents, user?.role).map(doc => (
                 <div key={doc.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">

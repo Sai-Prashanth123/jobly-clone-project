@@ -23,6 +23,7 @@ import MyProfile from './pages/MyProfile';
 // PortalApp chunk. The biggest wins are Reports (Recharts + 16 report
 // components) and all the detail pages (each pulls in the matching form).
 const EmployeeDetail = lazy(() => import('./pages/EmployeeDetail'));
+const OrgChart = lazy(() => import('./pages/OrgChart'));
 const ClientDetail = lazy(() => import('./pages/ClientDetail'));
 const AssignmentDetail = lazy(() => import('./pages/AssignmentDetail'));
 const TimesheetDetail = lazy(() => import('./pages/TimesheetDetail'));
@@ -205,6 +206,16 @@ export default function PortalApp() {
               element={
                 <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
                   <EmployeeDetail />
+                </ProtectedRoute>
+              }
+            />
+            {/* Same audience as the employee record it is built from — the
+                chart is just another view of who reports to whom. */}
+            <Route
+              path="org-chart"
+              element={
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
+                  <OrgChart />
                 </ProtectedRoute>
               }
             />
