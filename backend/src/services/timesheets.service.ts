@@ -2,7 +2,7 @@ import { MAX_PRESIGNED_SECONDS } from '../lib/storage/presign';
 import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isWeekBeforeJoiningUTC, isFutureWeekUTC } from '../lib/dateUtils';
+import { isWeekBeforeJoiningUTC, isBeyondFutureSubmitWindowUTC, FUTURE_SUBMIT_WINDOW_DAYS } from '../lib/dateUtils';
 import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
@@ -313,12 +313,15 @@ export async function patchTimesheetStatus(
     throw new ForbiddenError(`Role '${userRole}' cannot set status to '${action}'`);
   }
 
-  // A week that hasn't started yet can be drafted ahead of time (see the
-  // comment in createTimesheet), but it can't actually be submitted or
-  // approved — you can't attest to or sign off on hours for days that
-  // haven't happened yet. Applies to every role, including admin.
-  if ((action === 'submitted' || action === 'manager_approved') && isFutureWeekUTC(ts.week_start_date)) {
-    throw new ValidationError(`This timesheet is for the week of ${ts.week_start_date}, which hasn't started yet — it can't be ${action === 'submitted' ? 'submitted' : 'approved'} until that week begins.`);
+  // Submitting ahead is allowed up to FUTURE_SUBMIT_WINDOW_DAYS, per HR —
+  // people work to a rota and want known hours filed in advance. It used to be
+  // refused outright for any week past the current Monday, while the creation
+  // picker happily offered twelve weeks ahead, so a timesheet could be built
+  // and then rejected at the one step that mattered. Applies to every role
+  // including admin: the limit is about attesting to hours that have not
+  // happened, which seniority does not change.
+  if ((action === 'submitted' || action === 'manager_approved') && isBeyondFutureSubmitWindowUTC(ts.week_start_date)) {
+    throw new ValidationError(`This timesheet is for the week of ${ts.week_start_date}, which is more than ${FUTURE_SUBMIT_WINDOW_DAYS} days away — it can't be ${action === 'submitted' ? 'submitted' : 'approved'} yet.`);
   }
 
   // Submit-time gates (only checked when transitioning into `submitted`).

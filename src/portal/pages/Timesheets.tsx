@@ -54,7 +54,13 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
     : undefined;
   const fallbackCutoff = getMondayOfWeek(new Date(Date.now() - 26 * 7 * 86400000)).toISOString().split('T')[0];
   const minWeekStr = joiningMondayStr ?? fallbackCutoff;
-  const maxWeekStr = getMondayOfWeek(new Date(Date.now() + 12 * 7 * 86400000)).toISOString().split('T')[0];
+  // Matches the server's submission window (FUTURE_SUBMIT_WINDOW_DAYS in
+  // backend/src/lib/dateUtils.ts). It used to offer twelve weeks while the
+  // server refused anything past the current week, so the picker invited a
+  // timesheet that could be filled in and then never submitted — the employee
+  // found out only at the final step.
+  const FUTURE_SUBMIT_WINDOW_DAYS = 30;
+  const maxWeekStr = getMondayOfWeek(new Date(Date.now() + FUTURE_SUBMIT_WINDOW_DAYS * 86400000)).toISOString().split('T')[0];
 
   // Existing timesheets for the selected employee — used to flag weeks that
   // already have a (non-rejected) timesheet on this assignment so the picker

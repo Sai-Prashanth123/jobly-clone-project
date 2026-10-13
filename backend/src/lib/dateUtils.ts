@@ -78,12 +78,44 @@ export function isCurrentOrFutureWeekUTC(weekStart: string): boolean {
 
 /**
  * True if `weekStart` (a YYYY-MM-DD Monday) is STRICTLY AFTER the current ISO
- * week's Monday — i.e. a week that hasn't started yet. Used to block creating or
- * submitting a timesheet for a future week (applies to ALL roles incl. admin —
- * you can't log hours for a week that hasn't happened).
+ * week's Monday — i.e. a week that hasn't started yet.
+ *
+ * Kept as the plain predicate; the submission gate uses
+ * {@link isBeyondFutureSubmitWindowUTC} below, which allows a lead time.
  */
 export function isFutureWeekUTC(weekStart: string): boolean {
   return weekStart > currentMondayUTC();
+}
+
+/**
+ * How far ahead a timesheet may be submitted.
+ *
+ * Employees work to a rota and want to file known hours in advance; the
+ * creation picker already offered twelve weeks ahead while submission refused
+ * anything past the current Monday, so people could build a timesheet they
+ * could never submit and were told only at the last step. HR asked for 30 days.
+ *
+ * Expressed in days from today rather than in weeks, because that is how the
+ * request was phrased and how anyone will reason about it.
+ */
+export const FUTURE_SUBMIT_WINDOW_DAYS = 30;
+
+/** Today + `days`, as YYYY-MM-DD, computed in UTC. */
+export function dateAfterDaysUTC(days: number): string {
+  const now = new Date();
+  const then = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + days));
+  return then.toISOString().split('T')[0];
+}
+
+/**
+ * True if a week starts further ahead than submission allows.
+ *
+ * A week exactly `FUTURE_SUBMIT_WINDOW_DAYS` out is still allowed — the
+ * boundary is inclusive, since "up to 30 days" reads that way to the person
+ * who asked for it.
+ */
+export function isBeyondFutureSubmitWindowUTC(weekStart: string): boolean {
+  return weekStart > dateAfterDaysUTC(FUTURE_SUBMIT_WINDOW_DAYS);
 }
 
 /** UTC current year and 1-indexed month (matches the columns on monthly_timesheets). */
