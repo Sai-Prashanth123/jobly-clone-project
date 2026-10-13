@@ -1201,6 +1201,7 @@ CREATE TABLE public.monthly_timesheets (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     leave_reason text,
     client_signed_url text,
+    client_signed_path text,
     client_signed_filename text,
     hr_notes text,
     CONSTRAINT monthly_timesheets_month_check CHECK (((month >= 1) AND (month <= 12)))
@@ -1597,6 +1598,7 @@ CREATE TABLE public.timesheets (
     notes text,
     leave_reason text,
     client_signed_url text,
+    client_signed_path text,
     client_signed_filename text,
     hr_notes text
 );

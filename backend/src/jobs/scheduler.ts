@@ -2,7 +2,8 @@ import cron from 'node-cron';
 import { supabaseAdmin } from '../config/supabase';
 import { env } from '../config/env';
 import { todayUTC, daysBetween } from '../lib/dateUtils';
-import { sendInvoiceReminderEmail, mailerConfigured } from '../lib/mailer';
+import { sendInvoiceReminderEmail, sendCustomEmail, mailerConfigured } from '../lib/mailer';
+import { BILLING_EMAIL } from '../lib/billing';
 import { reactivateReturnedEmployees } from '../services/employees.service';
 import {
   triggerTimesheetReminders,
@@ -73,6 +74,29 @@ async function processReminders(): Promise<void> {
       console.error('[scheduler] overdue notification failed for', inv.invoiceNumber, err);
     }
   }
+  // ...and one digest email to accounts payable, which is what HR actually
+  // asked for ("Overdue invoice to be notified to ap@"). One message listing
+  // everything that turned overdue today rather than one per invoice: on a bad
+  // month that difference is a dozen emails against one.
+  if (wentOverdue.length > 0 && mailerConfigured) {
+    try {
+      const rows = wentOverdue
+        .map(i => `<tr><td style="padding:6px 12px;">${i.invoiceNumber}</td><td style="padding:6px 12px;">due ${i.dueDate}</td><td style="padding:6px 12px;text-align:right;">${i.balance.toFixed(2)}</td></tr>`)
+        .join('');
+      const total = wentOverdue.reduce((sum, i) => sum + i.balance, 0);
+      await sendCustomEmail({
+        to: BILLING_EMAIL,
+        subject: `${wentOverdue.length} invoice${wentOverdue.length === 1 ? '' : 's'} now overdue`,
+        html: `<p>The following invoice${wentOverdue.length === 1 ? ' has' : 's have'} passed their due date with a balance outstanding.</p>
+<table style="border-collapse:collapse;font-size:14px;">${rows}</table>
+<p style="margin-top:14px;"><strong>Total outstanding: ${total.toFixed(2)}</strong></p>`,
+      });
+    } catch (err) {
+      // Never let a failed digest stop the rest of the nightly tick.
+      console.error('[scheduler] overdue digest email failed', err);
+    }
+  }
+
   if (wentOverdue.length > 0) {
     console.log(`[scheduler] ${wentOverdue.length} invoice(s) went overdue`);
   }

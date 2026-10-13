@@ -126,11 +126,30 @@ export async function listMonthlyTimesheets(query: ListMonthlyTimesheetsQuery, u
   return { data: data ?? [], total: count ?? 0 };
 }
 
+/**
+ * Replace the stored proof URL with one minted now — see the weekly
+ * equivalent in timesheets.service.ts. A presigned URL cannot outlive 7 days,
+ * so the copy written at upload goes stale; the object's path does not.
+ * Rows predating client_signed_path keep whatever URL they have, and a
+ * re-signing failure leaves the row alone rather than failing the read.
+ */
+async function withFreshProofUrl<T extends Record<string, unknown>>(row: T): Promise<T> {
+  const path = row.client_signed_path as string | null | undefined;
+  if (!path) return row;
+  try {
+    const url = await storageProvider.signedUrl(PROOF_BUCKET, path, MAX_PRESIGNED_SECONDS);
+    return { ...row, client_signed_url: url };
+  } catch (err) {
+    console.error('[monthlyTimesheets] could not re-sign the client proof for', row.id, err);
+    return row;
+  }
+}
+
 export async function getMonthlyTimesheet(id: string) {
   const { data, error } = await supabaseAdmin
     .from('monthly_timesheets').select(EMP_JOIN).eq('id', id).single();
   if (error || !data) throw new NotFoundError('Monthly timesheet not found');
-  return data;
+  return withFreshProofUrl(data);
 }
 
 export async function getMyMonth(employeeId: string | null | undefined, year: number, month: number) {
@@ -139,7 +158,7 @@ export async function getMyMonth(employeeId: string | null | undefined, year: nu
     .from('monthly_timesheets').select('*')
     .eq('employee_id', employeeId).eq('year', year).eq('month', month)
     .maybeSingle();
-  return data ?? null;
+  return data ? await withFreshProofUrl(data) : null;
 }
 
 /**
@@ -609,7 +628,8 @@ export async function uploadMonthlyClientProof(
 
   const { data: updated, error: dbErr } = await supabaseAdmin
     .from('monthly_timesheets')
-    .update({ client_signed_url: signed, client_signed_filename: file.originalname })
+    // See the weekly equivalent: the path is durable, the URL is not.
+    .update({ client_signed_url: signed, client_signed_path: path, client_signed_filename: file.originalname })
     .eq('id', id).select().single();
   if (dbErr) throw dbErr;
 

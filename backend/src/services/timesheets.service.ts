@@ -67,7 +67,34 @@ export async function getTimesheet(id: string, actorRole?: string, actorEmployee
   if (actorRole === 'employee' && data.employee_id !== actorEmployeeId) {
     throw new ForbiddenError('You can only view your own timesheet.');
   }
-  return data;
+  return withFreshProofUrl(data, WEEKLY_PROOF_BUCKET);
+}
+
+/**
+ * Replace the stored proof URL with one minted now.
+ *
+ * A presigned URL cannot live longer than 7 days (the AWS maximum), so the
+ * copy written at upload time goes stale. The object's path does not, so the
+ * link is rebuilt on every read and never expires from the reader's point of
+ * view.
+ *
+ * Rows uploaded before client_signed_path existed keep whatever URL they have
+ * — there is nothing to re-sign from, and a dead link is still better than
+ * blanking a proof somebody uploaded.
+ *
+ * Failures are swallowed on purpose: a timesheet that loads without a working
+ * proof link beats one that will not load at all.
+ */
+async function withFreshProofUrl<T extends Record<string, unknown>>(row: T, bucket: string): Promise<T> {
+  const path = row.client_signed_path as string | null | undefined;
+  if (!path) return row;
+  try {
+    const url = await storageProvider.signedUrl(bucket, path, MAX_PRESIGNED_SECONDS);
+    return { ...row, client_signed_url: url };
+  } catch (err) {
+    console.error('[timesheets] could not re-sign the client proof for', row.id, err);
+    return row;
+  }
 }
 
 // Per-day hours already logged on WEEKLY timesheets overlapping a calendar
@@ -618,7 +645,9 @@ export async function uploadWeeklyClientProof(
 
   const { data: updated, error: dbErr } = await supabaseAdmin
     .from('timesheets')
-    .update({ client_signed_url: signed, client_signed_filename: file.originalname })
+    // The path is the durable value; the URL is a convenience copy that goes
+    // stale in 7 days (the AWS maximum) and is re-minted on every read.
+    .update({ client_signed_url: signed, client_signed_path: path, client_signed_filename: file.originalname })
     .eq('id', id).select().single();
   if (dbErr) throw dbErr;
 

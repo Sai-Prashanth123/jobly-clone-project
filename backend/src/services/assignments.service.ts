@@ -173,6 +173,34 @@ export async function updateAssignment(id: string, input: UpdateAssignmentInput,
   if (input.workLocation !== undefined) updateData.work_location = input.workLocation;
   if (input.reportingManagerId !== undefined) updateData.reporting_manager_id = input.reportingManagerId;
   if (input.notes !== undefined) updateData.notes = input.notes;
+
+  // Validate the dates that will actually be stored, not just the ones sent.
+  //
+  // The Zod refine only compares startDate and endDate when BOTH are in the
+  // payload, so moving one of them alone skipped every check — and the edit
+  // form sends only what changed. Back-dating end_date by a month therefore
+  // sailed through, and the consequences were all silent: the assignment
+  // dropped out of the timesheet picker (the list filters on the decorated
+  // status, which flips to 'completed' once end_date is past), monthly
+  // attendance marked every day outside the window absent, and the reports —
+  // which filter on the STORED status — carried on demanding timesheets for it.
+  const nextStart = (input.startDate !== undefined ? input.startDate : existing.start_date) as string | null;
+  const nextEnd = (input.endDate !== undefined ? input.endDate : existing.end_date) as string | null;
+  if (nextStart && nextEnd && nextEnd < nextStart) {
+    throw new ValidationError('End date must be on or after the start date.');
+  }
+
+  // Re-derive status the way createAssignment does. Without this an assignment
+  // edited back into the future keeps whatever status it had, so the stored
+  // value and the one every read overlays disagree — which is exactly how the
+  // picker and the reports came to tell different stories.
+  if (input.status === undefined && (input.startDate !== undefined || input.endDate !== undefined)) {
+    const today = todayUTC();
+    if (nextEnd && nextEnd < today) updateData.status = 'completed';
+    else if (nextStart && nextStart > today) updateData.status = 'pending';
+    else updateData.status = 'active';
+  }
+
   if (actorId) updateData.updated_by = actorId;
 
   const { data, error } = await supabaseAdmin
