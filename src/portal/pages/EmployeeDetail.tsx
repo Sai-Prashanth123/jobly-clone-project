@@ -644,37 +644,12 @@ export default function EmployeeDetail() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Payroll</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Field label="Pay Rate" value={formatCurrency(employee.payRate)} />
-            <Field label="Pay Type" value={employee.payType} />
-            <Field label="Payment Type" value={employee.paymentType?.toUpperCase()} />
-            <Field label="Tax Form" value={employee.taxFormType?.toUpperCase()} />
-            {employee.bankName && <Field label="Bank Name" value={employee.bankName} />}
-            {employee.bankRoutingNumber && (
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Routing Number</p>
-                <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
-                  <span className="text-sm font-mono text-gray-900 break-words [overflow-wrap:anywhere] min-w-0">
-                    {bankDetailsVisible ? employee.bankRoutingNumber : `****${employee.bankRoutingNumber.slice(-4)}`}
-                  </span>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-700 flex-shrink-0" onClick={() => setBankDetailsVisible(v => !v)} title={bankDetailsVisible ? 'Hide bank details' : 'Show bank details'}>
-                    {bankDetailsVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  </Button>
-                </div>
-              </div>
-            )}
-            {employee.bankAccountNumber && (
-              <div className="min-w-0">
-                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Account Number</p>
-                <p className="text-sm font-mono text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]">
-                  {bankDetailsVisible ? employee.bankAccountNumber : `****${employee.bankAccountNumber.slice(-4)}`}
-                </p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+        {/* The Payroll card was here. Removed from the employee record per HR
+            (Oct 2026), having already been removed from the employee's own
+            profile — pay rate, pay/payment type, tax form and bank details are
+            no longer shown on this page for any role. Nothing stopped being
+            collected or used: onboarding still asks, and invoicing still bills
+            from the assignment's rates. */}
 
         {(employee.visaType || employee.ssn || passport || photoId) && (
           <Card>

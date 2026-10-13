@@ -81,8 +81,13 @@ export function redactEmployee(emp: any, viewerRole?: string, isOwn = false): an
     out.pay_rate = 0; // serializeEmployee coerces null→0; keep the shape numeric
     return out;
   }
+  // Project Managers verify work authorisation, and an I-9 cannot be checked
+  // without the SSN — they were reading "Social Security Number —" on every
+  // H-1B record. Pay and bank details stay hidden from them: this widens one
+  // field, not the role.
+  const keep = new Set<string>(viewerRole === 'operations' ? ['ssn'] : []);
   const out = { ...self };
-  for (const f of SENSITIVE_EMPLOYEE_FIELDS) out[f] = null;
+  for (const f of SENSITIVE_EMPLOYEE_FIELDS) if (!keep.has(f)) out[f] = null;
   out.pay_rate = 0; // serializeEmployee coerces null→0; keep the shape numeric
   return out;
 }

@@ -22,12 +22,14 @@ export interface InvoiceColumnHeadings {
 }
 
 export function invoiceColumnHeadings(
-  lineItems: ReadonlyArray<{ isHours?: boolean }>,
+  _lineItems: ReadonlyArray<{ isHours?: boolean }>,
 ): InvoiceColumnHeadings {
-  if (lineItems.length === 0) return { quantity: 'Qty', price: 'Unit price' };
-
-  const hours = lineItems.filter(li => li.isHours).length;
-  if (hours === 0) return { quantity: 'Qty', price: 'Unit price' };
-  if (hours === lineItems.length) return { quantity: 'Hours', price: 'Rate' };
-  return { quantity: 'Qty / Hours', price: 'Rate' };
+  // HR asked for the quantity column to be Hours outright — this is a
+  // staffing business and effectively every line is time. A fixed-fee line
+  // therefore reads "Hours: 1", which is the trade they chose knowingly over
+  // a column heading that changed depending on what was on the invoice.
+  //
+  // The argument is kept so the per-invoice rule can be restored without
+  // touching the three call sites if that trade turns out to be wrong.
+  return { quantity: 'Hours', price: 'Rate' };
 }

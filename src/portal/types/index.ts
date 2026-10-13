@@ -589,6 +589,8 @@ export interface InvoiceLineItem {
   itemName?: string;
   description: string;
   employeeId?: string;
+  /** Filled by GET /invoices/:id so the Send dialog can name whose hours this covers. */
+  employeeName?: string;
   timesheetId?: string;
   quantity?: number;
   hours: number;

@@ -121,6 +121,12 @@ interface MailOptions {
    * announcement.
    */
   bcc?: string | string[];
+  /**
+   * Visible copies. Unlike bcc these DO belong in the headers: someone copied
+   * on an invoice should see who else received it, and reply-all should reach
+   * them. Counts toward SES's 50-destination limit alongside to and bcc.
+   */
+  cc?: string | string[];
   subject: string;
   html?: string;
   text?: string;
@@ -149,6 +155,7 @@ async function buildRawMessage(mail: MailOptions): Promise<Buffer> {
     new MailComposer({
       from: mail.from ?? MAIL_FROM,
       to: toList(mail.to),
+      cc: mail.cc ? toList(mail.cc) : undefined,
       // `bcc` is deliberately NOT passed to the composer. Nodemailer would
       // write a Bcc header into the MIME body, and SES sends the raw bytes
       // verbatim — every recipient would then read the full list, which is the
@@ -177,8 +184,9 @@ async function sendWithRetry(mail: MailOptions): Promise<void> {
   }
 
   const recipients = toList(mail.to);
+  const ccRecipients = mail.cc ? toList(mail.cc) : [];
   const bccRecipients = mail.bcc ? toList(mail.bcc) : [];
-  if (recipients.length === 0 && bccRecipients.length === 0) {
+  if (recipients.length === 0 && ccRecipients.length === 0 && bccRecipients.length === 0) {
     console.warn(`[mailer] skipped "${mail.subject}" — no recipients`);
     return;
   }
@@ -192,6 +200,7 @@ async function sendWithRetry(mail: MailOptions): Promise<void> {
       FromEmailAddress: mail.from ?? MAIL_FROM,
       Destination: {
         ToAddresses: recipients,
+        ...(ccRecipients.length > 0 ? { CcAddresses: ccRecipients } : {}),
         ...(bccRecipients.length > 0 ? { BccAddresses: bccRecipients } : {}),
       },
       Content: { Raw: { Data: raw } },
@@ -363,6 +372,10 @@ ${showCreds ? `
 
 export interface InvoiceEmailPayload {
   to: string;
+  /** Extra people to copy, visibly. */
+  cc?: string[];
+  /** Employees whose hours this invoice covers — leads the subject line. */
+  employeeNames?: string[];
   clientName: string;
   contactName: string;
   invoiceNumber: string;
@@ -504,7 +517,19 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
 </p>`;
 
   const { customTemplate } = payload;
-  const defaultSubject = `Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`;
+  // Lead with whose hours this covers. Finance was looking at a list of
+  // "Invoice INV-2026-0013" subjects with no way to tell them apart without
+  // opening each one. Two names are listed, then a count — a subject line with
+  // eight names in it is no more useful than none.
+  // trim() before the filter: a whitespace-only name is truthy, and would
+  // have produced a subject beginning with a stray em dash.
+  const names = (payload.employeeNames ?? []).map(n => n?.trim()).filter((n): n is string => !!n);
+  const who = names.length === 0
+    ? ''
+    : names.length <= 2
+      ? `${names.join(' & ')} — `
+      : `${names[0]} +${names.length - 1} more — `;
+  const defaultSubject = `${who}Invoice ${invoiceNumber} from Jobly Solutions — Due ${fmtDate(dueDate)}`;
 
   const html = customTemplate
     ? buildBrandedEmail({
@@ -541,6 +566,7 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
     from: BILLING_FROM,
     replyTo: BILLING_EMAIL,
     to,
+    cc: payload.cc,
     subject: (customTemplate?.subject && customTemplate.subject.trim()) || defaultSubject,
     html,
     attachments,

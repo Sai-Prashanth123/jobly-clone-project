@@ -15,6 +15,7 @@ function mapInvoice(raw: any): Invoice {
       itemName: li.item_name ?? undefined,
       description: li.description,
       employeeId: li.employee_id,
+      employeeName: li.employee_name ?? undefined,
       timesheetId: li.timesheet_id,
       productId: li.product_id ?? undefined,
       quantity: li.quantity ?? li.hours,
@@ -334,7 +335,7 @@ export function useGetInvoicePDF() {
 export function useSendInvoice(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (body?: { recipientEmail?: string }) => {
+    mutationFn: async (body?: { recipientEmail?: string; cc?: string[] }) => {
       const { data } = await apiClient.post(`/invoices/${id}/send`, body ?? {});
       return {
         invoice: mapInvoice(data.data),

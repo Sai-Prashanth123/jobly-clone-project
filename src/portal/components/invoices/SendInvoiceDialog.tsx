@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -44,13 +44,42 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
 
   const contactName = client?.billingContactName || client?.contactName || 'there';
   const defaultTo = client?.billingContactEmail || client?.contactEmail || '';
-  const defaultSubject = `Invoice ${invoice.invoiceNumber} from Jobly Solutions — Due ${formatDate(invoice.dueDate)}`;
+  // Lead with whose hours this covers, matching the server-sent subject.
+  // Finance was looking at a list of indistinguishable "Invoice INV-..."
+  // subjects. Two names, then a count — eight names in a subject help nobody.
+  const employeeNames = [...new Set(
+    (invoice.lineItems ?? [])
+      .map(li => (li as { employeeName?: string }).employeeName)
+      .filter((n): n is string => !!n && n.trim() !== ''),
+  )];
+  const who = employeeNames.length === 0
+    ? ''
+    : employeeNames.length <= 2
+      ? `${employeeNames.join(' & ')} — `
+      : `${employeeNames[0]} +${employeeNames.length - 1} more — `;
+  const defaultSubject = `${who}Invoice ${invoice.invoiceNumber} from Jobly Solutions — Due ${formatDate(invoice.dueDate)}`;
   const defaultMessage =
     `Please find invoice ${invoice.invoiceNumber} attached. The amount due is ${invoice.totalAmount?.toLocaleString(undefined, { style: 'currency', currency: invoice.currency || 'USD' })}, due by ${formatDate(invoice.dueDate)}.`;
 
   const [to, setTo] = useState(defaultTo);
+  const [cc, setCc] = useState('');
   const [subject, setSubject] = useState(defaultSubject);
   const [message, setMessage] = useState(defaultMessage);
+
+  // Re-seed when the dialog opens.
+  //
+  // The dialog is always mounted, so useState captured its initial values on
+  // the FIRST render — while the client was still loading. The client email
+  // then arrived and the To field stayed empty for good, which is why the
+  // address people had carefully put on the client record never showed up.
+  // Anything already typed is left alone.
+  useEffect(() => {
+    if (!open) return;
+    setTo(prev => (prev.trim() ? prev : defaultTo));
+    setSubject(prev => (prev.trim() ? prev : defaultSubject));
+    setMessage(prev => (prev.trim() ? prev : defaultMessage));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, defaultTo, defaultSubject, defaultMessage]);
   const [externalOpened, setExternalOpened] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [dontShow, setDontShow] = useState(() => localStorage.getItem(SEND_PREF_KEY) === 'direct');
@@ -106,7 +135,12 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
   const sendViaJobly = async () => {
     setSendError(null);
     try {
-      const r = await sendInvoice.mutateAsync(to.trim() ? { recipientEmail: to.trim() } : undefined);
+      const ccList = cc.split(/[,;]/).map(e => e.trim()).filter(Boolean);
+      const r = await sendInvoice.mutateAsync(
+        to.trim() || ccList.length > 0
+          ? { recipientEmail: to.trim() || undefined, cc: ccList.length > 0 ? ccList : undefined }
+          : undefined,
+      );
       if (r.emailSent) {
         toast.success(invoice.status === 'draft' ? 'Invoice sent to client via email' : 'Invoice re-sent to client');
         onOpenChange(false);
@@ -133,6 +167,15 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
           <div className="space-y-1.5">
             <Label htmlFor="si-to" className="text-xs">To</Label>
             <Input id="si-to" type="email" value={to} onChange={e => setTo(e.target.value)} placeholder="client@company.com" />
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="si-cc" className="text-xs">Cc <span className="text-gray-400 font-normal">(optional)</span></Label>
+            <Input
+              id="si-cc"
+              value={cc}
+              onChange={e => setCc(e.target.value)}
+              placeholder="accounts@client.com, manager@client.com"
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="si-subject" className="text-xs">Subject</Label>

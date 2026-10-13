@@ -209,12 +209,13 @@ export default function PortalApp() {
                 </ProtectedRoute>
               }
             />
-            {/* Same audience as the employee record it is built from — the
-                chart is just another view of who reports to whom. */}
+            {/* Project Manager and Admin, per HR. HR is deliberately not
+                included: unlike the document gating, this takes nothing away —
+                the page is new, so nobody loses a view they had. */}
             <Route
               path="org-chart"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations']}>
+                <ProtectedRoute allowedRoles={['admin', 'operations']}>
                   <OrgChart />
                 </ProtectedRoute>
               }

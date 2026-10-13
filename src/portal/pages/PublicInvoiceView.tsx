@@ -44,12 +44,9 @@ export default function PublicInvoiceView() {
   // invoiceColumnHeadings in backend/src/lib/invoiceColumns.ts, which the PDF
   // and the emailed copy use — the frontend cannot import from backend/, so
   // the rule is written twice and the backend test pins the wording.
-  const hourLines = items.filter((li: { timesheet_id?: string | null }) => !!li.timesheet_id).length;
-  const headings = hourLines === 0
-    ? { quantity: 'Qty', price: 'Unit price' }
-    : hourLines === items.length
-      ? { quantity: 'Hours', price: 'Rate' }
-      : { quantity: 'Qty / Hours', price: 'Rate' };
+  // Always Hours/Rate, per HR — mirrors invoiceColumnHeadings in
+  // backend/src/lib/invoiceColumns.ts, which the PDF and the emailed copy use.
+  const headings = { quantity: 'Hours', price: 'Rate' };
   const billTo = [client.billing_street, client.billing_city, client.billing_state, client.billing_zip, client.billing_country].filter(Boolean).join(', ');
 
   return (

@@ -111,7 +111,31 @@ export async function getInvoice(id: string) {
     .eq('entity_id', id)
     .order('uploaded_at', { ascending: false });
 
-  return { ...data, attachments: attachments ?? [] };
+  // Who the invoice is FOR. Line items carry employee_id but no name, so the
+  // Send dialog had nothing to put in the subject and finance was looking at
+  // "Invoice INV-2026-0013" with no idea whose hours it covered. One lookup
+  // for the whole invoice rather than a join per line.
+  const lineItems = (data.invoice_line_items ?? []) as Array<{ employee_id?: string | null }>;
+  const employeeIds = [...new Set(lineItems.map(li => li.employee_id).filter(Boolean))] as string[];
+  let namesById: Record<string, string> = {};
+  if (employeeIds.length > 0) {
+    const { data: emps } = await supabaseAdmin
+      .from('employees')
+      .select('id, first_name, last_name')
+      .in('id', employeeIds);
+    namesById = Object.fromEntries(
+      (emps ?? []).map(e => [e.id, `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim()]),
+    );
+  }
+
+  return {
+    ...data,
+    invoice_line_items: lineItems.map(li => ({
+      ...li,
+      employee_name: li.employee_id ? (namesById[li.employee_id] ?? null) : null,
+    })),
+    attachments: attachments ?? [],
+  };
 }
 
 export async function generateInvoice(input: GenerateInvoiceInput, actorId?: string) {
@@ -657,7 +681,7 @@ export async function removeInvoiceAttachment(invoiceId: string, docId: string) 
   await deleteDocument(docId);
 }
 
-export async function sendInvoice(id: string, recipientEmailOverride?: string) {
+export async function sendInvoice(id: string, recipientEmailOverride?: string, ccEmails?: string[]) {
   const inv = await getInvoice(id);
 
   const { data: client } = await supabaseAdmin
@@ -732,6 +756,13 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string) {
   try {
     await sendInvoiceEmail({
       to: recipientEmail,
+      cc: ccEmails?.filter(Boolean),
+      // Whose hours this invoice covers, de-duplicated and in line order.
+      employeeNames: [...new Set(
+        ((inv.invoice_line_items ?? []) as Array<{ employee_name?: string | null }>)
+          .map(li => li.employee_name)
+          .filter((n): n is string => !!n && n.trim() !== ''),
+      )],
       clientName: client?.company_name ?? 'Client',
       contactName: client?.billing_contact_name || client?.contact_name || 'Team',
       invoiceNumber: inv.invoice_number,

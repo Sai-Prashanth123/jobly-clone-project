@@ -66,8 +66,17 @@ export async function getPDF(req: Request, res: Response, next: NextFunction): P
 
 export async function send(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
-    const recipientEmail = (req.body as any)?.recipientEmail?.trim() || undefined;
-    const result = await svc.sendInvoice(req.params.id, recipientEmail);
+    const body = (req.body ?? {}) as { recipientEmail?: string; cc?: string[] | string };
+    const recipientEmail = body.recipientEmail?.trim() || undefined;
+    // Extra visible recipients, accepted as an array or a comma-separated
+    // string, since the dialog lets someone paste a list.
+    const rawCc = body.cc;
+    const ccEmails: string[] | undefined = Array.isArray(rawCc)
+      ? rawCc.map(e => String(e).trim()).filter(Boolean)
+      : typeof rawCc === 'string'
+        ? rawCc.split(/[,;]/).map(e => e.trim()).filter(Boolean)
+        : undefined;
+    const result = await svc.sendInvoice(req.params.id, recipientEmail, ccEmails);
     // Audit the send (who emailed which invoice to the client, and when).
     if (result.emailSent) {
       await logActivity(req.user?.id ?? null, 'sent', 'invoice', req.params.id, result.invoice?.invoice_number ?? req.params.id.slice(0, 8));

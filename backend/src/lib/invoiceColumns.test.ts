@@ -2,51 +2,46 @@ import { describe, it, expect } from 'vitest';
 import { invoiceColumnHeadings } from './invoiceColumns';
 
 /**
- * "In invoice — please to Hrs."
+ * "In invoice — please to Hrs", then "remove quantity and add hours in place
+ * of that".
  *
- * Hours were already labelled, but only when EVERY line was timesheet-derived:
- * both renderers used `lineItems.every(li => li.isHours)`. One manually-added
- * line on an otherwise timesheet-built invoice reverted the whole table to
- * "Qty"/"Unit price" and the hours stopped reading as hours. The public
- * invoice page was worse — it hardcoded "Qty"/"Price" and ignored `isHours`
- * entirely, so the same invoice read differently depending on where the
- * customer opened it.
+ * This went through two rounds. First the headings were per-invoice: Hours
+ * when every line came from a timesheet, Qty otherwise, and "Qty / Hours" for
+ * a mixed one — which fixed the original bug, where a single manually-added
+ * line reverted the whole table to "Qty"/"Unit price" and the hours stopped
+ * reading as hours.
+ *
+ * HR then asked for Hours outright. This is a staffing business and
+ * effectively every line is time, so a heading that changed depending on the
+ * invoice's contents was the wrong kind of clever. A fixed-fee line now reads
+ * "Hours: 1" — the trade they made knowingly.
  */
 const hours = { isHours: true };
 const fixed = { isHours: false };
 
 describe('invoice column headings', () => {
-  it('says Hours and Rate when every line came from a timesheet', () => {
-    expect(invoiceColumnHeadings([hours, hours])).toEqual({ quantity: 'Hours', price: 'Rate' });
+  it('always say Hours and Rate', () => {
+    for (const lines of [[hours], [fixed], [hours, fixed], [{}], []]) {
+      expect(invoiceColumnHeadings(lines)).toEqual({ quantity: 'Hours', price: 'Rate' });
+    }
   });
 
-  it('says Qty and Unit price when none did', () => {
-    expect(invoiceColumnHeadings([fixed, fixed])).toEqual({ quantity: 'Qty', price: 'Unit price' });
+  // The original defect, still covered: whatever else changes, one fixed-fee
+  // line must never relabel the hours on a timesheet-derived invoice.
+  it('does not change wording because of one non-timesheet line', () => {
+    expect(invoiceColumnHeadings([hours, hours, fixed]))
+      .toEqual(invoiceColumnHeadings([hours, hours, hours]));
   });
 
-  // The regression: one fixed-fee line used to silently relabel the hours.
-  it('keeps calling hours Rate on a mixed invoice', () => {
-    expect(invoiceColumnHeadings([hours, hours, fixed])).toEqual({ quantity: 'Qty / Hours', price: 'Rate' });
-    expect(invoiceColumnHeadings([fixed, hours])).toEqual({ quantity: 'Qty / Hours', price: 'Rate' });
-  });
-
-  it('treats a missing isHours as not hours', () => {
-    expect(invoiceColumnHeadings([{}, {}])).toEqual({ quantity: 'Qty', price: 'Unit price' });
-    expect(invoiceColumnHeadings([{}, hours])).toEqual({ quantity: 'Qty / Hours', price: 'Rate' });
-  });
-
-  it('falls back sensibly for an empty invoice', () => {
-    expect(invoiceColumnHeadings([])).toEqual({ quantity: 'Qty', price: 'Unit price' });
+  it('never says Qty or Unit price anywhere', () => {
+    const words = Object.values(invoiceColumnHeadings([fixed, fixed]));
+    expect(words).not.toContain('Qty');
+    expect(words).not.toContain('Unit price');
   });
 
   // PublicInvoiceView.tsx repeats this rule, because the frontend cannot
   // import from backend/. These are the exact strings it must produce.
   it('produces the wording the public invoice page also has to use', () => {
-    const all = new Set([
-      ...Object.values(invoiceColumnHeadings([hours])),
-      ...Object.values(invoiceColumnHeadings([fixed])),
-      ...Object.values(invoiceColumnHeadings([hours, fixed])),
-    ]);
-    expect([...all].sort()).toEqual(['Hours', 'Qty', 'Qty / Hours', 'Rate', 'Unit price']);
+    expect(invoiceColumnHeadings([hours])).toEqual({ quantity: 'Hours', price: 'Rate' });
   });
 });
