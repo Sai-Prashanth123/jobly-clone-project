@@ -882,6 +882,42 @@ export default function NewEmployee() {
             </a>
           )}
         </div>
+        {/* Document number — and, for the photo IDs, the issuing state.
+            IDENTITY_DOC_ROWS has carried `placeholder` and `hasState` since it
+            was written, but nothing ever rendered an input for either: the row
+            offered an expiry date and an upload and nothing else. So a passport
+            number could be displayed on the employee's profile and entered
+            nowhere, and every one of the 19 passport/licence records on file
+            has a date and no number.
+
+            `ssn` is excluded deliberately — it has its own dedicated field in
+            section 06, and a second place to type it would be one too many. */}
+        {row.placeholder && row.type !== 'ssn' && (
+          <div className={row.hasState ? 'grid grid-cols-1 sm:grid-cols-3 gap-3' : 'space-y-1'}>
+            <div className={row.hasState ? 'sm:col-span-2 space-y-1' : 'space-y-1'}>
+              <Label className="text-[11px] font-medium text-gray-500">Document Number</Label>
+              <Input
+                value={doc.number ?? ''}
+                placeholder={row.placeholder}
+                onChange={e => upsertIdentityDoc(row.type, { number: e.target.value })}
+              />
+            </div>
+            {row.hasState && (
+              <div className="space-y-1">
+                <Label className="text-[11px] font-medium text-gray-500">Issuing State</Label>
+                <Select
+                  value={doc.state ?? ''}
+                  onValueChange={v => upsertIdentityDoc(row.type, { state: v })}
+                >
+                  <SelectTrigger><SelectValue placeholder="State" /></SelectTrigger>
+                  <SelectContent className="max-h-[280px]">
+                    {US_STATES.map(st => <SelectItem key={st.code} value={st.code}>{st.code} — {st.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+        )}
         {row.hasExpiry && (
           <div className="space-y-1">
             <Label className="text-[11px] font-medium text-gray-500">

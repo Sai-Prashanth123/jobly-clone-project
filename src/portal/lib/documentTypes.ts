@@ -65,8 +65,8 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'state_id',       label: 'State-Issued ID',            placeholder: 'S1234567',
     hint: 'Alternative to driver license for non-drivers.', hasState: true, hasExpiry: true },
   { type: 'passport',       label: 'Passport',                   placeholder: '123456789',
-    hint: 'I-9 List A — proves identity AND work authorization on its own. Upload all pages (except blank ones). Up to 10 files.',
-    hasExpiry: true, multi: true, maxFiles: 10 },
+    hint: 'I-9 List A — proves identity AND work authorization on its own. Upload the photo page and any pages with stamps. Up to 5 files.',
+    hasExpiry: true, multi: true, maxFiles: 5 },
   { type: 'green_card',     label: 'Permanent Resident Card',    placeholder: 'A12345678',
     hint: 'Green Card — also I-9 List A.', hasExpiry: true },
   { type: 'ead',            label: 'Employment Authorization Document', placeholder: 'EAC1234567890',
@@ -207,7 +207,11 @@ export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4', 'insurance_waiver
 // the checklist demands them. US citizens remain the only exclusion - they
 // have no visa stamp or I-94 to produce at all, and requiring them would leave
 // onboarding permanently short of 100%.
-export const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'h4_ead', 'tn', 'gc']);
+// 'gc' removed per HR (Oct 2026): a permanent resident is no longer on the
+// visa they entered on, so demanding the visa stamp and the I-94 from that
+// entry blocked onboarding on paperwork they may not still hold. They keep the
+// passport requirement, which moved into VISA_REQUIRED_EXTRA.gc below.
+export const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'h4_ead', 'tn']);
 export const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 
 // Additional identity-doc types required for specific visa types, on top of
@@ -218,7 +222,10 @@ export const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
   opt: ['i9_form', 'i20', 'ead'],
   stem_opt: ['i9_form', 'i20', 'ead', 'us_visa'],
   h4_ead: ['i9_form', 'ead', 'i797'],
-  gc: ['passport', 'education_documents', 'experience_letters', 'i140', 'i140_approval_notice', 'labor_certificate', 'i797'],
+  // I-94, Visa, I-797 and the I-140 pair dropped per HR (Oct 2026) — a green
+  // card is itself the proof of status, so the petition trail behind it is no
+  // longer required to finish onboarding.
+  gc: ['passport', 'education_documents', 'experience_letters', 'labor_certificate'],
 };
 
 export function getRequiredIdentityTypes(visaType?: string | null): string[] {
@@ -313,6 +320,36 @@ const ROW_LABEL_BY_VISA: Record<string, Record<string, string>> = {
 /** What to SHOW for an identity row, given the employee's visa type. */
 export function identityRowLabel(row: { type: string; label: string }, visaType?: string | null): string {
   return (visaType && ROW_LABEL_BY_VISA[row.type]?.[visaType]) || row.label;
+}
+
+/**
+ * `identity_documents[].type` → the name a human reads.
+ *
+ * Derived from IDENTITY_DOC_ROWS rather than written out again: EmployeeDetail
+ * and MyProfile each kept their own hand-written copy, which had already
+ * drifted apart — six entries against eleven, and MyProfile still carrying the
+ * *legacy* "US Visa" label. Both fell back to the raw key for anything
+ * missing, which is why HR was reading `i20`, `us_visa`, `i983` and `i94` off
+ * a compliance screen.
+ *
+ * The backend has the same map (backend/src/lib/onboarding.ts), held in step
+ * with these same rows by contracts.test.ts.
+ */
+const IDENTITY_DOC_TYPE_LABELS: Record<string, string> =
+  Object.fromEntries(IDENTITY_DOC_ROWS.map(r => [r.type, r.label]));
+
+/**
+ * Display name for a stored identity-document row.
+ *
+ * `storedLabel` wins when present — a row may carry a label the wizard wrote
+ * for a per-visa variant (see ROW_LABEL_BY_VISA). Falls back to the raw type
+ * only for a key no row defines, which should not happen and is better shown
+ * than swallowed.
+ */
+export function identityDocLabel(type?: string | null, storedLabel?: string | null): string {
+  if (storedLabel && storedLabel.trim()) return storedLabel;
+  if (!type) return 'Document';
+  return IDENTITY_DOC_TYPE_LABELS[type] ?? type;
 }
 
 /** Does an uploaded document (by its stored `type`) belong to this identity row? */

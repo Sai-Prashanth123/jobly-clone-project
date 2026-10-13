@@ -1,3 +1,4 @@
+import { identityDocLabel } from '../lib/documentTypes';
 import { formatAddress } from '@/portal/lib/utils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -15,21 +16,6 @@ import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
 import { findIdentityDoc, hasIdentityDocDetail, photoIdOf, photoIdLabel } from '../lib/identityDocs';
 import { DetailField as Field } from '../components/shared/DetailField';
-
-// Identity-doc type codes → the labels shown on the Add Employee form.
-const ID_DOC_LABELS: Record<string, string> = {
-  ssn: 'Social Security Number',
-  driver_license: "Driver's License",
-  state_id: 'State-Issued ID',
-  passport: 'Passport',
-  green_card: 'Permanent Resident Card',
-  ead: 'Employment Authorization Document',
-  opt_card: 'OPT Card',
-  stem_opt_card: 'STEM OPT Card',
-  i983: 'I-983',
-  i94: 'I-94',
-  us_visa: 'US Visa',
-};
 
 export default function MyProfile() {
   const navigate = useNavigate();
@@ -259,7 +245,7 @@ export default function MyProfile() {
                 <div key={`${d.type}-${i}`} className={`p-3 rounded-md border ${expiryStatus(d.expiry) === 'expired' ? 'bg-red-50/60 border-red-200' : expiryStatus(d.expiry) === 'expiring' ? 'bg-amber-50/60 border-amber-200' : 'bg-gray-50/60 border-gray-100'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
-                      {ID_DOC_LABELS[d.type] ?? d.type}
+                      {identityDocLabel(d.type, (d as { label?: string }).label)}
                     </p>
                     <ExpiryBadge date={d.expiry} />
                   </div>

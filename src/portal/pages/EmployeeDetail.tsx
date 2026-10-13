@@ -1,3 +1,4 @@
+import { identityDocLabel } from '../lib/documentTypes';
 import { formatAddress } from '@/portal/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -156,15 +157,6 @@ export default function EmployeeDetail() {
   const isTerminated = employee.status === 'inactive' && !!employee.terminatedAt;
   const isPlainInactive = employee.status === 'inactive' && !employee.leaveReturnDate && !employee.terminatedAt;
 
-  // Map identity-doc type codes to the labels HR sees on the Add Employee form.
-  const ID_DOC_LABELS: Record<string, string> = {
-    ssn: 'Social Security Number',
-    driver_license: "Driver's License",
-    state_id: 'State-Issued ID',
-    passport: 'Passport',
-    green_card: 'Permanent Resident Card',
-    ead: 'Employment Authorization Document',
-  };
   const hasPermAddr = !!employee.permanentAddress && (
     employee.permanentAddress.street || employee.permanentAddress.city || employee.permanentAddress.state
   );
@@ -744,7 +736,7 @@ export default function EmployeeDetail() {
                 <div key={`${d.type}-${i}`} className={`p-3 rounded-md border ${expiryStatus(d.expiry) === 'expired' ? 'bg-red-50/60 border-red-200' : expiryStatus(d.expiry) === 'expiring' ? 'bg-amber-50/60 border-amber-200' : 'bg-gray-50/60 border-gray-100'}`}>
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
-                      {ID_DOC_LABELS[d.type] ?? d.type}
+                      {identityDocLabel(d.type, (d as { label?: string }).label)}
                     </p>
                     <ExpiryBadge date={d.expiry} />
                   </div>
