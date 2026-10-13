@@ -8,6 +8,7 @@ import {
   triggerTimesheetReminders,
   triggerContractExpiryAlerts,
   triggerDocumentExpiryAlerts,
+  notifyRoles,
 } from '../services/notifications.service';
 
 // env.FRONTEND_URL is schema-validated with its own default, so there is no
@@ -31,14 +32,49 @@ async function processReminders(): Promise<void> {
   // 1. Mark overdue: real invoices, sent/viewed, due date in the past, with a balance.
   const { data: toOverdue } = await supabaseAdmin
     .from('invoices')
-    .select('id, total_amount, amount_paid')
+    .select('id, invoice_number, total_amount, amount_paid, due_date')
     .eq('doc_type', 'invoice')
     .in('status', ['sent', 'viewed'])
     .lt('due_date', today);
+  const wentOverdue: { id: string; invoiceNumber: string; balance: number; dueDate: string }[] = [];
   for (const inv of toOverdue ?? []) {
-    if (round2((inv.total_amount ?? 0) - (inv.amount_paid ?? 0)) > 0.005) {
+    const balance = round2((inv.total_amount ?? 0) - (inv.amount_paid ?? 0));
+    if (balance > 0.005) {
       await supabaseAdmin.from('invoices').update({ status: 'overdue' }).eq('id', inv.id);
+      wentOverdue.push({
+        id: inv.id,
+        invoiceNumber: inv.invoice_number ?? inv.id.slice(0, 8),
+        balance,
+        dueDate: inv.due_date,
+      });
     }
+  }
+
+  // Tell finance. Until now the only thing that happened when an invoice went
+  // overdue was an email to the CLIENT — nobody internal was told at all, and
+  // notifications.service.ts had no overdue job either. The transition is the
+  // moment worth reporting: it happens once per invoice, so this cannot become
+  // the nightly repetition that the document-expiry alerts had to be rescued
+  // from.
+  for (const inv of wentOverdue) {
+    try {
+      await notifyRoles(
+        ['admin', 'finance'],
+        {
+          title: 'Invoice Overdue',
+          message: `Invoice ${inv.invoiceNumber} is overdue — ${inv.balance.toFixed(2)} outstanding, was due ${inv.dueDate}.`,
+          type: 'warning',
+          entityType: 'invoice',
+          entityId: inv.id,
+          link: `/portal/invoices/${inv.id}`,
+        },
+      );
+    } catch (err) {
+      console.error('[scheduler] overdue notification failed for', inv.invoiceNumber, err);
+    }
+  }
+  if (wentOverdue.length > 0) {
+    console.log(`[scheduler] ${wentOverdue.length} invoice(s) went overdue`);
   }
 
   if (!mailerConfigured) return; // can still flip overdue without a mailer

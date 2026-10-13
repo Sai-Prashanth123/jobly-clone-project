@@ -10,6 +10,7 @@ import { getJoblyLogoBuffer } from './joblyLogo';
 import { getTimesheetHeaderBuffer, getTimesheetFooterBuffer } from './timesheetBranding';
 import { RATING_CRITERIA } from '../schemas/performanceReviews.schema';
 import { SECTION_H_TITLE, SECTION_H_TEXT, SECTION_I_TITLE, SECTION_I_TEXT } from './enrollmentFormText';
+import { invoiceColumnHeadings } from './invoiceColumns';
 
 export interface InvoicePDFLineItem {
   itemName?: string;
@@ -161,9 +162,7 @@ export function generateInvoicePDF(data: InvoicePDFData, theme?: InvoiceTheme): 
     if (data.status) metaRow('Status', data.status.toUpperCase(), statusColor);
 
     // ── Line items table ──────────────────────────────────────────────────────
-    const allHours = data.lineItems.length > 0 && data.lineItems.every(li => li.isHours);
-    const qtyHeader = allHours ? 'Hours' : 'Qty';
-    const priceHeader = allHours ? 'Rate' : 'Unit price';
+    const { quantity: qtyHeader, price: priceHeader } = invoiceColumnHeadings(data.lineItems);
     // Columns within CONTENT_W (495): Description 250, Qty 60, Unit price 95, Amount 90
     const colX = [M, M + 250, M + 310, M + 405];   // 50, 300, 360, 455
     const colW = [250, 60, 95, 90];

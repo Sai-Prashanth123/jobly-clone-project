@@ -3,6 +3,7 @@ import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { formatDateSafe, formatDateUS } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
+import { invoiceColumnHeadings } from './invoiceColumns';
 
 // HTML-escape any user-supplied string before it lands in an email body.
 const HTML_ESCAPES: Record<string, string> = {
@@ -413,9 +414,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
   const fmt = (n: number) => cf.format(Number(n) || 0);
   const fmtDate = (s: string) => formatDateSafe(s, { long: true }) || s;
 
-  const allHours = lineItems.length > 0 && lineItems.every(li => li.isHours);
-  const qtyHeader = allHours ? 'Hours' : 'Qty';
-  const priceHeader = allHours ? 'Rate' : 'Unit price';
+  const { quantity: qtyHeader, price: priceHeader } = invoiceColumnHeadings(lineItems);
 
   const lineRows = lineItems.map(li => `
     <tr>

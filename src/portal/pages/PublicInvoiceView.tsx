@@ -40,6 +40,16 @@ export default function PublicInvoiceView() {
   const client = data.clients ?? {};
   const isEstimate = data.doc_type === 'estimate';
   const items = data.invoice_line_items ?? [];
+  // A line billed in hours is one generated from a timesheet. Mirrors
+  // invoiceColumnHeadings in backend/src/lib/invoiceColumns.ts, which the PDF
+  // and the emailed copy use — the frontend cannot import from backend/, so
+  // the rule is written twice and the backend test pins the wording.
+  const hourLines = items.filter((li: { timesheet_id?: string | null }) => !!li.timesheet_id).length;
+  const headings = hourLines === 0
+    ? { quantity: 'Qty', price: 'Unit price' }
+    : hourLines === items.length
+      ? { quantity: 'Hours', price: 'Rate' }
+      : { quantity: 'Qty / Hours', price: 'Rate' };
   const billTo = [client.billing_street, client.billing_city, client.billing_state, client.billing_zip, client.billing_country].filter(Boolean).join(', ');
 
   return (
@@ -69,11 +79,17 @@ export default function PublicInvoiceView() {
 
         <div className="px-8 pb-2">
           <table className="w-full text-sm">
+            {/* Headings match the PDF and the emailed copy — see
+                invoiceColumnHeadings in backend/src/lib/invoiceColumns.ts.
+                This page previously hardcoded "Qty"/"Price" and ignored
+                whether the lines were hours at all, so the same invoice read
+                differently depending on where the customer opened it.
+                A line is hours when it came from a timesheet. */}
             <thead>
               <tr className="text-[11px] uppercase tracking-wide text-gray-400 border-b border-gray-200">
                 <th className="text-left py-2">Item</th>
-                <th className="text-right py-2 w-16">Qty</th>
-                <th className="text-right py-2 w-28">Price</th>
+                <th className="text-right py-2 w-16">{headings.quantity}</th>
+                <th className="text-right py-2 w-28">{headings.price}</th>
                 <th className="text-right py-2 w-28">Amount</th>
               </tr>
             </thead>
@@ -85,7 +101,9 @@ export default function PublicInvoiceView() {
                     {li.item_name && li.description && <p className="text-xs text-gray-500">{li.description}</p>}
                   </td>
                   <td className="text-right tabular-nums">{li.quantity ?? li.hours}</td>
-                  <td className="text-right tabular-nums">{formatCurrency(li.bill_rate, cur)}</td>
+                  <td className="text-right tabular-nums">
+                    {formatCurrency(li.bill_rate, cur)}{li.timesheet_id ? <span className="text-gray-400">/hr</span> : null}
+                  </td>
                   <td className="text-right tabular-nums">{formatCurrency(li.amount, cur)}</td>
                 </tr>
               ))}
