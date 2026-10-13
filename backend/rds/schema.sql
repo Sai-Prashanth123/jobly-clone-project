@@ -274,6 +274,7 @@ CREATE TYPE public.user_role AS ENUM (
 CREATE TYPE public.visa_type AS ENUM (
     'h1b',
     'l1',
+    'l2',
     'opt',
     'stem_opt',
     'h4_ead',

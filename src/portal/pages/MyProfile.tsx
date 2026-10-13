@@ -140,18 +140,11 @@ export default function MyProfile() {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-base">Payroll</CardTitle></CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <Field label="Pay Rate" value={formatCurrency(employee.payRate)} />
-            <Field label="Pay Type" value={employee.payType} />
-            <Field label="Payment Type" value={employee.paymentType?.toUpperCase()} />
-            <Field label="Tax Form" value={employee.taxFormType?.toUpperCase()} />
-            {employee.bankName && <Field label="Bank Name" value={employee.bankName} />}
-            {employee.bankRoutingNumber && <Field label="Routing Number" value={`****${employee.bankRoutingNumber.slice(-4)}`} />}
-            {employee.bankAccountNumber && <Field label="Account Number" value={`****${employee.bankAccountNumber.slice(-4)}`} />}
-          </CardContent>
-        </Card>
+        {/* The Payroll card was here. Pay rate, pay/payment type, tax form and
+            bank details are hidden from the employee's own view per HR
+            (Oct 2026); admin, HR and Finance still see all of it on the
+            employee record. Nothing stopped being collected — onboarding still
+            asks for bank details, they are just no longer displayed back. */}
 
         {(employee.visaType || employee.ssn || passport || photoId) && (
           <Card>

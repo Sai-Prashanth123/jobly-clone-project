@@ -77,6 +77,7 @@ const VISA_OPTIONS = [
   { value: 'gc',       label: 'Green Card (Permanent Resident)' },
   { value: 'h1b',      label: 'H-1B' },
   { value: 'l1',       label: 'L-1' },
+  { value: 'l2',       label: 'L-2' },
   { value: 'opt',      label: 'OPT' },
   { value: 'stem_opt', label: 'STEM OPT' },
   { value: 'h4_ead',   label: 'H-4 EAD' },

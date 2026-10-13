@@ -47,7 +47,7 @@ export const ONBOARDING_REQUIRED_DOCS = [
 // Mirrors WORK_VISA_TYPES in src/portal/lib/documentTypes.ts.
 // 'gc' removed per HR (Oct 2026) — see the note on WORK_VISA_TYPES in
 // src/portal/lib/documentTypes.ts, which this mirrors.
-export const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'h4_ead', 'tn']);
+export const VISA_TYPES_REQUIRING_PASSPORT_I94 = new Set(['h1b', 'l1', 'l2', 'opt', 'stem_opt', 'h4_ead', 'tn']);
 export const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as const;
 
 // Documents required for a SPECIFIC visa type, on top of the universal list

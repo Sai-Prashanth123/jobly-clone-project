@@ -211,7 +211,7 @@ export const REQUIRED_IDENTITY_TYPES = ['ssn', 'resume', 'w4', 'insurance_waiver
 // visa they entered on, so demanding the visa stamp and the I-94 from that
 // entry blocked onboarding on paperwork they may not still hold. They keep the
 // passport requirement, which moved into VISA_REQUIRED_EXTRA.gc below.
-export const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'opt', 'stem_opt', 'h4_ead', 'tn']);
+export const WORK_VISA_TYPES = new Set(['h1b', 'l1', 'l2', 'opt', 'stem_opt', 'h4_ead', 'tn']);
 export const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 
 // Additional identity-doc types required for specific visa types, on top of
@@ -275,7 +275,7 @@ export const EMPLOYER_ROW_VISA_GATE: Record<string, string[]> = {
   // visible to admin/HR and never to the employee themselves - that part is
   // enforced by the role check on the Employer / Admin Documents section, not
   // by this gate.
-  e_verify_letter: ['citizen', 'gc', 'h1b', 'l1', 'opt', 'stem_opt', 'tn', 'other'],
+  e_verify_letter: ['citizen', 'gc', 'h1b', 'l1', 'l2', 'opt', 'stem_opt', 'h4_ead', 'tn', 'other'],
   i129: ['h1b'],
   lca_copy: ['h1b'],
   employer_verification_letter: ['h1b'],

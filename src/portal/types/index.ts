@@ -40,7 +40,7 @@ export type AssignmentStatus = 'active' | 'completed' | 'pending' | 'terminated'
 export type PayType = 'hourly' | 'salary';
 export type EmploymentType = 'full_time' | 'part_time' | 'contract' | 'w2' | '1099' | 'c2c' | 'vendor';
 export type BillingType = 'hourly' | 'monthly' | 'milestone';
-export type VisaType = 'h1b' | 'l1' | 'opt' | 'stem_opt' | 'tn' | 'gc' | 'citizen' | 'other';
+export type VisaType = 'h1b' | 'l1' | 'l2' | 'opt' | 'stem_opt' | 'h4_ead' | 'tn' | 'gc' | 'citizen' | 'other';
 export type I9Status = 'pending' | 'complete' | 'expired';
 export type EVerifyStatus = 'not_started' | 'pending' | 'employment_authorized' | 'tentative_nonconfirmation' | 'case_closed';
 
