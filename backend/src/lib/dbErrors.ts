@@ -84,9 +84,21 @@ export function appErrorFromDbError(err: unknown): AppError | null {
     case '22008':
       return new ValidationError('One of the dates is not in a valid format.');
 
+    case '21000':
+      // cardinality_violation. In practice this is
+      // "ON CONFLICT DO UPDATE command cannot affect row a second time" —
+      // one upsert carrying two rows with the same conflict key. The timesheet
+      // autosave hit it: a payload with a repeated entry_date surfaced to the
+      // employee as "Server error — Internal server error" mid-keystroke, with
+      // nothing to act on. The data is the problem, so say so.
+      return new ValidationError('The same item was sent twice in one request. Please reload and try again.');
+
     // ── Not the caller's fault, but still not "internal server error" ──────
     case '40001': // serialization_failure
     case '40P01': // deadlock_detected
+      return new AppError('The request conflicted with another change. Please try again.', 409);
+    case '55P03': // lock_not_available
+    case '25P02': // in_failed_sql_transaction
       return new AppError('The request conflicted with another change. Please try again.', 409);
     case '57014': // query_canceled (statement timeout)
       return new AppError('The request took too long and was stopped. Please try a smaller range.', 503);

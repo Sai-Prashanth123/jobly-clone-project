@@ -126,6 +126,28 @@ async function applyWeeklyHolidayOverrides<T extends { entryDate: string; hours:
   return entries.map(e => holidayDates.has(e.entryDate) ? { ...e, hours: 0, isBillable: false } : e);
 }
 
+/**
+ * Collapse repeated days, keeping the last one sent.
+ *
+ * The entries upsert compiles to a single multi-row
+ * `INSERT … ON CONFLICT (timesheet_id, entry_date) DO UPDATE`, and Postgres
+ * refuses to let one statement touch the same row twice — SQLSTATE 21000,
+ * "ON CONFLICT DO UPDATE command cannot affect row a second time". The autosave
+ * fires on every keystroke, so an employee saw that as a bare
+ * "Server error — Internal server error" while typing their hours, with the
+ * save silently lost.
+ *
+ * Last-one-wins because the payload is ordered as the grid renders it, so the
+ * later entry is the more recent edit. The schema now rejects duplicates too;
+ * this is the belt to that braces, since a duplicate here corrupts a save
+ * rather than merely being untidy.
+ */
+function dedupeByEntryDate<T extends { entryDate: string }>(entries: T[]): T[] {
+  const byDate = new Map<string, T>();
+  for (const e of entries) byDate.set(e.entryDate, e);
+  return [...byDate.values()];
+}
+
 export async function createTimesheet(input: CreateTimesheetInput, actorRole?: string) {
   // Timesheets are active from the joining date onward — including FUTURE weeks
   // (plan ahead) and elapsed weeks after joining (catch up). The only floor is
@@ -215,7 +237,7 @@ export async function updateTimesheet(id: string, input: UpdateTimesheetInput, u
     throw new ForbiddenError('Can only edit draft or rejected timesheets');
   }
 
-  const correctedEntries = await applyWeeklyHolidayOverrides(input.entries);
+  const correctedEntries = dedupeByEntryDate(await applyWeeklyHolidayOverrides(input.entries));
   const totalHours = correctedEntries.reduce((sum, e) => sum + Number(e.hours || 0), 0);
 
   // Upsert entries — avoids duplicate-key errors from concurrent requests

@@ -1,3 +1,4 @@
+import { BILLING_EMAIL, BILLING_FOOTER } from './billing';
 import PDFDocument from 'pdfkit';
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
@@ -118,7 +119,7 @@ export function generateInvoicePDF(data: InvoicePDFData, theme?: InvoiceTheme): 
       .text(data.invoiceNumber, RIGHT - 240, 76, { width: 240, align: 'right' });
     doc.fillColor(gray).fontSize(9).font('Helvetica')
       .text('Jobly Solutions · Workforce Management', RIGHT - 260, 94, { width: 260, align: 'right' })
-      .text('billing@joblysolutions.com', RIGHT - 260, 106, { width: 260, align: 'right' });
+      .text(BILLING_EMAIL, RIGHT - 260, 106, { width: 260, align: 'right' });
 
     // Divider rule
     doc.moveTo(M, 128).lineTo(RIGHT, 128).lineWidth(1).strokeColor(rule).stroke();
@@ -266,7 +267,7 @@ export function generateInvoicePDF(data: InvoicePDFData, theme?: InvoiceTheme): 
     const footerY = doc.page.height - 50;
     doc.rect(0, footerY, PAGE_W, 50).fill('#F3F4F6');
     doc.fillColor(gray).fontSize(8).font('Helvetica')
-      .text(theme?.footerText || 'Jobly Solutions  ·  billing@joblysolutions.com  ·  www.joblysolutions.com', M, footerY + 18, {
+      .text(theme?.footerText || BILLING_FOOTER, M, footerY + 18, {
         width: CONTENT_W, align: 'center', lineBreak: false,
       });
 

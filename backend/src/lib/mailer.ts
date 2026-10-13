@@ -1,3 +1,4 @@
+import { BILLING_EMAIL, BILLING_FROM, BILLING_FOOTER } from './billing';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { formatDateSafe, formatDateUS } from './dateUtils';
@@ -106,6 +107,19 @@ function toList(to: string | string[]): string[] {
 interface MailOptions {
   from?: string;
   to: string | string[];
+  /**
+   * Recipients who must NOT see each other.
+   *
+   * These are deliberately kept out of the composed MIME headers and passed to
+   * SES as `BccAddresses`, which is the only way to hide them — the header and
+   * the envelope are built separately here, so putting an address in one does
+   * not put it in the other.
+   *
+   * Added because announcement email was sent with every employee's address in
+   * `To:`, so ~20 people's addresses were disclosed to each other on every
+   * announcement.
+   */
+  bcc?: string | string[];
   subject: string;
   html?: string;
   text?: string;
@@ -134,6 +148,11 @@ async function buildRawMessage(mail: MailOptions): Promise<Buffer> {
     new MailComposer({
       from: mail.from ?? MAIL_FROM,
       to: toList(mail.to),
+      // `bcc` is deliberately NOT passed to the composer. Nodemailer would
+      // write a Bcc header into the MIME body, and SES sends the raw bytes
+      // verbatim — every recipient would then read the full list, which is the
+      // exact disclosure this is meant to prevent. The addresses reach SES
+      // through the envelope instead (see sendWithRetry).
       subject: mail.subject,
       html: mail.html,
       text: mail.text,
@@ -157,7 +176,8 @@ async function sendWithRetry(mail: MailOptions): Promise<void> {
   }
 
   const recipients = toList(mail.to);
-  if (recipients.length === 0) {
+  const bccRecipients = mail.bcc ? toList(mail.bcc) : [];
+  if (recipients.length === 0 && bccRecipients.length === 0) {
     console.warn(`[mailer] skipped "${mail.subject}" — no recipients`);
     return;
   }
@@ -169,10 +189,16 @@ async function sendWithRetry(mail: MailOptions): Promise<void> {
       // verified identity, so a mismatch fails loudly rather than silently
       // sending as the wrong sender.
       FromEmailAddress: mail.from ?? MAIL_FROM,
-      Destination: { ToAddresses: recipients },
+      Destination: {
+        ToAddresses: recipients,
+        ...(bccRecipients.length > 0 ? { BccAddresses: bccRecipients } : {}),
+      },
       Content: { Raw: { Data: raw } },
     }));
-    console.log(`[mailer] ✓ Email sent to ${JSON.stringify(mail.to)} subject="${mail.subject}"`);
+    // Log the COUNT of bcc recipients, not the addresses. This log is the
+    // audit trail for a send that deliberately hides who it went to.
+    const bccNote = bccRecipients.length > 0 ? ` bcc=${bccRecipients.length}` : '';
+    console.log(`[mailer] ✓ Email sent to ${JSON.stringify(mail.to)}${bccNote} subject="${mail.subject}"`);
   } catch (err: any) {
     // MessageRejected with "Email address is not verified" is the expected
     // failure while SES is still in the sandbox - call it out rather than let
@@ -475,7 +501,7 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
 </table>` : ''}
 
 <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">
-  Questions about this invoice? Contact us at <a href="mailto:billing@joblysolutions.com" style="color:#4069FF;text-decoration:none;">billing@joblysolutions.com</a>
+  Questions about this invoice? Contact us at <a href="mailto:${BILLING_EMAIL}" style="color:#4069FF;text-decoration:none;">${BILLING_EMAIL}</a>
 </p>`;
 
   const { customTemplate } = payload;
@@ -509,8 +535,12 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
     }
   }
 
+  // Invoice mail comes from — and replies to — the finance mailbox, not the
+  // generic no-reply sender. A customer replying to an invoice is answering
+  // accounts payable, and those replies were going nowhere.
   await sendWithRetry({
-    from: FROM,
+    from: BILLING_FROM,
+    replyTo: BILLING_EMAIL,
     to,
     subject: (customTemplate?.subject && customTemplate.subject.trim()) || defaultSubject,
     html,
@@ -551,7 +581,7 @@ export function buildBrandedEmail(parts: { headerHtml?: string; bodyHtml: string
         </td></tr>
         <tr>
           <td style="background:#f9fafb;padding:18px 40px;border-top:1px solid #f3f4f6;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">Jobly Solutions · billing@joblysolutions.com · www.joblysolutions.com</p>
+            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">${BILLING_FOOTER}</p>
           </td>
         </tr>
       </table>
@@ -665,7 +695,7 @@ ${payload.viewUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="p
 </table>` : ''}
 
 <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">
-  Questions? Contact us at <a href="mailto:billing@joblysolutions.com" style="color:#4069FF;text-decoration:none;">billing@joblysolutions.com</a>
+  Questions? Contact us at <a href="mailto:${BILLING_EMAIL}" style="color:#4069FF;text-decoration:none;">${BILLING_EMAIL}</a>
 </p>`;
 
   const html = emailShell({
@@ -676,7 +706,8 @@ ${payload.viewUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="p
   });
 
   await sendWithRetry({
-    from: FROM,
+    from: BILLING_FROM,
+    replyTo: BILLING_EMAIL,
     to: payload.to,
     subject: headline,
     html,
@@ -1017,7 +1048,9 @@ export async function testEmailDelivery(to: string): Promise<{ ok: boolean; erro
 }
 
 export interface AnnouncementEmailPayload {
-  to: string | string[];
+  /** Sent as bcc — see the send call below. Named for what it is, because the
+   *  previous name (`to`) is exactly what the disclosure bug looked like. */
+  recipients: string | string[];
   announcementTitle: string;
   announcementBody: string;
   announcementType: string;
@@ -1026,6 +1059,10 @@ export interface AnnouncementEmailPayload {
 
 export async function sendAnnouncementEmail(p: AnnouncementEmailPayload): Promise<void> {
   if (!mailerConfigured) return;
+  // With everyone in bcc, an empty list would still send — to MAIL_FROM, with
+  // nobody bcc'd — because the visible To: is the only remaining recipient.
+  // An announcement nobody receives should not land in the company inbox.
+  if ((Array.isArray(p.recipients) ? p.recipients : [p.recipients]).filter(Boolean).length === 0) return;
 
   const TYPE_STYLES: Record<string, { label: string; bg: string; color: string }> = {
     urgent: { label: 'Urgent',  bg: '#fef2f2', color: '#dc2626' },
@@ -1061,9 +1098,15 @@ export async function sendAnnouncementEmail(p: AnnouncementEmailPayload): Promis
     body: announcementBody,
   });
 
+  // Everyone goes in bcc: an announcement is a broadcast, and the recipients
+  // are staff who have no business seeing each other's addresses. The visible
+  // To: is the sending address itself, which is what every mail client expects
+  // of a bcc-only message — with no To: at all, several of them file it as
+  // suspicious.
   await sendWithRetry({
     from: FROM,
-    to: p.to,
+    to: MAIL_FROM,
+    bcc: p.recipients,
     subject: `[Announcement] ${p.announcementTitle}`,
     html,
   });

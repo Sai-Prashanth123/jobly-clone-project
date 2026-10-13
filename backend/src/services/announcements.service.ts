@@ -97,9 +97,11 @@ export async function createAnnouncement(input: CreateAnnouncementInput, authorI
       const { data: recipients } = await q;
       const emails = ((recipients ?? []) as any[]).map((r: any) => r.email).filter(Boolean) as string[];
       if (emails.length === 0) return;
+      // 50 per message because that is SES's cap on destinations per send,
+      // and bcc recipients count toward it.
       for (let i = 0; i < emails.length; i += 50) {
         await sendAnnouncementEmail({
-          to: emails.slice(i, i + 50),
+          recipients: emails.slice(i, i + 50),
           announcementTitle: row.title,
           announcementBody: row.body,
           announcementType: row.type,

@@ -1030,7 +1030,7 @@ CREATE TABLE public.invoice_templates (
     accent_color text DEFAULT '#2563EB'::text NOT NULL,
     font_family text DEFAULT 'Helvetica'::text NOT NULL,
     header_style text DEFAULT 'plain'::text NOT NULL,
-    footer_text text DEFAULT 'Jobly Solutions · billing@joblysolutions.com · www.joblysolutions.com'::text NOT NULL,
+    footer_text text DEFAULT 'Jobly Solutions · ap@joblysolutions.com · www.joblysolutions.com'::text NOT NULL,
     is_default boolean DEFAULT false NOT NULL,
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,

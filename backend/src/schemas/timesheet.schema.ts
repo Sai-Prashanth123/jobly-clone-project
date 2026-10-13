@@ -1,11 +1,27 @@
 import { z } from 'zod';
 
 const timesheetEntrySchema = z.object({
-  entryDate: z.string(),
+  // ISO date, enforced: the service slices the first four characters to work
+  // out which year's holidays to load, so a differently-shaped string reads a
+  // nonsense year, and `new Date('')` elsewhere is an Invalid Date.
+  entryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'entryDate must be YYYY-MM-DD'),
   dayOfWeek: z.string(),
   hours: z.number().min(0).max(24),
   isBillable: z.boolean().default(true),
 });
+
+/**
+ * One row per day, at most.
+ *
+ * Two entries for the same date make the upsert touch one row twice in a
+ * single statement, which Postgres rejects (SQLSTATE 21000) — and that
+ * surfaced to employees as "Server error — Internal server error" while they
+ * typed. The service also de-duplicates defensively; this is what turns a
+ * malformed payload into a 400 that names the problem instead of a 500.
+ */
+const uniqueEntryDates = <T extends { entryDate: string }>(entries: T[]) =>
+  new Set(entries.map(e => e.entryDate)).size === entries.length;
+const DUPLICATE_DATE_MESSAGE = 'Each day may only appear once in a timesheet.';
 
 export const createTimesheetSchema = z.object({
   employeeId: z.string().uuid(),
@@ -13,13 +29,13 @@ export const createTimesheetSchema = z.object({
   clientId: z.string().uuid(),
   weekStartDate: z.string(),
   weekEndDate: z.string(),
-  entries: z.array(timesheetEntrySchema).max(7),
+  entries: z.array(timesheetEntrySchema).max(7).refine(uniqueEntryDates, DUPLICATE_DATE_MESSAGE),
   notes: z.string().optional().nullable(),
   leaveReason: z.string().min(3).max(280).optional().nullable(),
 });
 
 export const updateTimesheetSchema = z.object({
-  entries: z.array(timesheetEntrySchema).max(7),
+  entries: z.array(timesheetEntrySchema).max(7).refine(uniqueEntryDates, DUPLICATE_DATE_MESSAGE),
   notes: z.string().optional().nullable(),
   leaveReason: z.string().min(3).max(280).optional().nullable(),
 });

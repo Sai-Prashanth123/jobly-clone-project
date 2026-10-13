@@ -1,3 +1,4 @@
+import { BILLING_FOOTER } from '../lib/billing';
 import { z } from 'zod';
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Must be a #RRGGBB hex color');
@@ -7,7 +8,7 @@ export const createInvoiceTemplateSchema = z.object({
   accentColor: hexColor.optional().default('#2563EB'),
   fontFamily: z.enum(['Helvetica', 'Times-Roman', 'Courier']).optional().default('Helvetica'),
   headerStyle: z.enum(['plain', 'band']).optional().default('plain'),
-  footerText: z.string().max(300).optional().default('Jobly Solutions · billing@joblysolutions.com · www.joblysolutions.com'),
+  footerText: z.string().max(300).optional().default(BILLING_FOOTER),
   isDefault: z.boolean().optional().default(false),
 });
 
