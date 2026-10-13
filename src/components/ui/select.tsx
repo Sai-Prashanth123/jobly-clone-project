@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
+import { findByPrefix, TYPEAHEAD_RESET_MS } from "./selectSearch";
 
 import { cn } from "@/lib/utils";
 
@@ -297,6 +298,13 @@ function SelectContent({ children, className }: SelectContentProps) {
     setPos(computePosition(triggerRef.current));
   }, [open, triggerRef]);
 
+  // Typed prefix and when it was last appended to. A ref, not state: it must
+  // not re-render the list on every keystroke.
+  const typeahead = React.useRef({ buffer: "", at: 0 });
+  React.useEffect(() => {
+    if (open) typeahead.current = { buffer: "", at: 0 };
+  }, [open]);
+
   React.useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
@@ -310,15 +318,25 @@ function SelectContent({ children, className }: SelectContentProps) {
         const dir = e.key === "ArrowDown" ? 1 : -1;
         const next = idx === -1 ? (dir === 1 ? 0 : enabled.length - 1) : (idx + dir + enabled.length) % enabled.length;
         setActiveValue(enabled[next].value);
-      } else if (e.key.length === 1 && /[a-z0-9]/i.test(e.key)) {
-        // Typeahead: jump to the next enabled item whose label starts with
-        // the typed character(s), matching native <select> behaviour.
-        const enabled = flatItems.filter(i => !i.disabled);
-        const text = (v: React.ReactNode) => (typeof v === "string" ? v : "").toLowerCase();
-        const key = e.key.toLowerCase();
-        const startIdx = Math.max(0, enabled.findIndex(i => i.value === activeValue) + 1);
-        const ordered = [...enabled.slice(startIdx), ...enabled.slice(0, startIdx)];
-        const found = ordered.find(i => text(i.label).startsWith(key));
+      } else if (e.key === "Backspace") {
+        // Correcting a mistyped prefix beats starting over in a 116-item list.
+        e.preventDefault();
+        typeahead.current.buffer = typeahead.current.buffer.slice(0, -1);
+        typeahead.current.at = Date.now();
+        const found = findByPrefix(flatItems, typeahead.current.buffer, activeValue);
+        if (found) setActiveValue(found.value);
+      } else if (e.key.length === 1 && /[a-z0-9 ]/i.test(e.key)) {
+        // Typeahead. Two things were wrong before: only ONE character was ever
+        // matched, so "ind" could not narrow to India — it just cycled through
+        // everything starting with "d" — and the comparison read the label only
+        // when it was a plain string, so the state lists, whose items render
+        // {code} — {name} as JSX, matched nothing at all.
+        if (e.key === " ") e.preventDefault(); // space would otherwise select
+        const now = Date.now();
+        if (now - typeahead.current.at > TYPEAHEAD_RESET_MS) typeahead.current.buffer = "";
+        typeahead.current.buffer += e.key.toLowerCase();
+        typeahead.current.at = now;
+        const found = findByPrefix(flatItems, typeahead.current.buffer, activeValue);
         if (found) setActiveValue(found.value);
       }
     };
