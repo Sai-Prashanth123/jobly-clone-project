@@ -41,14 +41,33 @@ describe('computeOnboarding document requirements', () => {
     expect(missing).not.toContain('I-20 (upload required)');
   });
 
-  it('requires the petition paperwork for Green Card', () => {
+  // Rewritten Oct 2026. This used to demand the whole I-140 petition trail
+  // plus the I-797, and — via the work-visa conditional — the visa stamp and
+  // I-94 from an entry that may be years past. HR: "Green card & Citizen
+  // employees, I94 is not required. Visa also not required. I797 also not
+  // required. I-140 not required." A permanent resident could not otherwise
+  // reach 100% without paperwork they may no longer hold.
+  it('asks a Green Card holder only for the card-adjacent paperwork', () => {
     const missing = missingDocs('gc', []);
     expect(missing).toEqual(expect.arrayContaining([
+      'Passport (upload required)',
+      'Labor Certificate (PERM) (upload required)',
+      'Education Documents & Academic Credentials (upload required)',
+      'Experience / Reference Letters (upload required)',
+    ]));
+  });
+
+  it('no longer asks a Green Card holder for the petition trail or entry documents', () => {
+    const missing = missingDocs('gc', []);
+    for (const doc of [
       'I-140 (upload required)',
       'I-140 Approval Notice (upload required)',
-      'Labor Certificate (PERM) (upload required)',
       'I-797 (upload required)',
-    ]));
+      'Visa (upload required)',
+      'I-94 (upload required)',
+    ]) {
+      expect(missing, `gc should not require ${doc}`).not.toContain(doc);
+    }
   });
 
   it('does not list the same document twice', () => {

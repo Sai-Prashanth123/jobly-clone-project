@@ -14,6 +14,7 @@
 //
 // Reached over the S3 gateway VPC endpoint, so this traffic never leaves the
 // VPC and does not consume the NAT gateway.
+import { MAX_PRESIGNED_SECONDS, clampExpiry } from './presign';
 import {
   S3Client,
   PutObjectCommand,
@@ -104,7 +105,7 @@ export const s3StorageProvider: StorageProvider = {
           ? { ResponseContentDisposition: `attachment; filename="${opts.download.replace(/"/g, '')}"` }
           : {}),
       }),
-      { expiresIn: expiresInSeconds },
+      { expiresIn: clampExpiry(expiresInSeconds) },
     );
   },
 

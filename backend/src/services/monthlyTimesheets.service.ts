@@ -1,3 +1,4 @@
+import { MAX_PRESIGNED_SECONDS } from '../lib/storage/presign';
 import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
@@ -570,7 +571,9 @@ async function runSubmitSideEffects(row: any): Promise<{ emailSent: boolean; war
 // + skipped when the period is zero-hours (employee was on leave / medical).
 
 const PROOF_BUCKET = 'timesheet-proofs';
-const PROOF_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+// 7 days is the AWS ceiling for a SigV4 presigned URL — see the weekly
+// equivalent in timesheets.service.ts.
+const PROOF_URL_TTL_SECONDS = MAX_PRESIGNED_SECONDS;
 
 export async function uploadMonthlyClientProof(
   id: string, file: Express.Multer.File, actorRole: string, actorEmployeeId: string | null, actorId?: string,

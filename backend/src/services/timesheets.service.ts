@@ -1,3 +1,4 @@
+import { MAX_PRESIGNED_SECONDS } from '../lib/storage/presign';
 import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
@@ -575,7 +576,10 @@ export async function bulkPatchTimesheetStatus(ids: string[], status: string, ac
 // skipped when zero-hour (leave). Files live in storage.timesheet-proofs/weekly/<id>/.
 
 const WEEKLY_PROOF_BUCKET = 'timesheet-proofs';
-const WEEKLY_PROOF_URL_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+// 7 days is the AWS ceiling for a SigV4 presigned URL (see clampExpiry in
+// lib/storage/s3Provider.ts). Asking for 30 threw, and every attempt to
+// upload a client-signed timesheet came back 500.
+const WEEKLY_PROOF_URL_TTL_SECONDS = MAX_PRESIGNED_SECONDS;
 
 export async function uploadWeeklyClientProof(
   id: string, file: Express.Multer.File, actorRole: string, actorEmployeeId: string | null, actorId?: string,
