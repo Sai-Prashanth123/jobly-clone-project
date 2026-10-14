@@ -161,6 +161,13 @@ export const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
   // must still satisfy the requirement, or employees who already provided it
   // would be blocked from finishing.
   Visa: ['US Visa'],
+  // The OPT and STEM OPT cards ARE the EAD — the same physical card. They had
+  // their own rows, so an OPT employee saw "EAD / STEM OPT Card" and
+  // "STEM OPT Card" side by side and was asked for one card twice. The rows
+  // are gone; aliasing the old labels here means anything already uploaded
+  // under them still counts for the EAD requirement and still appears, rather
+  // than silently going missing from a completed checklist.
+  'Employment Authorization Document': ['OPT Card', 'STEM OPT Card'],
 };
 
 export interface OnboardingItem {

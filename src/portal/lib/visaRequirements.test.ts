@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getRequiredIdentityTypes, WORK_VISA_TYPES, IDENTITY_DOC_ROWS } from './documentTypes';
+import { getRequiredIdentityTypes, WORK_VISA_TYPES, IDENTITY_DOC_ROWS, docMatchesRow } from './documentTypes';
 
 /**
  * HR (Oct 2026): "Green card & Citizen employees, I94 is not required. Visa
@@ -85,5 +85,42 @@ describe('every required type is a real row', () => {
         expect(known.has(t), `"${t}" is required for ${visa} but matches no row`).toBe(true);
       }
     }
+  });
+});
+
+/**
+ * "In OPT employees we have EAD/STEM OPT and STEM OPT Card — it is a double,
+ * can you delete STEM OPT card as they both are same."
+ *
+ * They are the same physical card. The rows are gone; these pin the thing that
+ * makes removing them safe — anything already uploaded under the old labels
+ * still counts for the EAD requirement rather than silently going missing from
+ * a checklist someone had already completed.
+ */
+describe('the OPT and STEM OPT cards are the EAD', () => {
+  const eadRow = IDENTITY_DOC_ROWS.find(r => r.type === 'ead')!;
+
+  it('counts an old "STEM OPT Card" upload as the EAD', () => {
+    expect(docMatchesRow({ type: 'STEM OPT Card' }, eadRow)).toBe(true);
+  });
+
+  it('counts an old "OPT Card" upload as the EAD', () => {
+    expect(docMatchesRow({ type: 'OPT Card' }, eadRow)).toBe(true);
+  });
+
+  it('still counts a document uploaded under the EAD label itself', () => {
+    expect(docMatchesRow({ type: 'Employment Authorization Document' }, eadRow)).toBe(true);
+  });
+
+  it('does not swallow an unrelated document', () => {
+    expect(docMatchesRow({ type: 'I-20' }, eadRow)).toBe(false);
+    expect(docMatchesRow({ type: 'Passport' }, eadRow)).toBe(false);
+  });
+
+  // The EAD is what the per-visa requirement names, so the alias is what keeps
+  // an OPT employee who uploaded against the old row at 100%.
+  it('leaves the EAD required for OPT and STEM OPT', () => {
+    expect(getRequiredIdentityTypes('opt')).toContain('ead');
+    expect(getRequiredIdentityTypes('stem_opt')).toContain('ead');
   });
 });

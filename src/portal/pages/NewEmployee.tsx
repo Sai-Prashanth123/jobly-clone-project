@@ -2390,16 +2390,19 @@ export default function NewEmployee() {
                 if (row.type === 'i20') {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
-                // OPT Card / STEM OPT Card are merged into the EAD row, which
-                // is relabelled "EAD / OPT Card" for these visa types — the
-                // OPT card IS the EAD, and having both rows asked for the
-                // same physical card twice while only the EAD one was
-                // required, so the checklist never listed the row people were
-                // hunting for. Kept visible only where something was already
-                // uploaded against them, so historical uploads don't vanish.
-                if (row.type === 'opt_card' || row.type === 'stem_opt_card') {
-                  return (existingEmployee?.documents ?? []).some(d => docMatchesRow(d, row));
-                }
+                // OPT Card / STEM OPT Card are the EAD — the same physical
+                // card — so they are never shown as rows of their own. The EAD
+                // row is relabelled "EAD / OPT Card" or "EAD / STEM OPT Card"
+                // for these visa types.
+                //
+                // They used to survive wherever something had already been
+                // uploaded against them, which is how an OPT employee ended up
+                // looking at "EAD / STEM OPT Card" and "STEM OPT Card" at the
+                // same time and asked for the duplicate to go. Those older
+                // uploads are not lost: both labels are now aliases of the EAD
+                // row (LEGACY_LABEL_ALIASES), so they still satisfy it and
+                // still appear under it.
+                if (row.type === 'opt_card' || row.type === 'stem_opt_card') return false;
                 // Rows explicitly hidden for specific visa types (e.g.
                 // Permanent Resident Card is irrelevant for H-1B/OPT) — an
                 // exclude always wins, checked before the allow-list below.

@@ -46,6 +46,15 @@ interface SelectContextValue {
   contentRef: React.RefObject<HTMLDivElement>;
   baseId: string;
   selectItem: (value: string) => void;
+  /**
+   * The letters typed so far, shared between the trigger and the open list.
+   *
+   * It lived inside the content before, which meant it only existed while the
+   * list was open — so typing on a closed dropdown did nothing at all. That is
+   * the natural gesture (click the field, type "I" for India) and the one
+   * people reported as "letter search is not working".
+   */
+  typeahead: React.MutableRefObject<{ buffer: string; at: number }>;
 }
 
 const SelectContext = React.createContext<SelectContextValue | null>(null);
@@ -73,6 +82,7 @@ function Select({ value, onValueChange, defaultValue, disabled, children }: Sele
   const [uncontrolledValue, setUncontrolledValue] = React.useState(defaultValue ?? "");
   const triggerRef = React.useRef<HTMLButtonElement>(null!);
   const contentRef = React.useRef<HTMLDivElement>(null!);
+  const typeahead = React.useRef({ buffer: "", at: 0 });
   const baseId = React.useId();
 
   const currentValue = value !== undefined ? value : uncontrolledValue;
@@ -155,6 +165,7 @@ function Select({ value, onValueChange, defaultValue, disabled, children }: Sele
     contentRef,
     baseId,
     selectItem,
+    typeahead,
   };
 
   return <SelectContext.Provider value={ctx}>{children}</SelectContext.Provider>;
@@ -176,7 +187,7 @@ function SelectValue({ placeholder, className }: { placeholder?: string; classNa
 
 const SelectTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttributes<HTMLButtonElement>>(
   ({ className, children, onClick, onKeyDown, ...props }, forwardedRef) => {
-    const { open, setOpen, disabled, triggerRef, activeValue, setActiveValue, items, selectItem, baseId } =
+    const { open, setOpen, disabled, triggerRef, activeValue, setActiveValue, items, selectItem, baseId, typeahead } =
       useSelectContext("SelectTrigger");
     const ref = useMergedRefs(triggerRef, forwardedRef);
 
@@ -217,6 +228,21 @@ const SelectTrigger = React.forwardRef<HTMLButtonElement, React.ButtonHTMLAttrib
             e.preventDefault();
             if (open) { if (activeValue) selectItem(activeValue); }
             else setOpen(true);
+          } else if (!open && e.key.length === 1 && /[a-z0-9]/i.test(e.key)) {
+            // Typing on a CLOSED dropdown. This is the gesture people actually
+            // use — click the field, type "I" for India — and it did nothing,
+            // because the typeahead listener only existed while the list was
+            // open. A native <select> jumps on the first keystroke, so this
+            // opens the list and seeds the same buffer the open list uses,
+            // which is why that ref lives on the context now.
+            e.preventDefault();
+            const now = Date.now();
+            if (now - typeahead.current.at > TYPEAHEAD_RESET_MS) typeahead.current.buffer = "";
+            typeahead.current.buffer += e.key.toLowerCase();
+            typeahead.current.at = now;
+            const found = findByPrefix(items, typeahead.current.buffer, activeValue);
+            setOpen(true);
+            if (found) setActiveValue(found.value);
           }
         }}
         {...props}
@@ -285,7 +311,7 @@ interface SelectContentProps {
 }
 
 function SelectContent({ children, className }: SelectContentProps) {
-  const { open, setOpen, contentRef, setItems, activeValue, setActiveValue, selectItem, baseId } =
+  const { open, setOpen, contentRef, setItems, activeValue, setActiveValue, selectItem, baseId, typeahead } =
     useSelectContext("SelectContent");
   const [pos, setPos] = React.useState<Position | null>(null);
   const { triggerRef } = useSelectContext("SelectContent");
@@ -300,10 +326,8 @@ function SelectContent({ children, className }: SelectContentProps) {
 
   // Typed prefix and when it was last appended to. A ref, not state: it must
   // not re-render the list on every keystroke.
-  const typeahead = React.useRef({ buffer: "", at: 0 });
-  React.useEffect(() => {
-    if (open) typeahead.current = { buffer: "", at: 0 };
-  }, [open]);
+  // The ref is shared with the trigger (see SelectContextValue.typeahead), so
+  // letters typed before the list opened keep narrowing once it does.
 
   React.useEffect(() => {
     if (!open) return;
