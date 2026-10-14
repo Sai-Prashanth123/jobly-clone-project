@@ -1,75 +1,109 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle, ChevronDown, ChevronRight, Loader2, Network, Search, Users } from 'lucide-react';
+import {
+  AlertCircle, ArrowRight, Briefcase, ChevronDown, ChevronRight,
+  Loader2, Network, Search, Users, X,
+} from 'lucide-react';
 import { PageHeader } from '../components/shared/PageHeader';
+import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
+import { DetailField as Field } from '../components/shared/DetailField';
+import { StatusBadge } from '../components/shared/StatusBadge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { useEmployees } from '../hooks/useEmployees';
-import { buildOrgTree, matchingIds, type OrgNode } from '../lib/orgChart';
+import { useAssignments } from '../hooks/useAssignments';
+import {
+  buildOrgTree, matchingIds, descendants, findNode, ancestorsOf,
+  type OrgNode, type OrgPerson,
+} from '../lib/orgChart';
+import { formatDate } from '../lib/utils';
 
 /**
- * Who reports to whom, drawn from `reportingManagerId`.
+ * Who reports to whom.
  *
- * The tree-building, cycle handling and search live in lib/orgChart.ts so they
- * can be tested without rendering; this file is layout only.
+ * Tree-building, cycle handling and search live in lib/orgChart.ts so they can
+ * be tested without rendering; this file is layout.
+ *
+ * Two things the first version got wrong, both reported as "confusing":
+ * clicking a person navigated away, so the structure could never be studied;
+ * and a node carried almost nothing, so the chart answered only "who reports
+ * to whom" and no other question anyone actually had.
  */
 
-/** Banding by depth, so levels are distinguishable without reading the lines. */
+const fullName = (p: OrgPerson) => `${p.firstName ?? ''} ${p.lastName ?? ''}`.trim() || 'Unnamed';
+
+/** Level banding, so depth is readable without tracing the lines. */
 const DEPTH_ACCENT = [
   'border-t-[#4069FF]',
+  'border-t-[#32CDDC]',
   'border-t-emerald-500',
   'border-t-amber-500',
   'border-t-violet-500',
-  'border-t-rose-500',
 ];
 
+function Chip({ children, tone = 'gray' }: { children: React.ReactNode; tone?: 'gray' | 'blue' | 'violet' }) {
+  const tones = {
+    gray: 'text-gray-600 bg-gray-100 border-gray-200',
+    blue: 'text-blue-700 bg-blue-50 border-blue-200',
+    violet: 'text-violet-700 bg-violet-50 border-violet-200',
+  } as const;
+  return (
+    <span className={`inline-flex items-center gap-1 text-[10px] font-medium border rounded-full px-1.5 py-0.5 whitespace-nowrap ${tones[tone]}`}>
+      {children}
+    </span>
+  );
+}
+
 function PersonCard({
-  node, collapsed, onToggle, onOpen, dimmed, highlighted,
+  node, collapsed, selected, onToggle, onSelect, dimmed, highlighted,
 }: {
   node: OrgNode;
   collapsed: boolean;
+  selected: boolean;
   onToggle: () => void;
-  onOpen: () => void;
+  onSelect: () => void;
   dimmed: boolean;
   highlighted: boolean;
 }) {
   const { person, directCount, totalCount, depth } = node;
-  const name = `${person.firstName ?? ''} ${person.lastName ?? ''}`.trim() || 'Unnamed';
-  const initials = person.avatarInitials
-    || `${person.firstName?.[0] ?? ''}${person.lastName?.[0] ?? ''}`.toUpperCase()
-    || '?';
   const accent = DEPTH_ACCENT[depth % DEPTH_ACCENT.length];
 
   return (
     <div
-      className={`inline-block align-top w-[208px] rounded-xl border border-gray-200 border-t-[3px] ${accent} bg-white shadow-sm transition
-        ${dimmed ? 'opacity-35' : 'opacity-100'}
-        ${highlighted ? 'ring-2 ring-[#4069FF] ring-offset-1' : ''}`}
+      className={`inline-block align-top w-[232px] rounded-xl border border-gray-200 border-t-[3px] ${accent} bg-white shadow-sm transition
+        ${dimmed ? 'opacity-30' : 'opacity-100'}
+        ${selected ? 'ring-2 ring-[#4069FF] ring-offset-1' : highlighted ? 'ring-2 ring-amber-400' : ''}`}
     >
       <button
         type="button"
-        onClick={onOpen}
-        className="w-full text-left px-3 pt-3 pb-2 hover:bg-gray-50/80 rounded-t-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF]"
-        title={`Open ${name}'s record`}
+        onClick={onSelect}
+        className="w-full text-left px-3 pt-3 pb-2.5 hover:bg-gray-50/80 rounded-t-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF]"
+        title={`Open ${fullName(person)}`}
       >
-        <div className="flex items-center gap-2.5">
-          {person.profilePhotoUrl ? (
-            <img src={person.profilePhotoUrl} alt="" className="h-9 w-9 rounded-full object-cover flex-shrink-0" />
-          ) : (
-            <span className="h-9 w-9 rounded-full bg-gradient-to-br from-[#4069FF] to-[#6b8cff] text-white text-[11px] font-semibold flex items-center justify-center flex-shrink-0">
-              {initials}
-            </span>
-          )}
-          <span className="min-w-0 text-left">
-            <span className="block text-[13px] font-semibold text-gray-900 truncate">{name}</span>
+        <span className="flex items-center gap-2.5">
+          <EmployeeAvatar photoUrl={person.profilePhotoUrl} name={fullName(person)} size="sm" initials />
+          <span className="min-w-0 flex-1">
+            <span className="block text-[13px] font-semibold text-gray-900 truncate">{fullName(person)}</span>
             <span className="block text-[11px] text-gray-500 truncate">{person.jobTitle || '—'}</span>
           </span>
-        </div>
-        {(person.department || person.displayId) && (
-          <p className="mt-1.5 text-[10px] text-gray-400 truncate">
-            {[person.displayId, person.department].filter(Boolean).join(' · ')}
-          </p>
+        </span>
+
+        <span className="mt-2 flex flex-wrap gap-1">
+          {person.displayId && <Chip>{person.displayId}</Chip>}
+          {person.department && <Chip tone="blue">{person.department}</Chip>}
+          {person.visaType && <Chip tone="violet">{person.visaType.toUpperCase()}</Chip>}
+        </span>
+
+        {/* Deliberately no rate: assignments are not redacted for operations,
+            who are the main audience for this page. */}
+        {person.projectName && (
+          <span className="mt-1.5 flex items-start gap-1 text-[10px] text-gray-500">
+            <Briefcase className="h-3 w-3 mt-px flex-shrink-0 text-gray-400" />
+            <span className="truncate">
+              {person.projectName}{person.clientName ? ` · ${person.clientName}` : ''}
+            </span>
+          </span>
         )}
       </button>
 
@@ -90,12 +124,13 @@ function PersonCard({
 }
 
 function Branch({
-  nodes, collapsed, toggle, open, hits, searching,
+  nodes, collapsed, selectedId, toggle, select, hits, searching,
 }: {
   nodes: OrgNode[];
   collapsed: Set<string>;
+  selectedId: string | null;
   toggle: (id: string) => void;
-  open: (id: string) => void;
+  select: (id: string) => void;
   hits: Set<string>;
   searching: boolean;
 }) {
@@ -103,24 +138,26 @@ function Branch({
   return (
     <ul>
       {nodes.map(node => {
-        const isCollapsed = collapsed.has(node.person.id);
-        const isHit = hits.has(node.person.id);
+        const id = node.person.id;
+        const isCollapsed = collapsed.has(id);
         return (
-          <li key={node.person.id}>
+          <li key={id}>
             <PersonCard
               node={node}
               collapsed={isCollapsed}
-              onToggle={() => toggle(node.person.id)}
-              onOpen={() => open(node.person.id)}
-              dimmed={searching && !isHit}
-              highlighted={searching && isHit}
+              selected={selectedId === id}
+              onToggle={() => toggle(id)}
+              onSelect={() => select(id)}
+              dimmed={searching && !hits.has(id)}
+              highlighted={searching && hits.has(id)}
             />
             {!isCollapsed && (
               <Branch
                 nodes={node.reports}
                 collapsed={collapsed}
+                selectedId={selectedId}
                 toggle={toggle}
-                open={open}
+                select={select}
                 hits={hits}
                 searching={searching}
               />
@@ -132,26 +169,172 @@ function Branch({
   );
 }
 
+/** A compact person row, used for the reports list and the breadcrumb. */
+function PersonRow({ node, onClick }: { node: OrgNode; onClick: () => void }) {
+  const p = node.person;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="w-full flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-gray-50 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF]"
+    >
+      <EmployeeAvatar photoUrl={p.profilePhotoUrl} name={fullName(p)} size="xs" initials />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[13px] text-gray-900 truncate">{fullName(p)}</span>
+        <span className="block text-[11px] text-gray-500 truncate">{p.jobTitle || '—'}</span>
+      </span>
+      {node.directCount > 0 && (
+        <span className="text-[10px] text-gray-400 whitespace-nowrap">+{node.totalCount}</span>
+      )}
+    </button>
+  );
+}
+
+function DetailPanel({
+  node, roots, onSelect, onClose, onOpenRecord,
+}: {
+  node: OrgNode;
+  roots: OrgNode[];
+  onSelect: (id: string) => void;
+  onClose: () => void;
+  onOpenRecord: () => void;
+}) {
+  const p = node.person;
+  const chain = ancestorsOf(roots, p.id);
+  const manager = chain.length > 0 ? chain[chain.length - 1] : undefined;
+  const indirect = descendants(node).filter(d => !node.reports.includes(d));
+
+  return (
+    <Card className="lg:sticky lg:top-4">
+      <CardHeader className="pb-3">
+        <div className="flex items-start gap-3">
+          <EmployeeAvatar photoUrl={p.profilePhotoUrl} name={fullName(p)} size="md" initials />
+          <div className="min-w-0 flex-1">
+            <CardTitle className="text-base leading-tight truncate">{fullName(p)}</CardTitle>
+            <p className="text-xs text-gray-500 mt-0.5 truncate">{p.jobTitle || '—'}</p>
+            {p.status && <div className="mt-1.5"><StatusBadge status={p.status} /></div>}
+          </div>
+          <Button variant="ghost" size="icon" className="h-7 w-7 flex-shrink-0" onClick={onClose} title="Close">
+            <X className="h-4 w-4" />
+          </Button>
+        </div>
+      </CardHeader>
+
+      <CardContent className="space-y-4">
+        {/* Where they sit. More useful than any count. */}
+        {chain.length > 0 && (
+          <div>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.08em] mb-1">Reports up through</p>
+            <div className="flex flex-wrap items-center gap-1 text-[11px]">
+              {chain.map((a, i) => (
+                <span key={a.person.id} className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onSelect(a.person.id)}
+                    className="text-[#4069FF] hover:underline underline-offset-2"
+                  >
+                    {fullName(a.person)}
+                  </button>
+                  {i < chain.length - 1 && <ChevronRight className="h-3 w-3 text-gray-300" />}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Employee ID" value={p.displayId} mono />
+          <Field label="Department" value={p.department} />
+          <Field label="Work Status" value={p.visaType?.toUpperCase()} />
+          <Field label="Manager" value={manager ? fullName(manager.person) : 'None — top level'} />
+        </div>
+
+        {p.projectName && (
+          <div>
+            <p className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.08em] mb-1">Currently on</p>
+            <p className="text-sm text-gray-900">{p.projectName}</p>
+            <p className="text-[11px] text-gray-500">
+              {[p.clientName, p.assignmentRole].filter(Boolean).join(' · ') || '—'}
+            </p>
+          </div>
+        )}
+
+        <div>
+          <p className="text-[10px] font-medium text-gray-400 uppercase tracking-[0.08em] mb-1">
+            Team — {node.directCount} direct{node.directCount === 1 ? '' : 's'}
+            {indirect.length > 0 && `, ${node.totalCount} in total`}
+          </p>
+          {node.reports.length === 0 ? (
+            <p className="text-sm text-gray-400">Nobody reports to {p.firstName}.</p>
+          ) : (
+            <div className="-mx-2 max-h-[280px] overflow-y-auto">
+              {node.reports.map(r => (
+                <PersonRow key={r.person.id} node={r} onClick={() => onSelect(r.person.id)} />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <Button variant="outline" size="sm" className="w-full gap-1.5" onClick={onOpenRecord}>
+          Open full record <ArrowRight className="h-3.5 w-3.5" />
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OrgChart() {
   const navigate = useNavigate();
   const { data, isLoading, isError, isFetching, refetch } = useEmployees({ limit: 500 });
+  // One request for everyone's current work — the precedent is
+  // ApprovedTimesheetsReport. Grouped by employee below.
+  const { data: assignmentData } = useAssignments({ status: 'active', limit: 500 });
   const [query, setQuery] = useState('');
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
-  // Terminated people would otherwise hang around as empty boxes.
-  const people = useMemo(
-    () => (data?.data ?? []).filter(e => e.status !== 'inactive' || !e.terminatedAt),
-    [data],
-  );
+  const people: OrgPerson[] = useMemo(() => {
+    const byEmployee = new Map<string, { projectName?: string; clientName?: string; role?: string }>();
+    for (const a of assignmentData?.data ?? []) {
+      if (a.employeeId && !byEmployee.has(a.employeeId)) {
+        byEmployee.set(a.employeeId, { projectName: a.projectName, clientName: a.clientName, role: a.role });
+      }
+    }
+    return (data?.data ?? [])
+      // Terminated people would otherwise hang around as empty boxes.
+      .filter(e => e.status !== 'inactive' || !e.terminatedAt)
+      .map(e => {
+        const asg = byEmployee.get(e.id);
+        return {
+          id: e.id,
+          firstName: e.firstName,
+          lastName: e.lastName,
+          jobTitle: e.jobTitle,
+          department: e.department,
+          displayId: e.displayId,
+          profilePhotoUrl: e.profilePhotoUrl,
+          status: e.status,
+          reportingManagerId: e.reportingManagerId,
+          visaType: e.visaType,
+          projectName: asg?.projectName,
+          clientName: asg?.clientName,
+          assignmentRole: asg?.role,
+        };
+      });
+  }, [data, assignmentData]);
+
   const tree = useMemo(() => buildOrgTree(people), [people]);
   const hits = useMemo(() => matchingIds(tree.roots, query), [tree, query]);
   const searching = query.trim().length > 0;
+  const selected = useMemo(
+    () => (selectedId ? findNode(tree.roots, selectedId) : undefined),
+    [tree, selectedId],
+  );
 
   const toggle = (id: string) =>
     setCollapsed(prev => {
       const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
+      if (next.has(id)) next.delete(id); else next.add(id);
       return next;
     });
 
@@ -175,11 +358,16 @@ export default function OrgChart() {
     );
   }
 
+  const withProject = people.filter(p => p.projectName).length;
+
   return (
     <div className="space-y-5">
       <PageHeader
         title="Organization Chart"
-        description={`${people.length} people${tree.isFlat ? '' : ` · ${tree.roots.length} at the top`}`}
+        description={
+          `${people.length} people · ${tree.roots.length} at the top`
+          + (withProject > 0 ? ` · ${withProject} on an active project` : '')
+        }
         onRefresh={refetch}
         isRefreshing={isFetching}
         action={
@@ -189,7 +377,7 @@ export default function OrgChart() {
               <Input
                 value={query}
                 onChange={e => setQuery(e.target.value)}
-                placeholder="Find a person, title or team…"
+                placeholder="Name, title, team, project…"
                 className="pl-8 w-full sm:w-64 h-9"
               />
             </div>
@@ -199,9 +387,9 @@ export default function OrgChart() {
         }
       />
 
-      {/* Nobody has a manager set, so there is no hierarchy to draw yet. Say so
-          plainly and point at the fix, rather than rendering a meaningless row
-          of disconnected boxes and letting someone conclude it is broken. */}
+      {/* Nobody has a manager set, so there is no hierarchy to draw. Say so and
+          point at the fix rather than rendering disconnected boxes and letting
+          someone conclude the page is broken. */}
       {tree.isFlat && (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 flex items-start gap-2">
           <Users className="h-4 w-4 text-amber-600 mt-0.5 flex-shrink-0" />
@@ -229,7 +417,7 @@ export default function OrgChart() {
           <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
           <p className="text-sm text-blue-800">
             {tree.orphanedIds.length} {tree.orphanedIds.length === 1 ? 'person reports' : 'people report'} to
-            someone who is no longer on the active roster, so they are shown at the top level.
+            someone no longer on the active roster, so they are shown at the top level.
           </p>
         </div>
       )}
@@ -244,19 +432,33 @@ export default function OrgChart() {
           <p className="text-sm">No active employees to chart.</p>
         </div>
       ) : (
-        /* Horizontal scroll rather than shrinking the cards: a wide org is
-           wide, and unreadable boxes help nobody. */
-        <div className="org-tree overflow-x-auto pb-6">
-          <div className="inline-block min-w-full px-4">
-            <Branch
-              nodes={tree.roots}
-              collapsed={collapsed}
-              toggle={toggle}
-              open={id => navigate(`/portal/employees/${id}`)}
-              hits={hits}
-              searching={searching}
-            />
+        /* Master-detail, following HrDocumentsView in Documents.tsx. The chart
+           keeps its own horizontal scroll so a wide org stays readable rather
+           than being squeezed into the remaining column. */
+        <div className={selected ? 'grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4' : ''}>
+          <div className="org-tree overflow-x-auto pb-6 min-w-0">
+            <div className="inline-block min-w-full px-4">
+              <Branch
+                nodes={tree.roots}
+                collapsed={collapsed}
+                selectedId={selectedId}
+                toggle={toggle}
+                select={setSelectedId}
+                hits={hits}
+                searching={searching}
+              />
+            </div>
           </div>
+
+          {selected && (
+            <DetailPanel
+              node={selected}
+              roots={tree.roots}
+              onSelect={setSelectedId}
+              onClose={() => setSelectedId(null)}
+              onOpenRecord={() => navigate(`/portal/employees/${selected.person.id}`)}
+            />
+          )}
         </div>
       )}
     </div>

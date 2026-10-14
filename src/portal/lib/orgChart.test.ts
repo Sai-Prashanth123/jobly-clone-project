@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildOrgTree, visibleNodes, matchingIds, type OrgPerson } from './orgChart';
+import { buildOrgTree, visibleNodes, matchingIds, descendants, findNode, ancestorsOf, type OrgPerson } from './orgChart';
 
 /**
  * The manager field is a dropdown over the whole roster with nothing stopping
@@ -160,5 +160,73 @@ describe('search', () => {
 
   it('returns nothing for an empty query', () => {
     expect(matchingIds(tree.roots, '   ').size).toBe(0);
+  });
+});
+
+/**
+ * Helpers behind the detail panel. Clicking a person now opens a panel rather
+ * than navigating away — the first version jumped straight to the employee
+ * record, so the structure could never actually be studied.
+ */
+describe('navigating the tree', () => {
+  // Maheswari → Francis → {Priya, Sreekanth}, and Maheswari → Sai
+  const tree = buildOrgTree([
+    p('1', 'Maheswari'),
+    p('2', 'Francis', '1'),
+    p('3', 'Priya', '2'),
+    p('4', 'Sreekanth', '2'),
+    p('5', 'Sai', '1'),
+  ]);
+
+  it('finds a node at any depth', () => {
+    expect(findNode(tree.roots, '3')?.person.firstName).toBe('Priya');
+    expect(findNode(tree.roots, '1')?.person.firstName).toBe('Maheswari');
+  });
+
+  it('returns nothing for an id that is not there', () => {
+    expect(findNode(tree.roots, 'nope')).toBeUndefined();
+  });
+
+  it('lists the management chain outermost first', () => {
+    const chain = ancestorsOf(tree.roots, '3').map(n => n.person.firstName);
+    expect(chain).toEqual(['Maheswari', 'Francis']);
+  });
+
+  it('gives an empty chain for someone at the top', () => {
+    expect(ancestorsOf(tree.roots, '1')).toEqual([]);
+  });
+
+  it('counts everyone beneath a person, not just directs', () => {
+    const francis = findNode(tree.roots, '2')!;
+    expect(descendants(francis).map(n => n.person.firstName).sort()).toEqual(['Priya', 'Sreekanth']);
+
+    const top = findNode(tree.roots, '1')!;
+    expect(descendants(top)).toHaveLength(4);
+  });
+
+  it('gives nobody for a leaf', () => {
+    expect(descendants(findNode(tree.roots, '3')!)).toEqual([]);
+  });
+
+  // A cycle must not make the panel's lookups hang either.
+  it('terminates on a roster containing a loop', () => {
+    const looped = buildOrgTree([p('1', 'A', '2'), p('2', 'B', '1')]);
+    expect(() => ancestorsOf(looped.roots, '1')).not.toThrow();
+    expect(() => descendants(looped.roots[0])).not.toThrow();
+  });
+});
+
+describe('search reaches the work, not just the person', () => {
+  const tree = buildOrgTree([
+    p('1', 'Maheswari'),
+    p('2', 'Priya', '1', { projectName: 'Atlas Migration', clientName: 'Acme Corp' }),
+  ]);
+
+  it('matches a project name', () => {
+    expect(matchingIds(tree.roots, 'atlas').has('2')).toBe(true);
+  });
+
+  it('matches a client name', () => {
+    expect(matchingIds(tree.roots, 'acme').has('2')).toBe(true);
   });
 });

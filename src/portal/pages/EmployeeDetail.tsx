@@ -183,7 +183,11 @@ export default function EmployeeDetail() {
   // from the uploaded documents list.
   const usVisa = findIdentityDoc(employee.identityDocuments, 'us_visa');
   const i797 = findIdentityDoc(employee.identityDocuments, 'i797');
-  const lcaCount = (employee.documents ?? []).filter(d => d.type === 'LCA').length;
+  const lcaDocs = (employee.documents ?? []).filter(d => d.type === 'LCA');
+  // Uploaded copies behind the dated rows on the Employment card. The row
+  // shows a date; these let you actually read the document without scrolling
+  // to the Documents card at the foot of the page.
+  const docsOfType = (label: string) => (employee.documents ?? []).filter(d => d.type === label);
   const educationList = employee.education ?? [];
   const workList = employee.workHistory ?? [];
 
@@ -626,6 +630,21 @@ export default function EmployeeDetail() {
                 <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
                   <span>{formatDate(usVisa.expiry)}</span>
                   <ExpiryBadge date={usVisa.expiry} />
+                {docsOfType('Visa').length > 0 && (
+                  <span className="flex flex-wrap gap-x-3">
+                    {docsOfType('Visa').map((doc, i) => (
+                      <button
+                        key={doc.id}
+                        type="button"
+                        onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}
+                        className="text-xs text-[#4069FF] hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF] rounded"
+                        title={`Preview ${doc.name}`}
+                      >
+                        {docsOfType('Visa').length === 1 ? 'View Visa' : `Visa ${i + 1}`}
+                      </button>
+                    ))}
+                  </span>
+                )}
                 </p>
               </div>
             )}
@@ -635,11 +654,45 @@ export default function EmployeeDetail() {
                 <p className="text-sm text-gray-900 mt-0.5 flex flex-wrap items-center gap-2">
                   <span>{formatDate(i797.expiry)}</span>
                   <ExpiryBadge date={i797.expiry} />
+                {docsOfType('I-797').length > 0 && (
+                  <span className="flex flex-wrap gap-x-3">
+                    {docsOfType('I-797').map((doc, i) => (
+                      <button
+                        key={doc.id}
+                        type="button"
+                        onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}
+                        className="text-xs text-[#4069FF] hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF] rounded"
+                        title={`Preview ${doc.name}`}
+                      >
+                        {docsOfType('I-797').length === 1 ? 'View I-797' : `I-797 ${i + 1}`}
+                      </button>
+                    ))}
+                  </span>
+                )}
                 </p>
               </div>
             )}
-            {canSeeRestricted && lcaCount > 0 && (
-              <Field label="LCA" value={`${lcaCount} on file`} />
+            {canSeeRestricted && lcaDocs.length > 0 && (
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">LCA</p>
+                {/* Clickable: the count alone meant scrolling to the Documents
+                    card at the foot of the page to actually read the thing.
+                    Each file opens in the same preview dialog the Documents
+                    card uses, so there is one preview behaviour to maintain. */}
+                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1">
+                  {lcaDocs.map((doc, i) => (
+                    <button
+                      key={doc.id}
+                      type="button"
+                      onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}
+                      className="text-sm text-[#4069FF] hover:underline underline-offset-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF] rounded"
+                      title={`Preview ${doc.name}`}
+                    >
+                      {lcaDocs.length === 1 ? 'View LCA' : `LCA ${i + 1}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
           </CardContent>
         </Card>

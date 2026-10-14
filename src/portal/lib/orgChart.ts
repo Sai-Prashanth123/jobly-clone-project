@@ -18,10 +18,23 @@ export interface OrgPerson {
   jobTitle?: string;
   department?: string;
   displayId?: string;
-  avatarInitials?: string;
   profilePhotoUrl?: string;
   status?: string;
   reportingManagerId?: string;
+  /** Work status, e.g. h1b — shown as a chip so the visa mix is visible at a glance. */
+  visaType?: string;
+  /**
+   * What this person is currently on, joined client-side from active
+   * assignments.
+   *
+   * Deliberately carries no bill or pay rate. redactEmployee zeroes
+   * employee.payRate for the operations role, but assignments are not redacted
+   * at all — so putting a rate on a node would leak it through the side door,
+   * to precisely the role this page is built for.
+   */
+  projectName?: string;
+  clientName?: string;
+  assignmentRole?: string;
 }
 
 export interface OrgNode {
@@ -131,6 +144,43 @@ export function visibleNodes(roots: OrgNode[], collapsed: ReadonlySet<string>): 
   return out;
 }
 
+/** Everyone beneath this node, flattened — the detail panel's team list. */
+export function descendants(node: OrgNode): OrgNode[] {
+  const out: OrgNode[] = [];
+  const walk = (n: OrgNode) => n.reports.forEach(r => { out.push(r); walk(r); });
+  walk(node);
+  return out;
+}
+
+/** Find one node anywhere in the forest, by person id. */
+export function findNode(roots: OrgNode[], id: string): OrgNode | undefined {
+  for (const r of roots) {
+    if (r.person.id === id) return r;
+    const hit = findNode(r.reports, id);
+    if (hit) return hit;
+  }
+  return undefined;
+}
+
+/**
+ * The chain of managers above this person, outermost first.
+ *
+ * Shown as a breadcrumb in the detail panel: knowing someone has four reports
+ * matters much less than knowing where they sit.
+ */
+export function ancestorsOf(roots: OrgNode[], id: string): OrgNode[] {
+  const path: OrgNode[] = [];
+  const walk = (nodes: OrgNode[], trail: OrgNode[]): boolean => {
+    for (const n of nodes) {
+      if (n.person.id === id) { path.push(...trail); return true; }
+      if (walk(n.reports, [...trail, n])) return true;
+    }
+    return false;
+  };
+  walk(roots, []);
+  return path;
+}
+
 /** Ids of everyone matching a search, plus their ancestors so they stay reachable. */
 export function matchingIds(roots: OrgNode[], query: string): Set<string> {
   const needle = query.trim().toLowerCase();
@@ -142,6 +192,8 @@ export function matchingIds(roots: OrgNode[], query: string): Set<string> {
       node.person.jobTitle ?? '',
       node.person.department ?? '',
       node.person.displayId ?? '',
+      node.person.projectName ?? '',
+      node.person.clientName ?? '',
     ].join(' ').toLowerCase();
     if (haystack.includes(needle)) {
       hits.add(node.person.id);
