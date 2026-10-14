@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createPortal } from "react-dom";
 import { Check, ChevronDown } from "lucide-react";
-import { findByPrefix, TYPEAHEAD_RESET_MS } from "./selectSearch";
+import { findByPrefix, labelText, TYPEAHEAD_RESET_MS } from "./selectSearch";
 
 import { cn } from "@/lib/utils";
 
@@ -55,6 +55,34 @@ interface SelectContextValue {
    * people reported as "letter search is not working".
    */
   typeahead: React.MutableRefObject<{ buffer: string; at: number }>;
+  /**
+   * The text typed into the search box, when the list is long enough to have
+   * one. Items that do not match it hide themselves.
+   *
+   * Typeahead ALONE was the wrong answer for these lists, and the reports kept
+   * coming until that was clear: "when we press T it is going to Thai but not
+   * showing other two language options". A native select jumps between
+   * matches silently, so with Thai, Tamil and Telugu scattered down a
+   * sixty-eight item list the other two are invisible and the control looks
+   * broken. People expect a letter to REVEAL the matches, not cycle them.
+   */
+  query: string;
+  setQuery: (q: string) => void;
+  /** Whether this list is long enough to warrant the search box. */
+  searchable: boolean;
+}
+
+/**
+ * Below this many options a search box is noise — Blood Group has eight and is
+ * entirely visible at a glance. Above it, scanning beats scrolling.
+ */
+export const SEARCHABLE_MIN_ITEMS = 12;
+
+/** Does an option match what has been typed into the search box? */
+export function matchesQuery(label: React.ReactNode, query: string): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  return labelText(label).toLowerCase().includes(q);
 }
 
 const SelectContext = React.createContext<SelectContextValue | null>(null);
@@ -83,6 +111,7 @@ function Select({ value, onValueChange, defaultValue, disabled, children }: Sele
   const triggerRef = React.useRef<HTMLButtonElement>(null!);
   const contentRef = React.useRef<HTMLDivElement>(null!);
   const typeahead = React.useRef({ buffer: "", at: 0 });
+  const [query, setQuery] = React.useState("");
   const baseId = React.useId();
 
   const currentValue = value !== undefined ? value : uncontrolledValue;
@@ -151,6 +180,9 @@ function Select({ value, onValueChange, defaultValue, disabled, children }: Sele
     };
   }, [open, setOpen]);
 
+  // A stale query would hide almost everything the next time the list opens.
+  React.useEffect(() => { if (!open) setQuery(""); }, [open]);
+
   const ctx: SelectContextValue = {
     value: currentValue,
     onValueChange,
@@ -159,6 +191,9 @@ function Select({ value, onValueChange, defaultValue, disabled, children }: Sele
     setOpen,
     activeValue,
     setActiveValue,
+    query,
+    setQuery,
+    searchable: items.length >= SEARCHABLE_MIN_ITEMS,
     items,
     setItems,
     triggerRef,
@@ -311,13 +346,35 @@ interface SelectContentProps {
 }
 
 function SelectContent({ children, className }: SelectContentProps) {
-  const { open, setOpen, contentRef, setItems, activeValue, setActiveValue, selectItem, baseId, typeahead } =
+  const { open, setOpen, contentRef, setItems, activeValue, setActiveValue, selectItem, baseId, typeahead, query, setQuery, searchable } =
     useSelectContext("SelectContent");
+  const searchRef = React.useRef<HTMLInputElement>(null);
   const [pos, setPos] = React.useState<Position | null>(null);
   const { triggerRef } = useSelectContext("SelectContent");
 
-  const flatItems = React.useMemo(() => collectItems(children), [children]);
-  React.useEffect(() => setItems(flatItems), [flatItems, setItems]);
+  const allItems = React.useMemo(() => collectItems(children), [children]);
+  React.useEffect(() => setItems(allItems), [allItems, setItems]);
+
+  // Arrow keys and Enter must walk what is ON SCREEN. Navigating the unfiltered
+  // list would move the highlight to rows the filter has hidden, which reads as
+  // the keyboard skipping items at random.
+  const flatItems = React.useMemo(
+    () => (searchable && query ? allItems.filter(i => matchesQuery(i.label, query)) : allItems),
+    [allItems, query, searchable],
+  );
+
+  // Typing narrows, so the previous highlight is often gone. Park it on the
+  // first surviving row: Enter should always commit something sensible.
+  React.useEffect(() => {
+    if (!open || !query) return;
+    const stillVisible = flatItems.some(i => i.value === activeValue);
+    if (!stillVisible) setActiveValue(flatItems.find(i => !i.disabled)?.value ?? null);
+  }, [query, flatItems, open, activeValue, setActiveValue]);
+
+  // The search box owns the keyboard once it exists, so focus it on open.
+  React.useEffect(() => {
+    if (open && searchable) searchRef.current?.focus();
+  }, [open, searchable]);
 
   React.useLayoutEffect(() => {
     if (!open || !triggerRef.current) { setPos(null); return; }
@@ -328,6 +385,32 @@ function SelectContent({ children, className }: SelectContentProps) {
   // not re-render the list on every keystroke.
   // The ref is shared with the trigger (see SelectContextValue.typeahead), so
   // letters typed before the list opened keep narrowing once it does.
+
+  /**
+   * Keep the highlighted option in view.
+   *
+   * Without this the typeahead "did nothing": it was setting the highlight
+   * correctly, but on a long list — 100-plus nationalities in a 280px box
+   * showing twelve — the match is forty rows below the fold, so the screen
+   * never changed. Reported three times as the search being broken when the
+   * search was fine and only the scroll was missing. Arrow keys had it too,
+   * once you held one past the last visible row.
+   *
+   * Scrolling the listbox by hand rather than calling scrollIntoView, which
+   * also scrolls ancestors: this control already has a history of yanking the
+   * whole page to the top when a Select with a pre-selected value reopens, and
+   * assigning scrollTop on this one element cannot move the page at all.
+   */
+  React.useEffect(() => {
+    const list = contentRef.current;
+    if (!open || !activeValue || !list) return;
+    const el = document.getElementById(`${baseId}-option-${activeValue}`);
+    if (!el) return;
+    const top = el.offsetTop;
+    const bottom = top + el.offsetHeight;
+    if (top < list.scrollTop) list.scrollTop = top;
+    else if (bottom > list.scrollTop + list.clientHeight) list.scrollTop = bottom - list.clientHeight;
+  }, [open, activeValue, baseId, contentRef]);
 
   React.useEffect(() => {
     if (!open) return;
@@ -389,7 +472,28 @@ function SelectContent({ children, className }: SelectContentProps) {
       )}
       style={{ top: pos.top, bottom: pos.bottom, left: pos.left, width: pos.width, maxHeight: pos.maxHeight }}
     >
+      {searchable && (
+        <div className="sticky top-0 z-10 -m-1 mb-1 border-b bg-popover p-2">
+          <input
+            ref={searchRef}
+            type="text"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Type to search…"
+            aria-label="Search options"
+            className="h-8 w-full rounded-sm border border-input bg-background px-2 text-sm outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            // The list's own key handling (arrows, Enter, Escape) listens on
+            // document, so nothing is needed here — but the space bar must not
+            // reach it, or typing "New Jersey" would select whatever is
+            // highlighted halfway through the word.
+            onKeyDown={e => { if (e.key === " ") e.stopPropagation(); }}
+          />
+        </div>
+      )}
       {children}
+      {searchable && query && flatItems.length === 0 && (
+        <p className="px-2 py-3 text-center text-sm text-muted-foreground">No matches for “{query}”</p>
+      )}
     </div>,
     document.body,
   );
@@ -405,9 +509,14 @@ interface SelectItemProps {
 }
 
 function SelectItem({ value, children, disabled, className }: SelectItemProps) {
-  const { value: selectedValue, activeValue, setActiveValue, selectItem, baseId } = useSelectContext("SelectItem");
+  const { value: selectedValue, activeValue, setActiveValue, selectItem, baseId, query, searchable } =
+    useSelectContext("SelectItem");
   const isSelected = selectedValue === value;
   const isActive = activeValue === value;
+
+  // Filtered out. Rendering nothing — rather than hiding with CSS — keeps the
+  // rows adjacent, which is the point: "all 3 should be at one place".
+  if (searchable && query && !matchesQuery(children, query)) return null;
 
   return (
     <div
