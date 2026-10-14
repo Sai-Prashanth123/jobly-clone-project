@@ -107,3 +107,45 @@ describe('typing a prefix', () => {
     expect(findByPrefix([], 'a', undefined)).toBeUndefined();
   });
 });
+
+/**
+ * "Letter search is not working for Identity & Documents in DL and State ID
+ * card where we have to give state name."
+ *
+ * The state items render "TX — Texas", so the label LEADS WITH THE CODE.
+ * Prefix matching alone — which is what a native <select> does — means typing
+ * "texas" matches nothing, and typing the code is not what anyone does.
+ */
+describe('lists that lead with a code', () => {
+  const STATE_ITEMS = [
+    item('TX', React.createElement(React.Fragment, null, 'TX', ' — ', 'Texas')),
+    item('TN', React.createElement(React.Fragment, null, 'TN', ' — ', 'Tennessee')),
+    item('CA', React.createElement(React.Fragment, null, 'CA', ' — ', 'California')),
+    item('NJ', React.createElement(React.Fragment, null, 'NJ', ' — ', 'New Jersey')),
+  ];
+
+  it('finds a state by its name, not just its code', () => {
+    expect(findByPrefix(STATE_ITEMS, 'texas', undefined)?.value).toBe('TX');
+    expect(findByPrefix(STATE_ITEMS, 'california', undefined)?.value).toBe('CA');
+    expect(findByPrefix(STATE_ITEMS, 'new jersey', undefined)?.value).toBe('NJ');
+  });
+
+  it('still finds it by code', () => {
+    expect(findByPrefix(STATE_ITEMS, 'tn', undefined)?.value).toBe('TN');
+    expect(findByPrefix(STATE_ITEMS, 'ca', undefined)?.value).toBe('CA');
+  });
+
+  it('matches partway through a name', () => {
+    expect(findByPrefix(STATE_ITEMS, 'jersey', undefined)?.value).toBe('NJ');
+  });
+
+  // The fallback must never steal a result the precise rule would have won.
+  it('prefers a prefix match over a substring one', () => {
+    const list = [item('A', 'West Indies'), item('B', 'India')];
+    expect(findByPrefix(list, 'ind', undefined)?.value).toBe('B');
+  });
+
+  it('still finds nothing when nothing matches', () => {
+    expect(findByPrefix(STATE_ITEMS, 'zzz', undefined)).toBeUndefined();
+  });
+});

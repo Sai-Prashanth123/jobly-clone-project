@@ -1,5 +1,6 @@
 import { identityDocLabel } from '../lib/documentTypes';
 import { canSeeRestrictedDocs, visibleIdentityDocs, visibleDocuments } from '../lib/docVisibility';
+import { ClientEngagementCard } from '../components/employees/ClientEngagementCard';
 import { formatAddress } from '@/portal/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
@@ -794,6 +795,13 @@ export default function EmployeeDetail() {
           </Card>
         )}
       </div>
+
+      {/* Who they are placed with, and the paperwork tying the two together.
+          No role check here: the whole page is route-restricted to admin, HR
+          and Project Manager, which is what keeps client contracts away from
+          employees. A second, weaker check would only invite someone to
+          mistake it for the boundary. */}
+      <ClientEngagementCard employee={employee} onPreview={setPreviewDoc} />
 
       {identityDocs.length > 0 && (
         <Card>

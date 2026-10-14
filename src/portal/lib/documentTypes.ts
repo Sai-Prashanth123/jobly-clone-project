@@ -156,8 +156,12 @@ export const ROW_VISA_GATE: Record<string, string[]> = {
   experience_letters: ['h1b', 'gc'],
   education_documents: ['h1b', 'gc'],
   certificates: ['gc'],
-  i140: ['gc', 'h1b'],
-  i140_approval_notice: ['gc'],
+  // I-140 and its approval notice are the petition trail BEHIND a green card.
+  // Per HR they are not required for a holder — and leaving them visible but
+  // optional still reads as the form asking for them, which is what was
+  // reported. Shown for H-1B, where the petition is live.
+  i140: ['h1b'],
+  i140_approval_notice: ['h1b'],
   labor_certificate: ['gc'],
 };
 
@@ -176,7 +180,14 @@ export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
   // feedback, H1B employees accumulate multiple I-797 approval/extension
   // notices over time, which the single-file EAD slot can't hold.
   ead: ['h1b'],
-  i797: ['opt'],
+  // A green card holder is no longer on the status they entered on, and a
+  // citizen never had one, so the entry documents and the I-797 are not just
+  // optional for them — they should not appear at all. This is the visibility
+  // half of the requirement change; without it the rows stayed on screen and
+  // the change read as not done.
+  us_visa: ['gc', 'citizen'],
+  i94: ['gc', 'citizen'],
+  i797: ['opt', 'gc', 'citizen'],
 };
 
 // Identity doc types mandatory for every employee during onboarding, regardless

@@ -30,8 +30,13 @@ export const TYPEAHEAD_RESET_MS = 700;
  * the same letter cycles through the matches — the behaviour a native
  * `<select>` has and the one people expect.
  *
- * Matching on prefix rather than substring, also matching the native control:
- * "ind" should find India, not "West Indies".
+ * Prefix first, like the native control: "ind" finds India, not "West Indies".
+ *
+ * Then a substring fallback, which the native control does NOT do, because
+ * several lists here lead with a code rather than the name. The state pickers
+ * render "TX — Texas", so somebody typing "texas" — the obvious thing — would
+ * match nothing at all on prefix alone. The fallback only runs when no prefix
+ * match exists, so it never steals a result from the more precise rule.
  */
 export function findByPrefix<T extends { value: string; label: React.ReactNode; disabled?: boolean }>(
   items: T[],
@@ -49,5 +54,7 @@ export function findByPrefix<T extends { value: string; label: React.ReactNode; 
   const start = needle.length === 1 ? activeIdx + 1 : 0;
   const ordered = [...enabled.slice(start), ...enabled.slice(0, Math.max(0, start))];
 
-  return ordered.find(i => labelText(i.label).trim().toLowerCase().startsWith(needle));
+  const text = (i: T) => labelText(i.label).trim().toLowerCase();
+  return ordered.find(i => text(i).startsWith(needle))
+    ?? ordered.find(i => text(i).includes(needle));
 }
