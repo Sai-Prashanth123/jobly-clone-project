@@ -2380,8 +2380,24 @@ export default function NewEmployee() {
             ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {IDENTITY_DOC_ROWS.filter(row => {
-                // I-983 / STEM OPT Card apply only to OPT / STEM OPT candidates.
-                if (['i983', 'stem_opt_card'].includes(row.type)) {
+                // OPT Card / STEM OPT Card are the EAD — the same physical
+                // card — so they are never a row of their own. The EAD row is
+                // relabelled "EAD / OPT Card" or "EAD / STEM OPT Card" for
+                // these visa types.
+                //
+                // FIRST, deliberately. This rule is absolute, and when it sat
+                // further down an earlier branch listing stem_opt_card
+                // returned true for OPT and STEM OPT before reaching it — so
+                // the removal did nothing for the only two visa types that
+                // could see the duplicate, which is exactly what was reported.
+                //
+                // Older uploads are not lost: both labels are aliases of the
+                // EAD row (LEGACY_LABEL_ALIASES), so they still satisfy it and
+                // still appear under it.
+                if (row.type === 'opt_card' || row.type === 'stem_opt_card') return false;
+
+                // I-983 applies only to OPT / STEM OPT candidates.
+                if (row.type === 'i983') {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
                 // I-20 is F-1/OPT-specific — H-1B holders don't need it shown,
@@ -2390,19 +2406,6 @@ export default function NewEmployee() {
                 if (row.type === 'i20') {
                   return form.visaType === 'opt' || form.visaType === 'stem_opt';
                 }
-                // OPT Card / STEM OPT Card are the EAD — the same physical
-                // card — so they are never shown as rows of their own. The EAD
-                // row is relabelled "EAD / OPT Card" or "EAD / STEM OPT Card"
-                // for these visa types.
-                //
-                // They used to survive wherever something had already been
-                // uploaded against them, which is how an OPT employee ended up
-                // looking at "EAD / STEM OPT Card" and "STEM OPT Card" at the
-                // same time and asked for the duplicate to go. Those older
-                // uploads are not lost: both labels are now aliases of the EAD
-                // row (LEGACY_LABEL_ALIASES), so they still satisfy it and
-                // still appear under it.
-                if (row.type === 'opt_card' || row.type === 'stem_opt_card') return false;
                 // Rows explicitly hidden for specific visa types (e.g.
                 // Permanent Resident Card is irrelevant for H-1B/OPT) — an
                 // exclude always wins, checked before the allow-list below.
