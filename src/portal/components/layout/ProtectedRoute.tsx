@@ -7,9 +7,23 @@ import type { UserRole } from '../../types';
 interface ProtectedRouteProps {
   children: React.ReactNode;
   allowedRoles?: UserRole[];
+  /**
+   * The permission this page needs, when there is one.
+   *
+   * Takes precedence over allowedRoles, so a grant made on the permissions
+   * screen reaches the page without a deploy. Until this existed, the screen
+   * governed the API while the route kept its own hardcoded list, and the two
+   * drifted: the server had always served Clients to HR and the Project
+   * Manager while the route refused them.
+   *
+   * allowedRoles stays as the fallback for pages with no permission of their
+   * own — the onboarding screens, the dashboard, a user's own profile — and
+   * for the moment before the session has loaded its permissions.
+   */
+  permission?: string;
 }
 
-export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) {
+export function ProtectedRoute({ children, allowedRoles, permission }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuth();
   const location = useLocation();
   const mustReset = !!user?.mustResetPassword;
@@ -26,7 +40,14 @@ export function ProtectedRoute({ children, allowedRoles }: ProtectedRouteProps) 
     user?.role === 'employee'
       ? (user.onboardingStatus ?? (user.onboardingComplete ? 'approved' : 'in_progress'))
       : 'approved';
-  const denied = !!(allowedRoles && user && !allowedRoles.includes(user.role));
+  // A session issued before permissions existed has none; fall back to roles
+  // rather than locking that user out of everything until they sign in again.
+  const perms = user?.permissions;
+  const denied = !!(user && (
+    permission && perms?.length
+      ? !perms.includes(permission)
+      : allowedRoles && !allowedRoles.includes(user.role)
+  ));
   const toastShown = useRef(false);
 
   // Surface a toast so a confused user understands why they bounced back to

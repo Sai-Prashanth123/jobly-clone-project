@@ -111,6 +111,11 @@ export interface PortalUser {
   role: UserRole;
   employeeId?: string;
   avatarInitials: string;
+  // Permission keys this role holds, sent by login and /auth/me. The sidebar
+  // and ProtectedRoute read these so a grant made on the permissions screen
+  // reaches the UI without a deploy. Absent on sessions issued before this
+  // existed, which is why both fall back to roles when it is missing.
+  permissions?: string[];
   // True while the user is still on a one-time temporary password and must set
   // their own before getting any other access (enforced by the backend gate +
   // the ProtectedRoute force-reset redirect).

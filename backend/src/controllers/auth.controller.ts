@@ -6,6 +6,7 @@ import { UnauthorizedError } from '../lib/errors';
 import { resetUserPassword } from '../services/admin.service';
 import * as employeesSvc from '../services/employees.service';
 import type { ChangePasswordInput, ForgotPasswordInput } from '../schemas/auth.schema';
+import { permissionsForRole } from '../services/permissions.service';
 
 export type OnboardingStatus = 'in_progress' | 'pending_review' | 'changes_requested' | 'approved';
 
@@ -129,6 +130,10 @@ export async function login(req: Request, res: Response, next: NextFunction): Pr
           mustResetPassword: portalUser.must_reset_password ?? false,
           onboardingComplete,
           onboardingStatus,
+          // Sent at login as well as from /me, so the first render after
+          // signing in already knows what this role may reach. Without it the
+          // sidebar would be empty for a moment and then fill in.
+          permissions: await permissionsForRole(portalUser.role),
         },
       },
     });
@@ -173,10 +178,18 @@ export async function me(req: Request, res: Response, next: NextFunction): Promi
     // immediately. Also surface the HR change-request message so the pending
     // screen can render it without an extra round-trip.
     const gate = await computeOnboardingState(req.user?.role, req.user?.employeeId);
+    // The permission keys this role holds, so the UI can decide what to show
+    // from the same source the API enforces. Without this the sidebar and
+    // ProtectedRoute read hardcoded role lists, and a grant made on the
+    // permissions screen governs the API while leaving the page unreachable —
+    // which is how HR and the Project Manager ended up unable to open Clients
+    // that the server had always served them.
+    const permissions = req.user?.role ? await permissionsForRole(req.user.role) : [];
     res.json({
       success: true,
       data: {
         ...req.user,
+        permissions,
         onboardingStatus: gate.status,
         onboardingComplete: gate.status === 'approved',
         onboardingChangeRequestMessage: gate.changeRequestMessage ?? null,

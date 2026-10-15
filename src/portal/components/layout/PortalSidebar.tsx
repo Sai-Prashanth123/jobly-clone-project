@@ -34,6 +34,8 @@ import type { UserRole } from '../../types';
 interface NavItem {
   label: string;
   path: string;
+  /** The API permission this page needs, where one governs it. */
+  permission?: string;
   icon: React.ReactNode;
   roles: UserRole[];
   badgeKey?: string;
@@ -45,12 +47,12 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   // ── Core features ─────────────────────────────────────────────────────────
   { label: 'Dashboard',           path: '/portal/dashboard',           icon: <LayoutDashboard className="h-4 w-4" />, roles: ['admin','hr','operations','finance','employee','legal'], group: 'Core' },
-  { label: 'Announcements',       path: '/portal/announcements',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee','legal'], badgeKey: 'announcements', group: 'Core' },
+  { label: 'Announcements',       path: '/portal/announcements', permission: 'announcements.view',       icon: <Megaphone className="h-4 w-4" />,       roles: ['admin','hr','operations','finance','employee','legal'], badgeKey: 'announcements', group: 'Core' },
   { label: 'Legal Review',        path: '/portal/legal-review',        icon: <Scale className="h-4 w-4" />,           roles: ['admin'], group: 'Core' },
-  { label: 'Cases',                path: '/portal/cases',               icon: <Gavel className="h-4 w-4" />,           roles: ['admin','hr','legal'], group: 'Core' },
-  { label: 'Support Tickets',      path: '/portal/support-tickets',     icon: <LifeBuoy className="h-4 w-4" />,        roles: ['admin','hr','legal'], group: 'Core' },
+  { label: 'Cases',                path: '/portal/cases', permission: 'cases.view',               icon: <Gavel className="h-4 w-4" />,           roles: ['admin','hr','legal'], group: 'Core' },
+  { label: 'Support Tickets',      path: '/portal/support-tickets', permission: 'supportTickets.view',     icon: <LifeBuoy className="h-4 w-4" />,        roles: ['admin','hr','legal'], group: 'Core' },
   { label: 'People',              path: '/portal/people',              icon: <Users2 className="h-4 w-4" />,          roles: ['admin','hr','operations','finance'], group: 'Core' },
-  { label: 'Employees',           path: '/portal/employees',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'], group: 'Core' },
+  { label: 'Employees',           path: '/portal/employees', permission: 'employees.view',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'], group: 'Core' },
   { label: 'Org Chart',           path: '/portal/org-chart',           icon: <Network className="h-4 w-4" />,         roles: ['admin','operations'], group: 'Core' },
   { label: 'Add Employee',        path: '/portal/employees/new',       icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'], group: 'Core' },
   { label: 'Expiring Documents',  path: '/portal/expiring-documents',  icon: <FileWarning className="h-4 w-4" />,     roles: ['admin','hr'], badgeKey: 'expiringDocs', group: 'Core' },
@@ -61,15 +63,15 @@ const NAV_ITEMS: NavItem[] = [
   // client book is not part of their job and nothing links them to it.
   { label: 'Clients',             path: '/portal/clients',             icon: <Building2 className="h-4 w-4" />,       roles: ['admin','hr','operations','finance'], group: 'Core' },
   { label: 'Assignments',         path: '/portal/assignments',         icon: <ClipboardList className="h-4 w-4" />,   roles: ['admin','operations','employee'], group: 'Core' },
-  { label: 'Timesheets',          path: '/portal/timesheets',          icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr','operations','finance','employee'], badgeKey: 'timesheets', group: 'Core' },
+  { label: 'Timesheets',          path: '/portal/timesheets', permission: 'timesheets.view',          icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr','operations','finance','employee'], badgeKey: 'timesheets', group: 'Core' },
   { label: 'My Attendance',       path: '/portal/attendance',          icon: <CalendarCheck className="h-4 w-4" />,   roles: ['employee','admin','hr'], group: 'Core' },
-  { label: 'Leave Requests',      path: '/portal/leave-requests',      icon: <CalendarDays className="h-4 w-4" />,    roles: ['employee','admin','hr'], badgeKey: 'leaveRequests', group: 'Core' },
+  { label: 'Leave Requests',      path: '/portal/leave-requests', permission: 'leaveRequests.view',      icon: <CalendarDays className="h-4 w-4" />,    roles: ['employee','admin','hr'], badgeKey: 'leaveRequests', group: 'Core' },
   { label: 'Company Holidays',    path: '/portal/company-holidays',    icon: <CalendarDays className="h-4 w-4" />,    roles: ['admin','hr','operations','finance','employee'], group: 'Core' },
   { label: 'Attendance Review',   path: '/portal/attendance/review',   icon: <CalendarClock className="h-4 w-4" />,   roles: ['admin','hr','operations'], badgeKey: 'attendanceReview', group: 'Core' },
-  { label: 'Expenses',            path: '/portal/expenses',            icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'], badgeKey: 'expenses', group: 'Core' },
+  { label: 'Expenses',            path: '/portal/expenses', permission: 'expenses.view',            icon: <Receipt className="h-4 w-4" />,         roles: ['admin','hr','operations','finance','employee'], badgeKey: 'expenses', group: 'Core' },
   { label: 'Performance Reviews', path: '/portal/reviews',             icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'], group: 'Core' },
   { label: 'My Reviews',          path: '/portal/my-reviews',          icon: <Star className="h-4 w-4" />,            roles: ['employee'], group: 'Core' },
-  { label: 'Enrollment Forms',    path: '/portal/enrollment-forms',    icon: <HeartPulse className="h-4 w-4" />,      roles: ['admin','hr','employee'], group: 'Core' },
+  { label: 'Enrollment Forms',    path: '/portal/enrollment-forms', permission: 'enrollmentForms.view',    icon: <HeartPulse className="h-4 w-4" />,      roles: ['admin','hr','employee'], group: 'Core' },
   // HR and the Project Manager were granted invoices.view in Admin Settings,
   // so the nav has to follow or the permission is unreachable. These lists are
   // still hardcoded: until ProtectedRoute reads the session's permissions, a
@@ -81,13 +83,13 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Reports',             path: '/portal/reports',             icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','hr'], group: 'Core' },
   { label: 'Notifications',       path: '/portal/notifications',       icon: <Bell className="h-4 w-4" />,            roles: ['admin','hr','operations','finance','employee','legal'], group: 'Core' },
   { label: 'My Profile',          path: '/portal/profile',             icon: <UserCircle className="h-4 w-4" />,      roles: ['employee'], group: 'Core' },
-  { label: 'Admin Settings',      path: '/portal/admin',               icon: <Settings className="h-4 w-4" />,        roles: ['admin'], group: 'Core' },
+  { label: 'Admin Settings',      path: '/portal/admin', permission: 'admin.view',               icon: <Settings className="h-4 w-4" />,        roles: ['admin'], group: 'Core' },
   // ── Analytics & extended features ─────────────────────────────────────────
   { label: 'Milestones',          path: '/portal/milestones',          icon: <Gift className="h-4 w-4" />,            roles: ['admin','hr'], group: 'Analytics' },
   { label: 'Headcount',           path: '/portal/headcount',           icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','hr'], group: 'Analytics' },
   { label: 'Workforce',           path: '/portal/workforce',           icon: <Users className="h-4 w-4" />,           roles: ['admin','hr','operations'], group: 'Analytics' },
   { label: 'Client SLA',          path: '/portal/client-sla',          icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','operations'], group: 'Analytics' },
-  { label: 'Budgets',             path: '/portal/budgets',             icon: <DollarSign className="h-4 w-4" />,      roles: ['admin','finance'], group: 'Analytics' },
+  { label: 'Budgets',             path: '/portal/budgets', permission: 'budgets.view',             icon: <DollarSign className="h-4 w-4" />,      roles: ['admin','finance'], group: 'Analytics' },
   { label: 'Tax Documents',       path: '/portal/tax-documents',       icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance','employee'], group: 'Analytics' },
   { label: 'Invoice Analytics',   path: '/portal/invoice-analytics',   icon: <TrendingUp className="h-4 w-4" />,      roles: ['admin','finance'], group: 'Analytics' },
   { label: 'Expense Analytics',   path: '/portal/expense-analytics',   icon: <Receipt className="h-4 w-4" />,         roles: ['admin','finance'], group: 'Analytics' },
@@ -96,8 +98,8 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Holidays',            path: '/portal/holidays',            icon: <CalendarDays className="h-4 w-4" />,    roles: ['admin','hr'], group: 'Analytics' },
   { label: 'System Settings',     path: '/portal/system-settings',     icon: <Settings className="h-4 w-4" />,        roles: ['admin'], group: 'Analytics' },
   // ── Previously-built but unrouted pages ───────────────────────────────────
-  { label: 'Assets',              path: '/portal/assets',              icon: <Package className="h-4 w-4" />,         roles: ['admin','hr','operations'], group: 'More' },
-  { label: 'Skills Registry',     path: '/portal/skills',              icon: <Award className="h-4 w-4" />,           roles: ['admin','hr'], group: 'More' },
+  { label: 'Assets',              path: '/portal/assets', permission: 'assets.view',              icon: <Package className="h-4 w-4" />,         roles: ['admin','hr','operations'], group: 'More' },
+  { label: 'Skills Registry',     path: '/portal/skills', permission: 'skills.view',              icon: <Award className="h-4 w-4" />,           roles: ['admin','hr'], group: 'More' },
   { label: 'Shift Schedule',      path: '/portal/shifts',              icon: <Calendar className="h-4 w-4" />,        roles: ['admin','hr','operations'], group: 'More' },
   { label: 'Probation Tracker',   path: '/portal/probation',           icon: <UserCheck className="h-4 w-4" />,       roles: ['admin','hr'], group: 'More' },
   { label: 'Capacity Report',     path: '/portal/capacity',            icon: <Gauge className="h-4 w-4" />,           roles: ['admin','hr','operations'], group: 'More' },
@@ -168,9 +170,30 @@ export function PortalSidebar() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [notifOpen]);
 
-  const visibleItems = NAV_ITEMS.filter(
-    item => user && item.roles.includes(user.role)
-  );
+  /**
+   * A nav item shows when the role list allows it AND the permission is held.
+   *
+   * INTERSECTED, not replaced, and the difference matters. The nav's list and
+   * the API's permission answer different questions — "should this page be
+   * offered to this role" versus "may this role call these endpoints" — and
+   * they disagree on eleven items. Swapping one for the other would have put
+   * the client book in front of every employee and taken Reports away from
+   * HR, both silently.
+   *
+   * Intersecting can only ever REMOVE a page, and only one the API would
+   * refuse anyway — which is the bug this is here to kill: a link that opens
+   * a page where every request 403s. Widening still needs a deliberate change
+   * to the list below, which is the right amount of friction for handing
+   * somebody a new part of the product.
+   *
+   * No permissions on the session (an older session, or the API unreachable)
+   * falls back to the role list alone rather than emptying the sidebar.
+   */
+  const visibleItems = NAV_ITEMS.filter(item => {
+    if (!user || !item.roles.includes(user.role)) return false;
+    if (!item.permission || !user.permissions?.length) return true;
+    return user.permissions.includes(item.permission);
+  });
 
   const roleGradient = ROLE_GRADIENTS[user?.role ?? 'admin'];
 
