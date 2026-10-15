@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/apiClient';
+import { triggerDownload } from '../../lib/download';
 
 interface DocumentPreviewDialogProps {
   docId: string;
@@ -120,9 +121,7 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
 
   const handleDownload = () => {
     if (!downloadUrl) { toast.error('Download link not available.'); return; }
-    const win = window.open('about:blank', '_blank');
-    if (win) win.location.href = downloadUrl;
-    else window.location.href = downloadUrl;
+    triggerDownload(downloadUrl, fileName);
   };
 
   return (

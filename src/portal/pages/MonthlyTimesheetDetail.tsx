@@ -16,6 +16,7 @@ import { formatDate, formatDateUS } from '../lib/utils';
 import { monthLabel } from '../lib/monthUtils';
 import type { MonthlyDayStatus, MonthlyTimesheetEntry } from '../types';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
+import { triggerDownload } from '../lib/download';
 
 const PILL: Record<MonthlyDayStatus, string> = {
   present: 'bg-emerald-100 text-emerald-700',
@@ -117,14 +118,12 @@ export default function MonthlyTimesheetDetail() {
 
   const handleDownload = async () => {
     setDownloading(true);
-    const win = window.open('about:blank', '_blank');
     try {
       const { data } = await apiClient.get(`/monthly-timesheets/${sheet.id}/pdf`);
       const url = data?.data?.url;
-      if (url && win) win.location.href = url;
-      else { win?.close(); toast.error('Could not generate the PDF.'); }
+      if (url) triggerDownload(url);
+      else toast.error('Could not generate the PDF.');
     } catch {
-      win?.close();
       toast.error('Could not generate the PDF.');
     } finally {
       setDownloading(false);

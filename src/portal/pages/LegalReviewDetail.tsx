@@ -13,6 +13,7 @@ import { DocumentPreviewDialog } from '../components/shared/DocumentPreviewDialo
 import { useEmployee, useSetDocumentLegalReview } from '../hooks/useEmployees';
 import { apiClient } from '../lib/apiClient';
 import { formatDate } from '../lib/utils';
+import { triggerDownload } from '../lib/download';
 
 const E_VERIFY_STATUS_LABELS: Record<string, string> = {
   not_started: 'Not Started',
@@ -28,20 +29,16 @@ const E_VERIFY_STATUS_LABELS: Record<string, string> = {
 function DependentPassportButton({ employeeId, dependentId }: { employeeId: string; dependentId: string }) {
   const [loading, setLoading] = useState(false);
   const handleClick = async () => {
-    const win = window.open('about:blank', '_blank');
     setLoading(true);
     try {
       const { data } = await apiClient.get(`/employees/${employeeId}/dependents/${dependentId}/passport-url`);
       const url: string | undefined = data?.url;
       if (!url) {
-        win?.close();
         toast.error('Could not generate a link. Please try again.');
         return;
       }
-      if (win) win.location.href = url;
-      else window.location.href = url;
+      triggerDownload(url);
     } catch (err: any) {
-      win?.close();
       toast.error(err?.response?.data?.error ?? 'Could not generate a link. Please try again.');
     } finally {
       setLoading(false);

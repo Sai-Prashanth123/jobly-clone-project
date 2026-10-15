@@ -109,7 +109,7 @@ export function ClientEngagementCard({
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-base">Client &amp; Placement</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Client/Project</CardTitle></CardHeader>
         <CardContent><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></CardContent>
       </Card>
     );
@@ -118,7 +118,7 @@ export function ClientEngagementCard({
   if (assignments.length === 0) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-base">Client &amp; Placement</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">Client/Project</CardTitle></CardHeader>
         <CardContent>
           <p className="text-sm text-gray-400">
             {employee.firstName} has no assignments, so there is no client to show.
@@ -137,7 +137,7 @@ export function ClientEngagementCard({
         <div className="flex items-start justify-between gap-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Building2 className="h-4 w-4 text-[#4069FF]" />
-            Client &amp; Placement
+            Client/Project
           </CardTitle>
           {client && (
             <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-[11px]">

@@ -24,11 +24,11 @@ export function PortalBrandMark({ compact = false }: PortalBrandMarkProps) {
   const roleGradient = ROLE_GRADIENTS[user?.role ?? 'admin'];
 
   return (
-    <div className="flex items-center gap-3 min-w-0">
+    <div className="flex items-center gap-2 min-w-0">
       <img
         src="/assets/img/logo/logo-3.png"
         alt="Jobly"
-        className={`${compact ? 'h-11' : 'h-8'} w-auto object-contain flex-shrink-0`}
+        className={`${compact ? 'h-11' : 'h-7 max-w-[88px]'} w-auto object-contain flex-shrink-0`}
         onError={e => {
           (e.currentTarget as HTMLImageElement).style.display = 'none';
           const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
@@ -43,7 +43,10 @@ export function PortalBrandMark({ compact = false }: PortalBrandMarkProps) {
       </div>
       {!compact && (
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-gray-900 truncate">Jobly Portal</p>
+          {/* No truncate: the point of this line is the name, and an ellipsis
+              after "Jobly P" tells the reader nothing. It is twelve characters
+              and the logo beside it is now capped to leave room. */}
+          <p className="text-sm font-semibold text-gray-900 whitespace-nowrap">Jobly Portal</p>
           {/* roleLabel, not `capitalize` on the raw value: this line is what
               still read "Operations" after the rename, while the user card at
               the foot of the sidebar already read "Project Manager". */}
