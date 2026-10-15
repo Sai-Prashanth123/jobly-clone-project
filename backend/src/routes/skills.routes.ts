@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { validateBody } from '../middleware/validate';
 import { createSkillSchema, updateSkillSchema } from '../schemas/skills.schema';
 import { ForbiddenError } from '../lib/errors';
@@ -9,11 +9,8 @@ import * as svc from '../services/skills.service';
 const router = Router();
 router.use(authenticate);
 
-const HR = requireRole('admin', 'hr');
 // Staff who may look at anyone's skills, plus the employee themselves — the
 // per-record scoping below is what keeps "employee" honest.
-const READ = requireRole('admin', 'hr', 'operations', 'finance', 'employee');
-
 /**
  * An employee may only touch their OWN skills.
  *
@@ -30,21 +27,21 @@ function assertOwnSkillsOrStaff(req: Request, employeeId: string | null | undefi
   }
 }
 
-router.get('/search', HR, async (req: Request, res: Response, next: NextFunction) => {
+router.get('/search', requirePermission('skills.view', 'admin', 'hr'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const skill = (req.query.skill as string) ?? '';
     res.json({ success: true, data: await svc.searchSkills(skill) });
   } catch (e) { next(e); }
 });
 
-router.get('/employee/:employeeId', READ, async (req, res, next) => {
+router.get('/employee/:employeeId', requirePermission('skills.view.employee-employeeId', 'admin', 'hr', 'operations', 'finance', 'employee'), async (req, res, next) => {
   try {
     assertOwnSkillsOrStaff(req, req.params.employeeId);
     res.json({ success: true, data: await svc.getEmployeeSkills(req.params.employeeId) });
   } catch (e) { next(e); }
 });
 
-router.post('/employee/:employeeId', READ, validateBody(createSkillSchema), async (req, res, next) => {
+router.post('/employee/:employeeId', requirePermission('skills.manage', 'admin', 'hr', 'operations', 'finance', 'employee'), validateBody(createSkillSchema), async (req, res, next) => {
   try {
     assertOwnSkillsOrStaff(req, req.params.employeeId);
     res.json({ success: true, data: await svc.addSkill(req.params.employeeId, req.body, req.user!.id) });
@@ -53,14 +50,14 @@ router.post('/employee/:employeeId', READ, validateBody(createSkillSchema), asyn
 
 // PUT/DELETE address a skill by its own id, so the owning employee has to be
 // looked up before the caller can be judged.
-router.put('/:id', READ, validateBody(updateSkillSchema), async (req, res, next) => {
+router.put('/:id', requirePermission('skills.manage', 'admin', 'hr', 'operations', 'finance', 'employee'), validateBody(updateSkillSchema), async (req, res, next) => {
   try {
     assertOwnSkillsOrStaff(req, await svc.getSkillOwner(req.params.id));
     res.json({ success: true, data: await svc.updateSkill(req.params.id, req.body, req.user!.id) });
   } catch (e) { next(e); }
 });
 
-router.delete('/:id', READ, async (req, res, next) => {
+router.delete('/:id', requirePermission('skills.manage', 'admin', 'hr', 'operations', 'finance', 'employee'), async (req, res, next) => {
   try {
     assertOwnSkillsOrStaff(req, await svc.getSkillOwner(req.params.id));
     await svc.deleteSkill(req.params.id, req.user!.id);

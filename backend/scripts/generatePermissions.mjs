@@ -50,7 +50,17 @@ export function collectRoutes(dir = DIR) {
       const rest = src.slice(after, eol === -1 ? src.length : eol);
 
       let roles = null;
-      const inline = rest.match(/requireRole\(([^)]*)\)/);
+
+      // requirePermission('some.key', 'admin', 'hr') — the trailing arguments
+      // ARE the old role list, kept as the fallback. Reading them keeps this
+      // scan complete while the 256 call sites are swapped a file at a time;
+      // without it, every swapped route would vanish from the inventory and
+      // the parity test would pass by having nothing left to check. That is
+      // precisely how the old roleParity.test.ts would have failed silently.
+      const byPermission = rest.match(/requirePermission\(\s*'[^']+'\s*,([^)]*)\)/);
+      if (byPermission) roles = [...byPermission[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
+
+      const inline = !roles && rest.match(/requireRole\(([^)]*)\)/);
       if (inline) roles = [...inline[1].matchAll(/'([^']+)'/g)].map(x => x[1]);
       if (!roles) {
         for (const [name, r] of aliases) {

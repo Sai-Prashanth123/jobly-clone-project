@@ -1,13 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { supabaseAdmin } from '../config/supabase';
 
 const router = Router();
 router.use(authenticate);
-router.use(requireRole('admin', 'hr'));
 
-router.get('/', async (req: Request, res: Response, next: NextFunction) => {
+router.get('/', requirePermission('activityLogs.view', 'admin', 'hr'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { page = '1', limit = '50', action, entityType, entityId, actorId, search, startDate, endDate } = req.query as Record<string, string>;
     const pageNum = Math.max(1, parseInt(page));

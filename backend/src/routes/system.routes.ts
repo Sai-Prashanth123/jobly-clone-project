@@ -1,6 +1,6 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { validateBody } from '../middleware/validate';
 import { emailTestSchema } from '../schemas/system.schema';
 import { mailerConfigured, testEmailDelivery } from '../lib/mailer';
@@ -30,7 +30,7 @@ router.get('/mailer-status', (_req: Request, res: Response) => {
  * Admin-only. Sends a test email to verify the SMTP transport end-to-end.
  * Body: { to: string }
  */
-router.post('/email-test', requireRole('admin'), validateBody(emailTestSchema), async (req: Request, res: Response, next: NextFunction) => {
+router.post('/email-test', requirePermission('system.manage', 'admin'), validateBody(emailTestSchema), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { to } = req.body as { to: string };
     const { ok, error } = await testEmailDelivery(to);

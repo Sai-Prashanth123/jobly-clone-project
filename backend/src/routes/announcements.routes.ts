@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
 import {
   createAnnouncementSchema,
@@ -13,12 +13,12 @@ const router = Router();
 
 router.use(authenticate);
 
-router.get('/',             requireRole('admin','hr','operations','finance','employee','legal'), validateQuery(listAnnouncementsQuerySchema), ctrl.list);
-router.post('/',            requireRole('admin','hr'),                                   validateBody(createAnnouncementSchema),       ctrl.create);
-router.get('/unread-count', requireRole('admin','hr','operations','finance','employee','legal'),                                               ctrl.getUnreadCount);
-router.post('/mark-seen',   requireRole('admin','hr','operations','finance','employee','legal'),                                               ctrl.markSeen);
-router.get('/:id',          requireRole('admin','hr','operations','finance','employee','legal'),                                               ctrl.getOne);
-router.put('/:id',          requireRole('admin','hr'),                                   validateBody(updateAnnouncementSchema),       ctrl.update);
-router.delete('/:id',       requireRole('admin','hr'),                                                                                ctrl.remove);
+router.get('/',             requirePermission('announcements.view', 'admin','hr','operations','finance','employee','legal'), validateQuery(listAnnouncementsQuerySchema), ctrl.list);
+router.post('/',            requirePermission('announcements.manage', 'admin','hr'),                                   validateBody(createAnnouncementSchema),       ctrl.create);
+router.get('/unread-count', requirePermission('announcements.view', 'admin','hr','operations','finance','employee','legal'),                                               ctrl.getUnreadCount);
+router.post('/mark-seen',   requirePermission('announcements.create.mark-seen', 'admin','hr','operations','finance','employee','legal'),                                               ctrl.markSeen);
+router.get('/:id',          requirePermission('announcements.view', 'admin','hr','operations','finance','employee','legal'),                                               ctrl.getOne);
+router.put('/:id',          requirePermission('announcements.manage', 'admin','hr'),                                   validateBody(updateAnnouncementSchema),       ctrl.update);
+router.delete('/:id',       requirePermission('announcements.manage', 'admin','hr'),                                                                                ctrl.remove);
 
 export default router;

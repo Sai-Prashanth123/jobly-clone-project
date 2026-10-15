@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { collectRoutes } from '../../scripts/generatePermissions.mjs';
 
 // Role-parity: a role the FRONTEND lets into a page must be a role the BACKEND
 // lets into that page's endpoints.
@@ -10,20 +11,26 @@ import { join } from 'node:path';
 // 403'd. Nobody noticed, because the two lists live in different trees and
 // nothing compared them.
 //
-// Deliberately parsed from source rather than imported: PortalApp.tsx is TSX
-// full of components, and the route files pull in controllers, the DB client
-// and the whole service layer. Reading the text keeps this test free of both.
-// That makes it a little brittle to reformatting, which is an acceptable trade
-// for a check that would have caught a live user-facing bug.
+// REWRITTEN for requirePermission. The original read the route files as text
+// and matched `requireRole(...)`, so it broke the moment the call sites moved
+// — the failure mode being the dangerous one: with no requireRole left to
+// find, the backend role set came out EMPTY and every page looked stranded.
+// A check that silently stops checking is worse than no check, so this reads
+// the same inventory the permission model is built from, which understands
+// all three guard styles and both guard functions.
+//
+// The frontend is still parsed from source: PortalApp.tsx is TSX full of
+// components, and importing it here would drag in the whole UI tree.
 const repo = join(__dirname, '..', '..', '..');
 const read = (p: string) => readFileSync(join(repo, p), 'utf8');
 
-/** Every role named in any requireRole(...) in a route file. */
+const ROUTES = collectRoutes(join(__dirname, '..', 'routes'));
+
+/** Every role admitted by any guarded route in a route file. */
 function backendRoles(routeFile: string): Set<string> {
-  const src = read(join('backend', 'src', 'routes', routeFile));
   const roles = new Set<string>();
-  for (const call of src.matchAll(/requireRole\(([^)]*)\)/g)) {
-    for (const role of call[1].matchAll(/'([a-z_]+)'/g)) roles.add(role[1]);
+  for (const r of ROUTES.filter((x: { file: string }) => x.file === routeFile)) {
+    for (const role of r.roles) roles.add(role);
   }
   return roles;
 }
@@ -50,6 +57,13 @@ const PAGES: Array<{ page: string; routes: string }> = [
 ];
 
 describe('frontend route roles are backed by the API', () => {
+  // The guard on the guard. If the inventory ever comes back empty for a file
+  // the tests below would all pass vacuously, which is exactly how the
+  // previous version of this file would have failed after the swap.
+  it.each(PAGES)('$routes is actually readable by the scanner', ({ routes }) => {
+    expect(backendRoles(routes).size, `no guarded routes found in ${routes}`).toBeGreaterThan(0);
+  });
+
   it.each(PAGES)('$page: every role the UI admits can reach $routes', ({ page, routes }) => {
     const ui = frontendRoles(page);
     const api = backendRoles(routes);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
 import { documentUpload } from '../middleware/upload';
 import {
@@ -14,14 +14,14 @@ import * as ctrl from '../controllers/expenses.controller';
 const router = Router();
 router.use(authenticate);
 
-router.get('/',    requireRole('admin','hr','finance','operations','employee'), validateQuery(listExpensesQuerySchema), ctrl.list);
-router.post('/',   requireRole('admin','hr','employee'),                        validateBody(createExpenseSchema),     ctrl.create);
-router.get('/:id', requireRole('admin','hr','finance','operations','employee'),                                        ctrl.getOne);
-router.put('/:id', requireRole('admin','hr','employee'),                        validateBody(updateExpenseSchema),     ctrl.update);
-router.post('/:id/receipt', requireRole('admin','hr','employee'),               documentUpload.single('file'),         ctrl.uploadReceipt);
-router.post('/:id/submit', requireRole('admin','hr','employee'),                                                       ctrl.submit);
-router.post('/:id/review', requireRole('admin','hr','finance'),                 validateBody(reviewExpenseSchema),     ctrl.review);
-router.post('/:id/paid',   requireRole('admin','finance'),                                                             ctrl.markPaid);
-router.delete('/:id',      requireRole('admin','hr','employee'),                                                       ctrl.remove);
+router.get('/',    requirePermission('expenses.view', 'admin','hr','finance','operations','employee'), validateQuery(listExpensesQuerySchema), ctrl.list);
+router.post('/',   requirePermission('expenses.manage', 'admin','hr','employee'),                        validateBody(createExpenseSchema),     ctrl.create);
+router.get('/:id', requirePermission('expenses.view', 'admin','hr','finance','operations','employee'),                                        ctrl.getOne);
+router.put('/:id', requirePermission('expenses.manage', 'admin','hr','employee'),                        validateBody(updateExpenseSchema),     ctrl.update);
+router.post('/:id/receipt', requirePermission('expenses.manage', 'admin','hr','employee'),               documentUpload.single('file'),         ctrl.uploadReceipt);
+router.post('/:id/submit', requirePermission('expenses.manage', 'admin','hr','employee'),                                                       ctrl.submit);
+router.post('/:id/review', requirePermission('expenses.create.id-review', 'admin','hr','finance'),                 validateBody(reviewExpenseSchema),     ctrl.review);
+router.post('/:id/paid',   requirePermission('expenses.create.id-paid', 'admin','finance'),                                                             ctrl.markPaid);
+router.delete('/:id',      requirePermission('expenses.manage', 'admin','hr','employee'),                                                       ctrl.remove);
 
 export default router;

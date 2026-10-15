@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
 import { createTicketSchema, resolveTicketSchema, listTicketsQuerySchema } from '../schemas/supportTicket.schema';
 import * as ctrl from '../controllers/supportTickets.controller';
@@ -12,9 +12,9 @@ router.use(authenticate);
 // HR/Admin ask Legal a question about a case/employee; Legal (+Admin) answer
 // and resolve it. Service-layer scoping restricts HR to only their own
 // tickets — see supportTickets.service.ts's listTickets/getTicket.
-router.get('/', requireRole('admin', 'hr', 'legal'), validateQuery(listTicketsQuerySchema), ctrl.list);
-router.post('/', requireRole('admin', 'hr', 'legal'), validateBody(createTicketSchema), ctrl.create);
-router.get('/:id', requireRole('admin', 'hr', 'legal'), ctrl.getOne);
-router.patch('/:id/resolve', requireRole('admin', 'legal'), validateBody(resolveTicketSchema), ctrl.resolve);
+router.get('/', requirePermission('supportTickets.view', 'admin', 'hr', 'legal'), validateQuery(listTicketsQuerySchema), ctrl.list);
+router.post('/', requirePermission('supportTickets.create', 'admin', 'hr', 'legal'), validateBody(createTicketSchema), ctrl.create);
+router.get('/:id', requirePermission('supportTickets.view', 'admin', 'hr', 'legal'), ctrl.getOne);
+router.patch('/:id/resolve', requirePermission('supportTickets.edit', 'admin', 'legal'), validateBody(resolveTicketSchema), ctrl.resolve);
 
 export default router;

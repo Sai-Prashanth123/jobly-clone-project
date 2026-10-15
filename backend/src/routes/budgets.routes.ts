@@ -1,14 +1,12 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import { validateBody } from '../middleware/validate';
 import * as svc from '../services/budgets.service';
 
 const router = Router();
 router.use(authenticate);
-
-const FIN = requireRole('admin', 'finance');
 
 const upsertBudgetSchema = z.object({
   department: z.string().min(1, 'Department is required'),
@@ -18,22 +16,22 @@ const upsertBudgetSchema = z.object({
   notes: z.string().max(1000).optional().nullable(),
 });
 
-router.get('/', FIN, async (req, res, next) => {
+router.get('/', requirePermission('budgets.view', 'admin', 'finance'), async (req, res, next) => {
   try {
     const year = req.query.year ? Number(req.query.year) : undefined;
     res.json({ success: true, data: await svc.listBudgets(year) });
   } catch (e) { next(e); }
 });
 
-router.post('/', FIN, validateBody(upsertBudgetSchema), async (req, res, next) => {
+router.post('/', requirePermission('budgets.manage', 'admin', 'finance'), validateBody(upsertBudgetSchema), async (req, res, next) => {
   try { res.json({ success: true, data: await svc.upsertBudget(req.body, req.user!.id) }); } catch (e) { next(e); }
 });
 
-router.delete('/:id', FIN, async (req, res, next) => {
+router.delete('/:id', requirePermission('budgets.manage', 'admin', 'finance'), async (req, res, next) => {
   try { await svc.deleteBudget(req.params.id, req.user!.id); res.json({ success: true }); } catch (e) { next(e); }
 });
 
-router.get('/summary', FIN, async (req, res, next) => {
+router.get('/summary', requirePermission('budgets.view', 'admin', 'finance'), async (req, res, next) => {
   try {
     const year = Number(req.query.year ?? new Date().getFullYear());
     res.json({ success: true, data: await svc.getBudgetSummary(year) });

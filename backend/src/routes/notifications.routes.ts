@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
-import { requireRole } from '../middleware/rbac';
+import { requirePermission } from '../middleware/rbac';
 import * as ctrl from '../controllers/notifications.controller';
 
 const router = Router();
@@ -13,9 +13,9 @@ router.patch('/:id/read',                 ctrl.markRead);
 router.patch('/read-all',                 ctrl.markAllRead);
 
 // Admin-only trigger endpoints (can be called by cron or manually)
-router.post('/trigger/timesheet-reminders', requireRole('admin'), ctrl.triggerTimesheetReminders);
-router.post('/trigger/contract-expiry',     requireRole('admin'), ctrl.triggerContractExpiry);
-router.post('/trigger/invoice-ready',       requireRole('admin'), ctrl.triggerInvoiceReadiness);
-router.post('/trigger/document-expiry',     requireRole('admin'), ctrl.triggerDocumentExpiry);
+router.post('/trigger/timesheet-reminders', requirePermission('notifications.manage', 'admin'), ctrl.triggerTimesheetReminders);
+router.post('/trigger/contract-expiry',     requirePermission('notifications.manage', 'admin'), ctrl.triggerContractExpiry);
+router.post('/trigger/invoice-ready',       requirePermission('notifications.manage', 'admin'), ctrl.triggerInvoiceReadiness);
+router.post('/trigger/document-expiry',     requirePermission('notifications.manage', 'admin'), ctrl.triggerDocumentExpiry);
 
 export default router;
