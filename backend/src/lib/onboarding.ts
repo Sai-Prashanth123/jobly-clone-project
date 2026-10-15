@@ -65,6 +65,11 @@ export const VISA_CONDITIONAL_REQUIRED_DOCS = ['Passport', 'Visa', 'I-94'] as co
 // Keyed BY LABEL, because documents.type stores the row's label. Mirrors
 // VISA_REQUIRED_EXTRA - keep the two in step.
 export const VISA_REQUIRED_EXTRA_DOCS: Record<string, readonly string[]> = {
+  // H-1B, per HR. Only the two the EMPLOYEE can produce: the LCA and the
+  // E-Verify letter are the employer's to issue, so requiring them here would
+  // make onboarding impossible to finish. They are tracked on the employee
+  // record instead (EMPLOYER_REQUIRED_BY_VISA, frontend).
+  h1b: ['I-9 Form', 'I-797'],
   opt: ['I-9 Form', 'I-20', 'Employment Authorization Document'],
   stem_opt: ['I-9 Form', 'I-20', 'Employment Authorization Document', 'Visa'],
   h4_ead: ['I-9 Form', 'Employment Authorization Document', 'I-797'],

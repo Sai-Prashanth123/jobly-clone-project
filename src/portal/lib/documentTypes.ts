@@ -239,6 +239,15 @@ export const WORK_VISA_REQUIRED_DOCS = ['passport', 'us_visa', 'i94'] as const;
 // directly from the per-visa-type document checklists (items without an
 // "(if any)" / "(Optional)" hedge become required).
 export const VISA_REQUIRED_EXTRA: Record<string, string[]> = {
+  // H-1B had no entry at all, so none of the H-1B compliance paperwork was
+  // ever demanded. Per HR the major documents for an H-1B are LCA, E-Verify,
+  // I-9 and I-797 — but only two of those can be asked of the EMPLOYEE.
+  //
+  // The LCA and the E-Verify letter are issued by the employer: they live in
+  // EMPLOYER_DOC_ROWS, the employee has no way to produce one, and requiring
+  // them here would make onboarding impossible to finish. They are tracked as
+  // an employer-side gap instead (see EMPLOYER_REQUIRED_BY_VISA below).
+  h1b: ['i9_form', 'i797'],
   opt: ['i9_form', 'i20', 'ead'],
   stem_opt: ['i9_form', 'i20', 'ead', 'us_visa'],
   h4_ead: ['i9_form', 'ead', 'i797'],
@@ -289,6 +298,34 @@ export const EMPLOYER_DOC_ROWS: IdentityDocRow[] = [
 // Visa types each employer/admin row applies to. A row not shown here is
 // never shown, for any visa type — unlike ROW_VISA_GATE above, there's no
 // "always visible" default for employer-managed documents.
+/**
+ * Paperwork the EMPLOYER must hold for a visa type.
+ *
+ * Not part of the employee's required set and deliberately so — an employee
+ * cannot upload their own LCA or E-Verify letter, and demanding it would stop
+ * them ever reaching 100%. This is the other half of HR's "major documents
+ * required for H-1B": the half the company owes, surfaced so it can be chased
+ * rather than silently missing. All four H-1B employees on file are missing
+ * both today, two of them already active.
+ */
+export const EMPLOYER_REQUIRED_BY_VISA: Record<string, string[]> = {
+  h1b: ['Copy of LCA', 'E-Verify Letter'],
+};
+
+/** Which employer documents are missing for this employee. */
+export function missingEmployerDocs(
+  visaType: string | null | undefined,
+  docs: { type?: string }[] | null | undefined,
+): string[] {
+  const required = EMPLOYER_REQUIRED_BY_VISA[visaType ?? ''] ?? [];
+  if (required.length === 0) return [];
+  const held = new Set((docs ?? []).map(d => d.type).filter(Boolean) as string[]);
+  // "LCA" and "Copy of LCA" are the same piece of paper in practice.
+  const satisfied = (label: string) =>
+    held.has(label) || (label === 'Copy of LCA' && held.has('LCA'));
+  return required.filter(label => !satisfied(label));
+}
+
 export const EMPLOYER_ROW_VISA_GATE: Record<string, string[]> = {
   // Every visa type, per Jagan via HR: the E-Verify letter is filed for any
   // employee, not only OPT/STEM OPT. It stays employer-managed, so it is

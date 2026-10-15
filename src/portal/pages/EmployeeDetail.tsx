@@ -1,5 +1,6 @@
 import { identityDocLabel } from '../lib/documentTypes';
 import { canSeeRestrictedDocs, visibleIdentityDocs, visibleDocuments } from '../lib/docVisibility';
+import { missingEmployerDocs } from '../lib/documentTypes';
 import { ClientEngagementCard } from '../components/employees/ClientEngagementCard';
 import { formatAddress } from '@/portal/lib/utils';
 import { useEffect, useRef, useState } from 'react';
@@ -152,6 +153,7 @@ export default function EmployeeDetail() {
   // page; today the route admits admin, HR and the PM only, so in practice
   // this is "not the Project Manager".
   const canSeePayroll = ['admin', 'hr', 'finance'].includes(user?.role ?? '');
+  const missingEmployer = missingEmployerDocs(employee?.visaType, employee?.documents);
 
   // Candidates quick-added from the New Case form deliberately get no portal
   // credentials (see createEmployee's isCandidate branch), so they can't sign
@@ -748,7 +750,24 @@ export default function EmployeeDetail() {
 
         {(employee.visaType || employee.ssn || passport || photoId) && (
           <Card>
-            <CardHeader><CardTitle className="text-base">Immigration & I-9</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Immigration &amp; I-9</CardTitle></CardHeader>
+            {/* The employer's half of HR's "major documents required for
+                H-1B". The LCA and the E-Verify letter are issued by the
+                company, so they are not in the employee's required set — an
+                employee cannot upload one, and demanding it would stop them
+                ever finishing onboarding. Without something like this they
+                were simply never missing from anywhere: all four H-1B
+                employees on file lack both, two of them already active. */}
+            {missingEmployer.length > 0 && (
+              <div className="mx-6 mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2">
+                <p className="text-[11px] font-semibold text-amber-900">
+                  Employer paperwork missing for {employee.visaType?.toUpperCase()}
+                </p>
+                <p className="text-[11px] text-amber-800 mt-0.5">
+                  {missingEmployer.join(' · ')} — the company issues {missingEmployer.length === 1 ? 'this' : 'these'}, not the employee.
+                </p>
+              </div>
+            )}
             <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <Field label="Work Status" value={employee.visaType?.toUpperCase()} />
               <div className="min-w-0">
