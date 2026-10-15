@@ -53,7 +53,20 @@ function NewTimesheetForm({ onSubmit, onCancel, isPending }: {
     ? getMondayOfWeek(new Date(selectedEmp.startDate)).toISOString().split('T')[0]
     : undefined;
   const fallbackCutoff = getMondayOfWeek(new Date(Date.now() - 26 * 7 * 86400000)).toISOString().split('T')[0];
-  const minWeekStr = joiningMondayStr ?? fallbackCutoff;
+  const hireFloor = joiningMondayStr ?? fallbackCutoff;
+
+  // An employee may fill in up to a month back (PAST_SUBMIT_WINDOW_DAYS on the
+  // server); admin and HR keep the full range to the joining week, because
+  // correcting an old timesheet is their job.
+  //
+  // The picker has to agree with the server. It previously offered twelve
+  // weeks ahead while the server refused anything past the current Monday, so
+  // a timesheet could be built and then rejected at the one step that
+  // mattered — the same trap in the other direction is not worth repeating.
+  const monthBackMonday = getMondayOfWeek(new Date(Date.now() - 31 * 86400000)).toISOString().split('T')[0];
+  const minWeekStr = user?.role === 'employee' && monthBackMonday > hireFloor
+    ? monthBackMonday
+    : hireFloor;
   // Matches the server's submission window (FUTURE_SUBMIT_WINDOW_DAYS in
   // backend/src/lib/dateUtils.ts). It used to offer twelve weeks while the
   // server refused anything past the current week, so the picker invited a

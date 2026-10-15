@@ -211,3 +211,33 @@ export function formatDateUS(dateStr: string | undefined | null): string {
   if (!y || !m || !d) return dateStr;
   return `${m}/${d}/${y}`;
 }
+
+/**
+ * How far back an EMPLOYEE may fill in a timesheet.
+ *
+ * "Previous week timesheet fillup — for month back." There was no past bound
+ * at all beyond the hire date, so this is a narrowing, and it is applied to
+ * the employee only: admin and HR keep the full range back to the joining
+ * week, because correcting an old timesheet is their job and a month-old
+ * mistake still has to be fixable.
+ *
+ * 31 days rather than 30, so "a month back" covers a long month rather than
+ * falling a day short of it.
+ */
+export const PAST_SUBMIT_WINDOW_DAYS = 31;
+
+/** Today − `days`, as YYYY-MM-DD, computed in UTC. */
+export function dateBeforeDaysUTC(days: number): string {
+  return dateAfterDaysUTC(-days);
+}
+
+/**
+ * True if a week starts further back than an employee may fill.
+ *
+ * The boundary is inclusive at both ends, matching
+ * isBeyondFutureSubmitWindowUTC: a week starting exactly 31 days ago is still
+ * allowed, because "up to a month back" reads that way to whoever asked.
+ */
+export function isBeyondPastSubmitWindowUTC(weekStart: string): boolean {
+  return weekStart < dateBeforeDaysUTC(PAST_SUBMIT_WINDOW_DAYS);
+}

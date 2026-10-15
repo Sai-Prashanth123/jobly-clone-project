@@ -753,6 +753,8 @@ export interface MonthlyTimesheetEmailPayload {
   status: string;
   pdfUrl?: string;
   rows: { date: string; day: string; project: string; task: string; start: string; end: string; hours: number; status: string }[];
+  /** The timesheet PDF itself, attached rather than linked — see the comment at the send site. */
+  pdf?: { filename: string; content: Buffer };
 }
 
 export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPayload): Promise<void> {
@@ -761,7 +763,7 @@ export async function sendMonthlyTimesheetEmail(payload: MonthlyTimesheetEmailPa
   }
   const {
     to, employeeName, employeeDisplayId, department, monthLabel,
-    totalHours, expectedHours, balance, workingDays, leaveDays, status, pdfUrl, rows,
+    totalHours, expectedHours, balance, workingDays, leaveDays, status, pdfUrl, rows, pdf,
   } = payload;
 
   const fmtH = (n: number) => (Number(n) || 0).toFixed(1);
@@ -853,6 +855,13 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
     to,
     subject: `Monthly Timesheet — ${employeeName} (${employeeDisplayId}) — ${monthLabel}`,
     html,
+    // "Email with timesheet with snapshot of filled / how to attach time
+    // card." The body already renders the filled grid row by row — that is
+    // the snapshot — but the PDF was only ever LINKED, behind a signed URL
+    // that expires in seven days and needs a login to follow. Attaching it
+    // means the timesheet survives in the recipient's mailbox as a document,
+    // which is what anyone filing or forwarding one actually needs.
+    attachments: pdf ? [{ filename: pdf.filename, content: pdf.content, contentType: 'application/pdf' }] : undefined,
   });
 }
 

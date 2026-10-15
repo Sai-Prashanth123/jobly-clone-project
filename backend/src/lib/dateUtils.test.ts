@@ -5,6 +5,9 @@ import {
   isBeyondFutureSubmitWindowUTC,
   dateAfterDaysUTC,
   FUTURE_SUBMIT_WINDOW_DAYS,
+  isBeyondPastSubmitWindowUTC,
+  dateBeforeDaysUTC,
+  PAST_SUBMIT_WINDOW_DAYS,
 } from './dateUtils';
 
 /**
@@ -116,5 +119,49 @@ describe('dateAfterDaysUTC', () => {
   it('does not drift when the clock is near midnight', () => {
     freeze('2026-10-20T23:59:59Z');
     expect(dateAfterDaysUTC(1)).toBe('2026-10-21');
+  });
+});
+
+/**
+ * "Previous week timesheet fillup — for month back."
+ *
+ * There was no past bound at all beyond the hire date, so this NARROWS what
+ * an employee may do, and only an employee: admin and HR keep the full range
+ * because correcting an old timesheet is their job.
+ */
+describe('how far back a timesheet may be filled', () => {
+  it('allows a week from a fortnight ago', () => {
+    expect(isBeyondPastSubmitWindowUTC(dateBeforeDaysUTC(14))).toBe(false);
+  });
+
+  // Inclusive at the boundary, matching the future window — "up to a month
+  // back" reads that way to whoever asked for it.
+  it('allows a week starting exactly at the boundary', () => {
+    expect(isBeyondPastSubmitWindowUTC(dateBeforeDaysUTC(PAST_SUBMIT_WINDOW_DAYS))).toBe(false);
+  });
+
+  it('refuses the day beyond it', () => {
+    expect(isBeyondPastSubmitWindowUTC(dateBeforeDaysUTC(PAST_SUBMIT_WINDOW_DAYS + 1))).toBe(true);
+  });
+
+  it('refuses a week from last year', () => {
+    expect(isBeyondPastSubmitWindowUTC(dateBeforeDaysUTC(365))).toBe(true);
+  });
+
+  it('never refuses this week or a future one', () => {
+    expect(isBeyondPastSubmitWindowUTC(dateAfterDaysUTC(0))).toBe(false);
+    expect(isBeyondPastSubmitWindowUTC(dateAfterDaysUTC(7))).toBe(false);
+  });
+
+  it('is a month, not a week', () => {
+    expect(PAST_SUBMIT_WINDOW_DAYS).toBe(31);
+  });
+
+  // The two windows are independent: narrowing the past must not have moved
+  // the future one, which HR asked for separately.
+  it('leaves the future window alone', () => {
+    expect(FUTURE_SUBMIT_WINDOW_DAYS).toBe(30);
+    expect(isBeyondFutureSubmitWindowUTC(dateAfterDaysUTC(30))).toBe(false);
+    expect(isBeyondFutureSubmitWindowUTC(dateAfterDaysUTC(31))).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { MAX_PRESIGNED_SECONDS } from '../lib/storage/presign';
 import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
-import { isWeekBeforeJoiningUTC, isBeyondFutureSubmitWindowUTC, FUTURE_SUBMIT_WINDOW_DAYS } from '../lib/dateUtils';
+import { isWeekBeforeJoiningUTC, isBeyondFutureSubmitWindowUTC, FUTURE_SUBMIT_WINDOW_DAYS, isBeyondPastSubmitWindowUTC, PAST_SUBMIT_WINDOW_DAYS } from '../lib/dateUtils';
 import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './conflicts.service';
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
@@ -349,6 +349,22 @@ export async function patchTimesheetStatus(
   // happened, which seniority does not change.
   if ((action === 'submitted' || action === 'manager_approved') && isBeyondFutureSubmitWindowUTC(ts.week_start_date)) {
     throw new ValidationError(`This timesheet is for the week of ${ts.week_start_date}, which is more than ${FUTURE_SUBMIT_WINDOW_DAYS} days away — it can't be ${action === 'submitted' ? 'submitted' : 'approved'} yet.`);
+  }
+
+  // ...and the mirror of it going backwards, per HR: an employee may fill in
+  // up to a month back. Unlike the future window this one is NOT applied to
+  // every role — admin and HR keep the full range back to the joining week,
+  // because correcting an old timesheet is their job and a month-old mistake
+  // still has to be fixable. The limit is about an employee attesting to
+  // hours long after the fact, which is a different thing from a correction
+  // made by the people who own the record.
+  if (
+    userRole === 'employee' && action === 'submitted' &&
+    isBeyondPastSubmitWindowUTC(ts.week_start_date)
+  ) {
+    throw new ValidationError(
+      `This timesheet is for the week of ${ts.week_start_date}, which is more than ${PAST_SUBMIT_WINDOW_DAYS} days ago — ask HR to file it for you.`,
+    );
   }
 
   // Submit-time gates (only checked when transitioning into `submitted`).

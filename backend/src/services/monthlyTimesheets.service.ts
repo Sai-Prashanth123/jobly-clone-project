@@ -486,7 +486,14 @@ async function buildMonthlyReportData(row: any): Promise<MonthlyTimesheetPDFData
   };
 }
 
-export async function generateAndStoreMonthlyPdf(row: any): Promise<string | null> {
+/**
+ * Build the monthly PDF, store it, and hand back BOTH the signed URL and the
+ * bytes.
+ *
+ * The bytes are returned so the notification email can attach the very file
+ * it just generated, rather than downloading it back from storage to do so.
+ */
+export async function generateAndStoreMonthlyPdf(row: any): Promise<{ url: string | null; buffer: Buffer } | null> {
   const buffer = await generateMonthlyTimesheetPDF(await buildMonthlyReportData(row));
 
   const fileName = `${row.display_id}.pdf`;
@@ -499,12 +506,13 @@ export async function generateAndStoreMonthlyPdf(row: any): Promise<string | nul
   );
 
   await supabaseAdmin.from('monthly_timesheets').update({ pdf_url: urlData }).eq('id', row.id);
-  return urlData ?? null;
+  return { url: urlData ?? null, buffer };
 }
 
 export async function getMonthlyTimesheetPDF(id: string): Promise<string | null> {
   const row = await getMonthlyTimesheet(id);
-  return generateAndStoreMonthlyPdf(row);
+  // The download endpoint wants the link, not the bytes.
+  return (await generateAndStoreMonthlyPdf(row))?.url ?? null;
 }
 
 // On-demand Word-doc export — direct-stream only, no Supabase Storage write
@@ -527,8 +535,11 @@ async function runSubmitSideEffects(row: any): Promise<{ emailSent: boolean; war
 
   // 1) PDF
   let pdfUrl: string | null = null;
+  let pdfBuffer: Buffer | null = null;
   try {
-    pdfUrl = await generateAndStoreMonthlyPdf(row);
+    const built = await generateAndStoreMonthlyPdf(row);
+    pdfUrl = built?.url ?? null;
+    pdfBuffer = built?.buffer ?? null;
   } catch (err) {
     console.error('[monthlyTimesheets.service] PDF generation failed', { id: row.id, err });
   }
@@ -571,6 +582,10 @@ async function runSubmitSideEffects(row: any): Promise<{ emailSent: boolean; war
         leaveDays: row.leave_days ?? 0,
         status: row.status,
         pdfUrl: pdfUrl ?? undefined,
+        // The time card itself, attached. A link alone expires in seven days
+        // and needs a login to follow, so a forwarded or filed email stopped
+        // carrying the timesheet.
+        pdf: pdfBuffer ? { filename: `${row.display_id}.pdf`, content: pdfBuffer } : undefined,
         rows: rowsForReport(row.entries as MonthlyEntry[]),
       });
       emailSent = true;
