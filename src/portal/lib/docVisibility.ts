@@ -1,66 +1,90 @@
 import type { UserRole } from '../types';
 
 /**
- * Immigration and compliance documents that only a manager may view.
+ * What a Project Manager sees on an employee's record.
  *
- * HR named these specifically: E-Verify, I-9, I-94, I-140, LCA, I-797, Visa,
- * Driver's Licence and Education. "Manager" is admin + operations (shown as
- * Project Manager), confirmed with Prashanth.
+ * HR named a set of documents — E-Verify, I-9, I-94, I-140, LCA, I-797, Visa,
+ * Driver's Licence, State ID and Education — and the rule attached to it is
+ * that those are the documents a PROJECT MANAGER may see. Not the whole file.
  *
- * SCOPED DELIBERATELY NARROWLY. A first attempt gated the entire uploaded
- * documents list, the whole Identity & Documents card and the Education card,
- * and HR reported within hours that they could not find any employee
- * documents at all — because resumes, W-4s, offer letters, insurance waivers
- * and the SSN card were swept up with them, and HR is who handles those. Only
- * the nine types below are restricted; everything else stays visible to
- * everyone who can already open an employee's record.
+ * I had this backwards. The first version read the same list as "only a
+ * manager may see these", which hid them from HR and left the PM seeing
+ * everything — the exact opposite of the intent, and wrong twice over:
+ *
+ *   - HR reported "I can't find the DL details in Immigration tile". Of
+ *     course they couldn't: driver_license was on the hidden list, and HR is
+ *     who files it.
+ *   - The PM kept seeing resumes, W-4s, offer letters and the SSN card, which
+ *     was reported as "still seeing all the documents from the project
+ *     manager's view".
+ *
+ * So the direction is inverted here. Admin and HR see an employee's whole
+ * file, as they always did; a PM sees the work-authorisation and compliance
+ * paperwork they actually need to verify, and nothing else.
  *
  * This is presentation, not access control. The page is already restricted at
- * the route (PortalApp.tsx) and the server policy in
- * backend/src/lib/documentAccess.ts is the real boundary — a reader who calls
+ * the route (PortalApp.tsx) to admin, HR and PM, and the server policy in
+ * backend/src/lib/documentAccess.ts is the real boundary — a reader calling
  * the API directly is governed by that, not by this.
  */
-const MANAGER_ROLES: ReadonlySet<string> = new Set<UserRole>(['admin', 'operations']);
 
-/** May this role see the restricted immigration/compliance documents? */
-export function canSeeRestrictedDocs(role?: string | null): boolean {
-  return !!role && MANAGER_ROLES.has(role);
+/** The role that sees a limited set. Everyone else who can open the page sees all of it. */
+const LIMITED_ROLES: ReadonlySet<string> = new Set<UserRole>(['operations']);
+
+/** Does this role see the employee's whole document file? */
+export function seesWholeFile(role?: string | null): boolean {
+  return !LIMITED_ROLES.has(role ?? '');
 }
 
 /**
- * `identity_documents[].type` values covered by the restriction.
+ * Kept for the tiles that ask "may this viewer see the immigration detail".
+ * Admin and HR: yes. A PM: yes, since these are exactly the documents a PM is
+ * here to verify.
+ */
+export function canSeeRestrictedDocs(_role?: string | null): boolean {
+  return true;
+}
+
+/**
+ * `identity_documents[].type` values a Project Manager may see.
  *
  * `ead` is included because an EAD *is* the employment-authorisation document
- * the I-9 rests on; `ssn`, `passport`, `resume`, `w4`, `offer_letter` and the
- * rest are deliberately absent.
+ * the I-9 rests on, and `passport` because it is a List A identity document —
+ * a PM cannot check work authorisation without being able to see the identity
+ * it rests on. `ssn` is already visible to a PM by server policy for the same
+ * reason (redactEmployee keeps it for operations).
  */
-const RESTRICTED_IDENTITY_TYPES: ReadonlySet<string> = new Set([
+const PM_VISIBLE_IDENTITY_TYPES: ReadonlySet<string> = new Set([
   'i9_form', 'i94', 'i140', 'i140_approval_notice', 'lca', 'i797', 'us_visa',
-  'driver_license', 'state_id', 'education_documents',
+  'driver_license', 'state_id', 'education_documents', 'ead', 'passport',
+  'green_card', 'i20',
 ]);
 
-/** Stored `documents.type` labels covered by the same restriction. */
-const RESTRICTED_DOC_LABELS: ReadonlySet<string> = new Set([
-  'I-9 Form', 'I-94', 'I-140', 'I-140 Approval Notice', 'LCA', 'I-797', 'Visa',
-  "Driver's License", 'State-Issued ID', 'Education Documents & Academic Credentials',
-  'E-Verify Letter',
+/** Stored `documents.type` labels a Project Manager may see. */
+const PM_VISIBLE_DOC_LABELS: ReadonlySet<string> = new Set([
+  'I-9 Form', 'I-94', 'I-140', 'I-140 Approval Notice', 'LCA', 'Copy of LCA',
+  'I-797', 'Visa', "Driver's License", 'State-Issued ID',
+  'Education Documents & Academic Credentials', 'E-Verify Letter',
+  'Employment Authorization Document', 'Passport', 'Permanent Resident Card',
+  'I-20',
 ]);
 
-export function isRestrictedIdentityType(type?: string | null): boolean {
-  return !!type && RESTRICTED_IDENTITY_TYPES.has(type);
+export function isPmVisibleIdentityType(type?: string | null): boolean {
+  return !!type && PM_VISIBLE_IDENTITY_TYPES.has(type);
 }
 
-export function isRestrictedDocLabel(label?: string | null): boolean {
-  return !!label && RESTRICTED_DOC_LABELS.has(label);
+export function isPmVisibleDocLabel(label?: string | null): boolean {
+  return !!label && PM_VISIBLE_DOC_LABELS.has(label);
 }
 
-/** Filter a list to what this role may see. */
+/** Filter identity documents to what this role may see. */
 export function visibleIdentityDocs<T extends { type?: string }>(docs: T[], role?: string | null): T[] {
-  if (canSeeRestrictedDocs(role)) return docs;
-  return docs.filter(d => !isRestrictedIdentityType(d.type));
+  if (seesWholeFile(role)) return docs;
+  return docs.filter(d => isPmVisibleIdentityType(d.type));
 }
 
+/** Filter uploaded documents to what this role may see. */
 export function visibleDocuments<T extends { type?: string }>(docs: T[], role?: string | null): T[] {
-  if (canSeeRestrictedDocs(role)) return docs;
-  return docs.filter(d => !isRestrictedDocLabel(d.type));
+  if (seesWholeFile(role)) return docs;
+  return docs.filter(d => isPmVisibleDocLabel(d.type));
 }

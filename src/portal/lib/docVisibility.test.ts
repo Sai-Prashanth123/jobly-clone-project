@@ -1,91 +1,99 @@
 import { describe, it, expect } from 'vitest';
 import {
-  canSeeRestrictedDocs,
-  isRestrictedIdentityType,
-  visibleIdentityDocs,
-  visibleDocuments,
+  seesWholeFile, visibleIdentityDocs, visibleDocuments,
+  isPmVisibleIdentityType, isPmVisibleDocLabel,
 } from './docVisibility';
 
 /**
- * HR asked for E-Verify, I-9, I-94, I-140, LCA, I-797, Visa, DL and Education
- * to be manager-only.
+ * "Still seeing all the documents from the project manager's view — I have
+ * told these documents should be visible by project manager."
  *
- * A first attempt gated the whole documents list and the entire Identity &
- * Documents card, and HR reported the same morning that they could not find
- * ANY employee documents — resumes, W-4s, offer letters, insurance waivers and
- * SSN cards had all gone with them. These tests exist mostly to pin the
- * boundary: what is hidden, and just as importantly what must not be.
+ * The list HR named was right; the DIRECTION was wrong. It read as "only a
+ * manager may see these", which hid them from HR (who then reported losing
+ * the DL details) while the PM still saw the whole file, resumes and W-4s
+ * included. A PM now sees the named documents and nothing else; admin and HR
+ * see everything, as they always did.
  */
-describe('who counts as a manager', () => {
-  it('is admin and Project Manager', () => {
-    expect(canSeeRestrictedDocs('admin')).toBe(true);
-    expect(canSeeRestrictedDocs('operations')).toBe(true);
+
+const IDENTITY = [
+  { type: 'i9_form' }, { type: 'i94' }, { type: 'lca' }, { type: 'us_visa' },
+  { type: 'driver_license' }, { type: 'education_documents' }, { type: 'passport' },
+  { type: 'ssn' }, { type: 'w4' }, { type: 'offer_letter' }, { type: 'resume' },
+];
+
+const UPLOADED = [
+  { type: 'I-9 Form' }, { type: 'Visa' }, { type: "Driver's License" },
+  { type: 'E-Verify Letter' }, { type: 'Passport' },
+  { type: 'Resume' }, { type: 'W-4' }, { type: 'Offer Letter' },
+  { type: 'Social Security Card' }, { type: 'Bank Letter' },
+];
+
+describe('a Project Manager sees only the named documents', () => {
+  it('does not see the whole file', () => {
+    expect(seesWholeFile('operations')).toBe(false);
   });
 
-  it('is not HR, Finance, Legal or an employee', () => {
-    for (const r of ['hr', 'finance', 'legal', 'employee']) {
-      expect(canSeeRestrictedDocs(r), r).toBe(false);
+  // The reported case: resumes, W-4s, offer letters, SSN card, bank letters.
+  it('is not shown personnel paperwork', () => {
+    const shown = visibleDocuments(UPLOADED, 'operations').map(d => d.type);
+    for (const hidden of ['Resume', 'W-4', 'Offer Letter', 'Social Security Card', 'Bank Letter']) {
+      expect(shown, hidden).not.toContain(hidden);
     }
   });
 
-  it('refuses an absent or unknown role rather than defaulting open', () => {
-    expect(canSeeRestrictedDocs(undefined)).toBe(false);
-    expect(canSeeRestrictedDocs(null)).toBe(false);
-    expect(canSeeRestrictedDocs('superuser')).toBe(false);
+  it('is shown the work-authorisation documents it exists to verify', () => {
+    const shown = visibleDocuments(UPLOADED, 'operations').map(d => d.type);
+    for (const seen of ['I-9 Form', 'Visa', "Driver's License", 'E-Verify Letter']) {
+      expect(shown, seen).toContain(seen);
+    }
+  });
+
+  it('applies the same rule to the identity rows', () => {
+    const shown = visibleIdentityDocs(IDENTITY, 'operations').map(d => d.type);
+    expect(shown).toContain('i9_form');
+    expect(shown).toContain('driver_license');
+    expect(shown).not.toContain('w4');
+    expect(shown).not.toContain('offer_letter');
+    expect(shown).not.toContain('resume');
+  });
+
+  // A PM cannot check work authorisation without the identity it rests on.
+  it('keeps the passport, a List A identity document', () => {
+    expect(isPmVisibleIdentityType('passport')).toBe(true);
+    expect(isPmVisibleDocLabel('Passport')).toBe(true);
   });
 });
 
-describe('exactly the nine that were named are restricted', () => {
-  it('covers each one', () => {
-    for (const t of ['i9_form', 'i94', 'i140', 'lca', 'i797', 'us_visa', 'driver_license', 'education_documents']) {
-      expect(isRestrictedIdentityType(t), t).toBe(true);
-    }
+describe('admin and HR see the whole file', () => {
+  // This is the regression that was reported live: HR losing the DL.
+  it('HR keeps every document, the driver licence included', () => {
+    expect(seesWholeFile('hr')).toBe(true);
+    expect(visibleDocuments(UPLOADED, 'hr')).toHaveLength(UPLOADED.length);
+    expect(visibleIdentityDocs(IDENTITY, 'hr').map(d => d.type)).toContain('driver_license');
   });
 
-  it('includes the state ID, since it stands in for the licence', () => {
-    expect(isRestrictedIdentityType('state_id')).toBe(true);
+  it('admin keeps every document', () => {
+    expect(visibleDocuments(UPLOADED, 'admin')).toHaveLength(UPLOADED.length);
+    expect(visibleIdentityDocs(IDENTITY, 'admin')).toHaveLength(IDENTITY.length);
   });
 
-  // The regression. HR handles all of these daily.
-  it('leaves the everyday documents alone', () => {
-    for (const t of ['resume', 'w4', 'offer_letter', 'insurance_waiver', 'ssn', 'passport', 'i20', 'green_card']) {
-      expect(isRestrictedIdentityType(t), `${t} must stay visible`).toBe(false);
-    }
+  // An unknown or missing role must not accidentally become the limited one.
+  it('defaults to the whole file rather than to nothing', () => {
+    expect(seesWholeFile(undefined)).toBe(true);
+    expect(seesWholeFile(null)).toBe(true);
+    expect(visibleDocuments(UPLOADED, undefined)).toHaveLength(UPLOADED.length);
   });
 });
 
-describe('filtering a list', () => {
-  const identityDocs = [
-    { type: 'passport' }, { type: 'resume' }, { type: 'i94' },
-    { type: 'driver_license' }, { type: 'w4' },
-  ];
-
-  it('gives a manager everything', () => {
-    expect(visibleIdentityDocs(identityDocs, 'operations')).toHaveLength(5);
-    expect(visibleIdentityDocs(identityDocs, 'admin')).toHaveLength(5);
+describe('the lists themselves', () => {
+  it('never hides a document it has no opinion about', () => {
+    expect(isPmVisibleDocLabel('Something Entirely New')).toBe(false);
+    // ...but only the PM is filtered, so a new type still reaches HR.
+    expect(visibleDocuments([{ type: 'Something Entirely New' }], 'hr')).toHaveLength(1);
   });
 
-  it('hides only the restricted ones from HR', () => {
-    const seen = visibleIdentityDocs(identityDocs, 'hr').map(d => d.type);
-    expect(seen).toEqual(['passport', 'resume', 'w4']);
-  });
-
-  it('never returns an empty list just because the viewer is not a manager', () => {
-    // The shape of the original bug: HR seeing nothing at all.
-    expect(visibleIdentityDocs(identityDocs, 'hr').length).toBeGreaterThan(0);
-  });
-
-  it('filters uploaded documents by their stored label', () => {
-    const uploaded = [
-      { type: 'Resume' }, { type: 'I-9 Form' }, { type: 'W-4' },
-      { type: 'LCA' }, { type: 'Insurance Waiver Form' },
-    ];
-    expect(visibleDocuments(uploaded, 'operations')).toHaveLength(5);
-    expect(visibleDocuments(uploaded, 'hr').map(d => d.type)).toEqual(['Resume', 'W-4', 'Insurance Waiver Form']);
-  });
-
-  it('copes with empty input', () => {
-    expect(visibleIdentityDocs([], 'hr')).toEqual([]);
-    expect(visibleDocuments([], 'admin')).toEqual([]);
+  it('handles an empty list and a missing type', () => {
+    expect(visibleDocuments([], 'operations')).toEqual([]);
+    expect(visibleDocuments([{}], 'operations')).toEqual([]);
   });
 });

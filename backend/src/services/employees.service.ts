@@ -74,7 +74,18 @@ export function redactEmployee(emp: any, viewerRole?: string, isOwn = false): an
     ? { ...emp, documents: withoutEmployerManagedDocs(emp.documents) }
     : emp;
 
-  if (viewerRole === 'admin' || viewerRole === 'hr' || isOwn) return self;
+  if (viewerRole === 'admin' || viewerRole === 'hr') return self;
+
+  // An employee reading their OWN record. The Payroll card was taken off
+  // MyProfile per HR, but `isOwn` short-circuited this function entirely, so
+  // pay_rate was still in the JSON — off the screen and one devtools tab away.
+  // Taking it off the screen and leaving it in the payload is not hiding it.
+  //
+  // Bank details deliberately stay: the onboarding wizard prefills them and
+  // counts the payroll section complete from them, so blanking them would
+  // show a finished section as unfinished. They are not displayed back on
+  // MyProfile either way.
+  if (isOwn) return viewerRole === 'employee' ? { ...self, pay_rate: 0 } : self;
   if (viewerRole === 'legal') {
     const out: any = {};
     for (const key of Object.keys(self)) out[key] = LEGAL_ALLOWED_EMPLOYEE_FIELDS.has(key) ? self[key] : null;
@@ -637,7 +648,33 @@ export async function resendCredentials(employeeId: string, actorId?: string): P
 
 // ── update ───────────────────────────────────────────────────────────────────
 
+/**
+ * Fields an employee may never set on their own record.
+ *
+ * The controller already stops one employee editing another's record, but
+ * there was no check on WHICH fields their own edit may carry — and the
+ * profile form posts the whole object, pay rate and status included. So an
+ * employee could set their own pay rate, which feeds invoicing, or flip
+ * themselves to active and step around HR's onboarding approval. Neither is
+ * theirs to decide.
+ *
+ * Dropping the fields rather than rejecting the request: the form sends them
+ * because it prefills them, not because the employee touched them, so a 403
+ * would break ordinary profile edits for everybody.
+ */
+const HR_ONLY_EMPLOYEE_FIELDS = ['payRate', 'payType', 'status'] as const;
+
+/** Drop the HR-only fields when the actor is an employee. Exported to be tested. */
+export function stripHrOnlyFields<T extends object>(input: T, actorRole?: string): T {
+  if (actorRole !== 'employee') return input;
+  const cleaned = { ...input } as Record<string, unknown>;
+  for (const f of HR_ONLY_EMPLOYEE_FIELDS) delete cleaned[f];
+  return cleaned as T;
+}
+
 export async function updateEmployee(id: string, input: UpdateEmployeeInput, actorId?: string, actorRole?: string) {
+  input = stripHrOnlyFields(input, actorRole);
+
   const { data: existing, error: findErr } = await supabaseAdmin
     .from('employees')
     .select('id, display_id, email, work_email, status, onboarding_completed_at, block_personal_email')
