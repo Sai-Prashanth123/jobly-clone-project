@@ -200,6 +200,8 @@ interface FormState {
   identityDocuments: IdentityDocumentEntry[];
   // Map of identity-doc type → File staged for upload, keyed by `type`.
   identityDocFiles: Record<string, File | null>;
+  /** Answers to "do they hold this?" — see OPTIONAL_HOLDING_ROWS. */
+  identityDocHolding: Record<string, 'yes' | 'no'>;
   // Map of multi-file identity-doc type (I-983, I-20, Other) → staged files
   // array, capped client-side by the row's maxFiles. Kept separate from
   // identityDocFiles so every other row's single-file logic stays untouched.
@@ -265,6 +267,7 @@ const defaultForm: FormState = {
   ssn: '',
   identityDocuments: [],
   identityDocFiles: {},
+  identityDocHolding: {},
   multiIdentityDocFiles: {},
   education: [],
   workHistory: [],
@@ -485,6 +488,7 @@ export default function NewEmployee() {
       ssn: e.ssn ?? '',
       identityDocuments: e.identityDocuments ?? [],
       identityDocFiles: {},
+      identityDocHolding: {},
       multiIdentityDocFiles: {},
       education: e.education ?? [],
       workHistory: e.workHistory ?? [],
@@ -850,6 +854,20 @@ export default function NewEmployee() {
   // Documents" grid (IDENTITY_DOC_ROWS) and the "Employer / Admin Documents"
   // card (EMPLOYER_DOC_ROWS, admin/hr view only) so the upload UI/logic
   // exists in exactly one place.
+  // Rows that ask "do you have this?" before asking for the file.
+  //
+  // "Green card — toggle yes or no... if they don't have then they should not
+  // upload that, if yes then he can upload that." A Permanent Resident Card
+  // shows for several work statuses where the employee may or may not hold
+  // one, and there was no way to say "no" — so the field sat there looking
+  // like something they had failed to provide.
+  //
+  // Answering No hides the upload and takes the row out of the required set.
+  // Answering Yes reveals it. An employee who has already uploaded one is
+  // treated as Yes and is not asked, so the toggle can never orphan a file
+  // that is already on record.
+  const OPTIONAL_HOLDING_ROWS = new Set(['green_card']);
+
   const renderIdentityDocRow = (row: IdentityDocRow) => {
     const file = form.identityDocFiles[row.type];
     const doc = getIdentityDoc(row.type);
@@ -874,7 +892,11 @@ export default function NewEmployee() {
     // hard-required ones — you can't be tracking the expiry of a document
     // you never provided.
     const expiryWithoutFile = isOnboarding && row.hasExpiry && !!expiryVal && !fileOrUploaded;
-    const isMissing = isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile);
+    // Default: Yes when something is already on file, otherwise unanswered.
+    const asksHolding = OPTIONAL_HOLDING_ROWS.has(row.type);
+    const holdingAnswer = form.identityDocHolding[row.type] ?? (fileOrUploaded ? 'yes' : undefined);
+    const hideUpload = asksHolding && holdingAnswer !== 'yes';
+    const isMissing = !hideUpload && isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile);
     return (
       <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
         <div>
@@ -886,6 +908,29 @@ export default function NewEmployee() {
             )}
           </p>
           {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
+          {asksHolding && (
+            <div className="mt-2 flex items-center gap-2">
+              <span className="text-[11px] text-gray-500">Do they hold this?</span>
+              {(['yes', 'no'] as const).map(answer => (
+                <button
+                  key={answer}
+                  type="button"
+                  onClick={() => setForm(f => ({ ...f, identityDocHolding: { ...f.identityDocHolding, [row.type]: answer } }))}
+                  className={`px-2.5 py-1 rounded-full border text-[11px] font-medium transition ${
+                    holdingAnswer === answer
+                      ? 'bg-blue-50 border-blue-200 text-blue-700'
+                      : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                  }`}
+                  aria-pressed={holdingAnswer === answer}
+                >
+                  {answer === 'yes' ? 'Yes' : 'No'}
+                </button>
+              ))}
+              {holdingAnswer === 'no' && (
+                <span className="text-[11px] text-gray-400">Nothing to upload.</span>
+              )}
+            </div>
+          )}
           {row.downloadUrl && (
             <a
               href={row.downloadUrl}
@@ -908,7 +953,7 @@ export default function NewEmployee() {
 
             `ssn` is excluded deliberately — it has its own dedicated field in
             section 06, and a second place to type it would be one too many. */}
-        {row.placeholder && row.type !== 'ssn' && (
+        {!hideUpload && row.placeholder && row.type !== 'ssn' && (
           <div className={row.hasState ? 'grid grid-cols-1 sm:grid-cols-3 gap-3' : 'space-y-1'}>
             <div className={row.hasState ? 'sm:col-span-2 space-y-1' : 'space-y-1'}>
               <Label className="text-[11px] font-medium text-gray-500">Document Number</Label>
@@ -934,7 +979,7 @@ export default function NewEmployee() {
             )}
           </div>
         )}
-        {row.hasExpiry && (
+        {!hideUpload && row.hasExpiry && (
           <div className="space-y-1">
             <Label className="text-[11px] font-medium text-gray-500">
               Expiry Date {isOnboarding && isRequired && <RequiredMark />}
@@ -949,7 +994,7 @@ export default function NewEmployee() {
             {expiryWithoutFile && <p className="text-[11px] text-red-500 mt-0.5">Upload the document below to save this expiry date</p>}
           </div>
         )}
-        {row.multi ? (
+        {hideUpload ? null : row.multi ? (
           <MultiFileUploadSlot
             inputId={inputId}
             existingDocs={multiExistingDocs}
