@@ -21,6 +21,7 @@ import {
 } from '../hooks/useAdmin';
 import { useAuth } from '../hooks/useAuth';
 import { formatDate } from '../lib/utils';
+import { RolePermissionsMatrix } from '../components/admin/RolePermissionsMatrix';
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 const ROLE_COLORS: Record<string, string> = {
@@ -407,52 +408,24 @@ function ActivityLogsTab() {
 }
 
 // ── Role Permissions Tab ──────────────────────────────────────────────────────
+//
+// Was a hardcoded 28-row table wired to nothing, and it disagreed with the
+// code in BOTH directions — it showed Activity Logs as admin-only where the
+// routes admit HR, and omitted HR from reports where the routes allow it.
+// Anyone reading it to answer "who can do what" was being told the wrong
+// thing. It now reads from the API, which is seeded from what the routes
+// actually enforce, and the ticks are editable.
 function PermissionsTab() {
-  const Check = () => <span className="text-green-600 font-bold text-base">✓</span>;
-  const Cross = () => <span className="text-gray-200 text-base">—</span>;
-
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base flex items-center gap-2">
           <Shield className="h-4 w-4 text-blue-500" />
-          Role Permissions Matrix
+          Role Permissions
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="bg-gray-50">
-                <TableHead className="font-semibold">Feature / Permission</TableHead>
-                <TableHead className="text-center font-semibold"><RoleBadge role="admin" /></TableHead>
-                <TableHead className="text-center font-semibold"><RoleBadge role="hr" /></TableHead>
-                <TableHead className="text-center font-semibold"><RoleBadge role="operations" /></TableHead>
-                <TableHead className="text-center font-semibold"><RoleBadge role="finance" /></TableHead>
-                <TableHead className="text-center font-semibold"><RoleBadge role="employee" /></TableHead>
-                <TableHead className="text-center font-semibold"><RoleBadge role="legal" /></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {PERMISSIONS.map(p => (
-                <TableRow key={p.feature}>
-                  <TableCell className="text-sm font-medium">
-                    {p.feature}
-                    {'note' in p && p.note && (
-                      <span className="block text-[11px] font-normal text-gray-500 mt-0.5">{p.note}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-center">{p.admin ? <Check /> : <Cross />}</TableCell>
-                  <TableCell className="text-center">{p.hr ? <Check /> : <Cross />}</TableCell>
-                  <TableCell className="text-center">{p.ops ? <Check /> : <Cross />}</TableCell>
-                  <TableCell className="text-center">{p.fin ? <Check /> : <Cross />}</TableCell>
-                  <TableCell className="text-center">{p.emp ? <Check /> : <Cross />}</TableCell>
-                  <TableCell className="text-center">{p.legal ? <Check /> : <Cross />}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <RolePermissionsMatrix />
       </CardContent>
     </Card>
   );
