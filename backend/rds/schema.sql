@@ -4207,3 +4207,40 @@ ALTER TABLE ONLY public.timesheets
 
 
 
+
+-- ── Role permissions ────────────────────────────────────────────────────────
+-- Admin-editable permissions (migration 052). The SEED lives in that migration
+-- rather than here, and deliberately: src/lib/permissions.ts carries a
+-- compiled-in fallback generated from the route guards, so an empty table
+-- behaves exactly like today rather than locking anybody out. A fresh database
+-- is therefore safe with these tables empty.
+CREATE TABLE IF NOT EXISTS public.roles (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  key         text UNIQUE NOT NULL,
+  label       text NOT NULL,
+  is_builtin  boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.permissions (
+  key         text PRIMARY KEY,
+  label       text NOT NULL,
+  group_name  text NOT NULL,
+  is_custom   boolean NOT NULL DEFAULT false,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.role_permissions (
+  role_key        text NOT NULL REFERENCES public.roles(key) ON DELETE CASCADE,
+  permission_key  text NOT NULL REFERENCES public.permissions(key) ON DELETE CASCADE,
+  granted         boolean NOT NULL DEFAULT true,
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (role_key, permission_key)
+);
+
+CREATE INDEX IF NOT EXISTS role_permissions_role_idx ON public.role_permissions (role_key);
+
+INSERT INTO public.roles (key, label, is_builtin) VALUES
+  ('admin', 'Admin', true), ('hr', 'HR', true), ('operations', 'Project Manager', true),
+  ('finance', 'Finance', true), ('legal', 'Legal', true), ('employee', 'Employee', true)
+ON CONFLICT (key) DO NOTHING;
