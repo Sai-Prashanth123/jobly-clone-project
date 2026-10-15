@@ -171,7 +171,16 @@ export const ROW_VISA_GATE: Record<string, string[]> = {
 // wins.
 export const ROW_VISA_EXCLUDE: Record<string, string[]> = {
   green_card: ['h1b', 'opt', 'stem_opt'],
-  i140_questionnaire: ['opt', 'h1b', 'stem_opt'],
+  // Also hidden for gc and citizen. This row is gated by EXCLUSION rather
+  // than by an allow-list, so when the I-140 pair was moved to h1b-only it
+  // was left behind and a green card holder still saw a field headed "I-140".
+  // The questionnaire is a step in getting the card; somebody holding one is
+  // past it, and a citizen was never on that path.
+  //
+  // The PERM questionnaire beside it deliberately stays: the backend still
+  // requires 'Labor Certificate (PERM)' for gc (VISA_REQUIRED_EXTRA_DOCS),
+  // so PERM paperwork is wanted for them and only the I-140 was dropped.
+  i140_questionnaire: ['opt', 'h1b', 'stem_opt', 'gc', 'citizen'],
   perm_questionnaire: ['opt', 'h1b', 'stem_opt'],
   // us_visa was hidden for OPT here. It is now part of HR's mandatory set for
   // every work-visa holder, so hiding it would demand a document the employee

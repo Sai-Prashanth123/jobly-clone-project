@@ -88,3 +88,42 @@ describe('every row resolves for every visa type', () => {
     }
   });
 });
+
+/**
+ * "Can you remove I-140 field from Green card / permanent resident list."
+ *
+ * THREE rows carry the I-140 name, and they are gated two different ways:
+ * i140 and i140_approval_notice by allow-list, i140_questionnaire by
+ * exclusion. Moving the first two to h1b-only therefore left the third one on
+ * screen, so the field was still there after the change said it had gone.
+ */
+describe('no I-140 row survives for a permanent resident', () => {
+  const I140_ROWS = ['i140', 'i140_approval_notice', 'i140_questionnaire'];
+
+  it('hides every I-140 row for gc and citizen', () => {
+    for (const visa of ['gc', 'citizen']) {
+      for (const row of I140_ROWS) {
+        expect(isShown(row, visa), `${row} for ${visa}`).toBe(false);
+      }
+    }
+  });
+
+  // Whatever the gating style, the rule is about the NAME on screen: if a
+  // label says I-140, a green card holder must not see it.
+  it('leaves no row labelled I-140 visible to a green card holder', () => {
+    const visible = IDENTITY_DOC_ROWS
+      .filter(r => isShown(r.type, 'gc'))
+      .filter(r => /i-?140/i.test(r.label));
+    expect(visible.map(r => r.label)).toEqual([]);
+  });
+
+  it('keeps the PERM questionnaire, which is still required for gc', () => {
+    expect(isShown('perm_questionnaire', 'gc')).toBe(true);
+  });
+
+  it('still shows the I-140 rows to an H-1B employee', () => {
+    for (const row of ['i140', 'i140_approval_notice']) {
+      expect(isShown(row, 'h1b'), row).toBe(true);
+    }
+  });
+});
