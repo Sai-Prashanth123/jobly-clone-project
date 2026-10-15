@@ -109,11 +109,46 @@ export function ClientEngagementCard({
     [employee.documents],
   );
 
+  // The collapse control belongs to the CARD, not to the happy path. It used
+  // to live only in the branch that renders placements, so an employee with
+  // no assignments — or one still loading — got a card with no toggle at all,
+  // which reads as the button having never been added.
+  const header = (subtitle?: string) => (
+    <CardHeader className="pb-3">
+      <div className="flex items-start justify-between gap-3">
+        <CardTitle className="text-base">
+          <button
+            type="button"
+            onClick={() => setExpanded(v => !v)}
+            aria-expanded={expanded}
+            aria-controls="client-placement-body"
+            className="flex items-center gap-2 text-left rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF]"
+            title={expanded ? 'Collapse' : 'Expand'}
+          >
+            <Building2 className="h-4 w-4 text-[#4069FF]" />
+            Client/Project
+            <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+            {!expanded && subtitle && (
+              <span className="text-xs font-normal text-gray-400">{subtitle}</span>
+            )}
+          </button>
+        </CardTitle>
+        {client && expanded && (
+          <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-[11px]">
+            <Link to={`/portal/clients/${client.id}`}>
+              Client record <ExternalLink className="h-3 w-3" />
+            </Link>
+          </Button>
+        )}
+      </div>
+    </CardHeader>
+  );
+
   if (isLoading) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-base">Client/Project</CardTitle></CardHeader>
-        <CardContent><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></CardContent>
+        {header()}
+        {expanded && <CardContent><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></CardContent>}
       </Card>
     );
   }
@@ -121,13 +156,15 @@ export function ClientEngagementCard({
   if (assignments.length === 0) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-base">Client/Project</CardTitle></CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-400">
-            {employee.firstName} has no assignments, so there is no client to show.
-            Create one under Assignments to link them to a client.
-          </p>
-        </CardContent>
+        {header('no placements')}
+        {expanded && (
+          <CardContent>
+            <p className="text-sm text-gray-400">
+              {employee.firstName} has no assignments, so there is no client to show.
+              Create one under Assignments to link them to a client.
+            </p>
+          </CardContent>
+        )}
       </Card>
     );
   }
@@ -136,39 +173,8 @@ export function ClientEngagementCard({
 
   return (
     <Card>
-      <CardHeader className="pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-base">
-            <button
-              type="button"
-              onClick={() => setExpanded(v => !v)}
-              aria-expanded={expanded}
-              aria-controls="client-placement-body"
-              className="flex items-center gap-2 text-left rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF]"
-              title={expanded ? 'Collapse' : 'Expand'}
-            >
-              <Building2 className="h-4 w-4 text-[#4069FF]" />
-              Client/Project
-              <ChevronDown
-                className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
-              />
-              {/* A count when collapsed, so the card still says something. */}
-              {!expanded && (
-                <span className="text-xs font-normal text-gray-400">
-                  {assignments.length} placement{assignments.length === 1 ? '' : 's'}
-                </span>
-              )}
-            </button>
-          </CardTitle>
-          {client && (
-            <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-[11px]">
-              <Link to={`/portal/clients/${client.id}`}>
-                Client record <ExternalLink className="h-3 w-3" />
-              </Link>
-            </Button>
-          )}
-        </div>
-
+      {header(`${assignments.length} placement${assignments.length === 1 ? '' : 's'}`)}
+      <CardHeader className="pt-0 pb-3">
         {/* Only when they have worked with more than one, and only while open. */}
         {expanded && clients.length > 1 && (
           <div className="flex flex-wrap gap-1.5 pt-2">

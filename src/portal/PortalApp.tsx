@@ -224,7 +224,7 @@ export default function PortalApp() {
             <Route
               path="clients"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'finance']}>
                   <PortalClients />
                 </ProtectedRoute>
               }

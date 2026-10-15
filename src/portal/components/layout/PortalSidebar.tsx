@@ -54,7 +54,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Org Chart',           path: '/portal/org-chart',           icon: <Network className="h-4 w-4" />,         roles: ['admin','operations'], group: 'Core' },
   { label: 'Add Employee',        path: '/portal/employees/new',       icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'], group: 'Core' },
   { label: 'Expiring Documents',  path: '/portal/expiring-documents',  icon: <FileWarning className="h-4 w-4" />,     roles: ['admin','hr'], badgeKey: 'expiringDocs', group: 'Core' },
-  { label: 'Clients',             path: '/portal/clients',             icon: <Building2 className="h-4 w-4" />,       roles: ['admin','finance'], group: 'Core' },
+  // HR and the Project Manager were missing this, while clients.routes.ts has
+  // always served them — the nav and the API simply disagreed, so the people
+  // who place employees with clients could not open the client list at all.
+  // Employees are left out on purpose: the API admits them, but browsing the
+  // client book is not part of their job and nothing links them to it.
+  { label: 'Clients',             path: '/portal/clients',             icon: <Building2 className="h-4 w-4" />,       roles: ['admin','hr','operations','finance'], group: 'Core' },
   { label: 'Assignments',         path: '/portal/assignments',         icon: <ClipboardList className="h-4 w-4" />,   roles: ['admin','operations','employee'], group: 'Core' },
   { label: 'Timesheets',          path: '/portal/timesheets',          icon: <Clock className="h-4 w-4" />,           roles: ['admin','hr','operations','finance','employee'], badgeKey: 'timesheets', group: 'Core' },
   { label: 'My Attendance',       path: '/portal/attendance',          icon: <CalendarCheck className="h-4 w-4" />,   roles: ['employee','admin','hr'], group: 'Core' },
