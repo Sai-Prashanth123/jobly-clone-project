@@ -148,6 +148,10 @@ export default function EmployeeDetail() {
   // else — resume, W-4, offer letter, insurance waiver, SSN card, passport —
   // stays visible to everyone who can open this page, which is what HR needs.
   const canSeeRestricted = canSeeRestrictedDocs(user?.role);
+  // Payroll is the employer's. Finance is included for when it can reach this
+  // page; today the route admits admin, HR and the PM only, so in practice
+  // this is "not the Project Manager".
+  const canSeePayroll = ['admin', 'hr', 'finance'].includes(user?.role ?? '');
 
   // Candidates quick-added from the New Case form deliberately get no portal
   // credentials (see createEmployee's isCandidate branch), so they can't sign
@@ -698,12 +702,49 @@ export default function EmployeeDetail() {
           </CardContent>
         </Card>
 
-        {/* The Payroll card was here. Removed from the employee record per HR
-            (Oct 2026), having already been removed from the employee's own
-            profile — pay rate, pay/payment type, tax form and bank details are
-            no longer shown on this page for any role. Nothing stopped being
-            collected or used: onboarding still asks, and invoicing still bills
-            from the assignment's rates. */}
+        {/* Payroll, for the employer only.
+            "Remove the Payroll & tax section" and "payroll details should be
+            visible to only Employer" are two different instructions, and I
+            collapsed them into one: the card came off the employee's own
+            profile, which was asked for, AND off this page for every role,
+            which was not. The employer then could not see payroll anywhere.
+            It is back here, for admin and HR alone — a Project Manager does
+            not see it, and the server does not send them the numbers either
+            (redactEmployee nulls pay and bank for operations), so this is the
+            display half of a rule the API already enforces. */}
+        {canSeePayroll && (
+          <Card>
+            <CardHeader><CardTitle className="text-base">Payroll</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <Field label="Pay Rate" value={formatCurrency(employee.payRate)} />
+              <Field label="Pay Type" value={employee.payType} />
+              <Field label="Payment Type" value={employee.paymentType?.toUpperCase()} />
+              <Field label="Tax Form" value={employee.taxFormType?.toUpperCase()} />
+              {employee.bankName && <Field label="Bank Name" value={employee.bankName} />}
+              {employee.bankRoutingNumber && (
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Routing Number</p>
+                  <div className="flex items-center gap-1.5 mt-0.5 min-w-0">
+                    <span className="text-sm font-mono text-gray-900 break-words [overflow-wrap:anywhere] min-w-0">
+                      {bankDetailsVisible ? employee.bankRoutingNumber : `****${employee.bankRoutingNumber.slice(-4)}`}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 text-gray-400 hover:text-gray-700 flex-shrink-0" onClick={() => setBankDetailsVisible(v => !v)} title={bankDetailsVisible ? 'Hide bank details' : 'Show bank details'}>
+                      {bankDetailsVisible ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+              {employee.bankAccountNumber && (
+                <div className="min-w-0">
+                  <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">Account Number</p>
+                  <p className="text-sm font-mono text-gray-900 mt-0.5 break-words [overflow-wrap:anywhere]">
+                    {bankDetailsVisible ? employee.bankAccountNumber : `****${employee.bankAccountNumber.slice(-4)}`}
+                  </p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         {(employee.visaType || employee.ssn || passport || photoId) && (
           <Card>

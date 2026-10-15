@@ -26,7 +26,11 @@ export default function ClientDetail() {
   const isHrAdmin = user?.role === 'admin' || user?.role === 'hr';
   const { data: client, isLoading, isError, refetch } = useClient(id);
   const { data: assignmentsData } = useAssignments({ clientId: id, limit: 100 });
-  const { data: invoicesData } = useInvoices({ clientId: id, limit: 100 });
+  // Invoices are admin + finance on the server. HR and the PM now reach this
+  // page (they click through from an employee's Client/Project card), so ask
+  // only when the answer can be given.
+  const canSeeInvoices = ['admin', 'finance'].includes(user?.role ?? '');
+  const { data: invoicesData } = useInvoices({ clientId: id, limit: 100 }, { enabled: canSeeInvoices });
   const { data: employeesData } = useEmployees({ limit: 200 });
   const updateClient = useUpdateClient(id!);
   const deleteClient = useDeleteClient();

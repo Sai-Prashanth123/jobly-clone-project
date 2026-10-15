@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Building2, ExternalLink, FileText, Loader2 } from 'lucide-react';
+import { Building2, ChevronDown, ExternalLink, FileText, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { DetailField as Field } from '../shared/DetailField';
@@ -96,6 +96,9 @@ export function ClientEngagementCard({
     return [...seen.entries()].map(([id, name]) => ({ id, name }));
   }, [assignments]);
 
+  // Open by default: this card answers "who are they on", which is usually
+  // why the record was opened. Collapsing is for when it is in the way.
+  const [expanded, setExpanded] = useState(true);
   const [selectedClientId, setSelectedClientId] = useState<string | null>(null);
   const activeClientId = selectedClientId ?? clients[0]?.id;
   // One query, for the client in view — a hook cannot be called per client.
@@ -135,9 +138,27 @@ export function ClientEngagementCard({
     <Card>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between gap-3">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Building2 className="h-4 w-4 text-[#4069FF]" />
-            Client/Project
+          <CardTitle className="text-base">
+            <button
+              type="button"
+              onClick={() => setExpanded(v => !v)}
+              aria-expanded={expanded}
+              aria-controls="client-placement-body"
+              className="flex items-center gap-2 text-left rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-[#4069FF]"
+              title={expanded ? 'Collapse' : 'Expand'}
+            >
+              <Building2 className="h-4 w-4 text-[#4069FF]" />
+              Client/Project
+              <ChevronDown
+                className={`h-4 w-4 text-gray-400 transition-transform ${expanded ? '' : '-rotate-90'}`}
+              />
+              {/* A count when collapsed, so the card still says something. */}
+              {!expanded && (
+                <span className="text-xs font-normal text-gray-400">
+                  {assignments.length} placement{assignments.length === 1 ? '' : 's'}
+                </span>
+              )}
+            </button>
           </CardTitle>
           {client && (
             <Button asChild variant="ghost" size="sm" className="h-7 gap-1 text-[11px]">
@@ -148,8 +169,8 @@ export function ClientEngagementCard({
           )}
         </div>
 
-        {/* Only when they have worked with more than one. */}
-        {clients.length > 1 && (
+        {/* Only when they have worked with more than one, and only while open. */}
+        {expanded && clients.length > 1 && (
           <div className="flex flex-wrap gap-1.5 pt-2">
             {clients.map(c => (
               <button
@@ -169,7 +190,8 @@ export function ClientEngagementCard({
         )}
       </CardHeader>
 
-      <CardContent className="space-y-5">
+      {expanded && (
+      <CardContent id="client-placement-body" className="space-y-5">
         {loadingClient ? (
           <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
         ) : client ? (
@@ -239,6 +261,7 @@ export function ClientEngagementCard({
           />
         </div>
       </CardContent>
+      )}
     </Card>
   );
 }

@@ -229,10 +229,21 @@ export default function PortalApp() {
                 </ProtectedRoute>
               }
             />
+            {/* HR and the Project Manager reach this by clicking through from
+                an employee's Client/Project card, and were met with "no
+                access" — while the SERVER has always served them this record
+                (clients.routes.ts: GET /:id admits admin, hr, operations,
+                finance, employee). The guard here was the only thing stopping
+                them, and it disagreed with the API it guards. Commercials are
+                still redacted per role server-side, so a PM sees the
+                engagement without the rates.
+                The clients LIST stays admin + finance: browsing the client
+                book is a different thing from opening the one client an
+                employee is placed with. */}
             <Route
               path="clients/:id"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'finance']}>
                   <ClientDetail />
                 </ProtectedRoute>
               }

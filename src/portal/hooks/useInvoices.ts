@@ -124,8 +124,14 @@ export function useCreateInvoice() {
 
 interface ListParams { status?: string; clientId?: string; docType?: 'invoice' | 'estimate'; page?: number; limit?: number }
 
-export function useInvoices(params?: ListParams) {
+/**
+ * `enabled` because GET /invoices is admin + finance only. HR and a Project
+ * Manager opening a client record fired this and took a guaranteed 403, which
+ * is noise in the console and a failed query on a page that otherwise works.
+ */
+export function useInvoices(params?: ListParams, opts?: { enabled?: boolean }) {
   return useQuery({
+    enabled: opts?.enabled ?? true,
     queryKey: ['invoices', params],
     queryFn: async () => {
       const { data } = await apiClient.get('/invoices', { params });
