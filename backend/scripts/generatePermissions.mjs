@@ -43,11 +43,17 @@ export function collectRoutes(dir = DIR) {
 
     for (const m of src.matchAll(/router\.(get|post|put|patch|delete)\(\s*'([^']*)'\s*,/g)) {
       const after = m.index + m[0].length;
-      // Only to the end of the line: enough to see the middleware list, and it
-      // cannot trip over an inline async handler body (which is what hid eight
-      // first-in-file routes from the previous version of this script).
-      const eol = src.indexOf('\n', after);
-      const rest = src.slice(after, eol === -1 ? src.length : eol);
+      // The middleware list, however it is laid out.
+      //
+      // Reading only to end-of-line missed routes whose arguments are spread
+      // over several lines, which is the house style for the longer ones —
+      // three of the four routes on permissions.routes.ts were invisible that
+      // way. Reading a fixed window instead, cut at the handler body, so an
+      // inline `async (req, res) => {` cannot drag the scan into code that
+      // merely mentions a role name.
+      const window = src.slice(after, after + 400);
+      const handler = window.search(/async\s*\(|\(\s*req\s*[,:)]|=>\s*\{/);
+      const rest = handler === -1 ? window : window.slice(0, handler);
 
       let roles = null;
 
