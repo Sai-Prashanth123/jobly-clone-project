@@ -70,7 +70,12 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Performance Reviews', path: '/portal/reviews',             icon: <Star className="h-4 w-4" />,            roles: ['admin','hr'], group: 'Core' },
   { label: 'My Reviews',          path: '/portal/my-reviews',          icon: <Star className="h-4 w-4" />,            roles: ['employee'], group: 'Core' },
   { label: 'Enrollment Forms',    path: '/portal/enrollment-forms',    icon: <HeartPulse className="h-4 w-4" />,      roles: ['admin','hr','employee'], group: 'Core' },
-  { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','finance'], group: 'Core' },
+  // HR and the Project Manager were granted invoices.view in Admin Settings,
+  // so the nav has to follow or the permission is unreachable. These lists are
+  // still hardcoded: until ProtectedRoute reads the session's permissions, a
+  // grant made on the screen needs a matching change here, which is the next
+  // piece of work on the permissions project.
+  { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','hr','operations','finance'], group: 'Core' },
   { label: 'Templates',           path: '/portal/templates',           icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'], group: 'Core' },
   { label: 'Documents',           path: '/portal/documents',           icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'], group: 'Core' },
   { label: 'Reports',             path: '/portal/reports',             icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','hr'], group: 'Core' },

@@ -299,7 +299,7 @@ export default function PortalApp() {
             <Route
               path="invoices"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'finance']}>
                   <Invoices />
                 </ProtectedRoute>
               }
@@ -307,7 +307,7 @@ export default function PortalApp() {
             <Route
               path="invoices/:id"
               element={
-                <ProtectedRoute allowedRoles={['admin', 'finance']}>
+                <ProtectedRoute allowedRoles={['admin', 'hr', 'operations', 'finance']}>
                   <InvoiceDetail />
                 </ProtectedRoute>
               }
