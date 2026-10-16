@@ -19,6 +19,7 @@ router.post('/', requirePermission('employees.create', 'admin','hr'), validateBo
 router.get('/export',             requirePermission('employees.view', 'admin', 'hr', 'operations'), ctrl.exportEmployees);
 router.get('/directory',          requirePermission('employees.view.directory', 'admin','hr','operations','finance'), ctrl.directory);
 router.get('/expiring-documents', requirePermission('employees.view.expiring-documents', 'admin','hr','legal'), ctrl.expiringDocuments);
+router.get('/document-gaps', requirePermission('employees.view.document-gaps', 'admin','hr'), ctrl.documentGaps);
 // 'legal' intentionally excluded — see the list route above.
 router.get('/:id', requirePermission('employees.view.id', 'admin','hr','operations','finance','employee'), ctrl.getOne);
 // 'employee' is allowed so a user can edit their own profile; the controller

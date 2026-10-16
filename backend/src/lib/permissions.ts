@@ -84,6 +84,7 @@ export const FALLBACK_GRANTS: Record<string, readonly string[]> = Object.freeze(
   'employees.edit': ['admin', 'employee', 'hr'],
   'employees.view': ['admin', 'hr', 'operations'],
   'employees.view.directory': ['admin', 'finance', 'hr', 'operations'],
+  'employees.view.document-gaps': ['admin', 'hr'],
   'employees.view.expiring-documents': ['admin', 'hr', 'legal'],
   'employees.view.id': ['admin', 'employee', 'finance', 'hr', 'operations'],
   'employees.view.id-dependents-dependentId-passport-url': ['admin', 'employee', 'hr', 'legal'],

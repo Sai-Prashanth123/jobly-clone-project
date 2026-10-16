@@ -5,6 +5,7 @@ import * as storageSvc from '../services/storage.service';
 import { ForbiddenError, NotFoundError } from '../lib/errors';
 import { supabaseAdmin } from '../config/supabase';
 import type { ListEmployeesQuery, CreateEmployeeInput, UpdateEmployeeInput, RaiseLegalRequestInput } from '../schemas/employee.schema';
+import * as gapsSvc from '../services/documentGaps.service';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -301,6 +302,17 @@ export async function exportEmployees(req: Request, res: Response, next: NextFun
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', `attachment; filename="employees-${new Date().toISOString().split('T')[0]}.csv"`);
     res.send(csv);
+  } catch (err) { next(err); }
+}
+
+export async function documentGaps(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const threshold = req.query.heldThreshold ? Number(req.query.heldThreshold) : undefined;
+    const data = await gapsSvc.buildDocumentGapsReport(
+      req.user!.role,
+      Number.isFinite(threshold) ? threshold : undefined,
+    );
+    res.json({ success: true, data });
   } catch (err) { next(err); }
 }
 
