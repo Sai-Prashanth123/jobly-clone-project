@@ -67,6 +67,8 @@ export const FALLBACK_GRANTS: Record<string, readonly string[]> = Object.freeze(
   'clients.edit': ['admin', 'hr'],
   'clients.edit.id': ['admin'],
   'clients.view': ['admin', 'employee', 'finance', 'hr', 'operations'],
+  'documentPolicy.manage': ['admin', 'hr'],
+  'documentPolicy.view': ['admin', 'employee', 'finance', 'hr', 'legal', 'operations'],
   'documents.create': ['admin', 'hr', 'operations'],
   'documents.delete': ['admin', 'hr', 'operations'],
   'documents.edit': ['admin', 'legal'],

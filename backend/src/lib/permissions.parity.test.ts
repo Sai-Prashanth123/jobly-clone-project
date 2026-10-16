@@ -34,7 +34,7 @@ describe('the route scan itself', () => {
   // happened twice while building this: aliased guards hid 44 routes and
   // router.use guards hid 39 more.
   it('finds every guarded route', () => {
-    expect(routes.length).toBe(265);
+    expect(routes.length).toBe(268);
   });
 
   it('resolves roles for every route it reports', () => {
