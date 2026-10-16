@@ -639,3 +639,46 @@ export function useExpiringDocuments(days = 90) {
     staleTime: 5 * 60_000,
   });
 }
+
+/**
+ * The document-gaps report: what each work-status category requires, against
+ * what people in it actually hold.
+ *
+ * Raw snake_case-free shapes straight from the API — these are findings, not
+ * entities, so there is no map* function to run them through.
+ */
+export interface CandidateGap {
+  visaType: string;
+  documentType: string;
+  heldBy: number;
+  categorySize: number;
+  heldPercent: number;
+}
+export interface UnmetRequirement {
+  visaType: string;
+  documentType: string;
+  missingFor: number;
+  categorySize: number;
+}
+export interface UnknownLabel {
+  documentType: string;
+  count: number;
+  employees: string[];
+}
+export interface DocumentGapsReport {
+  categories: Array<{ visaType: string; employees: number }>;
+  candidateGaps: CandidateGap[];
+  unmetRequirements: UnmetRequirement[];
+  unknownLabels: UnknownLabel[];
+  generatedAt: string;
+}
+
+export function useDocumentGaps() {
+  return useQuery({
+    queryKey: ['employees', 'document-gaps'],
+    queryFn: async (): Promise<DocumentGapsReport> => {
+      const { data } = await apiClient.get('/employees/document-gaps');
+      return data.data as DocumentGapsReport;
+    },
+  });
+}
