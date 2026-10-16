@@ -159,20 +159,37 @@ export function identityDocLabel(type?: string | null, label?: string | null): s
   return IDENTITY_DOC_TYPE_LABELS[type] ?? type;
 }
 
+/**
+ * Mirrors LEGACY_LABEL_ALIASES in src/portal/lib/documentTypes.ts, and
+ * contracts.test.ts asserts the two are identical — this is the half the
+ * ONBOARDING GATE reads, so a spelling missing here blocks somebody from
+ * finishing onboarding over a document they have already uploaded.
+ *
+ * The entries marked "from live data" came from auditing the 42 distinct
+ * labels in production: nine were unrecognised, and between them they made one
+ * OPT employee appear to be missing three documents they had provided.
+ */
 export const DOC_TYPE_LEGACY_ALIASES: Record<string, string[]> = {
-  'Social Security Card': ['Social Security Number'],
+  // 'SSN', 'SN copy' and 'Social Security' are from live data.
+  'Social Security Card': ['Social Security Number', 'SSN', 'SN copy', 'Social Security'],
   // Row renamed from "US Visa" per HR. Mirrors LEGACY_LABEL_ALIASES in
   // src/portal/lib/documentTypes.ts - documents uploaded under the old label
   // must still satisfy the requirement, or employees who already provided it
   // would be blocked from finishing.
-  Visa: ['US Visa'],
+  // 'Visa copy' is from live data.
+  Visa: ['US Visa', 'Visa copy'],
   // The OPT and STEM OPT cards ARE the EAD — the same physical card. They had
   // their own rows, so an OPT employee saw "EAD / STEM OPT Card" and
   // "STEM OPT Card" side by side and was asked for one card twice. The rows
   // are gone; aliasing the old labels here means anything already uploaded
   // under them still counts for the EAD requirement and still appears, rather
   // than silently going missing from a completed checklist.
-  'Employment Authorization Document': ['OPT Card', 'STEM OPT Card'],
+  // 'EAD' and 'EAD Copy' are from live data — the abbreviation people type.
+  'Employment Authorization Document': ['OPT Card', 'STEM OPT Card', 'EAD', 'EAD Copy'],
+  // All three from live data.
+  'I-20': ['I-20 copy'],
+  'I-983': ['I-983 Form'],
+  Resume: ['Latest Resume'],
 };
 
 export interface OnboardingItem {

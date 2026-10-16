@@ -350,20 +350,43 @@ export const IDENTITY_OWNED_DOC_LABELS = new Set([...IDENTITY_DOC_ROWS, ...EMPLO
 // Documents already uploaded under a row's PREVIOUS label — keeps them
 // recognized as "on file" after a label rename, without needing to rewrite
 // historical rows in the documents table.
+/**
+ * Other names the same document has been filed under.
+ *
+ * `documents.type` is free text — the "Other" box on the Documents page sends
+ * whatever is typed and the server stores it unvalidated — so one document
+ * accumulates spellings. An unlisted spelling is INVISIBLE to the matcher,
+ * which means the employee is asked to upload something they have already
+ * uploaded, and the onboarding gate counts it missing.
+ *
+ * The entries below marked "from live data" were found by auditing the 42
+ * distinct labels in production against this map: nine were unrecognised, and
+ * between them they made one OPT employee appear to be missing three
+ * documents they had already provided.
+ */
 export const LEGACY_LABEL_ALIASES: Record<string, string[]> = {
-  'Social Security Card': ['Social Security Number'],
+  // 'SSN', 'SN copy' and 'Social Security' are from live data.
+  'Social Security Card': ['Social Security Number', 'SSN', 'SN copy', 'Social Security'],
   // Renamed per HR - the row is just "the visa" in the H-1B checklist, and
   // "US Visa" read as a separate document. Anything already uploaded under
   // the old label must keep counting, or employees who have completed this
   // row would silently show as missing it.
-  Visa: ['US Visa'],
+  // 'Visa copy' is from live data.
+  Visa: ['US Visa', 'Visa copy'],
   // The OPT and STEM OPT cards ARE the EAD — the same physical card. They had
   // their own rows, so an OPT employee saw "EAD / STEM OPT Card" and
   // "STEM OPT Card" side by side and was asked for one card twice. The rows
   // are gone; aliasing the old labels here means anything already uploaded
   // under them still counts for the EAD requirement and still appears, rather
   // than silently going missing from a completed checklist.
-  'Employment Authorization Document': ['OPT Card', 'STEM OPT Card'],
+  // 'EAD' and 'EAD Copy' are from live data — the abbreviation people
+  // actually type.
+  'Employment Authorization Document': ['OPT Card', 'STEM OPT Card', 'EAD', 'EAD Copy'],
+  // All three from live data: the same document filed under a "copy" suffix
+  // or a longer name.
+  'I-20': ['I-20 copy'],
+  'I-983': ['I-983 Form'],
+  Resume: ['Latest Resume'],
 };
 
 // Display-only label overrides, by row type then visa type.
