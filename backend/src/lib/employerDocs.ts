@@ -12,7 +12,7 @@
 //
 // MUST mirror EMPLOYER_DOC_ROWS in src/portal/lib/documentTypes.ts, BY LABEL —
 // the label is what is stored as documents.type on upload.
-const EMPLOYER_MANAGED_DOC_TYPES = new Set([
+export const EMPLOYER_MANAGED_DOC_TYPES = new Set([
   'E-Verify Letter',
   'Form I-129',
   'Copy of LCA',

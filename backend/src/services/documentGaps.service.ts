@@ -7,6 +7,7 @@ import {
   DOC_TYPE_LEGACY_ALIASES,
   IDENTITY_DOC_TYPE_LABELS,
 } from '../lib/onboarding';
+import { EMPLOYER_MANAGED_DOC_TYPES } from '../lib/employerDocs';
 
 /**
  * What each work-status category requires, against what people in it actually
@@ -67,6 +68,11 @@ export interface DocumentGapsReport {
  */
 function knownLabels(): Set<string> {
   const known = new Set<string>(Object.values(IDENTITY_DOC_TYPE_LABELS));
+  // Employer-issued documents live in their own list, not in the identity
+  // rows. Leaving them out made the report call "E-Verify Letter" — five of
+  // them, perfectly well recognised everywhere else — an unknown label. The
+  // first run against live data caught it, which is why that run happened.
+  for (const label of EMPLOYER_MANAGED_DOC_TYPES) known.add(label);
   for (const [canonical, aliases] of Object.entries(DOC_TYPE_LEGACY_ALIASES)) {
     known.add(canonical);
     for (const a of aliases) known.add(a);
@@ -172,6 +178,11 @@ export async function buildDocumentGapsReport(
 
     for (const [documentType, heldBy] of holders) {
       if (required.has(documentType)) continue;
+      // An employer-issued document can never become an employee requirement
+      // — the employee cannot produce an E-Verify letter however many of them
+      // are on file. Whether the COMPANY still owes one is a different
+      // question, answered on the employee record itself.
+      if (EMPLOYER_MANAGED_DOC_TYPES.has(documentType)) continue;
       const heldPercent = Math.round((heldBy / size) * 100);
       if (heldPercent < heldThreshold) continue;
       candidateGaps.push({ visaType, documentType, heldBy, categorySize: size, heldPercent });
