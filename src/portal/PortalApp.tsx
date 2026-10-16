@@ -92,6 +92,7 @@ const Milestones = lazy(() => import('./pages/Milestones'));
 const HeadcountReport = lazy(() => import('./pages/HeadcountReport'));
 const ExpiringDocuments = lazy(() => import('./pages/ExpiringDocuments'));
 const DocumentGaps = lazy(() => import('./pages/DocumentGaps'));
+const DocumentPolicy = lazy(() => import('./pages/DocumentPolicy'));
 
 // Phase 4 — Operations
 const WorkforceAvailability = lazy(() => import('./pages/WorkforceAvailability'));
@@ -569,6 +570,7 @@ export default function PortalApp() {
             {/* Carries its permission, so revoking it in Admin Settings removes
                 the page without a deploy — the form every route should take. */}
             <Route path="document-gaps" element={<ProtectedRoute allowedRoles={['admin','hr']} permission="employees.view.document-gaps"><DocumentGaps /></ProtectedRoute>} />
+            <Route path="document-policy" element={<ProtectedRoute allowedRoles={['admin','hr']} permission="documentPolicy.manage"><DocumentPolicy /></ProtectedRoute>} />
 
             {/* Phase 4 — Operations */}
             <Route path="workforce" element={<ProtectedRoute allowedRoles={['admin','hr','operations']}><WorkforceAvailability /></ProtectedRoute>} />

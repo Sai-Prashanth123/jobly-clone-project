@@ -18,7 +18,7 @@ import {
   CalendarCheck, CalendarClock, CalendarDays, KeyRound, Package, Mail,
   Megaphone, Users2, Receipt, Network,
   Star,
-  Shield, Gift, Calendar, DollarSign, TrendingUp, FileSearch, FileWarning,
+  Shield, Gift, Calendar, DollarSign, TrendingUp, FileSearch, FileCheck, FileWarning,
   Award, UserCheck, FileSpreadsheet, Gauge,
   HeartPulse, Scale, Gavel, LifeBuoy,
 } from 'lucide-react';
@@ -57,6 +57,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Add Employee',        path: '/portal/employees/new',       icon: <UserPlus className="h-4 w-4" />,        roles: ['admin','hr'], group: 'Core' },
   { label: 'Expiring Documents',  path: '/portal/expiring-documents',  icon: <FileWarning className="h-4 w-4" />,     roles: ['admin','hr'], badgeKey: 'expiringDocs', group: 'Core' },
   { label: 'Document Gaps',       path: '/portal/document-gaps',       permission: 'employees.view.document-gaps', icon: <FileSearch className="h-4 w-4" />,      roles: ['admin','hr'], group: 'Core' },
+  { label: 'Document Policy',     path: '/portal/document-policy',     permission: 'documentPolicy.manage',        icon: <FileCheck className="h-4 w-4" />,       roles: ['admin','hr'], group: 'Core' },
   // HR and the Project Manager were missing this, while clients.routes.ts has
   // always served them — the nav and the API simply disagreed, so the people
   // who place employees with clients could not open the client list at all.
