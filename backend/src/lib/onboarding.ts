@@ -225,7 +225,22 @@ function expiryFor(identityDocuments: unknown, key: string | undefined): string 
 }
 const numPositive = (v: unknown): boolean => v != null && !Number.isNaN(Number(v)) && Number(v) > 0;
 
-export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingResult {
+/**
+ * @param policyExtras the per-visa documents this work status requires, by
+ *   LABEL, resolved from the document-policy catalogue by the caller.
+ *
+ *   Passed in rather than read here so this function stays synchronous and
+ *   pure — it is called from five places including two that gate onboarding,
+ *   and making it async would ripple through all of them for no benefit. When
+ *   absent it falls back to the compiled-in VISA_REQUIRED_EXTRA_DOCS, so an
+ *   unreachable catalogue behaves exactly as before rather than demanding
+ *   nothing.
+ */
+export function computeOnboarding(
+  emp: any,
+  docTypes: Set<string>,
+  policyExtras?: string[],
+): OnboardingResult {
   const education: any[] = Array.isArray(emp.education) ? emp.education : [];
 
   const checks: OnboardingItem[] = [
@@ -329,7 +344,7 @@ export function computeOnboarding(emp: any, docTypes: Set<string>): OnboardingRe
     // just filled in.
     // Skips anything already demanded above so a document cannot appear twice
     // in the missing list (Visa for STEM OPT, Passport for Green Card).
-    ...((VISA_REQUIRED_EXTRA_DOCS[String(emp.visa_type ?? '')] ?? [])
+    ...((policyExtras ?? VISA_REQUIRED_EXTRA_DOCS[String(emp.visa_type ?? '')] ?? [])
       .filter(t => !(VISA_TYPES_REQUIRING_PASSPORT_I94.has(String(emp.visa_type ?? ''))
         && (VISA_CONDITIONAL_REQUIRED_DOCS as readonly string[]).includes(t)))
       .map(t => {

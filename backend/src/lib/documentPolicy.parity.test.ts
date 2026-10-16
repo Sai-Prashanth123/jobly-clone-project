@@ -183,3 +183,52 @@ describe('emptying a category', () => {
       .toBe(false);
   });
 });
+
+/**
+ * The gate's requirement list, resolved from the catalogue, must equal the
+ * list it enforces today — for every work status.
+ *
+ * This is the assertion that makes Phase 4 safe. computeOnboarding decides
+ * whether a real person can finish onboarding and start work; a list that is
+ * one document longer blocks somebody, one document shorter lets an
+ * incomplete file through. Mirrors policyExtrasFor() without the database.
+ */
+import {
+  VISA_REQUIRED_EXTRA_DOCS, ONBOARDING_REQUIRED_DOCS,
+  VISA_CONDITIONAL_REQUIRED_DOCS, IDENTITY_DOC_TYPE_LABELS,
+} from './onboarding';
+
+describe('the requirements the gate will enforce', () => {
+  const resolveFromPolicy = (visa: string): string[] => {
+    const index = buildPolicyIndex([], FALLBACK_POLICY);
+    const universal = new Set<string>(ONBOARDING_REQUIRED_DOCS);
+    const conditional = new Set<string>(VISA_CONDITIONAL_REQUIRED_DOCS);
+    const out: string[] = [];
+    for (const key of Object.keys(FALLBACK_POLICY)) {
+      if (index(key, visa) !== 'required') continue;
+      const label = (IDENTITY_DOC_TYPE_LABELS as Record<string, string>)[key];
+      if (!label || universal.has(label) || conditional.has(label)) continue;
+      out.push(label);
+    }
+    return out.sort();
+  };
+
+  it.each([...VISA_TYPES])('resolves the same extras as today for %s', visa => {
+    const today = [...(VISA_REQUIRED_EXTRA_DOCS[visa] ?? [])]
+      // The gate already drops anything the conditional block demands, so the
+      // comparison has to drop it too or stem_opt reads as one short.
+      .filter(l => !(VISA_CONDITIONAL_REQUIRED_DOCS as readonly string[]).includes(l))
+      .sort();
+    expect(resolveFromPolicy(visa)).toEqual(today);
+  });
+
+  // The failure that would matter most: a work status silently losing every
+  // requirement because the catalogue answered with an empty set.
+  it('never resolves to nothing for a status that requires something today', () => {
+    for (const visa of VISA_TYPES) {
+      const today = VISA_REQUIRED_EXTRA_DOCS[visa] ?? [];
+      if (today.length === 0) continue;
+      expect(resolveFromPolicy(visa).length, visa).toBeGreaterThan(0);
+    }
+  });
+});

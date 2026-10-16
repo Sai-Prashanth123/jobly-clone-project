@@ -4,6 +4,11 @@ import {
   type PolicyRow, type DocState,
 } from '../lib/documentPolicy';
 import { logActivity } from '../lib/activityLogger';
+import {
+  ONBOARDING_REQUIRED_DOCS,
+  VISA_CONDITIONAL_REQUIRED_DOCS,
+  IDENTITY_DOC_TYPE_LABELS,
+} from '../lib/onboarding';
 
 /**
  * Reading and writing the document-policy tables.
@@ -168,4 +173,34 @@ export async function setAliases(
     `${documentKey} · aliases`,
     { document: documentKey, from: (before as { aliases?: string[] } | null)?.aliases ?? [], to: aliases },
   );
+}
+
+/**
+ * The per-visa documents a work status requires, BY LABEL — the shape
+ * computeOnboarding wants.
+ *
+ * Only the extras: the universal four and the passport/visa/I-94 set are
+ * handled by their own blocks in the gate, and returning them here would make
+ * a document appear twice in the "still required" message.
+ */
+export async function policyExtrasFor(visaType: string): Promise<string[] | undefined> {
+  if (!visaType) return undefined;
+  const rows = await getRows();
+  // Nothing stored yet: let the gate use its compiled-in list rather than
+  // computing an empty requirement set from an empty table.
+  if (rows.length === 0) return undefined;
+
+  const index = buildPolicyIndex(rows, FALLBACK_POLICY);
+  const universal = new Set<string>(ONBOARDING_REQUIRED_DOCS);
+  const conditional = new Set<string>(VISA_CONDITIONAL_REQUIRED_DOCS);
+
+  const labels: string[] = [];
+  for (const key of Object.keys(FALLBACK_POLICY)) {
+    if (index(key, visaType) !== 'required') continue;
+    const label = IDENTITY_DOC_TYPE_LABELS[key];
+    if (!label) continue;                        // employer rows have no entry
+    if (universal.has(label) || conditional.has(label)) continue;
+    labels.push(label);
+  }
+  return labels;
 }

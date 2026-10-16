@@ -14,6 +14,7 @@ import * as casesService from './cases.service';
 import { storageProvider } from '../lib/storage';
 import { withoutEmployerManagedDocs } from '../lib/employerDocs';
 import { generateTempPassword } from '../lib/tempPassword';
+import { policyExtrasFor } from './documentPolicy.service';
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
 function serializeEmployee(emp: any) {
@@ -704,7 +705,8 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
       .from('documents').select('type').eq('entity_type', 'employee').eq('entity_id', id);
     const docTypes = new Set<string>((docs ?? []).map((d: any) => d.type));
     const { data: empFull } = await supabaseAdmin.from('employees').select('*').eq('id', id).single();
-    const ob = computeOnboarding(empFull ?? existing, docTypes);
+    const subject = empFull ?? existing;
+    const ob = computeOnboarding(subject, docTypes, await policyExtrasFor(String((subject as { visa_type?: string }).visa_type ?? '')));
     if (!ob.complete) {
       throw new ValidationError(
         `Cannot approve: employee's onboarding is only ${ob.percent}% complete. Still required: ${ob.missing.join(', ')}`,
@@ -1068,7 +1070,11 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
     .from('documents').select('type').eq('entity_type', 'employee').eq('entity_id', id);
   const docTypes = new Set<string>((docs ?? []).map((d: any) => d.type));
 
-  const result = computeOnboarding(emp, docTypes);
+  // The requirements the catalogue holds for this work status, so a change HR
+  // makes on the Document Policy screen takes effect on the next submission
+  // rather than the next deploy. Undefined when the table is empty or
+  // unreachable, and the compiled-in list applies.
+  const result = computeOnboarding(emp, docTypes, await policyExtrasFor(String(emp.visa_type ?? '')));
   if (!result.complete) {
     // Surface the structured missing-items list under `details` so the
     // frontend can render clickable jump-to-section chips. The string message
