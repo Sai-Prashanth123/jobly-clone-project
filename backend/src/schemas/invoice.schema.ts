@@ -20,6 +20,11 @@ const lineItemSchema = z.object({
   quantity: z.number().min(0).default(1),
   unitPrice: z.number().min(0).default(0),
   productId: z.string().uuid().optional().nullable(),
+  // Who the line is FOR. invoice_line_items.employee_id already existed and
+  // getInvoice already resolves a name from it — only the create path never
+  // accepted one, so a manual line could name an employee in free text and
+  // the invoice had no idea which employee that was.
+  employeeId: z.string().uuid().optional().nullable(),
 });
 
 // Document-level discount (Wave's "Add a discount"): percentage or fixed amount,

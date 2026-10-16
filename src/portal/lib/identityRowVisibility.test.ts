@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { IDENTITY_DOC_ROWS, ROW_VISA_GATE, ROW_VISA_EXCLUDE } from './documentTypes';
+import { IDENTITY_DOC_ROWS, ROW_VISA_GATE, ROW_VISA_EXCLUDE, getRequiredIdentityTypes } from './documentTypes';
 
 /**
  * Which identity rows an employee is shown, per visa type.
@@ -125,5 +125,57 @@ describe('no I-140 row survives for a permanent resident', () => {
     for (const row of ['i140', 'i140_approval_notice']) {
       expect(isShown(row, 'h1b'), row).toBe(true);
     }
+  });
+});
+
+/**
+ * "The documents listed under each category still have some gaps... or the
+ * easy way is you can enable the Yes or No options so that the resource can
+ * opt out based on their category."
+ *
+ * The per-visa lists will always be slightly wrong for somebody, so every
+ * OPTIONAL row now asks "do you have this?" before asking for the file.
+ * Required rows never ask: an opt-out there would be a way around the
+ * onboarding gate rather than a convenience.
+ */
+describe('which rows may be opted out of', () => {
+  const asksHolding = (type: string, visa: string) => {
+    const required = REQUIRED_SET(visa).includes(type);
+    const isEmployerRow = ['e_verify_letter', 'lca_copy', 'i129', 'i140_employer'].includes(type);
+    return !required && !isEmployerRow;
+  };
+  // Mirrors getRequiredIdentityTypes without importing the whole wizard.
+  function REQUIRED_SET(visa: string): string[] {
+    return getRequiredIdentityTypes(visa);
+  }
+
+  it('never offers an opt-out on a required document', () => {
+    for (const visa of ['h1b', 'opt', 'stem_opt', 'gc', 'citizen']) {
+      for (const type of getRequiredIdentityTypes(visa)) {
+        expect(asksHolding(type, visa), `${type} for ${visa}`).toBe(false);
+      }
+    }
+  });
+
+  it('offers it on an optional one', () => {
+    // green_card is optional for an L-1; i20 is not required for an H-1B.
+    expect(asksHolding('green_card', 'l1')).toBe(true);
+    expect(asksHolding('i20', 'h1b')).toBe(true);
+  });
+
+  it('never offers it on employer-issued paperwork', () => {
+    expect(asksHolding('e_verify_letter', 'h1b')).toBe(false);
+    expect(asksHolding('lca_copy', 'h1b')).toBe(false);
+  });
+
+  // The point of the change: a document the category list got wrong is one
+  // the employee can decline rather than be blocked by.
+  it('lets an employee decline anything not demanded of them', () => {
+    const optionalForGc = IDENTITY_DOC_ROWS
+      .filter(r => isShown(r.type, 'gc'))
+      .filter(r => !getRequiredIdentityTypes('gc').includes(r.type))
+      .filter(r => !['e_verify_letter', 'lca_copy'].includes(r.type));
+    expect(optionalForGc.length).toBeGreaterThan(0);
+    for (const r of optionalForGc) expect(asksHolding(r.type, 'gc'), r.type).toBe(true);
   });
 });

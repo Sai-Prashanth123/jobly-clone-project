@@ -343,7 +343,7 @@ ${showCreds ? `
 <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
     <a href="${esc(PORTAL_URL)}/portal/login" style="display:inline-block;background:#4069FF;color:#ffffff;text-decoration:none;font-size:14px;font-weight:600;padding:13px 36px;border-radius:8px;">
-      Log In to Jobly Portal &rarr;
+      Log In to Jobly Solutions &rarr;
     </a>
   </td></tr>
 </table>
@@ -353,8 +353,8 @@ ${showCreds ? `
 <p style="margin:0;color:#9ca3af;font-size:13px;line-height:1.6;text-align:center;">Questions? Reach out to your HR team for assistance.</p>`;
 
   const html = emailShell({
-    previewText: showCreds ? `Welcome ${firstName}! Your Jobly Portal credentials are ready.` : `Your Jobly Portal account — ${firstName} ${lastName}`,
-    title: showCreds ? 'Welcome to Jobly Portal' : 'Your Jobly Portal Account',
+    previewText: showCreds ? `Welcome ${firstName}! Your Jobly Solutions credentials are ready.` : `Your Jobly Solutions account — ${firstName} ${lastName}`,
+    title: showCreds ? 'Welcome to Jobly Solutions' : 'Your Jobly Solutions Account',
     subtitle: showCreds ? 'Your employee account is ready — log in to complete your onboarding.' : 'Account update from Jobly Solutions.',
     body: welcomeBody,
   });
@@ -365,7 +365,7 @@ ${showCreds ? `
   await sendWithRetry({
     from: FROM,
     to,
-    subject: subject ?? (showCreds ? `Welcome to Jobly Portal — ${displayId ?? ''}` : 'Your Jobly Portal account'),
+    subject: subject ?? (showCreds ? `Welcome to Jobly Solutions — ${displayId ?? ''}` : 'Your Jobly Solutions account'),
     html,
   });
 }
@@ -841,7 +841,7 @@ ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentati
   </td></tr>
 </table>` : ''}
 
-<p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6;text-align:center;">Review this timesheet in the Jobly Portal under <strong style="color:#6b7280;">Attendance Review</strong>.</p>`;
+<p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6;text-align:center;">Review this timesheet in the Jobly Solutions under <strong style="color:#6b7280;">Attendance Review</strong>.</p>`;
 
   const html = emailShell({
     previewText: `Timesheet submitted — ${employeeName} (${employeeDisplayId}) — ${monthLabel}`,

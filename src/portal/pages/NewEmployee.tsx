@@ -866,7 +866,21 @@ export default function NewEmployee() {
   // Answering Yes reveals it. An employee who has already uploaded one is
   // treated as Yes and is not asked, so the toggle can never orphan a file
   // that is already on record.
-  const OPTIONAL_HOLDING_ROWS = new Set(['green_card']);
+  // Every OPTIONAL row asks "do you have this?" before asking for the file.
+  //
+  // "The documents listed under each category still have some gaps... or the
+  // easy way is you can enable the Yes or No options so that the resource can
+  // opt out based on their category." That is the better answer, and it is
+  // also the robust one: the per-visa lists will always be slightly wrong for
+  // somebody, and a row the employee can answer "no" to stops being a
+  // demand they cannot satisfy.
+  //
+  // REQUIRED rows never ask. Those are the ones HR genuinely needs, and an
+  // opt-out there would be a way around the onboarding gate rather than a
+  // convenience. So the toggle only ever appears where the answer is already
+  // allowed to be "nothing".
+  const asksHoldingRow = (row: IdentityDocRow, required: boolean) =>
+    !required && !EMPLOYER_DOC_ROWS.some(r => r.type === row.type);
 
   const renderIdentityDocRow = (row: IdentityDocRow) => {
     const file = form.identityDocFiles[row.type];
@@ -893,7 +907,7 @@ export default function NewEmployee() {
     // you never provided.
     const expiryWithoutFile = isOnboarding && row.hasExpiry && !!expiryVal && !fileOrUploaded;
     // Default: Yes when something is already on file, otherwise unanswered.
-    const asksHolding = OPTIONAL_HOLDING_ROWS.has(row.type);
+    const asksHolding = asksHoldingRow(row, isRequired);
     const holdingAnswer = form.identityDocHolding[row.type] ?? (fileOrUploaded ? 'yes' : undefined);
     const hideUpload = asksHolding && holdingAnswer !== 'yes';
     const isMissing = !hideUpload && isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile);
@@ -910,7 +924,7 @@ export default function NewEmployee() {
           {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
           {asksHolding && (
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-[11px] text-gray-500">Do they hold this?</span>
+              <span className="text-[11px] text-gray-500">{isSelfEdit ? 'Do you have this?' : 'Do they hold this?'}</span>
               {(['yes', 'no'] as const).map(answer => (
                 <button
                   key={answer}
@@ -2824,15 +2838,25 @@ export default function NewEmployee() {
             </div>
           </SectionCard>
 
-          {/* 11 Payroll & Tax */}
+          {/* 11 Payroll & Tax — bank details only when the employee is
+              filling it in themselves, since an employee sees none of the pay
+              fields and calling the section "Payroll & Tax" promised them a
+              pay conversation that is not theirs to have here. */}
           <SectionCard
             id={SECTION_IDS.payroll}
             complete={sectionComplete[SECTION_IDS.payroll]}
             num="11"
-            title="Payroll & Tax"
+            title={isSelfEdit ? 'Bank Details' : 'Payroll & Tax'}
             description="Direct deposit details for ACH payroll. Have a void cheque or bank letter ready for verification."
             icon={<Wallet className="h-4 w-4 text-[#4069FF]" />}
           >
+            {/* Pay rate, pay type, payment type and tax form are HR's to set,
+                and an employee filling in their own onboarding was being asked
+                for all four. The server already ignores them from an employee
+                (HR_ONLY_EMPLOYEE_FIELDS), so the form was collecting answers
+                that were then thrown away. Bank details below stay — ACH needs
+                them and the employee is the only one who can supply them. */}
+            {!isSelfEdit && (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <Label>Pay Rate (USD)</Label>
@@ -2874,6 +2898,7 @@ export default function NewEmployee() {
                 </Select>
               </div>
             </div>
+            )}
 
             <Separator className="my-5" />
 

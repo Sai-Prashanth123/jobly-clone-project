@@ -354,6 +354,7 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
       item_name: li.itemName ?? null,
       description: li.description ?? li.itemName ?? '',
       product_id: li.productId ?? null,
+      employee_id: li.employeeId ?? null,
       quantity: qty,
       hours: qty,           // kept for PDF/legacy columns (qty shown in the hours column)
       bill_rate: price,     // unit price shown in the rate column
@@ -537,6 +538,7 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
       return {
         invoice_id: id,
         item_name: li.itemName ?? null,
+        employee_id: li.employeeId ?? null,
         description: li.description ?? li.itemName ?? '',
         product_id: li.productId ?? null,
         quantity: qty,
@@ -980,6 +982,7 @@ function buildInvoicePdfData(inv: any, client: any): InvoicePDFData {
     currency: inv.currency ?? 'USD',
     lineItems: (inv.invoice_line_items ?? []).map((li: Record<string, unknown>) => ({
       itemName: li.item_name ? String(li.item_name) : undefined,
+      employeeId: li.employee_id ? String(li.employee_id) : undefined,
       description: String(li.description ?? ''),
       quantity: Number(li.quantity ?? li.hours ?? 0),
       unitPrice: Number(li.bill_rate ?? 0),

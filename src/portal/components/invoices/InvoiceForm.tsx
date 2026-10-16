@@ -42,7 +42,7 @@ export interface InvoiceFormInitial {
   notes?: string;
   terms?: string;
   attachments?: InvoiceAttachment[];
-  lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number }[];
+  lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number; employeeId?: string }[];
 }
 
 export interface InvoiceFormHandle {
@@ -79,13 +79,14 @@ function addDays(dateIso: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-interface DraftLine { id: string; itemName: string; description: string; quantity: string; unitPrice: string }
-const blankLine = (): DraftLine => ({ id: crypto.randomUUID(), itemName: '', description: '', quantity: '1', unitPrice: '' });
+interface DraftLine { id: string; itemName: string; description: string; quantity: string; unitPrice: string; employeeId: string }
+const blankLine = (): DraftLine => ({ id: crypto.randomUUID(), itemName: '', description: '', quantity: '1', unitPrice: '', employeeId: '' });
 const linesFromInitial = (initial?: InvoiceFormInitial): DraftLine[] => {
   if (!initial?.lineItems?.length) return [blankLine()];
   return initial.lineItems.map(li => ({
     id: crypto.randomUUID(),
     itemName: li.itemName ?? '',
+    employeeId: li.employeeId ?? '',
     description: li.description ?? '',
     quantity: String(li.quantity ?? 1),
     unitPrice: li.unitPrice != null ? String(li.unitPrice) : '',
@@ -147,7 +148,10 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   const { data: tsData } = useTimesheets({
     limit: 200, status: 'manager_approved', clientId: clientId || undefined, excludeInvoiced: true,
   }, { enabled: needsTimesheetData });
-  const { data: empData } = useEmployees({ limit: 500 }, { enabled: needsTimesheetData });
+  // Loaded unconditionally: the manual lines need the picker too, and asking
+  // only when timesheet data was needed is why there was no dropdown to pick
+  // an employee from on a new invoice.
+  const { data: empData } = useEmployees({ limit: 500 });
   const { data: assignData } = useAssignments({ limit: 200 }, { enabled: needsTimesheetData });
 
   const { data: invoiceThemes } = useInvoiceTemplates();
@@ -264,6 +268,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
         itemName: l.itemName || null,
         description: l.description || null,
         quantity: l.qty,
+        employeeId: l.employeeId || undefined,
         unitPrice: l.price,
       })),
     });
@@ -403,12 +408,33 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                   key={l.id}
                   className="rounded-lg border border-gray-200 p-3 space-y-2 sm:space-y-0 sm:border-0 sm:p-0 sm:rounded-none sm:grid sm:grid-cols-[1.4fr_2fr_70px_110px_90px_32px] sm:gap-2 sm:items-center"
                 >
-                  <Input value={l.itemName} onChange={e => updateLine(l.id, { itemName: e.target.value })} placeholder="Item / service" />
+                  {/* Pick the employee rather than typing their name. Choosing
+                      one fills the item name, which stays editable for lines
+                      that are not about a person at all. */}
+                  <Select
+                    value={l.employeeId || '__none__'}
+                    onValueChange={v => {
+                      if (v === '__none__') { updateLine(l.id, { employeeId: '' }); return; }
+                      const emp = employees.find(e => e.id === v);
+                      updateLine(l.id, {
+                        employeeId: v,
+                        itemName: emp ? `${emp.firstName} ${emp.lastName}` : l.itemName,
+                      });
+                    }}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Employee" /></SelectTrigger>
+                    <SelectContent className="max-h-[280px]">
+                      <SelectItem value="__none__">— No employee —</SelectItem>
+                      {employees.map(e => (
+                        <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Input value={l.description} onChange={e => updateLine(l.id, { description: e.target.value })} placeholder="Description" />
                   {/* Qty + unit price: 2-up on mobile, separate grid cells on desktop */}
                   <div className="grid grid-cols-2 gap-2 sm:contents">
-                    <Input type="number" min={0} step="any" inputMode="decimal" value={l.quantity} onChange={e => updateLine(l.id, { quantity: e.target.value })} placeholder="Qty" aria-label="Quantity" />
-                    <Input type="number" min={0} step="any" inputMode="decimal" value={l.unitPrice} onChange={e => updateLine(l.id, { unitPrice: e.target.value })} placeholder="Unit price" aria-label="Unit price" />
+                    <Input type="number" min={0} step="any" inputMode="decimal" value={l.quantity} onChange={e => updateLine(l.id, { quantity: e.target.value })} placeholder="Hours" aria-label="Hours" />
+                    <Input type="number" min={0} step="any" inputMode="decimal" value={l.unitPrice} onChange={e => updateLine(l.id, { unitPrice: e.target.value })} placeholder="Rate" aria-label="Rate" />
                   </div>
                   {/* Amount + remove: labelled row on mobile, separate cells on desktop */}
                   <div className="flex items-center justify-between sm:contents">
