@@ -15,6 +15,16 @@ interface MultiFileUploadSlotProps {
   maxFiles: number;
   onAdd: (file: File) => void;
   onRemoveStaged: (idx: number) => void;
+  /**
+   * Delete a file that is already saved against the employee.
+   *
+   * Optional because the wizard has nothing to delete yet — on a new employee
+   * every file is still staged. Passed in edit mode, where the same slot had
+   * no way at all to remove a saved file: one employee uploaded the same PDF
+   * eight times and neither they nor HR could clear the duplicates, despite
+   * both having permission to. The only delete lived on the Documents page.
+   */
+  onRemoveExisting?: (doc: ExistingDoc) => void;
   accept?: string;
 }
 
@@ -23,7 +33,8 @@ interface MultiFileUploadSlotProps {
  * staged-but-unsaved files as chips, with an "Add another" control that
  * disappears once existingDocs + stagedFiles reaches maxFiles. */
 export function MultiFileUploadSlot({
-  inputId, existingDocs, stagedFiles, maxFiles, onAdd, onRemoveStaged, accept = IDENTITY_DOC_ACCEPT,
+  inputId, existingDocs, stagedFiles, maxFiles, onAdd, onRemoveStaged, onRemoveExisting,
+  accept = IDENTITY_DOC_ACCEPT,
 }: MultiFileUploadSlotProps) {
   const total = existingDocs.length + stagedFiles.length;
   const atLimit = total >= maxFiles;
@@ -38,6 +49,15 @@ export function MultiFileUploadSlot({
                 On file
               </span>
               <span className="text-gray-500 truncate" title={doc.name}>{doc.name}</span>
+              {onRemoveExisting && doc.id && (
+                <button
+                  type="button"
+                  onClick={() => onRemoveExisting(doc)}
+                  className="text-red-600 hover:text-red-700 underline-offset-2 hover:underline ml-auto flex-shrink-0"
+                >
+                  Delete
+                </button>
+              )}
             </li>
           ))}
           {stagedFiles.map((file, i) => (

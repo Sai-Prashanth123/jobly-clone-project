@@ -18,7 +18,9 @@ import { MultiFileUploadSlot } from '../components/employees/MultiFileUploadSlot
 import { PageHeader } from '../components/shared/PageHeader';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { UsDateInput } from '../components/shared/UsDateInput';
-import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding } from '../hooks/useEmployees';
+import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding, useDeleteEmployeeDocument } from '../hooks/useEmployees';
+import { ConfirmDialog } from '../components/shared/ConfirmDialog';
+import { getApiErrorMessage } from '../lib/apiError';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput, formatUsPhone, formatZip, IDENTITY_DOC_ACCEPT, validateIdentityDocFile } from '../lib/utils';
@@ -937,6 +939,21 @@ export default function NewEmployee() {
       multiIdentityDocFiles: { ...p.multiIdentityDocFiles, [type]: [...(p.multiIdentityDocFiles[type] ?? []), file] },
     }));
   };
+
+  /**
+   * Deleting a file that is already saved.
+   *
+   * Only in edit mode: on a new employee nothing has been saved yet, so every
+   * file is staged and onRemoveStaged already covers it.
+   *
+   * This deletes immediately rather than on Save. The alternative — marking it
+   * and applying on submit — would leave the slot's count wrong until save,
+   * and the slot refuses new uploads at its maximum. Somebody clearing eight
+   * duplicates to upload the right file would be stuck behind a limit counting
+   * files they had already asked to remove.
+   */
+  const deleteSavedDoc = useDeleteEmployeeDocument(editId ?? '');
+  const [docPendingDelete, setDocPendingDelete] = useState<{ id: string; name: string } | null>(null);
   const removeMultiIdentityDocFile = (type: string, idx: number) => {
     setForm(p => ({
       ...p,
@@ -1188,6 +1205,9 @@ export default function NewEmployee() {
             maxFiles={row.maxFiles ?? 3}
             onAdd={f => addMultiIdentityDocFile(row.type, f)}
             onRemoveStaged={idx => removeMultiIdentityDocFile(row.type, idx)}
+            onRemoveExisting={isEditMode && editId
+              ? doc => setDocPendingDelete({ id: doc.id!, name: doc.name ?? 'this document' })
+              : undefined}
           />
         ) : (
           <>
@@ -3161,6 +3181,30 @@ export default function NewEmployee() {
           <div className="portal-top-progress h-full bg-gradient-to-r from-[#4069FF] via-[#32CDDC] to-[#4069FF]" />
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!docPendingDelete}
+        onOpenChange={open => { if (!open) setDocPendingDelete(null); }}
+        title="Delete this document?"
+        description={docPendingDelete
+          ? `${docPendingDelete.name} will be removed from this employee's record. This cannot be undone.`
+          : ''}
+        confirmLabel="Delete"
+        destructive
+        loading={deleteSavedDoc.isPending}
+        onConfirm={async () => {
+          if (!docPendingDelete) return;
+          try {
+            await deleteSavedDoc.mutateAsync(docPendingDelete.id);
+            toast.success(`${docPendingDelete.name} deleted`);
+          } catch (err) {
+            const { title, description } = getApiErrorMessage(err);
+            toast.error(title, { description });
+          } finally {
+            setDocPendingDelete(null);
+          }
+        }}
+      />
     </div>
   );
 }
