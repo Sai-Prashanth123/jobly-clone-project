@@ -78,6 +78,8 @@ export const FALLBACK_GRANTS: Record<string, readonly string[]> = Object.freeze(
   'employees.create': ['admin', 'hr'],
   'employees.create.id-dependents-dependentId-passport': ['admin', 'employee', 'hr'],
   'employees.create.id-documents': ['admin', 'employee', 'hr'],
+  'employees.create.id-documents-register': ['admin', 'employee', 'hr'],
+  'employees.create.id-documents-upload-url': ['admin', 'employee', 'hr'],
   'employees.create.id-onboarding-complete': ['admin', 'employee', 'hr'],
   'employees.create.id-onboarding-reopen': ['admin', 'employee', 'hr'],
   'employees.create.id-photo': ['admin', 'employee', 'hr'],

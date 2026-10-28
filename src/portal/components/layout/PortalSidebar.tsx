@@ -79,7 +79,9 @@ const NAV_ITEMS: NavItem[] = [
   // still hardcoded: until ProtectedRoute reads the session's permissions, a
   // grant made on the screen needs a matching change here, which is the next
   // piece of work on the permissions project.
-  { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','hr','operations','finance'], group: 'Core' },
+  // The badge counts overdue invoices and the server returns 0 for anyone but
+  // admin/finance, so hr and operations see the item without the count.
+  { label: 'Invoices',            path: '/portal/invoices',            icon: <FileText className="h-4 w-4" />,        roles: ['admin','hr','operations','finance'], badgeKey: 'overdueInvoices', group: 'Core' },
   { label: 'Templates',           path: '/portal/templates',           icon: <Mail className="h-4 w-4" />,            roles: ['admin','finance'], group: 'Core' },
   { label: 'Documents',           path: '/portal/documents',           icon: <FolderOpen className="h-4 w-4" />,      roles: ['admin','hr','employee'], group: 'Core' },
   { label: 'Reports',             path: '/portal/reports',             icon: <BarChart3 className="h-4 w-4" />,       roles: ['admin','finance','hr'], group: 'Core' },

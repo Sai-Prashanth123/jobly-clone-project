@@ -1083,6 +1083,11 @@ CREATE TABLE public.invoices (
     converted_invoice_id uuid,
     recurring_template_id uuid,
     last_reminder_at timestamp with time zone,
+    reminder_count integer DEFAULT 0 NOT NULL,
+    reminded_offsets text[] DEFAULT '{}'::text[] NOT NULL,
+    auto_generated boolean DEFAULT false NOT NULL,
+    blockers text[] DEFAULT '{}'::text[] NOT NULL,
+    blockers_ack_at timestamp with time zone,
     discount_type text,
     discount_value numeric(12,2) DEFAULT 0 NOT NULL,
     discount_amount numeric(12,2) DEFAULT 0 NOT NULL,
@@ -4244,3 +4249,40 @@ INSERT INTO public.roles (key, label, is_builtin) VALUES
   ('admin', 'Admin', true), ('hr', 'HR', true), ('operations', 'Project Manager', true),
   ('finance', 'Finance', true), ('legal', 'Legal', true), ('employee', 'Employee', true)
 ON CONFLICT (key) DO NOTHING;
+
+-- Document catalogue (migrations 055, 058). Which documents exist, who issues
+-- them, how they group, and what each work status needs from each one.
+-- Mirrored here because rds/schema.sql is the authoritative schema for the RDS
+-- target and these two tables were left out when 055 was applied; a database
+-- rebuilt from this file alone would have had no catalogue at all, and the
+-- onboarding gate would have silently fallen back to the compiled-in policy.
+-- DDL only -- the seed stays in the migrations, exactly as it does for 052.
+
+CREATE TABLE IF NOT EXISTS public.document_types (
+  key         text PRIMARY KEY,
+  label       text NOT NULL,
+  -- 'employee' or 'employer'. An employer-issued document is never REQUIRED of
+  -- an employee: they cannot produce an LCA, and demanding one would make
+  -- onboarding impossible to finish.
+  issued_by   text NOT NULL DEFAULT 'employee',
+  has_expiry  boolean NOT NULL DEFAULT false,
+  -- Other names the same document has been filed under. documents.type is free
+  -- text, so one document collects spellings; a spelling missing here is
+  -- invisible to the onboarding check and the employee is asked for something
+  -- they have already uploaded.
+  aliases     text[] NOT NULL DEFAULT '{}',
+  sort_order  integer NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  -- Display grouping: identity, work_auth, questionnaire, employment,
+  -- background, project, employer. Editable by HR on the Document Policy page.
+  category    text NOT NULL DEFAULT 'project'
+);
+
+CREATE TABLE IF NOT EXISTS public.document_requirements (
+  document_key text NOT NULL REFERENCES public.document_types(key) ON DELETE CASCADE,
+  visa_type    text NOT NULL,
+  -- 'required' | 'optional' | 'hidden'
+  state        text NOT NULL DEFAULT 'optional',
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (document_key, visa_type)
+);

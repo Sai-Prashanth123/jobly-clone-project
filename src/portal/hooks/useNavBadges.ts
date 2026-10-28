@@ -12,12 +12,13 @@ interface NavBadgeCounts {
   expenses: number;
   attendanceReview: number;
   expiringDocs: number;
+  overdueInvoices: number;
   announcements: number;
 }
 
 const ZERO: NavBadgeCounts = {
   timesheets: 0, leaveRequests: 0, expenses: 0,
-  attendanceReview: 0, expiringDocs: 0, announcements: 0,
+  attendanceReview: 0, expiringDocs: 0, overdueInvoices: 0, announcements: 0,
 };
 
 export function useNavBadges(role: string): Record<string, number> {

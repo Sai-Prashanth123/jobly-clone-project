@@ -89,10 +89,15 @@ function PersonCard({
           </span>
         </span>
 
+        {/* Work status is deliberately NOT a chip here. The org chart is the
+            one page in the portal that puts everybody on a single screen, so a
+            visa badge on every card broadcasts each person's immigration
+            status to anyone glancing at it — including over a shoulder in a
+            meeting. It is still one click away on the person's panel, where it
+            is read on purpose rather than in passing. */}
         <span className="mt-2 flex flex-wrap gap-1">
           {person.displayId && <Chip>{person.displayId}</Chip>}
           {person.department && <Chip tone="blue">{person.department}</Chip>}
-          {person.visaType && <Chip tone="violet">{person.visaType.toUpperCase()}</Chip>}
         </span>
 
         {/* Deliberately no rate: assignments are not redacted for operations,

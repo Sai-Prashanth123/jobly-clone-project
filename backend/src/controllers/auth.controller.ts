@@ -24,12 +24,37 @@ export interface OnboardingGateState {
 //                → approved (HR set status 'active').
 // Everyone else is always 'approved' (never gated).
 async function computeOnboardingState(role?: string, employeeId?: string | null): Promise<OnboardingGateState> {
-  if (role !== 'employee' || !employeeId) return { status: 'approved' };
-  const { data: emp } = await supabaseAdmin
+  if (role !== 'employee') return { status: 'approved' };
+
+  // An employee login with no linked employee record has nothing to onboard,
+  // and 'approved' here is what lets somebody into the portal. Logged loudly
+  // rather than changed, because gating it would lock out any legitimate
+  // account in this state and the wizard needs an employee id to write to.
+  if (!employeeId) {
+    console.warn('[auth] employee login with no linked employee record; onboarding gate skipped', { employeeId });
+    return { status: 'approved' };
+  }
+
+  const { data: emp, error: empError } = await supabaseAdmin
     .from('employees')
     .select('status, onboarding_completed_at, onboarding_change_request_message, onboarding_change_requested_at')
     .eq('id', employeeId).maybeSingle();
-  if (!emp) return { status: 'approved' };
+
+  // This read decides whether somebody must finish onboarding before using the
+  // portal. Discarding its error made a failed query indistinguishable from
+  // "no such employee", and both resolved to 'approved' — i.e. a database
+  // hiccup silently waved people straight past the gate. Treat a failure as
+  // "not yet approved": the worst case is being asked to finish onboarding
+  // again, which is recoverable, rather than skipping it, which is not.
+  if (empError) {
+    console.error('[auth] could not read the employee behind this login; holding at the onboarding gate', empError);
+    return { status: 'in_progress' };
+  }
+
+  if (!emp) {
+    console.warn('[auth] employee login points at a missing employee record; onboarding gate skipped', { employeeId });
+    return { status: 'approved' };
+  }
   if (emp.status === 'active') return { status: 'approved' };
   // HR has asked the employee to revise: status is still 'onboarding' (we
   // didn't add a new enum value), but the change-request message is set and

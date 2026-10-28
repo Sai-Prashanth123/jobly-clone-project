@@ -84,6 +84,7 @@ export function DataTable<T>({
   // so we only re-run when the selection itself changes. This prevents parent
   // re-renders (parents rarely memoize onSelectionChange) from causing an
   // effect loop, while still seeing the latest data at notify-time.
+  const topRef = useRef<HTMLDivElement>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const dataRef = useRef(data);
   const getRowKeyRef = useRef(getRowKey);
@@ -206,12 +207,32 @@ export function DataTable<T>({
     URL.revokeObjectURL(url);
   }, [sorted, columns, exportFilename]);
 
+  /**
+   * Page 2 used to open wherever page 1 was left scrolled to — usually the
+   * middle of the list, so the first rows of the new page were above the fold
+   * and it looked like the table had jumped.
+   *
+   * Scrolls the TABLE back into view, not the window to 0: these tables sit
+   * under a page header and filters, and sending the window to the top would
+   * push the data further away on a long page. Skipped when the table is
+   * already fully visible, so short lists do not twitch.
+   */
+  const goToPage = useCallback((next: number) => {
+    setPage(next);
+    const el = topRef.current;
+    if (!el) return;
+    const { top } = el.getBoundingClientRect();
+    if (top < 0 || top > window.innerHeight * 0.4) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, []);
+
   const visibleColumns = selectable
     ? [{ key: '__select__', header: '', render: undefined } as Column<T>, ...columns]
     : columns;
 
   return (
-    <div className="space-y-3 sm:space-y-4">
+    <div className="space-y-3 sm:space-y-4" ref={topRef}>
       {/* Search + filters + export */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3">
         <div className="relative flex-1 sm:max-w-sm">
@@ -384,7 +405,7 @@ export function DataTable<T>({
         <Pagination
           page={safePage}
           totalPages={totalPages}
-          onPageChange={setPage}
+          onPageChange={goToPage}
           summary={`Showing ${start + 1}–${Math.min(start + pageSize, sorted.length)} of ${sorted.length}`}
           pageSize={pageSize}
           onPageSizeChange={n => { setPageSize(n); setPage(1); }}

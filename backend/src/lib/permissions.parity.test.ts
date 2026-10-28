@@ -34,7 +34,13 @@ describe('the route scan itself', () => {
   // happened twice while building this: aliased guards hid 44 routes and
   // router.use guards hid 39 more.
   it('finds every guarded route', () => {
-    expect(routes.length).toBe(268);
+    // 273: + the two presigned-upload routes on employees (upload-url, register)
+    // and POST /invoices/:id/acknowledge-blockers, which reuses invoices.manage.
+    // They carry their own derived keys rather than sharing the multipart
+    // route's, so the catalogue and the runtime check agree. It reuses the existing
+    // invoices.manage key, whose role set is already exactly admin+finance, so
+    // the generated grants are unchanged — only the count moves.
+    expect(routes.length).toBe(273);
   });
 
   it('resolves roles for every route it reports', () => {
