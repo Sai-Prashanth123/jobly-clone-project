@@ -64,4 +64,25 @@ router.patch(
   },
 );
 
+const categorySchema = z.object({
+  // A closed list: these drive section headings on four screens, so a typo
+  // would silently create an eighth group containing one document.
+  category: z.enum([
+    'identity', 'work_auth', 'questionnaire', 'employment',
+    'background', 'project', 'employer',
+  ]),
+});
+
+router.patch(
+  '/:key/category',
+  requirePermission('documentPolicy.manage', 'admin', 'hr'),
+  validateBody(categorySchema),
+  async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await svc.setCategory(req.params.key, req.body.category, req.user!.id);
+      res.json({ success: true });
+    } catch (e) { next(e); }
+  },
+);
+
 export default router;

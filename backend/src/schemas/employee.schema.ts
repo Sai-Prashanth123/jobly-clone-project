@@ -51,6 +51,14 @@ export const identityDocumentEntrySchema = z.object({
   number: z.string().optional().default(''),
   state: z.string().optional().default(''),    // e.g. issuing state for DL/State ID
   expiry: z.string().optional().default(''),   // for passport / EAD
+  // The answer to "do you have this?" for an optional document. Zod strips
+  // unknown keys, so without this line the wizard's answer was discarded on
+  // the way in and the question had to be asked again on every visit.
+  //
+  // Deliberately no .default(): the states are yes / no / never-asked, and a
+  // default would erase the third. Advisory only — nothing that decides
+  // whether onboarding can complete reads it.
+  held: z.enum(['yes', 'no']).optional(),
 });
 
 // H-4 dependents (H1B holder's spouse/children). Unlike its sibling JSONB

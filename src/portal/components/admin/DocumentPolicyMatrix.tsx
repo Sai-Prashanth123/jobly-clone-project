@@ -8,9 +8,10 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  useDocumentPolicy, useSetDocumentState, useSetDocumentAliases,
+  useDocumentPolicy, useSetDocumentState, useSetDocumentAliases, useSetDocumentCategory,
   type DocState, type PolicyDocument,
 } from '../../hooks/useDocumentPolicy';
+import { DOCUMENT_CATEGORIES, DOCUMENT_CATEGORY_LABELS, DOCUMENT_CATEGORY_ORDER } from '../../lib/documentTypes';
 
 /**
  * Which documents each work status needs — editable.
@@ -59,14 +60,31 @@ export function DocumentPolicyMatrix() {
   // Employee documents first — they are what the wizard asks for and what
   // anyone opening this screen came to change. Employer-issued paperwork is a
   // different conversation and sits underneath.
+  // Grouped by subject rather than by who issues the document. The old
+  // two-way employee/employer split put a passport, a PERM questionnaire and a
+  // pay stub in one undifferentiated list of 33 — which is how two rows for
+  // the LCA, one on each side of that split, went unnoticed. Employer-issued
+  // paperwork is still its own group, and still last.
   const groups = useMemo(() => {
-    const employee = (data?.documents ?? []).filter(d => d.issuedBy !== 'employer');
-    const employer = (data?.documents ?? []).filter(d => d.issuedBy === 'employer');
-    return [
-      { name: 'Employee provides', docs: employee },
-      { name: 'Employer issues', docs: employer },
-    ].filter(g => g.docs.length > 0);
+    const byCategory = new Map<string, PolicyDocument[]>();
+    for (const d of data?.documents ?? []) {
+      const cat = d.category || 'project';
+      if (!byCategory.has(cat)) byCategory.set(cat, []);
+      byCategory.get(cat)!.push(d);
+    }
+    return [...byCategory.entries()]
+      .map(([key, docs]) => ({ key, name: DOCUMENT_CATEGORY_LABELS[key] ?? key, docs }))
+      .sort((a, b) => (DOCUMENT_CATEGORY_ORDER[a.key] ?? 99) - (DOCUMENT_CATEGORY_ORDER[b.key] ?? 99));
   }, [data]);
+
+  const setCategory = useSetDocumentCategory();
+
+  const moveTo = (doc: PolicyDocument, category: string) => {
+    setCategory.mutate({ key: doc.key, category }, {
+      onSuccess: () => toast.success(`${doc.label} moved to ${DOCUMENT_CATEGORY_LABELS[category] ?? category}`),
+      onError: () => toast.error(`Could not move ${doc.label}`),
+    });
+  };
 
   const change = (doc: PolicyDocument, visa: string, next: DocState) => {
     const id = `${doc.key}\u0000${visa}`;
@@ -121,7 +139,7 @@ export function DocumentPolicyMatrix() {
       {groups.map(group => {
         const isOpen = open.has(group.name);
         return (
-          <div key={group.name} className="rounded-lg border border-gray-200 overflow-hidden">
+          <div key={group.key} className="rounded-lg border border-gray-200 overflow-hidden">
             <button
               type="button"
               onClick={() => setOpen(s => {
@@ -134,7 +152,7 @@ export function DocumentPolicyMatrix() {
             >
               <span className="text-sm font-semibold text-gray-800 flex items-center gap-2">
                 <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${isOpen ? '' : '-rotate-90'}`} />
-                {group.name === 'Employer issues' && <Building2 className="h-3.5 w-3.5 text-gray-400" />}
+                {group.key === 'employer' && <Building2 className="h-3.5 w-3.5 text-gray-400" />}
                 {group.name}
               </span>
               <span className="text-[11px] text-gray-500">{group.docs.length}</span>
@@ -171,6 +189,23 @@ export function DocumentPolicyMatrix() {
                               ? `${doc.aliases.length} other name${doc.aliases.length === 1 ? '' : 's'}`
                               : 'add another name'}
                           </button>
+                          {/* Regrouping is presentation only — it moves where
+                              the document appears, never whether it is
+                              required — so it saves straight away with no
+                              confirmation. */}
+                          <Select value={doc.category || 'project'} onValueChange={val => moveTo(doc, val)}>
+                            <SelectTrigger
+                              className="h-6 mt-1 text-[10px] border-dashed text-gray-500"
+                              aria-label={`Group for ${doc.label}`}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {DOCUMENT_CATEGORIES.map(c => (
+                                <SelectItem key={c.key} value={c.key}>{c.label}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </td>
                         {data.visaTypes.map(v => {
                           const id = `${doc.key}\u0000${v}`;

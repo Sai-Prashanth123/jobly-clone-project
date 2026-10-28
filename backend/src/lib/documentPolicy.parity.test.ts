@@ -31,7 +31,7 @@ describe('the generated policy', () => {
   it('covers every document and every work status', () => {
     const rows = buildPolicy();
     expect(rows.length).toBe(ALL_ROWS.length);
-    expect(rows.length).toBe(39);
+    expect(rows.length).toBe(40);
     for (const r of rows) {
       expect(Object.keys(r.states).sort(), r.key).toEqual([...VISA_TYPES].sort());
     }
@@ -39,7 +39,8 @@ describe('the generated policy', () => {
 
   it('matches the committed FALLBACK_POLICY, so the file is not stale', () => {
     const generated = Object.fromEntries(buildPolicy().map(r => [r.key, {
-      label: r.label, issuedBy: r.issuedBy, hasExpiry: r.hasExpiry, states: r.states,
+      label: r.label, issuedBy: r.issuedBy, hasExpiry: r.hasExpiry,
+      category: r.category, states: r.states,
     }]));
     expect(FALLBACK_POLICY).toEqual(generated);
   });

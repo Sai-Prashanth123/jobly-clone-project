@@ -8,6 +8,23 @@ import {
   IDENTITY_DOC_TYPE_LABELS,
 } from '../lib/onboarding';
 import { EMPLOYER_MANAGED_DOC_TYPES } from '../lib/employerDocs';
+import { FALLBACK_POLICY } from '../lib/documentPolicy';
+
+/**
+ * The display group a document belongs to, looked up by LABEL.
+ *
+ * Every finding in this report is keyed by label rather than by row type —
+ * that is what the documents table stores — so the category has to come back
+ * the same way. FALLBACK_POLICY carries both, which makes it the one place
+ * that can answer this without a second mapping to keep in step.
+ */
+const CATEGORY_BY_LABEL: Record<string, string> = Object.fromEntries(
+  Object.values(FALLBACK_POLICY).map(e => [e.label, e.category]),
+);
+
+function categoryForLabel(label: string): string {
+  return CATEGORY_BY_LABEL[label] ?? 'project';
+}
 
 /**
  * What each work-status category requires, against what people in it actually
@@ -31,6 +48,8 @@ import { EMPLOYER_MANAGED_DOC_TYPES } from '../lib/employerDocs';
 export interface CandidateGap {
   visaType: string;
   documentType: string;
+  /** Display group, so related findings sort together. */
+  category: string;
   heldBy: number;
   categorySize: number;
   /** 0-100. High means "almost everyone files this, yet nothing asks for it". */
@@ -41,8 +60,37 @@ export interface CandidateGap {
 export interface UnmetRequirement {
   visaType: string;
   documentType: string;
+  category: string;
   missingFor: number;
   categorySize: number;
+}
+
+/**
+ * A document people in this category have explicitly said they do not have.
+ *
+ * This is the other half of the Yes/No opt-out. The toggle lets somebody
+ * decline a document that does not apply to them, which stops them being
+ * blocked — but until now nobody could see those answers, so a document the
+ * whole category keeps declining looked exactly like a document nobody had got
+ * round to uploading.
+ */
+export interface DeclaredNotHeld {
+  visaType: string;
+  documentType: string;
+  category: string;
+  declaredNo: number;
+  categorySize: number;
+  /** 0-100 of the category. */
+  percent: number;
+  /**
+   * True when this document IS required for the category, i.e. the answer is
+   * being correctly ignored by the onboarding gate.
+   *
+   * The invariant "a no can never satisfy a requirement" is asserted in unit
+   * tests; this makes it OBSERVABLE in production. A row that lights up here
+   * is a stale answer left over from a visa change, not a hole in the gate.
+   */
+  conflictsWithRequirement: boolean;
 }
 
 /** A stored document name matching no known document and no known alias. */
@@ -56,6 +104,7 @@ export interface DocumentGapsReport {
   categories: Array<{ visaType: string; employees: number }>;
   candidateGaps: CandidateGap[];
   unmetRequirements: UnmetRequirement[];
+  declaredNotHeld: DeclaredNotHeld[];
   unknownLabels: UnknownLabel[];
   generatedAt: string;
 }
@@ -110,20 +159,68 @@ async function scopedEmployeeIds(viewerRole: string): Promise<string[] | undefin
  *   it counts as a candidate gap. 50 by default — a majority filing something
  *   nobody asked for is the signal worth looking at.
  */
+/**
+ * The "no" answers for one category, counted by document.
+ *
+ * Pure and exported so it can be tested directly; buildDocumentGapsReport
+ * needs a database and this is the part with the decisions in it.
+ */
+export function declinedForCategory(
+  visaType: string,
+  members: Array<{ identity_documents?: unknown }>,
+  required: Set<string>,
+): DeclaredNotHeld[] {
+  const size = members.length;
+  if (size === 0) return [];
+
+  const declined = new Map<string, number>();
+  for (const m of members) {
+    // Array.isArray rather than ?? [] — at least one production row holds an
+    // object here rather than an array, and iterating it took a page down.
+    const entries = Array.isArray(m.identity_documents) ? m.identity_documents : [];
+    for (const entry of entries) {
+      if (!entry || typeof entry !== 'object') continue;
+      const row = entry as { type?: unknown; held?: unknown };
+      if (row.held !== 'no' || typeof row.type !== 'string') continue;
+      declined.set(row.type, (declined.get(row.type) ?? 0) + 1);
+    }
+  }
+
+  const out: DeclaredNotHeld[] = [];
+  for (const [rowType, declaredNo] of declined) {
+    // Same reasoning as candidateGaps: an employer-issued document is never
+    // the employee's to hold, so a "no" on one says nothing about policy.
+    const documentType = IDENTITY_DOC_TYPE_LABELS[rowType] ?? rowType;
+    if (EMPLOYER_MANAGED_DOC_TYPES.has(documentType)) continue;
+    // Every count is reported, with no threshold. One person declining a
+    // document the category should not be asking for is already the signal.
+    out.push({
+      visaType,
+      documentType,
+      category: categoryForLabel(documentType),
+      declaredNo,
+      categorySize: size,
+      percent: Math.round((declaredNo / size) * 100),
+      conflictsWithRequirement: required.has(documentType),
+    });
+  }
+  return out;
+}
+
 export async function buildDocumentGapsReport(
   viewerRole = 'admin',
   heldThreshold = 50,
 ): Promise<DocumentGapsReport> {
   const scopedIds = await scopedEmployeeIds(viewerRole);
   const empty: DocumentGapsReport = {
-    categories: [], candidateGaps: [], unmetRequirements: [], unknownLabels: [],
+    categories: [], candidateGaps: [], unmetRequirements: [], declaredNotHeld: [], unknownLabels: [],
     generatedAt: new Date().toISOString(),
   };
   if (scopedIds && scopedIds.length === 0) return empty;
 
   let empQuery = supabaseAdmin
     .from('employees')
-    .select('id,display_id,visa_type')
+    .select('id,display_id,visa_type,identity_documents')
     .is('deleted_at', null)
     .in('status', ['active', 'inactive', 'onboarding']);
   if (scopedIds) empQuery = empQuery.in('id', scopedIds);
@@ -156,6 +253,7 @@ export async function buildDocumentGapsReport(
 
   const candidateGaps: CandidateGap[] = [];
   const unmetRequirements: UnmetRequirement[] = [];
+  const declaredNotHeld: DeclaredNotHeld[] = [];
 
   for (const [visaType, members] of byCategory) {
     const required = new Set(requiredFor(visaType));
@@ -185,7 +283,10 @@ export async function buildDocumentGapsReport(
       if (EMPLOYER_MANAGED_DOC_TYPES.has(documentType)) continue;
       const heldPercent = Math.round((heldBy / size) * 100);
       if (heldPercent < heldThreshold) continue;
-      candidateGaps.push({ visaType, documentType, heldBy, categorySize: size, heldPercent });
+      candidateGaps.push({
+        visaType, documentType, category: categoryForLabel(documentType),
+        heldBy, categorySize: size, heldPercent,
+      });
     }
 
     for (const documentType of required) {
@@ -193,9 +294,16 @@ export async function buildDocumentGapsReport(
         m => !holds(heldByEmployee.get(m.id) ?? new Set<string>(), documentType),
       ).length;
       if (missingFor === 0) continue;
-      unmetRequirements.push({ visaType, documentType, missingFor, categorySize: size });
+      unmetRequirements.push({
+        visaType, documentType, category: categoryForLabel(documentType),
+        missingFor, categorySize: size,
+      });
     }
+
+    declaredNotHeld.push(...declinedForCategory(visaType, members, required));
   }
+
+  declaredNotHeld.sort((a, b) => b.declaredNo - a.declaredNo);
 
   // Names the gate cannot see at all. These are a data problem, not a policy
   // one: the employee uploaded the document and is still being asked for it.
@@ -222,6 +330,7 @@ export async function buildDocumentGapsReport(
     unmetRequirements: unmetRequirements.sort(
       (a, b) => b.missingFor - a.missingFor || a.visaType.localeCompare(b.visaType),
     ),
+    declaredNotHeld,
     unknownLabels: [...unknown.entries()]
       .map(([documentType, v]) => ({ documentType, count: v.count, employees: [...v.employees] }))
       .sort((a, b) => b.count - a.count),

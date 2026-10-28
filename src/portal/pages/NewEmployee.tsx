@@ -3,7 +3,7 @@ import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft, Loader2, Trash2, Plus, GraduationCap, Briefcase, Camera, BadgeCheck,
   User, Phone, MapPin, Building2, ShieldCheck, HeartHandshake, Wallet, FileText, CheckCircle2, Upload,
-  AlertTriangle, X, LogOut, Eye, EyeOff, Download, Users,
+  AlertTriangle, X, LogOut, Eye, EyeOff, Download, Users, Lock,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useQueryClient } from '@tanstack/react-query';
@@ -27,7 +27,14 @@ import { COUNTRIES } from '../lib/countries';
 import { NATIONALITIES } from '../lib/nationalities';
 import { LANGUAGES } from '../lib/languages';
 import {
-  DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, EMPLOYER_DOC_ROWS, ROW_VISA_GATE, ROW_VISA_EXCLUDE, EMPLOYER_ROW_VISA_GATE,
+  holdingSlotFor, effectiveHolding, hidesUpload, identityDocsForPersist, isEmployerManagedRow,
+} from '../lib/docHolding';
+import { hasIdentityDocDetail } from '../lib/identityDocs';
+import { useDocumentPolicy } from '../hooks/useDocumentPolicy';
+import {
+  DOCUMENT_TYPES as DOC_TYPES, IDENTITY_DOC_ROWS, EMPLOYER_DOC_ROWS, EMPLOYER_ROW_VISA_GATE,
+  isIdentityRowVisible, categoryOf, DOCUMENT_CATEGORY_LABELS, DOCUMENT_CATEGORY_ORDER,
+  rowCollectsNumber,
   getRequiredIdentityTypes, getMinFiles, IDENTITY_OWNED_DOC_LABELS, docMatchesRow, docsMatchingRow,
   identityRowLabel,
   type IdentityDocRow,
@@ -200,8 +207,6 @@ interface FormState {
   identityDocuments: IdentityDocumentEntry[];
   // Map of identity-doc type → File staged for upload, keyed by `type`.
   identityDocFiles: Record<string, File | null>;
-  /** Answers to "do they hold this?" — see OPTIONAL_HOLDING_ROWS. */
-  identityDocHolding: Record<string, 'yes' | 'no'>;
   // Map of multi-file identity-doc type (I-983, I-20, Other) → staged files
   // array, capped client-side by the row's maxFiles. Kept separate from
   // identityDocFiles so every other row's single-file logic stays untouched.
@@ -267,7 +272,6 @@ const defaultForm: FormState = {
   ssn: '',
   identityDocuments: [],
   identityDocFiles: {},
-  identityDocHolding: {},
   multiIdentityDocFiles: {},
   education: [],
   workHistory: [],
@@ -488,7 +492,6 @@ export default function NewEmployee() {
       ssn: e.ssn ?? '',
       identityDocuments: e.identityDocuments ?? [],
       identityDocFiles: {},
-      identityDocHolding: {},
       multiIdentityDocFiles: {},
       education: e.education ?? [],
       workHistory: e.workHistory ?? [],
@@ -580,6 +583,54 @@ export default function NewEmployee() {
     }),
   ]);
 
+  /**
+   * What this work status needs from each document — FROM THE LIVE CATALOGUE.
+   *
+   * This used to read only `category` from the server and decide "required"
+   * and "shown" from the compiled-in tables. That left the original bug in
+   * place, just moved: setting PERM to Optional for Green Card on the Document
+   * Policy page stopped the GATE demanding it while this form carried on
+   * rendering "Required — must be uploaded" with no Yes/No. HR changed the
+   * policy, the server agreed, and the employee saw no difference.
+   *
+   * The compiled-in tables stay as the fallback for the first paint and for an
+   * unreachable endpoint — the same arrangement the backend keeps with
+   * FALLBACK_POLICY, so an outage degrades to today's behaviour rather than to
+   * a form that asks for nothing.
+   */
+  const { data: documentPolicy } = useDocumentPolicy();
+  const docPolicy = useMemo(() => {
+    const states = new Map<string, string>();
+    const categories = new Map<string, string>();
+    for (const d of documentPolicy?.documents ?? []) {
+      const state = d.states?.[form.visaType];
+      if (state) states.set(d.key, state);
+      categories.set(d.key, d.category);
+    }
+    const live = states.size > 0;
+
+    const stateOf = (rowType: string): 'required' | 'optional' | 'hidden' => {
+      const stored = states.get(rowType);
+      if (stored === 'required' || stored === 'optional' || stored === 'hidden') return stored;
+      // No answer for this document: fall back per-document, never per-table.
+      if (!isIdentityRowVisible(rowType, form.visaType)) return 'hidden';
+      return getRequiredIdentityTypes(form.visaType).includes(rowType) ? 'required' : 'optional';
+    };
+
+    const requiredTypes = live
+      ? IDENTITY_DOC_ROWS.filter(r => stateOf(r.type) === 'required').map(r => r.type)
+      : getRequiredIdentityTypes(form.visaType);
+
+    return {
+      live,
+      stateOf,
+      requiredTypes,
+      isRequired: (rowType: string) => stateOf(rowType) === 'required',
+      isVisible: (rowType: string) => stateOf(rowType) !== 'hidden',
+      categoryOfKey: (rowType: string) => categories.get(rowType) ?? categoryOf(rowType, 'employee'),
+    };
+  }, [documentPolicy, form.visaType]);
+
   // Per-section completion — drives the green check shown on each section header.
   // Conditions here match the onboardingChecklist so that the section icon and
   // the progress chip always agree on what "done" means.
@@ -588,7 +639,7 @@ export default function NewEmployee() {
     const permFilled = form.permanentSameAsPresent ? presentFilled
       : (!!form.permanentAddress.street.trim() && !!form.permanentAddress.city.trim() && !!form.permanentAddress.state.trim() && !!form.permanentAddress.zip.trim());
     const educationDone = isEducationSectionDone(form.education);
-    const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
+    const requiredIdentityTypes = docPolicy.requiredTypes;
     return {
       [SECTION_IDS.personal]:     !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.bloodGroup && !!form.nationality.trim() && !!form.preferredLanguage.trim() && (!!form.profilePhotoFile || !!form.profilePhotoPreview),
       [SECTION_IDS.contact]:      !!form.email.trim() && !!form.phone.trim() && ((isOnboarding || isEditMode) ? !!form.linkedinUrl.trim() : true),
@@ -627,7 +678,7 @@ export default function NewEmployee() {
     // OPT Card is shown to OPT/STEM OPT candidates in the Identity section
     // (like I-983) but is NOT required to finish onboarding — it used to block
     // submission for every OPT/STEM-OPT visa type, which HR flagged as wrong.
-    const requiredIdentityTypes = getRequiredIdentityTypes(form.visaType);
+    const requiredIdentityTypes = docPolicy.requiredTypes;
     return [
       // Personal — profile photo is required to finish onboarding
       { id: 'personal',    label: 'Personal details',               section: SECTION_IDS.personal,      done: !!form.firstName.trim() && !!form.lastName.trim() && !!form.dob && !!form.gender && !!form.maritalStatus && !!form.nationality && !!form.bloodGroup && !!form.preferredLanguage && (!!form.profilePhotoFile || !!form.profilePhotoPreview) },
@@ -694,7 +745,12 @@ export default function NewEmployee() {
       // so it doesn't affect the % for anyone who never touches these fields.
       ...IDENTITY_DOC_ROWS.filter(row => row.hasExpiry && !requiredIdentityTypes.includes(row.type)).flatMap(row => {
         const fileOrUploaded = isRowSatisfied(row, form, form.visaType, existingEmployee?.documents);
-        const expiry = (form.identityDocuments.find(d => d.type === row.type)?.expiry ?? '').trim();
+        const stored = form.identityDocuments.find(d => d.type === row.type);
+        // Answered "no": there is nothing to upload, so an expiry left over
+        // from before the answer is not an inconsistency to report — the field
+        // it refers to is hidden.
+        if (stored?.held === 'no') return [];
+        const expiry = (stored?.expiry ?? '').trim();
         if (!expiry || fileOrUploaded) return [];
         return [{
           id: `ident_${row.type}_needs_upload`,
@@ -703,6 +759,44 @@ export default function NewEmployee() {
           done: false,
         }];
       }),
+      // "Do you have this?" must be answered on every optional row, and a
+      // "yes" then behaves like a required document. Mirrors the holdingChecks
+      // block in backend/src/lib/onboarding.ts — the two must agree or the
+      // wizard shows 100% while Finish onboarding refuses.
+      ...(form.visaType ? IDENTITY_DOC_ROWS.filter(row => {
+        // Same resolver as the rows themselves, so the checklist and the cards
+        // can never disagree about which documents ask a question.
+        if (docPolicy.stateOf(row.type) !== 'optional') return false;
+        return !EMPLOYER_DOC_ROWS.some(r => r.type === row.type);
+      }).map(row => {
+        const stored = form.identityDocuments.find(d => d.type === row.type);
+        const fileOrUploaded = isRowSatisfied(row, form, form.visaType, existingEmployee?.documents);
+        const answer = stored?.held ?? (fileOrUploaded ? 'yes' : undefined);
+        const label = identityRowLabel(row, form.visaType);
+        if (answer === undefined) {
+          return {
+            id: `held_${row.type}`,
+            label: `${label} — answer whether you have this`,
+            section: SECTION_IDS.identity,
+            done: false,
+          };
+        }
+        if (answer === 'no') {
+          return {
+            id: `held_${row.type}`,
+            label: `${label} — answered`,
+            section: SECTION_IDS.identity,
+            done: true,
+          };
+        }
+        const expiryOk = !row.hasExpiry || (stored?.expiry ?? '').trim() !== '';
+        return {
+          id: `held_${row.type}`,
+          label: `${label} (upload required — you answered yes)`,
+          section: SECTION_IDS.identity,
+          done: fileOrUploaded && expiryOk,
+        };
+      }) : []),
       // Bank details and declaration are optional (HR collects separately if needed)
     ];
   }, [form, uploadedDocTypes, existingEmployee]);
@@ -877,10 +971,34 @@ export default function NewEmployee() {
   //
   // REQUIRED rows never ask. Those are the ones HR genuinely needs, and an
   // opt-out there would be a way around the onboarding gate rather than a
-  // convenience. So the toggle only ever appears where the answer is already
-  // allowed to be "nothing".
-  const asksHoldingRow = (row: IdentityDocRow, required: boolean) =>
-    !required && !EMPLOYER_DOC_ROWS.some(r => r.type === row.type);
+  // convenience — so instead of a choice they carry an explicit marker saying
+  // the document must be uploaded, which reads as a rule rather than as a
+  // question somebody forgot to ask.
+  //
+  // The rules themselves live in lib/docHolding.ts: they decide whether
+  // somebody can finish onboarding, and inline in this file they could only be
+  // tested by restating them.
+
+  // Grouping, visibility and requirement all come from docPolicy above, so an
+  // HR change on the Document Policy page reaches this form without a deploy.
+  const identityRowGroups = useMemo(() => {
+    const requiredTypes = docPolicy.requiredTypes;
+    const buckets = new Map<string, IdentityDocRow[]>();
+    for (const row of IDENTITY_DOC_ROWS) {
+      if (!docPolicy.isVisible(row.type)) continue;
+      const cat = docPolicy.categoryOfKey(row.type);
+      if (!buckets.has(cat)) buckets.set(cat, []);
+      buckets.get(cat)!.push(row);
+    }
+    return [...buckets.entries()]
+      .map(([key, rows]) => ({
+        key,
+        label: DOCUMENT_CATEGORY_LABELS[key] ?? key,
+        rows,
+        requiredCount: rows.filter(r => requiredTypes.includes(r.type)).length,
+      }))
+      .sort((a, b) => (DOCUMENT_CATEGORY_ORDER[a.key] ?? 99) - (DOCUMENT_CATEGORY_ORDER[b.key] ?? 99));
+  }, [docPolicy]);
 
   const renderIdentityDocRow = (row: IdentityDocRow) => {
     const file = form.identityDocFiles[row.type];
@@ -892,7 +1010,7 @@ export default function NewEmployee() {
     // mandatory (it never blocked Finish Onboarding either way, since that
     // gate only runs on the employee's own onboarding route, not HR's edit
     // route this card renders on).
-    const isRequired = getRequiredIdentityTypes(form.visaType).includes(row.type);
+    const isRequired = docPolicy.isRequired(row.type);
     const existingDoc = existingEmployee?.documents?.find((d: any) => docMatchesRow(d, row));
     const isAlreadyUploaded = !!existingDoc;
     const multiExistingDocs = row.multi ? docsMatchingRow(existingEmployee?.documents ?? [], row) : [];
@@ -907,10 +1025,23 @@ export default function NewEmployee() {
     // you never provided.
     const expiryWithoutFile = isOnboarding && row.hasExpiry && !!expiryVal && !fileOrUploaded;
     // Default: Yes when something is already on file, otherwise unanswered.
-    const asksHolding = asksHoldingRow(row, isRequired);
-    const holdingAnswer = form.identityDocHolding[row.type] ?? (fileOrUploaded ? 'yes' : undefined);
-    const hideUpload = asksHolding && holdingAnswer !== 'yes';
-    const isMissing = !hideUpload && isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile);
+    const holdingSlot = holdingSlotFor({
+      required: isRequired,
+      employerManaged: isEmployerManagedRow(row.type),
+    });
+    const holdingAnswer = effectiveHolding(doc.held, { slot: holdingSlot, hasFileOrUpload: fileOrUploaded });
+    const hideUpload = hidesUpload(holdingSlot, holdingAnswer);
+    // A copy already on record cannot be answered away — the row would claim
+    // the person does not hold a document that is attached to it.
+    const lockedToYes = isAlreadyUploaded || multiExistingDocs.length > 0;
+    // An unanswered question is now an outstanding item, not a blank space —
+    // and a "yes" with nothing behind it is the same as a missing required
+    // document.
+    const holdingUnanswered = holdingSlot === 'ask' && isOnboarding && holdingAnswer === undefined;
+    const holdingYesIncomplete = holdingSlot === 'ask' && isOnboarding && holdingAnswer === 'yes'
+      && (!fileOrUploaded || (!!row.hasExpiry && !expiryVal));
+    const isMissing = holdingUnanswered || holdingYesIncomplete
+      || (!hideUpload && isOnboarding && ((isRequired && (!fileOrUploaded || missingExpiry)) || expiryWithoutFile));
     return (
       <div key={row.type} className={`p-4 bg-gray-50/60 rounded-lg border flex flex-col gap-3 ${isMissing ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
         <div>
@@ -922,26 +1053,67 @@ export default function NewEmployee() {
             )}
           </p>
           {row.hint && <p className="text-[11px] text-gray-500 mt-0.5">{row.hint}</p>}
-          {asksHolding && (
-            <div className="mt-2 flex items-center gap-2">
+          {/* Every visible row says which of the two it is, in the same place
+              on the card: a question, or a rule. A required row showing nothing
+              at all is what made the Yes/No look like it existed for only some
+              work statuses. */}
+          {holdingSlot === 'required' && (
+            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-gray-600">
+              <Lock className="h-3 w-3 text-gray-400" />
+              <span className="font-medium bg-gray-100 border border-gray-200 rounded-full px-2 py-0.5">
+                Required — must be uploaded
+              </span>
+              <span className="text-gray-400">no Yes/No option for this one</span>
+            </div>
+          )}
+          {holdingSlot === 'ask' && (
+            <div className="mt-2 flex items-center gap-2 flex-wrap">
               <span className="text-[11px] text-gray-500">{isSelfEdit ? 'Do you have this?' : 'Do they hold this?'}</span>
               {(['yes', 'no'] as const).map(answer => (
                 <button
                   key={answer}
                   type="button"
-                  onClick={() => setForm(f => ({ ...f, identityDocHolding: { ...f.identityDocHolding, [row.type]: answer } }))}
+                  disabled={answer === 'no' && lockedToYes}
+                  onClick={() => {
+                    // Answering No clears what the row was carrying. Without
+                    // this an invisible expiry stays behind and the onboarding
+                    // checklist keeps complaining about a field that is no
+                    // longer on screen — and the staged file still uploads,
+                    // because the upload loop reads identityDocFiles and knows
+                    // nothing about the answer.
+                    upsertIdentityDoc(row.type, answer === 'no'
+                      ? { held: 'no', number: '', state: '', expiry: '' }
+                      : { held: 'yes' });
+                    if (answer === 'no') {
+                      setIdentityDocFile(row.type, null);
+                      if (row.multi) {
+                        setForm(f => ({
+                          ...f,
+                          multiIdentityDocFiles: { ...f.multiIdentityDocFiles, [row.type]: [] },
+                        }));
+                      }
+                    }
+                  }}
                   className={`px-2.5 py-1 rounded-full border text-[11px] font-medium transition ${
                     holdingAnswer === answer
                       ? 'bg-blue-50 border-blue-200 text-blue-700'
                       : 'border-gray-200 text-gray-500 hover:bg-gray-50'
-                  }`}
+                  } ${answer === 'no' && lockedToYes ? 'opacity-40 cursor-not-allowed hover:bg-transparent' : ''}`}
                   aria-pressed={holdingAnswer === answer}
                 >
                   {answer === 'yes' ? 'Yes' : 'No'}
                 </button>
               ))}
+              {holdingUnanswered && (
+                <span className="text-[11px] font-medium text-red-500">Answer required</span>
+              )}
               {holdingAnswer === 'no' && (
                 <span className="text-[11px] text-gray-400">Nothing to upload.</span>
+              )}
+              {lockedToYes && (
+                <span className="text-[11px] text-gray-400">
+                  A copy is already on file — remove it from the Documents page first.
+                </span>
               )}
             </div>
           )}
@@ -967,7 +1139,7 @@ export default function NewEmployee() {
 
             `ssn` is excluded deliberately — it has its own dedicated field in
             section 06, and a second place to type it would be one too many. */}
-        {!hideUpload && row.placeholder && row.type !== 'ssn' && (
+        {!hideUpload && rowCollectsNumber(row.type) && (
           <div className={row.hasState ? 'grid grid-cols-1 sm:grid-cols-3 gap-3' : 'space-y-1'}>
             <div className={row.hasState ? 'sm:col-span-2 space-y-1' : 'space-y-1'}>
               <Label className="text-[11px] font-medium text-gray-500">Document Number</Label>
@@ -1079,7 +1251,7 @@ export default function NewEmployee() {
   const employerDocsSatisfiedCount = applicableEmployerRows.filter(row =>
     (existingEmployee?.documents ?? []).some(d => docMatchesRow(d, row)),
   ).length;
-  const requiredIdentityLabels = getRequiredIdentityTypes(form.visaType)
+  const requiredIdentityLabels = docPolicy.requiredTypes
     .map(t => { const r = IDENTITY_DOC_ROWS.find(x => x.type === t); return r ? identityRowLabel(r, form.visaType) : undefined; })
     .filter((l): l is string => !!l);
 
@@ -1177,12 +1349,20 @@ export default function NewEmployee() {
       totalExperienceYears: parseNumberInput(form.totalExperienceYears),
       experienceLevel: form.experienceLevel || undefined,
       emergencyContact: form.emergencyContact,
-      // identity_documents JSONB: all modes are upload-only now, so the only
-      // metadata captured is the expiry date on visa-tied docs. Persist rows
-      // that have an expiry (or legacy number/state already on the record) so
-      // a partial PUT never wipes pre-existing HR-entered values.
-      identityDocuments: form.identityDocuments.filter(d =>
-        (d.expiry ?? '').trim() !== '' || (d.number ?? '').trim() !== '' || (d.state ?? '').trim() !== '',
+      // identity_documents JSONB: the expiry date on visa-tied docs, any
+      // legacy number/state already on the record, and the answer to "do you
+      // have this?" on optional rows. Rows with none of those are dropped so a
+      // partial PUT never wipes pre-existing HR-entered values.
+      //
+      // That last part is the fix: a bare "no" carries no expiry, number or
+      // state, so the old filter discarded it and the question was asked again
+      // on every visit. identityDocsForPersist also strips an answer from any
+      // row that is required or hidden for this work status, so changing
+      // somebody's visa type cannot leave an opt-out behind.
+      identityDocuments: identityDocsForPersist(
+        form.identityDocuments,
+        docPolicy.requiredTypes,
+        t => docPolicy.isVisible(t),
       ),
       // Sent through in full (not filtered like identityDocuments above) —
       // each entry may already carry a passportStoragePath from a prior
@@ -2414,7 +2594,7 @@ export default function NewEmployee() {
               / Green Card / EAD) so HR can track work-authorization expiry. */}
           <SectionCard
             id={SECTION_IDS.identity}
-            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.identity) : (Object.values(form.identityDocFiles ?? {}).some(Boolean) || (form.identityDocuments?.length ?? 0) > 0) || undefined}
+            complete={isOnboarding ? !onbIncompleteSections.has(SECTION_IDS.identity) : (Object.values(form.identityDocFiles ?? {}).some(Boolean) || (form.identityDocuments ?? []).some(hasIdentityDocDetail)) || undefined}
             attention={isOnboarding && onbIncompleteSections.has(SECTION_IDS.identity)}
             num="07"
             title="Identity & Documents"
@@ -2437,46 +2617,30 @@ export default function NewEmployee() {
                 </p>
               </div>
             ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {IDENTITY_DOC_ROWS.filter(row => {
-                // OPT Card / STEM OPT Card are the EAD — the same physical
-                // card — so they are never a row of their own. The EAD row is
-                // relabelled "EAD / OPT Card" or "EAD / STEM OPT Card" for
-                // these visa types.
-                //
-                // FIRST, deliberately. This rule is absolute, and when it sat
-                // further down an earlier branch listing stem_opt_card
-                // returned true for OPT and STEM OPT before reaching it — so
-                // the removal did nothing for the only two visa types that
-                // could see the duplicate, which is exactly what was reported.
-                //
-                // Older uploads are not lost: both labels are aliases of the
-                // EAD row (LEGACY_LABEL_ALIASES), so they still satisfy it and
-                // still appear under it.
-                if (row.type === 'opt_card' || row.type === 'stem_opt_card') return false;
-
-                // I-983 applies only to OPT / STEM OPT candidates.
-                if (row.type === 'i983') {
-                  return form.visaType === 'opt' || form.visaType === 'stem_opt';
-                }
-                // I-20 is F-1/OPT-specific — H-1B holders don't need it shown,
-                // per HR feedback (previously also shown for H-1B holders who
-                // recently transitioned from F-1/OPT, but that was confusing).
-                if (row.type === 'i20') {
-                  return form.visaType === 'opt' || form.visaType === 'stem_opt';
-                }
-                // Rows explicitly hidden for specific visa types (e.g.
-                // Permanent Resident Card is irrelevant for H-1B/OPT) — an
-                // exclude always wins, checked before the allow-list below.
-                const exclude = ROW_VISA_EXCLUDE[row.type];
-                if (exclude && exclude.includes(form.visaType)) return false;
-                // Newer visa-specific rows (H-1B / Green Card checklists) —
-                // shown only for the visa types they were sourced from; a row
-                // absent from ROW_VISA_GATE is shown for every visa type.
-                const gate = ROW_VISA_GATE[row.type];
-                if (gate) return gate.includes(form.visaType);
-                return true;
-              }).map(row => renderIdentityDocRow(row))}
+            <div className="space-y-4">
+              {identityRowGroups.map(group => (
+                <div key={group.key}>
+                  {/* Related paperwork under one heading. The grid was flat —
+                      23 cards for an H-1B employee, a passport next to a PERM
+                      questionnaire next to a pay stub — so nothing told you
+                      which of them were about the same subject. */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <h4 className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                      {group.label}
+                    </h4>
+                    <span className="text-[11px] text-gray-400">{group.rows.length}</span>
+                    {group.requiredCount > 0 && (
+                      <span className="text-[10px] font-medium text-red-500 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">
+                        {group.requiredCount} required
+                      </span>
+                    )}
+                    <div className="flex-1 border-t border-gray-100" />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {group.rows.map(row => renderIdentityDocRow(row))}
+                  </div>
+                </div>
+              ))}
             </div>
             )}
           </SectionCard>

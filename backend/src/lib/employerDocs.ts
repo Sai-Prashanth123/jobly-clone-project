@@ -19,6 +19,9 @@ export const EMPLOYER_MANAGED_DOC_TYPES = new Set([
   'Employer Letter / Employment Verification Letter',
   'Employer-Countersigned Offer / Contract Letter',
   'Contract / MSA (Petitioner & Vendor)',
+  // The LCA public access file: employer-maintained by law, so an employee is
+  // never asked for it and never shown it.
+  'Public Access File (PAF)',
 ]);
 
 /** True when this document is employer-managed, and so off-limits to employees. */

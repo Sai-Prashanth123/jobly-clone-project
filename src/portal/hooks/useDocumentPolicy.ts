@@ -17,6 +17,8 @@ export interface PolicyDocument {
   issuedBy: string;
   hasExpiry: boolean;
   aliases: string[];
+  /** Display grouping; editable by HR, so it comes from the server. */
+  category: string;
   states: Record<string, DocState>;
 }
 
@@ -56,6 +58,23 @@ export function useSetDocumentAliases() {
   return useMutation({
     mutationFn: async ({ key, aliases }: { key: string; aliases: string[] }) => {
       await apiClient.patch(`/document-policy/${key}/aliases`, { aliases });
+    },
+    onSettled: () => { void qc.invalidateQueries({ queryKey: ['document-policy'] }); },
+  });
+}
+
+/**
+ * Move a document into a different group.
+ *
+ * Grouping is presentation, not policy — it changes where a document appears,
+ * never whether it is required — so unlike useSetDocumentState this cannot
+ * come back with a warning.
+ */
+export function useSetDocumentCategory() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ key, category }: { key: string; category: string }) => {
+      await apiClient.patch(`/document-policy/${key}/category`, { category });
     },
     onSettled: () => { void qc.invalidateQueries({ queryKey: ['document-policy'] }); },
   });

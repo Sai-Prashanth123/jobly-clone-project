@@ -46,22 +46,38 @@ describe('what an H-1B employee must upload', () => {
 });
 
 describe('what the employer owes for an H-1B', () => {
-  it('names the LCA and the E-Verify letter', () => {
-    expect(EMPLOYER_REQUIRED_BY_VISA.h1b).toEqual(['Copy of LCA', 'E-Verify Letter']);
+  // The PAF joined these two: the LCA public access file is employer-maintained
+  // per certified LCA, so it is the company's to produce, not the employee's.
+  it('names the LCA, the E-Verify letter and the public access file', () => {
+    expect(EMPLOYER_REQUIRED_BY_VISA.h1b).toEqual([
+      'Copy of LCA', 'E-Verify Letter', 'Public Access File (PAF)',
+    ]);
   });
 
-  it('reports both missing when nothing is on file — the live case', () => {
-    expect(missingEmployerDocs('h1b', [])).toEqual(['Copy of LCA', 'E-Verify Letter']);
+  it('reports all three missing when nothing is on file — the live case', () => {
+    expect(missingEmployerDocs('h1b', [])).toEqual([
+      'Copy of LCA', 'E-Verify Letter', 'Public Access File (PAF)',
+    ]);
   });
 
   // "LCA" and "Copy of LCA" are the same piece of paper.
   it('accepts an LCA filed under either label', () => {
-    expect(missingEmployerDocs('h1b', [{ type: 'LCA' }])).toEqual(['E-Verify Letter']);
-    expect(missingEmployerDocs('h1b', [{ type: 'Copy of LCA' }])).toEqual(['E-Verify Letter']);
+    expect(missingEmployerDocs('h1b', [{ type: 'LCA' }]))
+      .toEqual(['E-Verify Letter', 'Public Access File (PAF)']);
+    expect(missingEmployerDocs('h1b', [{ type: 'Copy of LCA' }]))
+      .toEqual(['E-Verify Letter', 'Public Access File (PAF)']);
   });
 
-  it('reports nothing once both are filed', () => {
-    expect(missingEmployerDocs('h1b', [{ type: 'LCA' }, { type: 'E-Verify Letter' }])).toEqual([]);
+  it('reports nothing once all three are filed', () => {
+    expect(missingEmployerDocs('h1b', [
+      { type: 'LCA' }, { type: 'E-Verify Letter' }, { type: 'Public Access File (PAF)' },
+    ])).toEqual([]);
+  });
+
+  // Surfaced, never blocking: an employee cannot produce any of these, so none
+  // of them may appear in their own required set.
+  it('never asks the employee for the public access file', () => {
+    expect(getRequiredIdentityTypes('h1b')).not.toContain('paf');
   });
 
   it('says nothing for visa types with no employer requirement', () => {
@@ -71,6 +87,8 @@ describe('what the employer owes for an H-1B', () => {
   });
 
   it('survives a missing document list', () => {
-    expect(missingEmployerDocs('h1b', null)).toEqual(['Copy of LCA', 'E-Verify Letter']);
+    expect(missingEmployerDocs('h1b', null)).toEqual([
+      'Copy of LCA', 'E-Verify Letter', 'Public Access File (PAF)',
+    ]);
   });
 });

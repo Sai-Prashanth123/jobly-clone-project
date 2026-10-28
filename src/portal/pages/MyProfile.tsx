@@ -1,4 +1,4 @@
-import { identityDocLabel } from '../lib/documentTypes';
+import { identityDocLabel, rowCollectsNumber } from '../lib/documentTypes';
 import { formatAddress } from '@/portal/lib/utils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -14,7 +14,7 @@ import { useAuth } from '../hooks/useAuth';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
-import { findIdentityDoc, hasIdentityDocDetail, photoIdOf, photoIdLabel } from '../lib/identityDocs';
+import { findIdentityDoc, isIdentityRowListed, photoIdOf, photoIdLabel } from '../lib/identityDocs';
 import { DetailField as Field } from '../components/shared/DetailField';
 
 export default function MyProfile() {
@@ -55,7 +55,15 @@ export default function MyProfile() {
   // and the data looked lost rather than merely partial.
   const hasEC = !!ec && !!(ec.name || ec.phone || ec.relationship || ec.altPhone
     || ec.address || ec.city || ec.state || ec.zip);
-  const identityDocs = (employee.identityDocuments ?? []).filter(hasIdentityDocDetail);
+  // Includes the rows this employee answered "no" to, so their own answers
+  // are visible back to them rather than silently filed. The passport and
+  // photo-ID tiles above still use findIdentityDoc, so a declined document
+  // cannot render a tile full of dashes. Declines sort last.
+  const identityDocs = (employee.identityDocuments ?? [])
+    .filter(isIdentityRowListed)
+    .slice()
+    .sort((a, b) => Number(a.held === 'no') - Number(b.held === 'no'));
+  const notHeldCount = identityDocs.filter(d => d.held === 'no').length;
   const passport = findIdentityDoc(employee.identityDocuments, 'passport');
   const photoId = photoIdOf(employee.identityDocuments);
   const educationList = employee.education ?? [];
@@ -231,18 +239,58 @@ export default function MyProfile() {
 
       {identityDocs.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Identity & Documents</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Identity &amp; Documents
+              {notHeldCount > 0 && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  · {notHeldCount} you said you don&apos;t have
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {identityDocs.map((d, i) => (
-                <div key={`${d.type}-${i}`} className={`p-3 rounded-md border ${expiryStatus(d.expiry) === 'expired' ? 'bg-red-50/60 border-red-200' : expiryStatus(d.expiry) === 'expiring' ? 'bg-amber-50/60 border-amber-200' : 'bg-gray-50/60 border-gray-100'}`}>
+              {identityDocs.map((d, i) => d.held === 'no' ? (
+                <div key={`${d.type}-${i}`} className="p-3 rounded-md border border-dashed border-gray-200 bg-gray-50/60">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
                       {identityDocLabel(d.type, (d as { label?: string }).label)}
                     </p>
+                    <span className="text-[10px] font-medium text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                      Not held
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    You answered &ldquo;No&rdquo; — nothing to upload.
+                  </p>
+                  {/* An answer of fact that changes: the licence arrives, the
+                      green card arrives. Editing the profile reopens the same
+                      question rather than needing an HR request. */}
+                  <button
+                    type="button"
+                    onClick={() => navigate('/portal/profile/edit')}
+                    className="mt-1.5 text-[11px] font-medium text-blue-600 hover:underline"
+                  >
+                    Change this answer
+                  </button>
+                </div>
+              ) : (
+                <div key={`${d.type}-${i}`} className={`p-3 rounded-md border ${expiryStatus(d.expiry) === 'expired' ? 'bg-red-50/60 border-red-200' : expiryStatus(d.expiry) === 'expiring' ? 'bg-amber-50/60 border-amber-200' : 'bg-gray-50/60 border-gray-100'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+                      {identityDocLabel(d.type, (d as { label?: string }).label)}
+                      {d.held === 'yes' && (
+                        <span className="ml-1.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full normal-case">
+                          You answered Yes
+                        </span>
+                      )}
+                    </p>
                     <ExpiryBadge date={d.expiry} />
                   </div>
-                  <p className="text-sm font-medium text-gray-900 mt-0.5 font-mono">{d.number || '—'}</p>
+                  {rowCollectsNumber(d.type) && (
+                    <p className="text-sm font-medium text-gray-900 mt-0.5 font-mono">{d.number || '—'}</p>
+                  )}
                   {(d.state || d.expiry) && (
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       {d.state && <span>State: {d.state}</span>}

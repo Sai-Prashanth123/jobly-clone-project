@@ -22,6 +22,10 @@
 // frontend: the wizard showed 100% while this list still demanded it, so
 // Finish onboarding failed with "Still required: Offer Letter". W-4 was added
 // when it became required for every employee.
+// The compiled-in document catalogue. Pure data with no imports of its own,
+// so this stays a database-free module.
+import { FALLBACK_POLICY, type PolicyEntry } from './documentPolicy';
+
 export const ONBOARDING_REQUIRED_DOCS = [
   'Resume',
   'Social Security Card',
@@ -225,6 +229,31 @@ function expiryFor(identityDocuments: unknown, key: string | undefined): string 
 }
 const numPositive = (v: unknown): boolean => v != null && !Number.isNaN(Number(v)) && Number(v) > 0;
 
+/** The stored "do you have this?" answer for a document row, if any. */
+function heldFor(identityDocuments: unknown, key: string): 'yes' | 'no' | undefined {
+  const docs: IdentityDocEntry[] = Array.isArray(identityDocuments) ? identityDocuments : [];
+  const held = (docs.find(d => d?.type === key) as { held?: unknown } | undefined)?.held;
+  return held === 'yes' || held === 'no' ? held : undefined;
+}
+
+/**
+ * The optional documents a work status shows, as {key, label, hasExpiry}.
+ *
+ * Read from the compiled-in catalogue so this module stays free of database
+ * imports. The caller may pass the live list instead, exactly as it does for
+ * policyExtras.
+ */
+export function optionalDocsFor(visaType: string): Array<{ key: string; label: string; hasExpiry: boolean }> {
+  const out: Array<{ key: string; label: string; hasExpiry: boolean }> = [];
+  for (const [key, entry] of Object.entries(FALLBACK_POLICY) as Array<[string, PolicyEntry]>) {
+    // Employer-issued paperwork is never the employee's to answer for.
+    if (entry.issuedBy === 'employer') continue;
+    if (entry.states[visaType] !== 'optional') continue;
+    out.push({ key, label: entry.label, hasExpiry: entry.hasExpiry });
+  }
+  return out;
+}
+
 /**
  * @param policyExtras the per-visa documents this work status requires, by
  *   LABEL, resolved from the document-policy catalogue by the caller.
@@ -240,8 +269,55 @@ export function computeOnboarding(
   emp: any,
   docTypes: Set<string>,
   policyExtras?: string[],
+  optionalDocs?: Array<{ key: string; label: string; hasExpiry: boolean }>,
 ): OnboardingResult {
   const education: any[] = Array.isArray(emp.education) ? emp.education : [];
+
+  /**
+   * "Do you have this?" is a question that must be answered.
+   *
+   * HR: *"the option should force user to pick either of the option and if the
+   * user pick Yes that should mandate to get the details and documents to
+   * upload. If No then function should keeps to move next."*
+   *
+   * So an optional document is no longer inert. Unanswered blocks; Yes pulls
+   * the upload (and the expiry, where the row has one) into the required set;
+   * No satisfies the item and asks for nothing.
+   *
+   * ONLY WHILE SOMEBODY IS STILL ONBOARDING. Applying it to active staff would
+   * retroactively mark ten finished records incomplete for questions nobody
+   * was asked at the time.
+   */
+  const asksHolding = String(emp.status ?? '') === 'onboarding' && nonEmpty(emp.visa_type);
+  const holdingChecks: OnboardingItem[] = asksHolding
+    ? (optionalDocs ?? optionalDocsFor(String(emp.visa_type)))
+        // A document already demanded elsewhere is not an optional one.
+        .filter(d => !(ONBOARDING_REQUIRED_DOCS as readonly string[]).includes(d.label))
+        .filter(d => !(VISA_CONDITIONAL_REQUIRED_DOCS as readonly string[]).includes(d.label))
+        .map(d => {
+          const answer = heldFor(emp.identity_documents, d.key);
+          if (answer === undefined) {
+            return {
+              id: `held_${d.key}`,
+              label: `${d.label} — answer whether you have this`,
+              done: false,
+            };
+          }
+          if (answer === 'no') {
+            // Answered, and the answer asks for nothing further.
+            return { id: `held_${d.key}`, label: `${d.label} — answered`, done: true };
+          }
+          // Yes: now it behaves exactly like a required document.
+          const uploaded = docTypes.has(d.label)
+            || (DOC_TYPE_LEGACY_ALIASES[d.label] ?? []).some(alias => docTypes.has(alias));
+          const expiry = d.hasExpiry ? expiryFor(emp.identity_documents, d.key) : 'n/a';
+          return {
+            id: `held_${d.key}`,
+            label: `${d.label} (upload required — you answered yes)`,
+            done: uploaded && nonEmpty(expiry),
+          };
+        })
+    : [];
 
   const checks: OnboardingItem[] = [
     // Personal — photo is intentionally optional (the wizard labels it "optional but
@@ -357,6 +433,10 @@ export function computeOnboarding(
           done: uploaded && (!key || nonEmpty(expiry)),
         };
       })),
+
+    // The answered/unanswered optional documents, last so the required list
+    // still reads first in the "missing" message.
+    ...holdingChecks,
   ];
 
   const done = checks.filter(c => c.done).length;

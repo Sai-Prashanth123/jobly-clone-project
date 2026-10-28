@@ -68,13 +68,14 @@ export async function stateOf(documentKey: string, visaType: string): Promise<Do
 export async function getPolicy(): Promise<{
   documents: Array<{
     key: string; label: string; issuedBy: string; hasExpiry: boolean; aliases: string[];
+    category: string;
     states: Record<string, DocState>;
   }>;
   visaTypes: string[];
 }> {
   const [rows, types] = await Promise.all([
     getRows(),
-    supabaseAdmin.from('document_types').select('key, label, issued_by, has_expiry, aliases, sort_order'),
+    supabaseAdmin.from('document_types').select('key, label, issued_by, has_expiry, aliases, sort_order, category'),
   ]);
   const index = buildPolicyIndex(rows, FALLBACK_POLICY);
 
@@ -82,15 +83,20 @@ export async function getPolicy(): Promise<{
   // fresh or unreachable database still describes every document.
   const stored = (types.data ?? []) as Array<{
     key: string; label: string; issued_by: string; has_expiry: boolean;
-    aliases: string[] | null; sort_order: number;
+    aliases: string[] | null; sort_order: number; category: string | null;
   }>;
   const source = stored.length
     ? stored.map(t => ({
         key: t.key, label: t.label, issuedBy: t.issued_by,
         hasExpiry: t.has_expiry, aliases: t.aliases ?? [], sort: t.sort_order,
+        // An uncategorised row falls back to the compiled-in grouping rather
+        // than to a bucket called "Other", so a document added directly in the
+        // database still appears somewhere truthful.
+        category: t.category || FALLBACK_POLICY[t.key]?.category || 'project',
       }))
     : Object.entries(FALLBACK_POLICY).map(([key, e], i) => ({
         key, label: e.label, issuedBy: e.issuedBy, hasExpiry: e.hasExpiry, aliases: [], sort: i,
+        category: e.category,
       }));
 
   return {
@@ -98,7 +104,7 @@ export async function getPolicy(): Promise<{
       .sort((a, b) => a.sort - b.sort || a.key.localeCompare(b.key))
       .map(d => ({
         key: d.key, label: d.label, issuedBy: d.issuedBy, hasExpiry: d.hasExpiry,
-        aliases: d.aliases,
+        aliases: d.aliases, category: d.category,
         states: Object.fromEntries(VISA_TYPES.map(v => [v, index(d.key, v)])) as Record<string, DocState>,
       })),
     visaTypes: [...VISA_TYPES],
@@ -146,6 +152,40 @@ export async function setState(
     return { warning: `No document is now required for ${change.visa_type}. Onboarding will complete without any category-specific paperwork.` };
   }
   return {};
+}
+
+
+/**
+ * Move a document into a different group.
+ *
+ * Grouping is presentation, not policy: it changes where a document appears,
+ * never whether it is required. That is why this needs no warning and cannot
+ * leave a work status requiring nothing — unlike setState above.
+ */
+export async function setCategory(
+  documentKey: string,
+  category: string,
+  actorId?: string,
+): Promise<void> {
+  const { data: before } = await supabaseAdmin
+    .from('document_types').select('category').eq('key', documentKey).maybeSingle();
+
+  const { error } = await supabaseAdmin
+    .from('document_types')
+    .update({ category })
+    .eq('key', documentKey);
+  if (error) throw error;
+
+  invalidate();
+
+  await logActivity(
+    actorId ?? null,
+    'permission_changed',
+    'document_requirement',
+    `${documentKey}:category`,
+    `${documentKey} · category`,
+    { document: documentKey, from: (before as { category?: string } | null)?.category ?? null, to: category },
+  );
 }
 
 /** Add or remove a spelling the same document has been filed under. */
@@ -203,4 +243,34 @@ export async function policyExtrasFor(visaType: string): Promise<string[] | unde
     labels.push(label);
   }
   return labels;
+}
+
+/**
+ * The OPTIONAL employee documents a work status shows, for the onboarding gate.
+ *
+ * These are the rows that ask "do you have this?". Since that answer is now
+ * mandatory while somebody is onboarding — and a "yes" pulls the upload into
+ * the required set — the gate needs the live list, not just the compiled-in
+ * one, or an HR change on the Document Policy page would move the form and
+ * not the gate.
+ *
+ * Returns undefined when the table is empty or unreachable, so computeOnboarding
+ * falls back to its compiled-in catalogue rather than asking for nothing.
+ */
+export async function policyOptionalFor(
+  visaType: string,
+): Promise<Array<{ key: string; label: string; hasExpiry: boolean }> | undefined> {
+  if (!visaType) return undefined;
+  const rows = await getRows();
+  if (rows.length === 0) return undefined;
+
+  const index = buildPolicyIndex(rows, FALLBACK_POLICY);
+  const out: Array<{ key: string; label: string; hasExpiry: boolean }> = [];
+  for (const [key, entry] of Object.entries(FALLBACK_POLICY)) {
+    // Employer-issued paperwork is never the employee's to answer for.
+    if (entry.issuedBy === 'employer') continue;
+    if (index(key, visaType) !== 'optional') continue;
+    out.push({ key, label: entry.label, hasExpiry: entry.hasExpiry });
+  }
+  return out;
 }

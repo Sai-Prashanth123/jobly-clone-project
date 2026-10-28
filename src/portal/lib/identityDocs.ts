@@ -25,6 +25,20 @@ export function hasIdentityDocDetail(d: IdentityDocumentEntry): boolean {
 }
 
 /**
+ * Worth a card on an Identity & Documents list: it has details, OR the person
+ * answered "no" and that answer is worth showing.
+ *
+ * Deliberately separate from hasIdentityDocDetail rather than widening it.
+ * That predicate — and findIdentityDoc above — back the Immigration, passport
+ * and photo-ID tiles, where a row carrying nothing but `held: 'no'` would
+ * render a passport panel with a dash in every field. A declined document is
+ * a thing to list, not a thing to display the details of.
+ */
+export function isIdentityRowListed(d: IdentityDocumentEntry): boolean {
+  return hasIdentityDocDetail(d) || d.held === 'no';
+}
+
+/**
  * The person's photo ID. A driver's licence if they have one, otherwise the
  * state-issued ID — they are alternatives to each other (I-9 List B), so only
  * one is ever expected, and showing an empty "Driver's License" next to a

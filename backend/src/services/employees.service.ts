@@ -14,7 +14,25 @@ import * as casesService from './cases.service';
 import { storageProvider } from '../lib/storage';
 import { withoutEmployerManagedDocs } from '../lib/employerDocs';
 import { generateTempPassword } from '../lib/tempPassword';
-import { policyExtrasFor } from './documentPolicy.service';
+import { policyExtrasFor, policyOptionalFor } from './documentPolicy.service';
+
+/**
+ * The live document policy for one work status, for computeOnboarding.
+ *
+ * Every path that reports onboarding progress must pass this. Three of them
+ * did not — the employee list, the employee detail and the response after a
+ * submit — so they fell back to the COMPILED-IN policy while the actual
+ * "Finish onboarding" gate used the live catalogue. An HR change on the
+ * Document Policy page then moved the gate and not the screen: setting PERM to
+ * optional for Green Card left the employee record still reporting it as a
+ * hard requirement, which is exactly the two-sources-of-truth problem the
+ * catalogue exists to remove.
+ */
+async function livePolicyFor(visaType: unknown) {
+  const v = String(visaType ?? '');
+  const [extras, optional] = await Promise.all([policyExtrasFor(v), policyOptionalFor(v)]);
+  return { extras, optional };
+}
 
 // Supabase returns snake_case — pass through as-is, just ensure numeric types are correct
 function serializeEmployee(emp: any) {
@@ -149,11 +167,23 @@ export async function listEmployees(query: ListEmployeesQuery, opts?: { restrict
     }
   }
 
+  // Resolved once per distinct work status rather than once per employee —
+  // the service caches for 30s, but a 200-row page would still make 200 calls.
+  const visaTypes = [...new Set(rows.map(r => String((r as { visa_type?: string }).visa_type ?? '')))];
+  const policyByVisa = new Map(
+    await Promise.all(visaTypes.map(async v => [v, await livePolicyFor(v)] as const)),
+  );
+
   return {
-    data: rows.map(r => ({
-      ...serializeEmployee(r),
-      onboarding: computeOnboarding(r, typesByEmp.get(r.id) ?? new Set()),
-    })),
+    data: rows.map(r => {
+      const policy = policyByVisa.get(String((r as { visa_type?: string }).visa_type ?? ''));
+      return {
+        ...serializeEmployee(r),
+        onboarding: computeOnboarding(
+          r, typesByEmp.get(r.id) ?? new Set(), policy?.extras, policy?.optional,
+        ),
+      };
+    }),
     total: count ?? 0,
   };
 }
@@ -192,11 +222,12 @@ export async function getEmployee(id: string) {
 
   const docList = docs ?? [];
   const docTypes = new Set<string>(docList.map((d: any) => d.type));
+  const policy = await livePolicyFor((emp as { visa_type?: string }).visa_type);
   return {
     ...serializeEmployee(emp),
     has_login: !!loginRow,
     documents: docList,
-    onboarding: computeOnboarding(emp, docTypes),
+    onboarding: computeOnboarding(emp, docTypes, policy.extras, policy.optional),
   };
 }
 
@@ -369,13 +400,21 @@ export async function createEmployee(input: CreateEmployeeInput, actorId?: strin
   // Active duplicate → reject. Legacy soft-deleted row with the same email
   // (pre-this-fix) → purge it inline so the email frees up, then fall through
   // to a fresh insert (no resurrect — see deleteEmployee for the why).
-  const { data: existingEmp } = await supabaseAdmin
+  const { data: existingEmp, error: existingEmpError } = await supabaseAdmin
     .from('employees')
     .select('*')
     .eq('email', input.email)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  // Discarding this error made a failed read look like "that email is free",
+  // so the duplicate check failed open and two employees could share the
+  // address that every notification and password reset is sent to.
+  if (existingEmpError) {
+    console.error('[employees] could not check for an existing employee with this email', existingEmpError);
+    throw new Error('Could not verify that this email is unique. Nothing was created — please try again.');
+  }
 
   if (existingEmp) {
     if (!existingEmp.deleted_at) {
@@ -706,7 +745,12 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
     const docTypes = new Set<string>((docs ?? []).map((d: any) => d.type));
     const { data: empFull } = await supabaseAdmin.from('employees').select('*').eq('id', id).single();
     const subject = empFull ?? existing;
-    const ob = computeOnboarding(subject, docTypes, await policyExtrasFor(String((subject as { visa_type?: string }).visa_type ?? '')));
+    const subjectVisa = String((subject as { visa_type?: string }).visa_type ?? '');
+    const ob = computeOnboarding(
+      subject, docTypes,
+      await policyExtrasFor(subjectVisa),
+      await policyOptionalFor(subjectVisa),
+    );
     if (!ob.complete) {
       throw new ValidationError(
         `Cannot approve: employee's onboarding is only ${ob.percent}% complete. Still required: ${ob.missing.join(', ')}`,
@@ -827,7 +871,7 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
   const emailsToCheck: string[] = [patch.email, patch.work_email].filter(Boolean) as string[];
   for (const email of emailsToCheck) {
     const safeEmail = sanitizeForPostgrestFilter(email);
-    const { data: dup } = await supabaseAdmin
+    const { data: dup, error: dupError } = await supabaseAdmin
       .from('employees')
       .select('id, display_id, first_name, last_name')
       .or(`email.eq.${safeEmail},work_email.eq.${safeEmail}`)
@@ -835,6 +879,13 @@ export async function updateEmployee(id: string, input: UpdateEmployeeInput, act
       .neq('id', id)
       .limit(1)
       .maybeSingle();
+    // A discarded error here reads as "no duplicate" and lets two employees
+    // share an email — which decides who a password reset and every
+    // notification reaches. There is no unique constraint behind this.
+    if (dupError) {
+      console.error('[employees] could not check for a duplicate email', dupError);
+      throw new Error('Could not verify that this email is unique. Nothing was saved — please try again.');
+    }
     if (dup) {
       const label = dup.display_id ?? dup.id.slice(0, 8);
       throw new ConflictError(
@@ -1074,7 +1125,11 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
   // makes on the Document Policy screen takes effect on the next submission
   // rather than the next deploy. Undefined when the table is empty or
   // unreachable, and the compiled-in list applies.
-  const result = computeOnboarding(emp, docTypes, await policyExtrasFor(String(emp.visa_type ?? '')));
+  const result = computeOnboarding(
+    emp, docTypes,
+    await policyExtrasFor(String(emp.visa_type ?? '')),
+    await policyOptionalFor(String(emp.visa_type ?? '')),
+  );
   if (!result.complete) {
     // Surface the structured missing-items list under `details` so the
     // frontend can render clickable jump-to-section chips. The string message
@@ -1127,7 +1182,12 @@ export async function completeOnboarding(id: string, actorRole?: string, actorEm
   // initial query with the full select inline).
   const { data: docList } = await supabaseAdmin
     .from('documents').select('*').eq('entity_type', 'employee').eq('entity_id', id);
-  return { ...serializeEmployee(updated), documents: docList ?? [], onboarding: computeOnboarding(updated, docTypes) };
+  const submitPolicy = await livePolicyFor((updated as { visa_type?: string }).visa_type);
+  return {
+    ...serializeEmployee(updated),
+    documents: docList ?? [],
+    onboarding: computeOnboarding(updated, docTypes, submitPolicy.extras, submitPolicy.optional),
+  };
 }
 
 // ── HR-side: request changes from the employee ─────────────────────────────────

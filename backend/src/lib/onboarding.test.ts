@@ -168,3 +168,172 @@ describe('computeOnboarding expiry requirements', () => {
     expect(missing).not.toContain('I-9 Form (upload required)');
   });
 });
+
+/**
+ * The guarantee behind the Yes/No opt-out.
+ *
+ * An optional document can be answered "no" and the row stops asking for a
+ * file. A REQUIRED document cannot — the wizard never offers the choice, and
+ * these assertions hold the other end of that: even if an answer reaches the
+ * record anyway (an older row, a visa change, a direct API call), nothing the
+ * gate reads is `held`, so a declined requirement is still a missing
+ * requirement.
+ */
+describe('a declined document can never satisfy a requirement', () => {
+  it('still demands a required document the employee answered no to', () => {
+    const result = computeOnboarding(
+      {
+        visa_type: 'stem_opt',
+        identity_documents: [
+          { type: 'i20', held: 'no' },
+          { type: 'passport', held: 'no' },
+        ],
+      },
+      new Set(),
+    );
+    const missing = result.missing.filter(l => l.endsWith('(upload required)'));
+    expect(missing).toEqual(expect.arrayContaining([
+      'I-20 (upload required)',
+      'Passport (upload required)',
+    ]));
+    expect(result.complete).toBe(false);
+  });
+
+  // The completion figure is shown to the employee and to HR. If `held`
+  // changed the denominator, answering "no" to a few optional rows would move
+  // everyone's percentage for reasons nobody could explain.
+  it('does not change the completion percentage', () => {
+    const base = computeOnboarding({ visa_type: 'h1b' }, new Set());
+    const withAnswers = computeOnboarding(
+      {
+        visa_type: 'h1b',
+        identity_documents: [
+          { type: 'driver_license', held: 'no' },
+          { type: 'state_id', held: 'no' },
+          { type: 'offer_letter', held: 'yes' },
+        ],
+      },
+      new Set(),
+    );
+    expect(withAnswers.percent).toBe(base.percent);
+    expect(withAnswers.missing).toEqual(base.missing);
+  });
+
+  it('ignores an answer on a document it has never heard of', () => {
+    const result = computeOnboarding(
+      { visa_type: 'citizen', identity_documents: [{ type: 'invented_thing', held: 'no' }] },
+      new Set(),
+    );
+    expect(result.missing).toEqual(
+      computeOnboarding({ visa_type: 'citizen' }, new Set()).missing,
+    );
+  });
+});
+
+/**
+ * "Do you have this?" must be answered.
+ *
+ * HR: *"the option should force user to pick either of the option and if the
+ * user pick Yes that should mandate to get the details and documents to
+ * upload. If No then function should keeps to move next."*
+ *
+ * Before this the answer was inert: unanswered, yes and no all behaved
+ * identically, and an optional document never appeared in the gate at all.
+ */
+describe('the mandatory yes/no answer', () => {
+  const onboarding = (over: Record<string, unknown> = {}) => ({
+    status: 'onboarding', visa_type: 'h1b', ...over,
+  });
+
+  it('blocks completion while an optional document is unanswered', () => {
+    const r = computeOnboarding(onboarding(), new Set());
+    const unanswered = r.missing.filter(l => l.endsWith('answer whether you have this'));
+    expect(unanswered.length).toBeGreaterThan(0);
+    expect(r.complete).toBe(false);
+  });
+
+  it('asks on every optional row for the work status', () => {
+    // h1b has 14 optional employee rows; none of them may be skipped.
+    const r = computeOnboarding(onboarding(), new Set());
+    expect(r.items.filter(i => i.id.startsWith('held_')).length).toBe(14);
+  });
+
+  it('accepts a no and asks for nothing more', () => {
+    const r = computeOnboarding(
+      onboarding({ identity_documents: [{ type: 'driver_license', held: 'no' }] }),
+      new Set(),
+    );
+    const item = r.items.find(i => i.id === 'held_driver_license');
+    expect(item?.done).toBe(true);
+    expect(r.missing).not.toContain("Driver's License — answer whether you have this");
+  });
+
+  // The half HR asked for explicitly: a yes is a promise to provide it.
+  it('demands the upload once the answer is yes', () => {
+    const r = computeOnboarding(
+      onboarding({ identity_documents: [{ type: 'driver_license', held: 'yes' }] }),
+      new Set(),
+    );
+    const item = r.items.find(i => i.id === 'held_driver_license');
+    expect(item?.done).toBe(false);
+    expect(item?.label).toContain('upload required');
+  });
+
+  it('is satisfied by a yes with the document on file', () => {
+    const r = computeOnboarding(
+      onboarding({ identity_documents: [{ type: 'driver_license', held: 'yes', expiry: '2030-01-01' }] }),
+      new Set(["Driver's License"]),
+    );
+    expect(r.items.find(i => i.id === 'held_driver_license')?.done).toBe(true);
+  });
+
+  // Driver's License carries an expiry, so "details" means the expiry too.
+  it('demands the expiry as well where the row has one', () => {
+    const r = computeOnboarding(
+      onboarding({ identity_documents: [{ type: 'driver_license', held: 'yes' }] }),
+      new Set(["Driver's License"]),
+    );
+    expect(r.items.find(i => i.id === 'held_driver_license')?.done).toBe(false);
+  });
+
+  /**
+   * The scope decision: active staff are not retroactively marked incomplete
+   * for a question nobody asked them.
+   */
+  it('asks nothing of an employee who has already finished onboarding', () => {
+    const r = computeOnboarding({ status: 'active', visa_type: 'h1b' }, new Set());
+    expect(r.items.filter(i => i.id.startsWith('held_'))).toEqual([]);
+  });
+
+  // The documents section is locked until a work status is chosen, so there is
+  // nothing to ask about yet.
+  it('asks nothing before a work status is set', () => {
+    const r = computeOnboarding({ status: 'onboarding' }, new Set());
+    expect(r.items.filter(i => i.id.startsWith('held_'))).toEqual([]);
+  });
+
+  it('never asks about an employer-issued document', () => {
+    const r = computeOnboarding(onboarding(), new Set());
+    const ids = r.items.filter(i => i.id.startsWith('held_')).map(i => i.id);
+    for (const employerRow of ['held_lca_copy', 'held_e_verify_letter', 'held_i129', 'held_paf']) {
+      expect(ids, employerRow).not.toContain(employerRow);
+    }
+  });
+
+  // A required document is not an optional one, and must not appear twice in
+  // the missing list under two different wordings.
+  it('does not double-count a document that is already required', () => {
+    const r = computeOnboarding(onboarding(), new Set());
+    const heldLabels = r.items.filter(i => i.id.startsWith('held_')).map(i => i.label);
+    for (const required of ['Resume', 'Social Security Card', 'W-4', 'Passport', 'I-94']) {
+      expect(heldLabels.filter(l => l.startsWith(required + ' ')), required).toEqual([]);
+    }
+  });
+
+  it('honours a live catalogue passed by the caller', () => {
+    const r = computeOnboarding(onboarding(), new Set(), undefined, [
+      { key: 'driver_license', label: "Driver's License", hasExpiry: true },
+    ]);
+    expect(r.items.filter(i => i.id.startsWith('held_')).length).toBe(1);
+  });
+});

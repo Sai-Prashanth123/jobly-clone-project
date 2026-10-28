@@ -34,6 +34,7 @@ import {
   ROW_VISA_EXCLUDE,
   EMPLOYER_ROW_VISA_GATE,
   getRequiredIdentityTypes,
+  categoryOf,
 } from '../../src/portal/lib/documentTypes';
 
 /** Every work status an employee can hold — the enum the UI offers. */
@@ -87,6 +88,8 @@ export interface PolicyRow {
   label: string;
   issuedBy: 'employee' | 'employer';
   hasExpiry: boolean;
+  /** Grouping, so related paperwork sits together on every surface. */
+  category: string;
   states: Record<string, DocState>;
 }
 
@@ -97,7 +100,7 @@ export function buildPolicy(): PolicyRow[] {
     for (const v of VISA_TYPES) states[v] = deriveState(row.type, v, false);
     rows.push({
       key: row.type, label: row.label, issuedBy: 'employee',
-      hasExpiry: !!row.hasExpiry, states,
+      hasExpiry: !!row.hasExpiry, category: categoryOf(row.type, 'employee'), states,
     });
   }
   for (const row of EMPLOYER_DOC_ROWS) {
@@ -105,7 +108,7 @@ export function buildPolicy(): PolicyRow[] {
     for (const v of VISA_TYPES) states[v] = deriveState(row.type, v, true);
     rows.push({
       key: row.type, label: row.label, issuedBy: 'employer',
-      hasExpiry: !!row.hasExpiry, states,
+      hasExpiry: !!row.hasExpiry, category: categoryOf(row.type, 'employer'), states,
     });
   }
   return rows;
@@ -120,19 +123,19 @@ const OUT = path.join(process.cwd(), 'src', 'lib', 'documentPolicy.ts');
 function toLiteral(rows: PolicyRow[]): string {
   return rows.map(r => {
     const states = VISA_TYPES.map(v => `${v}: '${r.states[v]}'`).join(', ');
-    return `  '${r.key}': { label: ${JSON.stringify(r.label)}, issuedBy: '${r.issuedBy}', hasExpiry: ${r.hasExpiry},\n    states: { ${states} } },`;
+    return `  '${r.key}': { label: ${JSON.stringify(r.label)}, issuedBy: '${r.issuedBy}', hasExpiry: ${r.hasExpiry}, category: '${r.category}',\n    states: { ${states} } },`;
   }).join('\n');
 }
 
 function toSeedSql(rows: PolicyRow[]): string {
   const q = (s: string) => `'${String(s).replace(/'/g, "''")}'`;
   const types = rows.map(r =>
-    `  (${q(r.key)}, ${q(r.label)}, ${q(r.issuedBy)}, ${r.hasExpiry})`).join(',\n');
+    `  (${q(r.key)}, ${q(r.label)}, ${q(r.issuedBy)}, ${r.hasExpiry}, ${q(r.category)})`).join(',\n');
   const reqs: string[] = [];
   for (const r of rows) {
     for (const v of VISA_TYPES) reqs.push(`  (${q(r.key)}, ${q(v)}, ${q(r.states[v])})`);
   }
-  return `INSERT INTO public.document_types (key, label, issued_by, has_expiry) VALUES\n${types}\nON CONFLICT (key) DO NOTHING;\n\nINSERT INTO public.document_requirements (document_key, visa_type, state) VALUES\n${reqs.join(',\n')}\nON CONFLICT (document_key, visa_type) DO NOTHING;\n`;
+  return `INSERT INTO public.document_types (key, label, issued_by, has_expiry, category) VALUES\n${types}\nON CONFLICT (key) DO NOTHING;\n\nINSERT INTO public.document_requirements (document_key, visa_type, state) VALUES\n${reqs.join(',\n')}\nON CONFLICT (document_key, visa_type) DO NOTHING;\n`;
 }
 
 if (process.argv[1]?.includes('generateDocumentPolicy')) {

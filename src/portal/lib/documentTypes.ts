@@ -263,6 +263,51 @@ export function getRequiredIdentityTypes(visaType?: string | null): string[] {
   return [...new Set([...REQUIRED_IDENTITY_TYPES, ...conditional, ...extra])];
 }
 
+/**
+ * Is this identity row shown at all for this work status?
+ *
+ * THE RULE ORDER IS LOAD-BEARING. It was inlined in the onboarding wizard's
+ * JSX, which meant the only test of it had to restate the rules rather than
+ * exercise them — and restating is how the ordering bug below survived a fix.
+ * Moved here verbatim so one function answers the question for the wizard, for
+ * what gets asked "do you have this?", and for what may be persisted.
+ */
+export function isIdentityRowVisible(rowType: string, visaType?: string | null): boolean {
+  // OPT Card / STEM OPT Card are the EAD — the same physical card — so they
+  // are never a row of their own. The EAD row is relabelled "EAD / OPT Card"
+  // or "EAD / STEM OPT Card" for these visa types.
+  //
+  // FIRST, deliberately. This rule is absolute, and when it sat further down
+  // an earlier branch listing stem_opt_card returned true for OPT and STEM OPT
+  // before reaching it — so the removal did nothing for the only two visa
+  // types that could see the duplicate, which is exactly what was reported.
+  //
+  // Older uploads are not lost: both labels are aliases of the EAD row
+  // (LEGACY_LABEL_ALIASES), so they still satisfy it and still appear under it.
+  if (rowType === 'opt_card' || rowType === 'stem_opt_card') return false;
+
+  // I-983 applies only to OPT / STEM OPT candidates.
+  if (rowType === 'i983') return visaType === 'opt' || visaType === 'stem_opt';
+
+  // I-20 is F-1/OPT-specific — H-1B holders don't need it shown, per HR
+  // feedback (previously also shown for H-1B holders who recently
+  // transitioned from F-1/OPT, but that was confusing).
+  if (rowType === 'i20') return visaType === 'opt' || visaType === 'stem_opt';
+
+  // Rows explicitly hidden for specific visa types (e.g. Permanent Resident
+  // Card is irrelevant for H-1B/OPT) — an exclude always wins, checked before
+  // the allow-list below.
+  const exclude = ROW_VISA_EXCLUDE[rowType];
+  if (exclude && visaType && exclude.includes(visaType)) return false;
+
+  // Newer visa-specific rows (H-1B / Green Card checklists) — shown only for
+  // the visa types they were sourced from; a row absent from ROW_VISA_GATE is
+  // shown for every visa type.
+  const gate = ROW_VISA_GATE[rowType];
+  if (gate) return !!visaType && gate.includes(visaType);
+  return true;
+}
+
 // Per-visa-type minimum file-count overrides for specific multi-file rows.
 // A row/visa pair absent from this table defaults to the row's own
 // `minFiles` (or 1 if unset). Previously had a GC/I-797 override requiring 4
@@ -271,9 +316,42 @@ export function getRequiredIdentityTypes(visaType?: string | null): string[] {
 const VISA_MIN_FILES: Record<string, Record<string, number>> = {};
 
 export function getMinFiles(rowType: string, visaType?: string | null): number {
-  const row = IDENTITY_DOC_ROWS.find(r => r.type === rowType);
+  const row = identityRowFor(rowType);
   const override = visaType ? VISA_MIN_FILES[visaType]?.[rowType] : undefined;
   return override ?? row?.minFiles ?? 1;
+}
+
+/**
+ * The row definition behind a stored identity_documents entry.
+ *
+ * Nothing exported did this before — the only type→row lookup in the codebase
+ * was a private `.find()` inside getMinFiles, so every read surface rendering a
+ * stored entry had to guess at what the row actually collects.
+ */
+export function identityRowFor(rowType: string): IdentityDocRow | undefined {
+  return [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS].find(r => r.type === rowType);
+}
+
+/**
+ * Does this document have a number at all?
+ *
+ * I-20, I-983 and I-797 do not — there is nothing on them to type in, and the
+ * wizard renders no Document Number field for them. The employee record showed
+ * a "—" for every row regardless, so "this document has no number" was
+ * indistinguishable from "they left it blank", and HR read it as missing data.
+ *
+ * `placeholder` is the signal because it is what the wizard keys off: a row
+ * with placeholder text has an input, a row with '' does not. (It is doing
+ * double duty as both the hint text and the flag — a dedicated `hasNumber`
+ * field would be clearer, but that means touching all 33 rows.)
+ *
+ * The SSN exclusion lives here rather than in the wizard's JSX so this
+ * predicate and the form cannot disagree: SSN has a placeholder, but the
+ * number is collected once in the Immigration section instead.
+ */
+export function rowCollectsNumber(rowType: string): boolean {
+  if (rowType === 'ssn') return false;
+  return !!identityRowFor(rowType)?.placeholder;
 }
 
 // Employer/HR-managed sponsorship documents (H-1B petition paperwork, the
@@ -293,6 +371,11 @@ export const EMPLOYER_DOC_ROWS: IdentityDocRow[] = [
     hint: 'Offer letter / employment contract letter signed by both the employee and the employer.' },
   { type: 'vendor_msa',     label: 'Contract / MSA (Petitioner & Vendor)', placeholder: '',
     hint: 'Contract or Master Services Agreement between the petitioner and the vendor.' },
+  // The LCA public-disclosure file. Employer-maintained by law and not
+  // something an employee can produce, so it sits here with the rest of the
+  // sponsorship paperwork rather than in the employee's own list.
+  { type: 'paf',            label: 'Public Access File (PAF)', placeholder: '',
+    hint: 'LCA public access file — the employer must keep one per certified LCA.' },
 ];
 
 // Visa types each employer/admin row applies to. A row not shown here is
@@ -309,7 +392,10 @@ export const EMPLOYER_DOC_ROWS: IdentityDocRow[] = [
  * both today, two of them already active.
  */
 export const EMPLOYER_REQUIRED_BY_VISA: Record<string, string[]> = {
-  h1b: ['Copy of LCA', 'E-Verify Letter'],
+  // The PAF is required per certified LCA, so it belongs on the list of what
+  // the company owes. Like the other two it is surfaced, never blocking: an
+  // employee cannot upload it, so it must not stop them reaching 100%.
+  h1b: ['Copy of LCA', 'E-Verify Letter', 'Public Access File (PAF)'],
 };
 
 /** Which employer documents are missing for this employee. */
@@ -338,6 +424,7 @@ export const EMPLOYER_ROW_VISA_GATE: Record<string, string[]> = {
   employer_verification_letter: ['h1b'],
   employer_offer_contract: ['h1b'],
   vendor_msa: ['h1b'],
+  paf: ['h1b'],
 };
 
 // Labels from IDENTITY_DOC_ROWS and EMPLOYER_DOC_ROWS — used to exclude these
@@ -448,4 +535,145 @@ export function docMatchesRow(doc: { type?: string }, row: { label: string }): b
 /** All uploaded documents belonging to this identity row (for multi-file rows, which can have more than one). */
 export function docsMatchingRow<T extends { type?: string }>(docs: T[], row: { label: string }): T[] {
   return (docs ?? []).filter(d => docMatchesRow(d, row));
+}
+
+/**
+ * Document categories — grouping related paperwork so the same kind of thing
+ * sits in one place.
+ *
+ * The onboarding wizard showed up to 23 document cards in a single flat grid,
+ * with a passport next to a PERM questionnaire next to a pay stub. Nothing
+ * said which of them were about the same subject, which is how two rows for
+ * the LCA (one employee-provided, one employer-issued) went unnoticed.
+ *
+ * This is the COMPILED-IN DEFAULT only. The authoritative categories live in
+ * document_types.category and are editable by HR on the Document Policy page,
+ * exactly like the required/optional states. This map is what the apps fall
+ * back to when the table is empty or unreachable, and it is the source the
+ * seed is generated from (backend/scripts/generateDocumentPolicy.ts imports
+ * it rather than parsing it).
+ */
+export const DOCUMENT_CATEGORIES = [
+  { key: 'identity',      label: 'Identity' },
+  { key: 'work_auth',     label: 'Work authorisation' },
+  { key: 'questionnaire', label: 'Questionnaires' },
+  { key: 'employment',    label: 'Employment forms' },
+  { key: 'background',    label: 'Background & experience' },
+  { key: 'project',       label: 'Project & vendor' },
+  { key: 'employer',      label: 'Employer issues' },
+] as const;
+
+export type DocumentCategory = typeof DOCUMENT_CATEGORIES[number]['key'];
+
+export const DOCUMENT_CATEGORY_LABELS: Record<string, string> =
+  Object.fromEntries(DOCUMENT_CATEGORIES.map(c => [c.key, c.label]));
+
+/** Display order, so every surface groups them the same way round. */
+export const DOCUMENT_CATEGORY_ORDER: Record<string, number> =
+  Object.fromEntries(DOCUMENT_CATEGORIES.map((c, i) => [c.key, i]));
+
+const CATEGORY_OF_TYPE: Record<string, DocumentCategory> = {
+  // Who the person is.
+  passport: 'identity',
+  driver_license: 'identity',
+  state_id: 'identity',
+  ssn: 'identity',
+
+  // What lets them work, and for how long. Most of these carry an expiry.
+  us_visa: 'work_auth',
+  i94: 'work_auth',
+  i797: 'work_auth',
+  ead: 'work_auth',
+  green_card: 'work_auth',
+  i20: 'work_auth',
+  i983: 'work_auth',
+  i140: 'work_auth',
+  i140_approval_notice: 'work_auth',
+  labor_certificate: 'work_auth',
+  // Retired rows: the OPT/STEM OPT card IS the EAD, so these are never shown.
+  // Categorised anyway so nothing falls through to a default.
+  opt_card: 'work_auth',
+  stem_opt_card: 'work_auth',
+
+  // Forms about a petition rather than evidence of one.
+  h1b_employee_questionnaire: 'questionnaire',
+  h4_beneficiary_questionnaire: 'questionnaire',
+  i140_questionnaire: 'questionnaire',
+  perm_questionnaire: 'questionnaire',
+
+  // Signed on joining.
+  i9_form: 'employment',
+  w4: 'employment',
+  offer_letter: 'employment',
+  insurance_waiver: 'employment',
+
+  // History: who they are professionally.
+  resume: 'background',
+  education_documents: 'background',
+  certificates: 'background',
+  experience_letters: 'background',
+  pay_stubs_w2_tax_returns: 'background',
+
+  // The engagement rather than the person. 'lca' sits here next to the vendor
+  // paperwork pending the duplicate question — there is also an employer-side
+  // 'lca_copy' row for the same document, and whichever survives belongs in
+  // work_auth. HR can move it without a deploy.
+  project_documents: 'project',
+  vendor_letter: 'project',
+  lca: 'project',
+  other: 'project',
+
+  // Issued by the company, never demanded of the employee.
+  e_verify_letter: 'employer',
+  employer_offer_contract: 'employer',
+  employer_verification_letter: 'employer',
+  i129: 'employer',
+  lca_copy: 'employer',
+  vendor_msa: 'employer',
+  paf: 'employer',
+};
+
+/**
+ * The category a document belongs to.
+ *
+ * Falls back to the employer/employee split rather than to a catch-all, so a
+ * document added without a category still lands somewhere truthful instead of
+ * in a bucket called "Other".
+ */
+export function categoryOf(rowType: string, issuedBy: 'employee' | 'employer' = 'employee'): DocumentCategory {
+  return CATEGORY_OF_TYPE[rowType] ?? (issuedBy === 'employer' ? 'employer' : 'project');
+}
+
+/**
+ * The category for a document LABEL rather than a row type.
+ *
+ * The uploader's type list (DOCUMENT_TYPES) and the gap report are both keyed
+ * by label, because that is what the documents table stores. Falls back to the
+ * catch-all group so a label with no matching row still appears somewhere.
+ */
+export function categoryOfLabel(label: string): DocumentCategory {
+  const row = [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS].find(r => r.label === label);
+  if (row) return categoryOf(row.type, EMPLOYER_DOC_ROWS.some(e => e.type === row.type) ? 'employer' : 'employee');
+  // LEGACY_LABEL_ALIASES maps a canonical label to the other spellings it has
+  // been filed under, so resolving a variant means searching the values.
+  const canonical = Object.entries(LEGACY_LABEL_ALIASES)
+    .find(([, aliases]) => aliases.includes(label))?.[0];
+  if (canonical) {
+    const aliased = [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS].find(r => r.label === canonical);
+    if (aliased) return categoryOf(aliased.type, 'employee');
+  }
+  return 'project';
+}
+
+/** DOCUMENT_TYPES, grouped for a picker. Order matches every other surface. */
+export function groupedDocumentTypes(): Array<{ key: string; label: string; types: string[] }> {
+  const buckets = new Map<string, string[]>();
+  for (const t of DOCUMENT_TYPES) {
+    const c = categoryOfLabel(t);
+    if (!buckets.has(c)) buckets.set(c, []);
+    buckets.get(c)!.push(t);
+  }
+  return [...buckets.entries()]
+    .map(([key, types]) => ({ key, label: DOCUMENT_CATEGORY_LABELS[key] ?? key, types }))
+    .sort((a, b) => (DOCUMENT_CATEGORY_ORDER[a.key] ?? 99) - (DOCUMENT_CATEGORY_ORDER[b.key] ?? 99));
 }

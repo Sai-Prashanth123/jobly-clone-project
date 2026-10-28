@@ -1,11 +1,12 @@
 import { AlertCircle, CheckCircle2, FileSearch, Loader2 } from 'lucide-react';
+import { DOCUMENT_CATEGORY_LABELS, DOCUMENT_CATEGORY_ORDER } from '../lib/documentTypes';
 import { PageHeader } from '../components/shared/PageHeader';
 import { DataTable, type Column } from '../components/shared/DataTable';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   useDocumentGaps,
-  type CandidateGap, type UnmetRequirement, type UnknownLabel,
+  type CandidateGap, type UnmetRequirement, type UnknownLabel, type DeclaredNotHeld,
 } from '../hooks/useEmployees';
 
 /**
@@ -30,12 +31,26 @@ const visaLabel = (v: string) => VISA_LABELS[v] ?? v;
 export default function DocumentGaps() {
   const { data, isLoading, isError, refetch, isFetching } = useDocumentGaps();
 
+  // Added so related findings sit together: the three tables below are keyed
+  // by document, and without a group a passport finding sorted next to a pay
+  // stub finding for no reason anyone could see.
+  const groupColumn = <T extends { category: string }>(): Column<T> => ({
+    key: 'category', header: 'Group', sortable: true,
+    getValue: (r: T) => String(DOCUMENT_CATEGORY_ORDER[r.category] ?? 99).padStart(2, '0'),
+    render: (r: T) => (
+      <span className="text-[11px] text-gray-500">
+        {DOCUMENT_CATEGORY_LABELS[r.category] ?? r.category}
+      </span>
+    ),
+  });
+
   const gapColumns: Column<CandidateGap>[] = [
     {
       key: 'visaType', header: 'Category',
       getValue: (r: CandidateGap) => visaLabel(r.visaType),
       render: (r: CandidateGap) => <span className="font-medium">{visaLabel(r.visaType)}</span>,
     },
+    groupColumn<CandidateGap>(),
     {
       key: 'documentType', header: 'Document',
       getValue: (r: CandidateGap) => r.documentType,
@@ -62,6 +77,7 @@ export default function DocumentGaps() {
       getValue: (r: UnmetRequirement) => visaLabel(r.visaType),
       render: (r: UnmetRequirement) => <span className="font-medium">{visaLabel(r.visaType)}</span>,
     },
+    groupColumn<UnmetRequirement>(),
     { key: 'documentType', header: 'Document', getValue: (r: UnmetRequirement) => r.documentType },
     {
       key: 'missingFor', header: 'Missing for', sortable: true,
@@ -70,6 +86,44 @@ export default function DocumentGaps() {
         <Badge variant={r.missingFor === r.categorySize ? 'destructive' : 'secondary'}>
           {r.missingFor} of {r.categorySize}
         </Badge>
+      ),
+    },
+  ];
+
+  const declinedColumns: Column<DeclaredNotHeld>[] = [
+    {
+      key: 'visaType', header: 'Category',
+      getValue: (r: DeclaredNotHeld) => visaLabel(r.visaType),
+      render: (r: DeclaredNotHeld) => <span className="font-medium">{visaLabel(r.visaType)}</span>,
+    },
+    groupColumn<DeclaredNotHeld>(),
+    {
+      key: 'documentType', header: 'Document',
+      getValue: (r: DeclaredNotHeld) => r.documentType,
+      render: (r: DeclaredNotHeld) => (
+        <span className="flex items-center gap-2 flex-wrap">
+          {r.documentType}
+          {/* The invariant made visible: a "no" is never allowed to satisfy a
+              requirement, so a row here is an answer the gate is correctly
+              ignoring — almost always left over from a visa change. */}
+          {r.conflictsWithRequirement && (
+            <Badge variant="destructive">Required — answer ignored</Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: 'declaredNo', header: 'Answered no', sortable: true,
+      getValue: (r: DeclaredNotHeld) => String(r.declaredNo),
+      render: (r: DeclaredNotHeld) => (
+        <span className="flex items-center gap-2">
+          <Badge className={r.percent === 100
+            ? 'bg-amber-100 text-amber-800 border-amber-200'
+            : 'bg-gray-100 text-gray-700 border-gray-200'}>
+            {r.declaredNo} of {r.categorySize}
+          </Badge>
+          <span className="text-xs text-gray-500">{r.percent}%</span>
+        </span>
       ),
     },
   ];
@@ -190,6 +244,35 @@ export default function DocumentGaps() {
                   searchKeys={['documentType', 'visaType']}
                   exportFilename="unmet-requirements"
                   emptyTitle="Nothing outstanding"
+                />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Declared not held</CardTitle>
+              <p className="text-xs text-muted-foreground mt-1">
+                Documents people in that category have said, in as many words, that they do not
+                have. A high count is a document the category probably should not be asking for —
+                the opposite signal to the first table, and the one the Yes/No answers were
+                collecting all along without anywhere to show them.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {data.declaredNotHeld.length === 0 ? (
+                <p className="text-sm text-gray-400 flex items-center gap-2">
+                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  Nobody has answered &ldquo;no&rdquo; to a document yet.
+                </p>
+              ) : (
+                <DataTable
+                  data={data.declaredNotHeld}
+                  columns={declinedColumns}
+                  getRowKey={r => `${r.visaType}-${r.documentType}`}
+                  searchKeys={['documentType', 'visaType']}
+                  exportFilename="declared-not-held"
+                  emptyTitle="No answers yet"
                 />
               )}
             </CardContent>

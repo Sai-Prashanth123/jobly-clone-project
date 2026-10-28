@@ -55,3 +55,46 @@ describe('employee ZIP validation', () => {
     expect(withZip(zip).success).toBe(false);
   });
 });
+
+/**
+ * The "do you have this?" answer on an identity-document row.
+ *
+ * Zod strips unknown keys, so before `held` was declared the wizard's answer
+ * was discarded on the way in — which is why the question came back unanswered
+ * on every visit, and why it looked as though the toggle only existed for some
+ * work statuses.
+ */
+describe('identity document held answer', () => {
+  const withDocs = (docs: unknown[]) => parse({ identityDocuments: docs });
+
+  it('keeps a no answer instead of stripping it', () => {
+    const result = withDocs([{ type: 'driver_license', held: 'no' }]);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.identityDocuments?.[0]).toMatchObject({
+      type: 'driver_license', held: 'no',
+    });
+  });
+
+  it('keeps a yes answer', () => {
+    const result = withDocs([{ type: 'green_card', held: 'yes' }]);
+    expect(result.success && result.data.identityDocuments?.[0].held).toBe('yes');
+  });
+
+  // Three states, not two: yes, no, and never asked. A default would erase the
+  // third and make every untouched row look answered.
+  it('leaves an unanswered row unanswered rather than defaulting it', () => {
+    const result = withDocs([{ type: 'passport', number: 'X1' }]);
+    expect(result.success).toBe(true);
+    expect(result.success && result.data.identityDocuments?.[0].held).toBeUndefined();
+  });
+
+  it('rejects anything that is not yes or no', () => {
+    expect(withDocs([{ type: 'passport', held: 'maybe' }]).success).toBe(false);
+    expect(withDocs([{ type: 'passport', held: true }]).success).toBe(false);
+  });
+
+  it('still accepts the rows it always accepted', () => {
+    const result = withDocs([{ type: 'passport', number: 'X1', state: 'TX', expiry: '2030-01-01' }]);
+    expect(result.success).toBe(true);
+  });
+});

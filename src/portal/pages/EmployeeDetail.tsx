@@ -1,4 +1,4 @@
-import { identityDocLabel } from '../lib/documentTypes';
+import { identityDocLabel, rowCollectsNumber } from '../lib/documentTypes';
 import { canSeeRestrictedDocs, visibleIdentityDocs, visibleDocuments } from '../lib/docVisibility';
 import { missingEmployerDocs } from '../lib/documentTypes';
 import { ClientEngagementCard } from '../components/employees/ClientEngagementCard';
@@ -34,7 +34,7 @@ import { ExpiryBadge } from '../components/shared/ExpiryBadge';
 import { expiryStatus } from '../lib/expiry';
 import { formatDate, formatCurrency, maskSsn } from '../lib/utils';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
-import { findIdentityDoc, hasIdentityDocDetail, photoIdOf, photoIdLabel } from '../lib/identityDocs';
+import { findIdentityDoc, isIdentityRowListed, photoIdOf, photoIdLabel } from '../lib/identityDocs';
 import { DetailField as Field } from '../components/shared/DetailField';
 
 const E_VERIFY_STATUS_LABELS: Record<string, string> = {
@@ -178,10 +178,16 @@ export default function EmployeeDetail() {
   // and the data looked lost rather than merely partial.
   const hasEC = !!ec && !!(ec.name || ec.phone || ec.relationship || ec.altPhone
     || ec.address || ec.city || ec.state || ec.zip);
+  // isIdentityRowListed, not hasIdentityDocDetail: a row carrying only
+  // "held: no" has no number or expiry to show but is exactly the answer HR
+  // wants to see. The tiles below still use hasIdentityDocDetail/findIdentityDoc,
+  // so a declined document cannot render a passport panel full of dashes.
+  // Declines sort last — the data first, the answers after.
   const identityDocs = visibleIdentityDocs(
-    (employee.identityDocuments ?? []).filter(hasIdentityDocDetail),
+    (employee.identityDocuments ?? []).filter(isIdentityRowListed),
     user?.role,
-  );
+  ).slice().sort((a, b) => Number(a.held === 'no') - Number(b.held === 'no'));
+  const notHeldCount = identityDocs.filter(d => d.held === 'no').length;
   const passport = findIdentityDoc(employee.identityDocuments, 'passport');
   const photoId = photoIdOf(employee.identityDocuments);
   // Work-authorisation paperwork HR wants beside the job details rather than
@@ -865,18 +871,54 @@ export default function EmployeeDetail() {
 
       {identityDocs.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">Identity & Documents</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Identity &amp; Documents
+              {notHeldCount > 0 && (
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  · {notHeldCount} declared not held
+                </span>
+              )}
+            </CardTitle>
+          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {identityDocs.map((d, i) => (
-                <div key={`${d.type}-${i}`} className={`p-3 rounded-md border ${expiryStatus(d.expiry) === 'expired' ? 'bg-red-50/60 border-red-200' : expiryStatus(d.expiry) === 'expiring' ? 'bg-amber-50/60 border-amber-200' : 'bg-gray-50/60 border-gray-100'}`}>
+              {identityDocs.map((d, i) => d.held === 'no' ? (
+                /* Answered "no": there is no number, no expiry and nothing
+                   uploaded, so showing the usual dashes would read as missing
+                   data rather than as a settled answer. */
+                <div key={`${d.type}-${i}`} className="p-3 rounded-md border border-dashed border-gray-200 bg-gray-50/60">
                   <div className="flex items-start justify-between gap-2">
                     <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
                       {identityDocLabel(d.type, (d as { label?: string }).label)}
                     </p>
+                    <span className="text-[10px] font-medium text-gray-500 bg-gray-100 border border-gray-200 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                      Not held
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Employee answered &ldquo;No&rdquo; — nothing to upload.
+                  </p>
+                </div>
+              ) : (
+                <div key={`${d.type}-${i}`} className={`p-3 rounded-md border ${expiryStatus(d.expiry) === 'expired' ? 'bg-red-50/60 border-red-200' : expiryStatus(d.expiry) === 'expiring' ? 'bg-amber-50/60 border-amber-200' : 'bg-gray-50/60 border-gray-100'}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">
+                      {identityDocLabel(d.type, (d as { label?: string }).label)}
+                      {/* An explicit yes, distinguishable from a row HR simply
+                          typed details into. Absence of an answer stays blank
+                          rather than being dressed up as one. */}
+                      {d.held === 'yes' && (
+                        <span className="ml-1.5 text-[10px] font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-full normal-case">
+                          Yes
+                        </span>
+                      )}
+                    </p>
                     <ExpiryBadge date={d.expiry} />
                   </div>
-                  <p className="text-sm font-medium text-gray-900 mt-0.5 font-mono">{d.number || '—'}</p>
+                  {rowCollectsNumber(d.type) && (
+                    <p className="text-sm font-medium text-gray-900 mt-0.5 font-mono">{d.number || '—'}</p>
+                  )}
                   {(d.state || d.expiry) && (
                     <p className="text-[11px] text-muted-foreground mt-0.5">
                       {d.state && <span>State: {d.state}</span>}

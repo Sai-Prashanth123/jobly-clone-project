@@ -1,30 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import { IDENTITY_DOC_ROWS, ROW_VISA_GATE, ROW_VISA_EXCLUDE, getRequiredIdentityTypes } from './documentTypes';
+import {
+  IDENTITY_DOC_ROWS, ROW_VISA_GATE, ROW_VISA_EXCLUDE,
+  getRequiredIdentityTypes, isIdentityRowVisible,
+} from './documentTypes';
 
 /**
  * Which identity rows an employee is shown, per visa type.
  *
- * The filter lives inline in NewEmployee.tsx, so this mirrors its rules rather
- * than importing them. That mirroring is the point: the duplicate STEM OPT
- * card survived a removal because an EARLIER branch in that filter returned
- * true for OPT and STEM OPT before the removal was ever reached — the fix was
- * dead code for precisely the two visa types that could see the problem, and
- * nothing failed. Ordering is the thing under test.
+ * Ordering is the thing under test. The duplicate STEM OPT card survived a
+ * removal because an EARLIER branch returned true for OPT and STEM OPT before
+ * the removal was ever reached — the fix was dead code for precisely the two
+ * visa types that could see the problem, and nothing failed.
+ *
+ * These assertions were originally written against a copy of the rules, because
+ * the real ones were inlined in NewEmployee.tsx's JSX. They now run against
+ * isIdentityRowVisible itself, so the ordering being asserted is the ordering
+ * that ships.
  */
-const NEVER_SHOWN = new Set(['opt_card', 'stem_opt_card']);
-const OPT_ONLY = new Set(['i983', 'i20']);
-
-function isShown(rowType: string, visaType: string): boolean {
-  // 1. Absolute: the OPT/STEM OPT cards ARE the EAD, never their own row.
-  if (NEVER_SHOWN.has(rowType)) return false;
-  // 2. F-1 specific.
-  if (OPT_ONLY.has(rowType)) return visaType === 'opt' || visaType === 'stem_opt';
-  // 3. Explicit excludes beat the allow-list.
-  if ((ROW_VISA_EXCLUDE[rowType] ?? []).includes(visaType)) return false;
-  // 4. Allow-list, where one exists.
-  const gate = ROW_VISA_GATE[rowType];
-  return gate ? gate.includes(visaType) : true;
-}
+const isShown = (rowType: string, visaType: string): boolean =>
+  isIdentityRowVisible(rowType, visaType);
 
 describe('the OPT and STEM OPT card rows are never shown', () => {
   // The reported case. Previously true, because rule 2 ran first.
