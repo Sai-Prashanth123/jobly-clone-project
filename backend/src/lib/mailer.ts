@@ -1,5 +1,6 @@
 import { BILLING_EMAIL, BILLING_FROM, BILLING_FOOTER, INVOICE_THANK_YOU } from './billing';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
+import { splitSuppressed, AllRecipientsSuppressedError } from './mailSuppression';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { formatDateSafe, formatDateUS } from './dateUtils';
 import { getJoblyLogoBuffer } from './joblyLogo';
@@ -203,12 +204,29 @@ async function sendWithRetry(mail: MailOptions): Promise<void> {
     throw new Error('Email is not configured. Set MAIL_DRIVER=ses and MAIL_FROM to a verified SES identity.');
   }
 
-  const recipients = toList(mail.to);
-  const ccRecipients = mail.cc ? toList(mail.cc) : [];
-  const bccRecipients = mail.bcc ? toList(mail.bcc) : [];
+  let recipients = toList(mail.to);
+  let ccRecipients = mail.cc ? toList(mail.cc) : [];
+  let bccRecipients = mail.bcc ? toList(mail.bcc) : [];
   if (recipients.length === 0 && ccRecipients.length === 0 && bccRecipients.length === 0) {
     console.warn(`[mailer] skipped "${mail.subject}" — no recipients`);
     return;
+  }
+
+  // SES accepts a message addressed to a suppressed recipient and discards it,
+  // so without this check "sent" can mean "thrown away". Drop those addresses
+  // here and fail outright if none are left — see mailSuppression.ts for the
+  // invoice reminder that was silently binned for weeks because of it.
+  const split = await splitSuppressed({ to: recipients, cc: ccRecipients, bcc: bccRecipients });
+  if (split.suppressed.length > 0) {
+    console.error(
+      `[mailer] ✗ suppressed recipient(s) removed from "${mail.subject}": ${split.suppressed.join(', ')}`,
+    );
+    recipients = split.to;
+    ccRecipients = split.cc;
+    bccRecipients = split.bcc;
+    if (recipients.length === 0 && ccRecipients.length === 0 && bccRecipients.length === 0) {
+      throw new AllRecipientsSuppressedError(split.suppressed);
+    }
   }
 
   try {

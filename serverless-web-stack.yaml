@@ -868,6 +868,16 @@ Resources:
                 Resource:
                   - !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:identity/*'
                   - !Sub 'arn:${AWS::Partition}:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/*'
+              # Read the account suppression list before sending. SES accepts a
+              # message addressed to a suppressed recipient and then discards
+              # it, so without this the app cannot tell "delivered" from
+              # "silently binned" - which is how an overdue-invoice reminder
+              # went unseen for weeks. Account-scoped, so no resource ARN
+              # exists to narrow it to; read-only either way, and the write
+              # actions (Put/DeleteSuppressedDestination) are NOT granted.
+              - Effect: Allow
+                Action: ses:GetSuppressedDestination
+                Resource: '*'
         - PolicyName: documents-bucket
           PolicyDocument:
             Version: '2012-10-17'
