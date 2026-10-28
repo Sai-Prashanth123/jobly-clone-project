@@ -45,3 +45,41 @@ export function uniqueObjectPath(prefix: string, originalName: string): string {
   const unique = `${Date.now()}-${randomBytes(4).toString('hex')}`;
   return `${prefix.replace(/\/+$/, '')}/${unique}-${safeFileName(originalName)}`;
 }
+
+/**
+ * Refuse a storage key that does not belong to this entity.
+ *
+ * The inverse of uniqueObjectPath, and it lives beside it so the two cannot
+ * drift: if that function's shape changes, this regex has to change with it.
+ *
+ * This is the whole defence behind a presigned upload. The browser PUTs
+ * straight to S3 and then tells the server "I put a file at this path" — so
+ * the path it names has to be proven to sit inside the prefix that caller was
+ * already allowed to write to. Without this, a user could register an object
+ * belonging to someone else and attach it to their own record.
+ *
+ * `prefix` is the entity id for document uploads, or something like
+ * `weekly/<timesheetId>` for the bespoke-column surfaces.
+ */
+/** `<epoch>-<8 hex>-<safeFileName>` — the tail uniqueObjectPath generates. */
+const UNIQUE_SEGMENT = /^\d+-[0-9a-f]{8}-[A-Za-z0-9._-]{0,120}$/;
+
+export function assertPathBelongsToEntity(prefix: string, storagePath: string): void {
+  const clean = prefix.replace(/\/+$/, '');
+
+  // Compared as a plain string rather than interpolated into a RegExp: a
+  // prefix carrying regex metacharacters would otherwise widen the pattern and
+  // match paths it should not, and escaping it correctly is the kind of thing
+  // that silently rots.
+  if (!clean || !storagePath.startsWith(`${clean}/`)) {
+    throw new Error(`Storage path does not belong to this record: ${storagePath}`);
+  }
+
+  // Exactly one segment may follow, and it must look like something
+  // uniqueObjectPath produced. safeFileName has already stripped slashes and
+  // "..", so no traversal sequence can survive this.
+  const tail = storagePath.slice(clean.length + 1);
+  if (!UNIQUE_SEGMENT.test(tail)) {
+    throw new Error(`Storage path does not belong to this record: ${storagePath}`);
+  }
+}

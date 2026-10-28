@@ -214,6 +214,56 @@ export async function timesheets(req: Request, res: Response, next: NextFunction
   } catch (err) { next(err); }
 }
 
+/**
+ * Where to PUT a file, for an upload that bypasses this server.
+ *
+ * The ownership check below is repeated from uploadDoc and is NOT redundant:
+ * this endpoint mints a signed URL, and without it an employee could obtain
+ * one scoped to another employee's prefix. The bytes would then be sitting in
+ * that person's folder, and registerUploadedDocument — which only verifies
+ * that a path matches the record it is given — would accept them later from
+ * the owner's own session.
+ */
+export async function createDocumentUploadUrl(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only manage their own documents');
+    }
+    const { fileName } = req.body as { fileName: string };
+    const data = await storageSvc.createDocumentUploadTarget('employee', req.params.id, fileName);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
+/** Record a file the browser has already uploaded. */
+export async function registerDocument(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    if (req.user!.role === 'employee' && req.user!.employeeId !== req.params.id) {
+      throw new ForbiddenError('Employees may only manage their own documents');
+    }
+    const b = req.body as {
+      storagePath: string; fileName: string; name?: string; docType?: string;
+      expiryDate?: string | null; category?: string | null; replace?: boolean;
+    };
+    const data = await storageSvc.registerUploadedDocument({
+      entityType: 'employee',
+      entityId: req.params.id,
+      storagePath: b.storagePath,
+      uploadedBy: req.user!.id,
+      fileName: b.fileName,
+      nameOverride: b.name,
+      docTypeOverride: b.docType,
+      expiryDate: b.expiryDate,
+      category: b.category,
+      replaceExisting: b.replace,
+    });
+    // Same reasoning as uploadDoc: awaited, because Lambda freezes the
+    // container on response and an unawaited notify never runs.
+    await svc.notifyEmployeeDocumentUpload(req.params.id, data);
+    res.status(201).json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function uploadDoc(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const file = req.file;

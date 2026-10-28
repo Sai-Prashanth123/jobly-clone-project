@@ -40,6 +40,30 @@ export const supabaseStorageProvider: StorageProvider = {
     return data.signedUrl;
   },
 
+  async signedUploadUrl(bucket, path) {
+    // Supabase signs an upload target rather than taking a content type — the
+    // type is whatever the client sends. That is acceptable here because the
+    // protection that matters is on the way back OUT: signedUrl below always
+    // passes `download`, so nothing from this driver is ever rendered inline.
+    const { data, error } = await supabaseAdmin.storage
+      .from(bucket)
+      .createSignedUploadUrl(path);
+    if (error || !data?.signedUrl) throw error ?? new Error(`Upload signing failed for ${bucket}/${path}`);
+    return data.signedUrl;
+  },
+
+  async stat(bucket, path) {
+    const slash = path.lastIndexOf('/');
+    const dir = slash === -1 ? '' : path.slice(0, slash);
+    const name = slash === -1 ? path : path.slice(slash + 1);
+    const { data, error } = await supabaseAdmin.storage.from(bucket).list(dir, { search: name });
+    if (error) throw error;
+    const hit = (data ?? []).find(o => o.name === name);
+    if (!hit) return null;
+    const meta = (hit as { metadata?: { size?: number; mimetype?: string } }).metadata;
+    return { size: meta?.size ?? 0, contentType: meta?.mimetype };
+  },
+
   publicUrl(bucket, path) {
     return supabaseAdmin.storage.from(bucket).getPublicUrl(path).data.publicUrl;
   },

@@ -96,58 +96,60 @@ export function formatZip(raw: string): string {
   return digits.length <= 5 ? digits : `${digits.slice(0, 5)}-${digits.slice(5)}`;
 }
 
-// Mirrors backend ALLOWED_MIME_TYPES (backend/src/middleware/upload.ts) for
-// instant client-side feedback — the accept="..." attribute on a file input
-// is only a picker *hint*; it does not stop drag-and-drop or "All Files" in
-// the OS dialog, so every upload needs this check in its onChange too.
-export const ALLOWED_DOCUMENT_MIME_TYPES = new Set([
-  'application/pdf', 'image/png', 'image/jpeg', 'image/gif', 'image/webp',
-  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain', 'text/csv',
-]);
-export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+/**
+ * The one upload limit, mirroring MAX_UPLOAD_BYTES in
+ * backend/src/lib/storage/uploadLimits.ts. uploadLimits.parity.test.ts fails if
+ * the two drift apart.
+ *
+ * 100 MB is now a real number. It used to say 20 MB while the infrastructure
+ * refused anything over about 4.5 MB, because uploads passed through Lambda;
+ * they now go straight to storage (see lib/uploadDocument.ts).
+ */
+export const MAX_DOCUMENT_BYTES = 100 * 1024 * 1024;
 
-/** Returns an error message if the file should be rejected, or null if it's fine. */
+/**
+ * The limit as a person reads it. EVERY piece of user-facing copy derives from
+ * this — the old number was retyped on six screens, so raising it once left
+ * five of them lying. uploadLimits.parity.test.ts fails on a hard-typed size.
+ */
+export const MAX_DOCUMENT_SIZE_LABEL = `${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))} MB`;
+
+/**
+ * Returns an error message if the file should be rejected, or null if it's fine.
+ *
+ * Size only. There is no longer a type whitelist: people onboard with whatever
+ * their university or attorney sent them, and a rejected .pages or .zip meant
+ * an email to HR instead. Safety moved to how files are SERVED rather than
+ * what may be stored — see backend contentType.ts and the attachment-by-default
+ * download URLs.
+ *
+ * Kept as a function even though it now checks one thing, so all ~12 call sites
+ * stay unchanged and the next rule has somewhere to live.
+ */
 export function validateUploadFile(file: File, maxBytes = MAX_DOCUMENT_BYTES): string | null {
-  if (file.size > maxBytes) return `${file.name} is larger than ${Math.round(maxBytes / (1024 * 1024))}MB.`;
-  // Some Windows setups report .doc/.docx as a generic/empty mimetype (e.g.
-  // application/octet-stream) instead of the real Word MIME type — fall back
-  // to a filename-extension check, mirroring backend/src/middleware/upload.ts's
-  // fileFilter so a file this rejects wouldn't have been accepted server-side
-  // either, and a file it allows here won't be rejected after upload.
-  const hasWordExtension = /\.docx?$/i.test(file.name);
-  if (!ALLOWED_DOCUMENT_MIME_TYPES.has(file.type) && !hasWordExtension) {
-    return `${file.name}: that file type isn't allowed.`;
+  if (file.size === 0) return `${file.name} is empty.`;
+  if (file.size > maxBytes) {
+    return `${file.name} is larger than ${Math.round(maxBytes / (1024 * 1024))} MB.`;
   }
   return null;
 }
 
-// Identity & Documents uploads (the onboarding wizard's section 07) accept
-// PDFs, image scans and Word documents — narrower than
-// ALLOWED_DOCUMENT_MIME_TYPES above (no spreadsheets/plain text), but shared
-// by BOTH controls in that section: the single-file rows in NewEmployee.tsx
-// and the multi-file MultiFileUploadSlot. They previously carried separate
-// hardcoded lists that drifted apart twice — first Word docs were blocked for
-// the questionnaire templates, then for every other row — so the rule lives
-// here once instead.
-export const IDENTITY_DOC_ACCEPT = '.pdf,.jpg,.jpeg,.png,.doc,.docx';
-const IDENTITY_DOC_MIME_TYPES = new Set([
-  'application/pdf', 'image/jpeg', 'image/png',
-  'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-]);
+/**
+ * Identity & Documents uploads (the onboarding wizard's section 07).
+ *
+ * Empty, so the file picker shows everything. It used to list
+ * '.pdf,.jpg,.jpeg,.png,.doc,.docx', which twice drifted from the backend's own
+ * list and blocked Word documents — and an `accept` attribute is only a picker
+ * HINT anyway: it never stopped drag-and-drop or "All Files" in the OS dialog,
+ * so it was never the thing enforcing anything.
+ *
+ * Kept as a named export so the six inputs that spread it stay unchanged.
+ */
+export const IDENTITY_DOC_ACCEPT = '';
 
 /** Returns an error message if the file should be rejected, or null if it's fine. */
 export function validateIdentityDocFile(file: File): string | null {
-  // Same Windows generic-mimetype fallback as validateUploadFile above.
-  const hasWordExtension = /\.docx?$/i.test(file.name);
-  if (!IDENTITY_DOC_MIME_TYPES.has(file.type) && !hasWordExtension) {
-    return 'Please upload a PDF, Word document, JPEG, or PNG file.';
-  }
-  if (file.size > MAX_DOCUMENT_BYTES) {
-    return `${file.name} is larger than ${Math.round(MAX_DOCUMENT_BYTES / (1024 * 1024))}MB.`;
-  }
-  return null;
+  return validateUploadFile(file);
 }
 
 export function maskSsn(ssn: string): string {

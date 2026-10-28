@@ -26,7 +26,7 @@ import { useHolidays } from '../hooks/useHolidays';
 import { useAssignments } from '../hooks/useAssignments';
 import { apiClient } from '../lib/apiClient';
 import { exportToCsv } from '../lib/exportCsv';
-import { formatDateUS, validateUploadFile } from '../lib/utils';
+import { formatDateUS, validateUploadFile, MAX_DOCUMENT_SIZE_LABEL } from '../lib/utils';
 import {
   buildMonthSkeleton, computeHours, computeMonthlySummary,
   currentMonth, monthInputValue, parseMonthInput, monthLabel, daysInMonth,
@@ -68,7 +68,6 @@ const LEAVE_REASON_OPTIONS: { value: string; label: string }[] = [
 
 // Accepted client-proof file types — mirrors the backend multer whitelist.
 const PROOF_ACCEPT = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv';
-const MAX_PROOF_BYTES = 20 * 1024 * 1024;
 
 const ROW_TINT: Record<string, string> = {
   weekend: 'bg-gray-50/70',
@@ -977,7 +976,7 @@ export default function MyMonthlyTimesheet() {
           {!isLocked && !periodClosed && showClientProofCard && (
             <div className="rounded-lg border border-gray-200 bg-gray-50/60 px-4 py-3">
               <Label className="text-[12px] font-medium text-gray-800">Client-signed timesheet <span className="text-muted-foreground font-normal">(optional)</span></Label>
-              <p className="text-[11px] text-muted-foreground mb-2">Upload a PDF / image / DOC of the client-signed copy as proof. Max 20 MB.</p>
+              <p className="text-[11px] text-muted-foreground mb-2">Upload the client-signed copy as proof. Any file type, max {MAX_DOCUMENT_SIZE_LABEL}.</p>
               {hasClientProof ? (
                 <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-white border border-emerald-200">
                   <div className="flex items-center gap-2 min-w-0">
@@ -1003,7 +1002,7 @@ export default function MyMonthlyTimesheet() {
                       onChange={async e => {
                         const f = e.target.files?.[0];
                         if (!f) return;
-                        { const err = validateUploadFile(f, MAX_PROOF_BYTES); if (err) { toast.error(err); e.target.value = ''; return; } }
+                        { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
                         const saved = await ensureSaved();
                         if (!saved) { toast.warning('Add some hours before attaching a client-signed proof.'); return; }
                         try {
@@ -1052,7 +1051,7 @@ export default function MyMonthlyTimesheet() {
                     onChange={async e => {
                       const f = e.target.files?.[0];
                       if (!f) return;
-                      { const err = validateUploadFile(f, MAX_PROOF_BYTES); if (err) { toast.error(err); e.target.value = ''; return; } }
+                      { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
                       const saved = await ensureSaved();
                       if (!saved) { toast.warning('Add some hours before attaching a client-signed proof.'); return; }
                       try {
@@ -1065,7 +1064,7 @@ export default function MyMonthlyTimesheet() {
                       e.target.value = '';
                     }}
                   />
-                  <span className="text-[11px] text-muted-foreground">PDF / JPG / PNG / DOC / XLS — max 20 MB</span>
+                  <span className="text-[11px] text-muted-foreground">Any file type — max {MAX_DOCUMENT_SIZE_LABEL}</span>
                 </div>
               )}
             </div>

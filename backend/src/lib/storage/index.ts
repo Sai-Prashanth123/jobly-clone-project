@@ -30,6 +30,8 @@ export const storageProvider: StorageProvider = {
   remove: (...a) => resolve().remove(...a),
   list: (...a) => resolve().list(...a),
   signedUrl: (...a) => resolve().signedUrl(...a),
+  signedUploadUrl: (...a) => resolve().signedUploadUrl(...a),
+  stat: (...a) => resolve().stat(...a),
   publicUrl: (...a) => resolve().publicUrl(...a),
 };
 

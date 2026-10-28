@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { uploadFileDirect } from '../lib/uploadDocument';
 import { apiClient } from '../lib/apiClient';
 import { isValidId } from '../lib/utils';
 import type { Employee, DirectoryEmployee } from '../types';
@@ -476,14 +477,34 @@ export function useReopenOnboarding(id: string) {
   });
 }
 
+export interface DocumentUploadInput {
+  file: File;
+  name?: string;
+  docType?: string;
+  expiryDate?: string;
+  replace?: boolean;
+  onProgress?: (fraction: number) => void;
+}
+
+/**
+ * Upload a document for an employee.
+ *
+ * Takes the file and its metadata rather than a FormData, because the bytes no
+ * longer travel through our API — uploadFileDirect PUTs them straight to
+ * storage, which is what lifted the real ceiling from ~4.5 MB.
+ */
 export function useUploadEmployeeDocument(employeeId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (formData: FormData) => {
-      const { data } = await apiClient.post(`/employees/${employeeId}/documents`, formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
+    mutationFn: async (input: DocumentUploadInput) => {
+      const { file, onProgress, ...meta } = input;
+      return uploadFileDirect({
+        urlEndpoint: `/employees/${employeeId}/documents/upload-url`,
+        registerEndpoint: `/employees/${employeeId}/documents/register`,
+        file,
+        meta,
+        onProgress,
       });
-      return data;
     },
     onSuccess: () => {
       // Documents live inside the employee detail — invalidate to get fresh list.
@@ -650,6 +671,8 @@ export function useExpiringDocuments(days = 90) {
 export interface CandidateGap {
   visaType: string;
   documentType: string;
+  /** Display group, so related findings sort together. */
+  category: string;
   heldBy: number;
   categorySize: number;
   heldPercent: number;
@@ -657,9 +680,22 @@ export interface CandidateGap {
 export interface UnmetRequirement {
   visaType: string;
   documentType: string;
+  category: string;
   missingFor: number;
   categorySize: number;
 }
+/** A document people in a category have explicitly answered "no" to. */
+export interface DeclaredNotHeld {
+  visaType: string;
+  documentType: string;
+  category: string;
+  declaredNo: number;
+  categorySize: number;
+  percent: number;
+  /** The document is required for this category, so the answer is being ignored. */
+  conflictsWithRequirement: boolean;
+}
+
 export interface UnknownLabel {
   documentType: string;
   count: number;
@@ -669,6 +705,7 @@ export interface DocumentGapsReport {
   categories: Array<{ visaType: string; employees: number }>;
   candidateGaps: CandidateGap[];
   unmetRequirements: UnmetRequirement[];
+  declaredNotHeld: DeclaredNotHeld[];
   unknownLabels: UnknownLabel[];
   generatedAt: string;
 }

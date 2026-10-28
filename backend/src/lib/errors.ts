@@ -54,3 +54,17 @@ export class ConflictError extends AppError {
     super(message, 409, true, details);
   }
 }
+
+/**
+ * The thing you uploaded is too big.
+ *
+ * 413 rather than 400 so it is distinguishable from ordinary bad input — the
+ * client surfaces it as "File too large" (apiError.ts), and it is the same
+ * status API Gateway returns when a request body exceeds what Lambda can
+ * carry, so one branch in the UI covers both.
+ */
+export class PayloadTooLargeError extends AppError {
+  constructor(message: string, details?: Record<string, unknown>) {
+    super(message, 413, true, details);
+  }
+}

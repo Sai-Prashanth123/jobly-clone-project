@@ -19,6 +19,7 @@ import {
   S3Client,
   PutObjectCommand,
   GetObjectCommand,
+  HeadObjectCommand,
   DeleteObjectsCommand,
   ListObjectsV2Command,
 } from '@aws-sdk/client-s3';
@@ -104,9 +105,41 @@ export const s3StorageProvider: StorageProvider = {
         ...(opts?.download
           ? { ResponseContentDisposition: `attachment; filename="${opts.download.replace(/"/g, '')}"` }
           : {}),
+        ...(opts?.forceContentType ? { ResponseContentType: opts.forceContentType } : {}),
       }),
       { expiresIn: clampExpiry(expiresInSeconds) },
     );
+  },
+
+  async signedUploadUrl(bucket, path, expiresInSeconds, opts) {
+    // Mirrors signedUrl deliberately — same key builder, same expiry clamp —
+    // so the two cannot drift apart in how they address an object.
+    return getSignedUrl(
+      s3(),
+      new PutObjectCommand({
+        Bucket: bucketName(),
+        Key: s3Key(bucket, path),
+        ContentType: opts.contentType,
+      }),
+      { expiresIn: clampExpiry(expiresInSeconds) },
+    );
+  },
+
+  async stat(bucket, path) {
+    try {
+      const res = await s3().send(new HeadObjectCommand({
+        Bucket: bucketName(),
+        Key: s3Key(bucket, path),
+      }));
+      return { size: res.ContentLength ?? 0, contentType: res.ContentType };
+    } catch (err) {
+      // A missing key is a 404 here because the role holds s3:ListBucket; 403
+      // is caught too so this still answers "no such object" rather than
+      // throwing if that policy is ever narrowed.
+      const status = (err as { $metadata?: { httpStatusCode?: number } })?.$metadata?.httpStatusCode;
+      if (status === 404 || status === 403) return null;
+      throw err;
+    }
   },
 
   publicUrl(bucket, path) {

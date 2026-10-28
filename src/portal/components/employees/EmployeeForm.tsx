@@ -113,12 +113,12 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
 
     if (isEdit && initial?.id) {
       // Edit mode: upload immediately
-      const fd = new FormData();
-      fd.append('file', newDocFile);
-      fd.append('name', newDocFile.name);
-      fd.append('docType', newDocType);
       try {
-        await uploadDoc.mutateAsync(fd);
+        await uploadDoc.mutateAsync({
+          file: newDocFile,
+          name: newDocFile.name,
+          docType: newDocType,
+        });
         toast.success('Document uploaded');
       } catch {
         toast.error('Failed to upload document');

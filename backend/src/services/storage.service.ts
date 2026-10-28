@@ -1,6 +1,12 @@
-import { uniqueObjectPath } from '../lib/storage/objectPath';
+import { uniqueObjectPath, assertPathBelongsToEntity } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
-import { NotFoundError, ForbiddenError } from '../lib/errors';
+import {
+  NotFoundError, ForbiddenError, ValidationError, ConflictError, PayloadTooLargeError,
+} from '../lib/errors';
+import { contentTypeForFileName } from '../lib/storage/contentType';
+import {
+  MAX_UPLOAD_BYTES, UPLOAD_URL_TTL_SECONDS, maxUploadLabel, isInlineSafe, RENDER_MAX_BYTES,
+} from '../lib/storage/uploadLimits';
 import mammoth from 'mammoth';
 import WordExtractor from 'word-extractor';
 import * as XLSX from 'xlsx';
@@ -77,6 +83,197 @@ async function assertLegalCanAccessDocument(doc: { entity_type: string; entity_i
   throw new ForbiddenError('This document is not linked to a case you can access');
 }
 
+/**
+ * Write the `documents` row for a file that is already in storage.
+ *
+ * Extracted from uploadDocument so the presigned-upload path, where the
+ * browser PUTs straight to S3 and the server never sees the bytes, records a
+ * document exactly the same way a multipart upload does — including the
+ * replacement semantics below, which are easy to get subtly different in a
+ * second implementation.
+ */
+async function insertDocumentRow(a: {
+  entityType: 'employee' | 'client' | 'invoice' | 'case';
+  entityId: string;
+  storagePath: string;
+  name: string;
+  type: string;
+  uploadedBy: string;
+  expiryDate?: string | null;
+  category?: string | null;
+  replaceExisting?: boolean;
+}) {
+  // Don't generate/store a signed URL here: it's an extra storage round-trip on
+  // every upload (slows uploads) and the value expires in ~1h anyway. Downloads
+  // always mint a fresh, download-forcing URL via getDocumentSignedUrl below
+  // (GET /documents/:id/url).
+  const { data: doc, error } = await supabaseAdmin
+    .from('documents')
+    .insert({
+      entity_type: a.entityType,
+      entity_id: a.entityId,
+      name: a.name,
+      type: a.type,
+      storage_path: a.storagePath,
+      storage_url: null,
+      uploaded_by: a.uploadedBy,
+      expiry_date: a.expiryDate || null,
+      category: a.category || null,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  // Retire the previous file(s) for this slot, but only AFTER the new row is
+  // safely stored — deleting first would lose the old document if the upload
+  // then failed, leaving the employee with neither.
+  //
+  // Best-effort: the replacement has already succeeded and been returned, so a
+  // failure to tidy up must not fail the request. The worst case is the old
+  // behaviour (a leftover duplicate), which is visible and fixable by hand.
+  if (a.replaceExisting && doc?.id) {
+    try {
+      const { data: superseded } = await supabaseAdmin
+        .from('documents')
+        .select('id')
+        .eq('entity_type', a.entityType)
+        .eq('entity_id', a.entityId)
+        .eq('type', a.type)
+        .neq('id', doc.id);
+      for (const old of superseded ?? []) {
+        await deleteDocument(old.id);
+      }
+    } catch (err) {
+      console.error('[storage] failed to remove superseded documents for', a.entityId, a.type, err);
+    }
+  }
+
+  return doc;
+}
+
+/**
+ * Hand the browser a URL it can PUT a file straight to.
+ *
+ * The bytes never reach this server. Uploads used to travel through Lambda,
+ * where API Gateway base64-encodes the body and Lambda caps a request at 6 MB
+ * — a real ceiling of about 4.5 MiB, while every screen promised 20 MB. A
+ * 7.9 MB passport was rejected by API Gateway before Express ran, which is why
+ * raising the multer limit could never have fixed it.
+ *
+ * THE SERVER CHOOSES THE KEY. It is the same uniqueObjectPath call the
+ * multipart path uses, so the key format is unchanged, every existing
+ * storage_path keeps working, and — crucially — a client cannot name a
+ * location of its own choosing. registerUploadedDocument re-checks that the
+ * path it is later given sits under this entity's prefix.
+ */
+export async function createDocumentUploadTarget(
+  entityType: 'employee' | 'client' | 'invoice' | 'case',
+  entityId: string,
+  fileName: string,
+): Promise<{
+  uploadUrl: string;
+  storagePath: string;
+  contentType: string;
+  maxBytes: number;
+  expiresInSeconds: number;
+}> {
+  const bucket = BUCKET_MAP[entityType];
+  const storagePath = uniqueObjectPath(entityId, fileName);
+
+  // Signed into the URL, so the browser cannot store a file under a type it
+  // picked — an uploaded .html is stored as application/octet-stream and can
+  // never be served back as something a browser will execute.
+  const contentType = contentTypeForFileName(fileName);
+
+  const uploadUrl = await storageProvider.signedUploadUrl(
+    bucket, storagePath, UPLOAD_URL_TTL_SECONDS, { contentType },
+  );
+
+  // maxBytes travels back so the client's error copy is never a retyped number.
+  return {
+    uploadUrl, storagePath, contentType,
+    maxBytes: MAX_UPLOAD_BYTES,
+    expiresInSeconds: UPLOAD_URL_TTL_SECONDS,
+  };
+}
+
+/**
+ * Record a file the browser has already put in storage.
+ *
+ * Everything the client says about the upload is checked, because by this
+ * point the client is the only one who has seen it:
+ *
+ *   the path   must sit under this entity's prefix, or a user could attach
+ *              somebody else's document to their own record
+ *   existence  a path can be claimed without anything having been uploaded
+ *   the size   is read from storage, never taken from the request
+ *
+ * An oversize object is deleted rather than left orphaned — otherwise the size
+ * limit is merely advisory and the bucket accumulates files nothing points at.
+ */
+export async function registerUploadedDocument(a: {
+  entityType: 'employee' | 'client' | 'invoice' | 'case';
+  entityId: string;
+  storagePath: string;
+  uploadedBy: string;
+  fileName: string;
+  nameOverride?: string;
+  docTypeOverride?: string;
+  expiryDate?: string | null;
+  category?: string | null;
+  replaceExisting?: boolean;
+}) {
+  const bucket = BUCKET_MAP[a.entityType];
+
+  // 1. The path must be one we issued for THIS record.
+  try {
+    assertPathBelongsToEntity(a.entityId, a.storagePath);
+  } catch {
+    throw new ForbiddenError('That upload does not belong to this record.');
+  }
+
+  // 2. Never let two rows point at one object: deleting either would destroy
+  //    the file the other still references.
+  const { data: already, error: dupErr } = await supabaseAdmin
+    .from('documents')
+    .select('id')
+    .eq('storage_path', a.storagePath)
+    .maybeSingle();
+  if (dupErr) {
+    console.error('[storage] could not check for an existing document row', a.storagePath, dupErr);
+    throw dupErr;
+  }
+  if (already) throw new ConflictError('That upload has already been saved.');
+
+  // 3. Confirm it actually arrived, and how big it really is.
+  const info = await storageProvider.stat(bucket, a.storagePath);
+  if (!info) {
+    throw new ValidationError('That upload did not finish. Please try again.');
+  }
+  if (info.size === 0) {
+    await storageProvider.remove(bucket, [a.storagePath]).catch(() => {});
+    throw new ValidationError('That file appears to be empty. Please check it and try again.');
+  }
+  if (info.size > MAX_UPLOAD_BYTES) {
+    await storageProvider.remove(bucket, [a.storagePath]).catch(err =>
+      console.error('[storage] could not remove an oversize upload', a.storagePath, err));
+    throw new PayloadTooLargeError(`That file is larger than ${maxUploadLabel()}.`);
+  }
+
+  return insertDocumentRow({
+    entityType: a.entityType,
+    entityId: a.entityId,
+    storagePath: a.storagePath,
+    name: a.nameOverride || a.fileName,
+    type: a.docTypeOverride || contentTypeForFileName(a.fileName),
+    uploadedBy: a.uploadedBy,
+    expiryDate: a.expiryDate,
+    category: a.category,
+    replaceExisting: a.replaceExisting,
+  });
+}
+
 export async function uploadDocument(
   entityType: 'employee' | 'client' | 'invoice' | 'case',
   entityId: string,
@@ -100,54 +297,17 @@ export async function uploadDocument(
       upsert: false,
     });
 
-  // Don't generate/store a signed URL here: it's an extra storage round-trip on
-  // every upload (slows uploads) and the value expires in ~1h anyway. Downloads
-  // always mint a fresh, download-forcing URL via getDocumentSignedUrl below
-  // (GET /documents/:id/url).
-  const { data: doc, error } = await supabaseAdmin
-    .from('documents')
-    .insert({
-      entity_type: entityType,
-      entity_id: entityId,
-      name: nameOverride || file.originalname,
-      type: docTypeOverride || file.mimetype,
-      storage_path: storagePath,
-      storage_url: null,
-      uploaded_by: uploadedBy,
-      expiry_date: expiryDate || null,
-      category: category || null,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-
-  // Retire the previous file(s) for this slot, but only AFTER the new row is
-  // safely stored — deleting first would lose the old document if the upload
-  // then failed, leaving the employee with neither.
-  //
-  // Best-effort: the replacement has already succeeded and been returned, so a
-  // failure to tidy up must not fail the request. The worst case is the old
-  // behaviour (a leftover duplicate), which is visible and fixable by hand.
-  if (replaceExisting && doc?.id) {
-    const slotType = docTypeOverride || file.mimetype;
-    try {
-      const { data: superseded } = await supabaseAdmin
-        .from('documents')
-        .select('id')
-        .eq('entity_type', entityType)
-        .eq('entity_id', entityId)
-        .eq('type', slotType)
-        .neq('id', doc.id);
-      for (const old of superseded ?? []) {
-        await deleteDocument(old.id);
-      }
-    } catch (err) {
-      console.error('[storage] failed to remove superseded documents for', entityId, slotType, err);
-    }
-  }
-
-  return doc;
+  return insertDocumentRow({
+    entityType,
+    entityId,
+    storagePath,
+    name: nameOverride || file.originalname,
+    type: docTypeOverride || file.mimetype,
+    uploadedBy,
+    expiryDate,
+    category,
+    replaceExisting,
+  });
 }
 
 // Profile photos live in a dedicated PUBLIC bucket so the URL is permanent and
@@ -314,10 +474,19 @@ export async function getDocumentPreviewUrl(
   if (user.role === 'legal') await assertLegalCanAccessDocument(doc);
 
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
-  // No `download` option → inline rendering in the browser.
-  const url = await storageProvider.signedUrl(bucket, doc.storage_path, 3600);
+  const name: string = doc.name ?? 'document';
 
-  return { url: url ?? null, mimeType: doc.type ?? null, name: doc.name ?? 'document' };
+  // Inline ONLY for types a browser can safely render. Now that every file
+  // type may be uploaded, an .html or .svg handed back without a disposition
+  // would execute its script when opened — not against the portal's own
+  // origin, but still as a credible page on an amazonaws.com URL. Everything
+  // outside the safe list downloads instead.
+  const url = await storageProvider.signedUrl(
+    bucket, doc.storage_path, 3600,
+    isInlineSafe(name) ? undefined : { download: name, forceContentType: 'application/octet-stream' },
+  );
+
+  return { url: url ?? null, mimeType: doc.type ?? null, name };
 }
 
 // Self-hosted document render: downloads from Supabase, converts to HTML server-side.
@@ -342,10 +511,23 @@ export async function renderDocument(
   const ext = (name.split('.').pop() ?? '').toLowerCase();
   const bucket = BUCKET_MAP[doc.entity_type as keyof typeof BUCKET_MAP];
 
-  // PDF and images: return inline signed URL so client renders them natively.
-  if (ext === 'pdf' || ['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) {
+  // PDF and images: return an inline signed URL so the client renders them
+  // natively. Driven by the shared safe list rather than a literal, which is
+  // how SVG left this branch — it is an image to a person and a script host to
+  // a browser, so it now falls through to the "Preview not available" path.
+  if (isInlineSafe(name)) {
     const urlData = await storageProvider.signedUrl(bucket, doc.storage_path, 3600);
     return { html: '', kind: 'passthrough', name, inlineUrl: urlData ?? undefined };
+  }
+
+  // Anything converted below is pulled whole into this process and returned
+  // inside a JSON response, and a Lambda response has the same 6 MB limit a
+  // request does. With uploads now allowed up to 100 MB, a large spreadsheet
+  // would exhaust memory or produce a response API Gateway refuses — a 500
+  // where the dialog should simply offer a download.
+  const info = await storageProvider.stat(bucket, doc.storage_path);
+  if ((info?.size ?? 0) > RENDER_MAX_BYTES) {
+    return { html: '', kind: 'passthrough', name };
   }
 
   // Download the file bytes from Supabase storage.
@@ -485,12 +667,49 @@ function wrapHtml(body: string, _name: string, wide = false): string {
 </style></head><body>${body}</body></html>`;
 }
 
+/**
+ * Read an object from a named bucket, refusing anything over `maxBytes`.
+ *
+ * downloadDocumentBuffer cannot serve this: it maps an entity type to the
+ * documents bucket, and timesheet proofs live in their own bucket. It also
+ * applies RENDER_MAX_BYTES, which is the wrong limit for an email attachment
+ * and would silently drop a proof the caller wanted to know about.
+ *
+ * The size is checked BEFORE the read, so an oversize proof costs a HEAD
+ * rather than pulling 100 MB into the Lambda to then discard it. Returns the
+ * reason instead of null so the caller can tell the client what is missing.
+ */
+export async function readSizedObject(
+  bucket: string,
+  storagePath: string,
+  maxBytes: number,
+): Promise<{ buffer: Buffer } | { tooLarge: true; size: number } | null> {
+  try {
+    const info = await storageProvider.stat(bucket, storagePath);
+    if (!info) return null;
+    if (info.size > maxBytes) return { tooLarge: true, size: info.size };
+    return { buffer: await storageProvider.download(bucket, storagePath) };
+  } catch (err) {
+    console.error('[storage] could not read', bucket, storagePath, err);
+    return null;
+  }
+}
+
 export async function downloadDocumentBuffer(
   storagePath: string,
   entityType: 'employee' | 'client' | 'invoice',
 ): Promise<Buffer | null> {
   const bucket = BUCKET_MAP[entityType];
   try {
+    // Pulled whole into this process, by callers that then attach it to an
+    // email or embed it in a PDF. With uploads now up to 100 MB, a large file
+    // would exhaust the Lambda's memory; null is the answer those callers
+    // already handle for "no such document".
+    const info = await storageProvider.stat(bucket, storagePath);
+    if ((info?.size ?? 0) > RENDER_MAX_BYTES) {
+      console.warn('[storage] skipping an oversize buffer read for', storagePath, info?.size);
+      return null;
+    }
     return await storageProvider.download(bucket, storagePath);
   } catch {
     // Callers treat null as "no such document"; the provider throws instead of

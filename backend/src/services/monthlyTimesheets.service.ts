@@ -1,4 +1,5 @@
 import { MAX_PRESIGNED_SECONDS } from '../lib/storage/presign';
+import { isInlineSafe } from '../lib/storage/uploadLimits';
 import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
@@ -137,7 +138,14 @@ async function withFreshProofUrl<T extends Record<string, unknown>>(row: T): Pro
   const path = row.client_signed_path as string | null | undefined;
   if (!path) return row;
   try {
-    const url = await storageProvider.signedUrl(PROOF_BUCKET, path, MAX_PRESIGNED_SECONDS);
+    // Client proofs accept any file type now, so an uploaded .html or .svg
+    // would otherwise come back as a page the browser renders. Anything
+    // outside the safe list is served as a download instead.
+    const name = (row.client_signed_filename as string | null) ?? path;
+    const url = await storageProvider.signedUrl(
+      PROOF_BUCKET, path, MAX_PRESIGNED_SECONDS,
+      isInlineSafe(name) ? undefined : { download: name, forceContentType: 'application/octet-stream' },
+    );
     return { ...row, client_signed_url: url };
   } catch (err) {
     console.error('[monthlyTimesheets] could not re-sign the client proof for', row.id, err);
@@ -639,7 +647,13 @@ export async function uploadMonthlyClientProof(
   const path = uniqueObjectPath(`monthly/${id}`, file.originalname);
   await storageProvider.upload(PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
 
-  const signed = await storageProvider.signedUrl(PROOF_BUCKET, path, PROOF_URL_TTL_SECONDS);
+  // Same conditional as withFreshProofUrl above — see the note there.
+  const signed = await storageProvider.signedUrl(
+    PROOF_BUCKET, path, PROOF_URL_TTL_SECONDS,
+    isInlineSafe(file.originalname)
+      ? undefined
+      : { download: file.originalname, forceContentType: 'application/octet-stream' },
+  );
 
   const { data: updated, error: dbErr } = await supabaseAdmin
     .from('monthly_timesheets')

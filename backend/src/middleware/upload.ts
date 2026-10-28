@@ -1,43 +1,56 @@
 import multer from 'multer';
 import type { Request } from 'express';
+import { LEGACY_MULTER_MAX_BYTES, MAX_PHOTO_BYTES } from '../lib/storage/uploadLimits';
 
-// Whitelist of accepted MIME types. Rejects executables, archives, scripts,
-// macros, etc. Keep this narrow — relax only when there's a real document type
-// to support (and add tests).
-const ALLOWED_MIME_TYPES = new Set([
-  'application/pdf',
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'image/webp',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/plain',
-  'text/csv',
-]);
+/**
+ * Multipart uploads that still travel through this server.
+ *
+ * Most documents no longer do: the browser PUTs them straight to storage and
+ * then registers the path, which is what lifted the ceiling from ~4.5 MB to
+ * 100 MB. See lib/storage/uploadLimits.ts for the arithmetic behind that
+ * number, and why the 20 MB this file used to claim was never achievable.
+ *
+ * THE MIME WHITELIST IS GONE. Every file type is accepted now. That is safe
+ * because of two things that live elsewhere and must stay in place:
+ *
+ *   lib/storage/contentType.ts   never stores a type a browser will execute —
+ *                                .html and .svg become application/octet-stream
+ *   storage.service download URLs force Content-Disposition: attachment for
+ *                                anything outside INLINE_SAFE_EXTENSIONS
+ *
+ * Removing the whitelist WITHOUT those two is the one change that would make
+ * things worse than before, so they ship together.
+ */
 
-function fileFilter(
+export const documentUpload = multer({
+  storage: multer.memoryStorage(),
+  // The honest limit for this path. API Gateway base64-encodes the body before
+  // Lambda sees it, so a 6 MB invoke payload is about 4.5 MB of file; the old
+  // 20 MB here could never be reached and a file between the two produced a
+  // bare "Request Entity Too Large" from API Gateway before Express ran.
+  limits: { fileSize: LEGACY_MULTER_MAX_BYTES },
+});
+
+/**
+ * Profile photos, which stay on this path deliberately.
+ *
+ * 2 MB genuinely works through Lambda, and the photo write also clears the
+ * previous file from a public bucket — more moving parts to port for no user
+ * benefit. This is the one place a type filter still earns its keep: the value
+ * is rendered as an <img> everywhere a person appears, so a non-image is
+ * simply a broken avatar.
+ */
+function imagesOnly(
   _req: Request,
   file: Express.Multer.File,
   cb: multer.FileFilterCallback,
 ) {
-  // Some Windows setups report .doc/.docx as a generic/empty mimetype
-  // (e.g. application/octet-stream) instead of the real Word MIME type —
-  // fall back to a filename-extension check so those uploads aren't wrongly
-  // rejected server-side even after the frontend now lets them through.
-  const hasWordExtension = /\.docx?$/i.test(file.originalname);
-  if (ALLOWED_MIME_TYPES.has(file.mimetype) || hasWordExtension) {
-    cb(null, true);
-  } else {
-    // multer aborts the upload and surfaces this via the route's next(err) chain
-    cb(new Error(`File type not allowed: ${file.mimetype}`));
-  }
+  if (/^image\//.test(file.mimetype)) cb(null, true);
+  else cb(new Error(`A profile photo must be an image, not ${file.mimetype || 'an unknown type'}`));
 }
 
-export const documentUpload = multer({
+export const photoUpload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB
-  fileFilter,
+  limits: { fileSize: MAX_PHOTO_BYTES },
+  fileFilter: imagesOnly,
 });

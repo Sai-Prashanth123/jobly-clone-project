@@ -18,7 +18,7 @@ import { useClient } from '../hooks/useClients';
 import { useAssignment } from '../hooks/useAssignments';
 import { useAuth } from '../hooks/useAuth';
 import { useHolidaysInRange } from '../hooks/useHolidays';
-import { formatDate, formatDateTime, formatCurrency, validateUploadFile } from '../lib/utils';
+import { formatDate, formatDateTime, formatCurrency, validateUploadFile, MAX_DOCUMENT_SIZE_LABEL } from '../lib/utils';
 import type { TimesheetEntry } from '../types';
 import { EntityAuditTrail } from '../components/shared/EntityAuditTrail';
 
@@ -431,7 +431,7 @@ export default function TimesheetDetail() {
             ) : (
               <div className="space-y-1.5">
                 <Label className="text-sm">Client-signed timesheet <span className="text-muted-foreground font-normal">(optional)</span></Label>
-                <p className="text-xs text-muted-foreground">Upload the client-signed copy as proof of days worked (PDF / image / DOC, max 20 MB).</p>
+                <p className="text-xs text-muted-foreground">Upload the client-signed copy as proof of days worked (any file type, max {MAX_DOCUMENT_SIZE_LABEL}).</p>
                 {timesheet.clientSignedUrl ? (
                   <div className="flex items-center justify-between gap-2 px-3 py-2 rounded-md bg-white border border-emerald-200 max-w-md">
                     <div className="flex items-center gap-2 min-w-0">

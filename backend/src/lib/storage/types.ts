@@ -15,6 +15,13 @@ export interface UploadOptions {
 export interface SignedUrlOptions {
   /** Forces a download and names the file, rather than rendering inline. */
   download?: string;
+  /**
+   * Serve the object as this type regardless of what is stored against it.
+   *
+   * Used to hand back application/octet-stream for anything a browser would
+   * execute, so an uploaded .html or .svg downloads instead of running.
+   */
+  forceContentType?: string;
 }
 
 export interface StorageObject {
@@ -37,6 +44,30 @@ export interface StorageProvider {
   signedUrl(
     bucket: string, path: string, expiresInSeconds: number, opts?: SignedUrlOptions,
   ): Promise<string>;
+
+  /**
+   * Time-limited URL the BROWSER may PUT a file to, bypassing this server.
+   *
+   * Uploads used to travel through Lambda, where API Gateway base64-encodes
+   * the body and Lambda caps a request at 6 MB — a real ceiling of ~4.5 MiB,
+   * while the UI advertised 20 MB. Sending the bytes straight to storage
+   * removes that limit entirely.
+   *
+   * `contentType` is signed into the URL, so the client cannot store a file
+   * under a type it chose; see lib/storage/contentType.ts for why that matters.
+   */
+  signedUploadUrl(
+    bucket: string, path: string, expiresInSeconds: number, opts: { contentType: string },
+  ): Promise<string>;
+
+  /**
+   * Size and type of a stored object, or null when there is none.
+   *
+   * Two callers: confirming a presigned upload actually arrived and how big it
+   * really is (the client cannot be believed about either), and refusing to
+   * pull an enormous file into memory to render a preview.
+   */
+  stat(bucket: string, path: string): Promise<{ size: number; contentType?: string } | null>;
 
   /**
    * Permanent, unauthenticated URL. Only valid for the buckets listed in

@@ -2,8 +2,9 @@ import { Router } from 'express';
 import { authenticate } from '../middleware/auth';
 import { requirePermission } from '../middleware/rbac';
 import { validateBody, validateQuery } from '../middleware/validate';
-import { documentUpload } from '../middleware/upload';
+import { documentUpload, photoUpload } from '../middleware/upload';
 import { createEmployeeSchema, updateEmployeeSchema, listEmployeesQuerySchema, placeOnLeaveSchema, terminateEmployeeSchema, raiseLegalRequestSchema } from '../schemas/employee.schema';
+import { createUploadUrlSchema, registerDocumentSchema } from '../schemas/uploads.schema';
 import * as ctrl from '../controllers/employees.controller';
 
 const router = Router();
@@ -37,10 +38,20 @@ router.post('/:id/rehire', requirePermission('employees.create', 'admin','hr'), 
 
 router.get('/:id/assignments', requirePermission('employees.view', 'admin','hr','operations'), ctrl.assignments);
 router.get('/:id/timesheets', requirePermission('employees.view', 'admin','hr','operations'), ctrl.timesheets);
-router.post('/:id/photo', requirePermission('employees.create.id-photo', 'admin','hr','employee'), upload.single('file'), ctrl.uploadPhoto);
+router.post('/:id/photo', requirePermission('employees.create.id-photo', 'admin','hr','employee'), photoUpload.single('file'), ctrl.uploadPhoto);
 router.post('/:id/dependents/:dependentId/passport', requirePermission('employees.create.id-dependents-dependentId-passport', 'admin','hr','employee'), upload.single('file'), ctrl.uploadDependentPassport);
 router.get('/:id/dependents/:dependentId/passport-url', requirePermission('employees.view.id-dependents-dependentId-passport-url', 'admin','hr','employee','legal'), ctrl.getDependentPassportUrl);
 router.post('/:id/documents', requirePermission('employees.create.id-documents', 'admin','hr','employee'), upload.single('file'), ctrl.uploadDoc);
+// Large uploads go straight from the browser to storage: ask for a signed URL,
+// PUT the file, then register it.
+//
+// Each half carries its OWN permission key, matching what generatePermissions
+// derives from the path. The alternative — sharing the multipart route's key —
+// left the catalogue holding two keys nothing checked, so the Role Permissions
+// screen would have shown toggles that silently did nothing. All three keys
+// default to the same audience, and permissions.parity pins that.
+router.post('/:id/documents/upload-url', requirePermission('employees.create.id-documents-upload-url', 'admin','hr','employee'), validateBody(createUploadUrlSchema), ctrl.createDocumentUploadUrl);
+router.post('/:id/documents/register', requirePermission('employees.create.id-documents-register', 'admin','hr','employee'), validateBody(registerDocumentSchema), ctrl.registerDocument);
 router.delete('/:id/documents/:docId', requirePermission('employees.delete.id-documents-docId', 'admin','hr','employee'), ctrl.deleteDoc);
 // Finalize self-onboarding (re-validates the checklist server-side, auto-activates).
 router.post('/:id/onboarding/complete', requirePermission('employees.create.id-onboarding-complete', 'admin','hr','employee'), ctrl.completeOnboarding);

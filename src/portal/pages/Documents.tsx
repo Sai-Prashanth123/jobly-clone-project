@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   AlertCircle, FileText, FileImage, FileSpreadsheet, FolderOpen, Loader2, Search, Trash2, Upload,
 } from 'lucide-react';
@@ -22,9 +22,9 @@ import {
   useDeleteEmployeeDocument,
 } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
-import { formatDate, validateUploadFile } from '../lib/utils';
+import { formatDate, validateUploadFile, MAX_DOCUMENT_SIZE_LABEL } from '../lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { DOCUMENT_TYPES, IDENTITY_OWNED_DOC_LABELS } from '../lib/documentTypes';
+import { DOCUMENT_TYPES, IDENTITY_OWNED_DOC_LABELS, groupedDocumentTypes } from '../lib/documentTypes';
 import type { Employee } from '../types';
 
 // Identity/required doc types are collected exclusively via the onboarding
@@ -108,13 +108,13 @@ function DocumentManager({ employee }: { employee: Employee }) {
       toast.error('Pick a document type and a file first');
       return;
     }
-    const fd = new FormData();
-    fd.append('file', file);
-    fd.append('name', file.name);
-    fd.append('docType', docType === 'Other' && customName.trim() ? customName.trim() : docType);
-    if (expiryDate) fd.append('expiryDate', expiryDate);
     try {
-      await upload.mutateAsync(fd);
+      await upload.mutateAsync({
+        file,
+        name: file.name,
+        docType: docType === 'Other' && customName.trim() ? customName.trim() : docType,
+        ...(expiryDate ? { expiryDate } : {}),
+      });
       toast.success(`${file.name} uploaded`);
       setDocType('');
       setCustomName('');
@@ -158,8 +158,17 @@ function DocumentManager({ employee }: { employee: Employee }) {
               <Select value={docType} onValueChange={v => { setDocType(v); setExpiryDate(''); if (v !== 'Other') setCustomName(''); }}>
                 <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                 <SelectContent>
-                  {DOC_TYPES.map(t => (
-                    <SelectItem key={t} value={t}>{t}</SelectItem>
+                  {/* Grouped rather than one flat list of 27. Related
+                      paperwork sits together, which also makes it less likely
+                      somebody reaches for "Other" and types a name that
+                      duplicates a document already on the list. */}
+                  {groupedDocumentTypes().map(g => (
+                    <SelectGroup key={g.key}>
+                      <SelectLabel>{g.label}</SelectLabel>
+                      {g.types.map(t => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>
@@ -213,7 +222,7 @@ function DocumentManager({ employee }: { employee: Employee }) {
             </div>
           </div>
           <p className="text-[11px] text-gray-400 mt-3">
-            Accepted: PDF, DOC, DOCX, JPG, PNG, XLS, CSV · Max 20 MB
+            Any file type · Max {MAX_DOCUMENT_SIZE_LABEL}
           </p>
         </CardContent>
       </Card>

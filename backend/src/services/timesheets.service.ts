@@ -1,4 +1,5 @@
 import { MAX_PRESIGNED_SECONDS } from '../lib/storage/presign';
+import { isInlineSafe } from '../lib/storage/uploadLimits';
 import { uniqueObjectPath } from '../lib/storage/objectPath';
 import { supabaseAdmin } from '../config/supabase';
 import { NotFoundError, ForbiddenError, ConflictError, ValidationError } from '../lib/errors';
@@ -7,6 +8,7 @@ import { detectLeaveConflictsForDays, approvedLeaveBlockMessage } from './confli
 import { createNotification, getUserIdsByRole, getPortalUserByEmployeeId, getReportingManagerPortalUserId } from './notifications.service';
 import { logActivity } from '../lib/activityLogger';
 import { bustNavBadgeCache } from './navBadges.service';
+import { onTimesheetApprovalChanged } from './invoiceDrafts.service';
 import { listHolidays } from './holidays.service';
 import { storageProvider } from '../lib/storage';
 import type {
@@ -89,7 +91,14 @@ async function withFreshProofUrl<T extends Record<string, unknown>>(row: T, buck
   const path = row.client_signed_path as string | null | undefined;
   if (!path) return row;
   try {
-    const url = await storageProvider.signedUrl(bucket, path, MAX_PRESIGNED_SECONDS);
+    // Client proofs accept any file type now, so an uploaded .html or .svg
+    // would otherwise come back as a page the browser renders. Anything
+    // outside the safe list is served as a download instead.
+    const name = (row.client_signed_filename as string | null) ?? path;
+    const url = await storageProvider.signedUrl(
+      bucket, path, MAX_PRESIGNED_SECONDS,
+      isInlineSafe(name) ? undefined : { download: name, forceContentType: 'application/octet-stream' },
+    );
     return { ...row, client_signed_url: url };
   } catch (err) {
     console.error('[timesheets] could not re-sign the client proof for', row.id, err);
@@ -419,6 +428,18 @@ export async function patchTimesheetStatus(
   await logActivity(actorId ?? null, 'status_changed', 'timesheet', id, label, { from: ts.status, to: input.status });
   bustNavBadgeCache();
 
+  // Approving a timesheet is what used to start a manual invoicing job:
+  // somebody had to notice, open Invoices → New, pick the client and tick the
+  // sheets. The client's draft now assembles itself here instead.
+  //
+  // Fired on the way OUT of manager_approved as well — a rejection after
+  // approval has to take the line back off the draft, or the client is billed
+  // for work that was withdrawn.
+  if (input.status === 'manager_approved' || ts.status === 'manager_approved') {
+    const clientId = (data as { client_id?: string }).client_id ?? ts.client_id;
+    if (clientId) await onTimesheetApprovalChanged(clientId, actorId);
+  }
+
   const actorIsOwner = actorEmployeeId != null && actorEmployeeId === ts.employee_id;
   await notifyTimesheetStatusChange(
     { id, employeeId: ts.employee_id, label },
@@ -657,7 +678,13 @@ export async function uploadWeeklyClientProof(
   const path = uniqueObjectPath(`weekly/${id}`, file.originalname);
   await storageProvider.upload(WEEKLY_PROOF_BUCKET, path, file.buffer, { contentType: file.mimetype, upsert: false });
 
-  const signed = await storageProvider.signedUrl(WEEKLY_PROOF_BUCKET, path, WEEKLY_PROOF_URL_TTL_SECONDS);
+  // Same conditional as withFreshProofUrl above — see the note there.
+  const signed = await storageProvider.signedUrl(
+    WEEKLY_PROOF_BUCKET, path, WEEKLY_PROOF_URL_TTL_SECONDS,
+    isInlineSafe(file.originalname)
+      ? undefined
+      : { download: file.originalname, forceContentType: 'application/octet-stream' },
+  );
 
   const { data: updated, error: dbErr } = await supabaseAdmin
     .from('timesheets')
