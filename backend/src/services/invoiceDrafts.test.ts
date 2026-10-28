@@ -7,7 +7,7 @@ vi.mock('./navBadges.service', () => ({ bustNavBadgeCache: () => {} }));
 vi.mock('./invoices.service', () => ({ insertInvoiceWithNumber: async () => ({}) }));
 vi.mock('../lib/activityLogger', () => ({ logActivity: async () => {} }));
 
-import { collectBlockers } from './invoiceDrafts.service';
+import { collectBlockers, billingMonthOf, groupByBillingMonth } from './invoiceDrafts.service';
 
 /**
  * What stops a self-assembled invoice going out.
@@ -111,5 +111,60 @@ describe('what blocks a self-assembled invoice', () => {
       billingEmail: 'ap@acme.test',
     });
     expect(out[0]).toContain('1 of 1 timesheet has');
+  });
+});
+
+/**
+ * Which invoice a week's work lands on.
+ *
+ * Before this, one client's backlog assembled 51 sheets across 14 months into
+ * a single $85,920 draft, because the only rule was "approved and not yet
+ * billed". The month is now the cut, so these cases are the cut.
+ */
+describe('billingMonthOf', () => {
+  it('returns the whole month, not the week', () => {
+    expect(billingMonthOf('2026-10-19')).toEqual({
+      key: '2026-10', start: '2026-10-01', end: '2026-10-31',
+    });
+  });
+
+  it('bills a week that straddles month end in the month it started', () => {
+    // Mon 26 Oct → Sun 1 Nov. One signed sheet, one invoice: October's.
+    expect(billingMonthOf('2026-10-26').key).toBe('2026-10');
+  });
+
+  it('knows how long each month is, February included', () => {
+    expect(billingMonthOf('2026-02-02').end).toBe('2026-02-28');
+    expect(billingMonthOf('2028-02-07').end).toBe('2028-02-29'); // leap
+    expect(billingMonthOf('2026-04-06').end).toBe('2026-04-30');
+    expect(billingMonthOf('2026-12-28').end).toBe('2026-12-31');
+  });
+
+  it('does not drift across a timezone boundary', () => {
+    // The trap: new Date('2026-03-01') is UTC midnight, which is 29 February
+    // in any negative offset, and the month would come out as February.
+    expect(billingMonthOf('2026-03-01').key).toBe('2026-03');
+    expect(billingMonthOf('2026-01-01').key).toBe('2026-01');
+  });
+});
+
+describe('groupByBillingMonth', () => {
+  const week = (d: string) => ({ week_start_date: d });
+
+  it('splits a backlog into one bucket per month', () => {
+    const out = groupByBillingMonth([
+      week('2026-09-28'), week('2026-10-05'), week('2026-10-12'), week('2026-11-02'),
+    ]);
+    expect([...out.keys()].sort()).toEqual(['2026-09', '2026-10', '2026-11']);
+    expect(out.get('2026-10')).toHaveLength(2);
+  });
+
+  it('keeps a single month as a single bucket', () => {
+    const out = groupByBillingMonth([week('2026-10-05'), week('2026-10-12')]);
+    expect(out.size).toBe(1);
+  });
+
+  it('returns nothing for no work, rather than an empty bucket', () => {
+    expect(groupByBillingMonth([]).size).toBe(0);
   });
 });

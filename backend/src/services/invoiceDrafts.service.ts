@@ -14,14 +14,22 @@ import { todayUTC } from '../lib/dateUtils';
  * records which sheets are on which invoice, and the readiness sweep already
  * knew how to find approved work nobody had billed. This is the wiring.
  *
- * THE MODEL: one open draft per client, recomputed from the truth.
+ * THE MODEL: one open draft per client PER BILLING MONTH, recomputed from the
+ * truth.
  *
- * When a project manager approves a timesheet it joins that client's open
- * draft, and the draft is then rebuilt from the FULL set of timesheets linked
- * to it rather than patched by adding one line. Incremental arithmetic on
- * money drifts — a rate corrected after the fact, an approval reversed, a
- * sheet moved to another assignment — and a recomputed total cannot. It also
- * makes the sync idempotent: running it twice changes nothing.
+ * When a project manager approves a timesheet it joins that client's draft for
+ * the month the work was done in, and that draft is then rebuilt from the FULL
+ * set of timesheets linked to it rather than patched by adding one line.
+ * Incremental arithmetic on money drifts — a rate corrected after the fact, an
+ * approval reversed, a sheet moved to another assignment — and a recomputed
+ * total cannot. It also makes the sync idempotent: running it twice changes
+ * nothing.
+ *
+ * The month matters. A single draft per client accumulated every approved,
+ * unbilled sheet no matter how old, so one client with a backlog assembled 51
+ * timesheets spanning 14 months into a single $85,920 invoice. That is not a
+ * bill anybody sends. Months are the unit customers reconcile against, so they
+ * are the unit the drafts are cut on.
  *
  * Nothing here sends anything. The draft is prepared and finance sends it,
  * because an invoice is money claimed from a customer and a wrong bill rate
@@ -30,6 +38,8 @@ import { todayUTC } from '../lib/dateUtils';
 
 export interface DraftSyncResult {
   clientId: string;
+  /** The billing month this result is about, as YYYY-MM. */
+  period: string;
   invoiceId?: string;
   invoiceNumber?: string;
   timesheetCount: number;
@@ -52,8 +62,66 @@ interface TimesheetRow {
 
 const round2 = (n: number): number => Math.round(n * 100) / 100;
 
-/** Approved timesheets for this client that are not on any invoice yet. */
-async function unbilledApproved(clientId: string): Promise<TimesheetRow[]> {
+export interface BillingMonth {
+  /** YYYY-MM. The key a draft is matched to its month on. */
+  key: string;
+  /** First day of the month — stored as billing_period_start. */
+  start: string;
+  /** Last day of the month — stored as billing_period_end. */
+  end: string;
+}
+
+/**
+ * The billing month a timesheet belongs to.
+ *
+ * Decided by week_start_date alone, so a week straddling month end (Mon 28 Oct
+ * → Sun 3 Nov) bills wholly in October. Splitting it would split one signed
+ * sheet's hours across two invoices, and the sheet is the thing the client put
+ * their name to.
+ *
+ * Parsed as text rather than through Date: `new Date('2026-10-01')` is UTC
+ * midnight, which is the 30th of September anywhere west of UTC, and the month
+ * would silently be wrong for a third of the world.
+ */
+export function billingMonthOf(weekStartDate: string): BillingMonth {
+  const [y, m] = weekStartDate.split('-');
+  const key = `${y}-${m}`;
+  // Day 0 of the following month is the last day of this one. Date.UTC takes a
+  // zero-based month, so passing the 1-based number already means "next".
+  const lastDay = new Date(Date.UTC(Number(y), Number(m), 0)).getUTCDate();
+  return { key, start: `${key}-01`, end: `${key}-${String(lastDay).padStart(2, '0')}` };
+}
+
+/** Approved work split into the months it will be billed in. */
+export function groupByBillingMonth<T extends { week_start_date: string }>(rows: T[]): Map<string, T[]> {
+  const out = new Map<string, T[]>();
+  for (const row of rows) {
+    const { key } = billingMonthOf(row.week_start_date);
+    const bucket = out.get(key);
+    if (bucket) bucket.push(row);
+    else out.set(key, [row]);
+  }
+  return out;
+}
+
+/**
+ * Which month an existing draft covers.
+ *
+ * Taken from the stored period rather than from its lines, so a draft written
+ * before this was month-scoped — its period_start is the first week worked,
+ * not the 1st — still lands in the right bucket and gets rewritten in place.
+ */
+function monthKeyOfDraft(draft: { billing_period_start?: string | null }): string {
+  return String(draft.billing_period_start ?? '').slice(0, 7);
+}
+
+/**
+ * Approved timesheets for this client that are not on any invoice yet.
+ *
+ * `ownDraftIds` are the client's open auto-drafts: sheets linked to those are
+ * still unbilled, because those drafts are about to be rebuilt from scratch.
+ */
+async function unbilledApproved(clientId: string, ownDraftIds: Set<string>): Promise<TimesheetRow[]> {
   const { data: approved, error } = await supabaseAdmin
     .from('timesheets')
     .select('id, display_id, employee_id, assignment_id, client_id, total_hours, week_start_date, week_end_date, client_signed_path')
@@ -77,28 +145,26 @@ async function unbilledApproved(clientId: string): Promise<TimesheetRow[]> {
     throw linkErr;
   }
 
-  const draft = await openDraftFor(clientId);
   const onAnotherInvoice = new Set(
-    (linked ?? []).filter(l => l.invoice_id !== draft?.id).map(l => l.timesheet_id),
+    (linked ?? []).filter(l => !ownDraftIds.has(l.invoice_id as string)).map(l => l.timesheet_id),
   );
   return rows.filter(r => !onAnotherInvoice.has(r.id));
 }
 
-/** This client's open, self-assembled draft, if there is one. */
-async function openDraftFor(clientId: string) {
+/** Every open, self-assembled draft this client has — at most one per month. */
+async function openAutoDrafts(clientId: string) {
   const { data, error } = await supabaseAdmin
     .from('invoices')
-    .select('id, invoice_number, issue_date, payment_terms, tax_rate, blockers_ack_at')
+    .select('id, invoice_number, issue_date, payment_terms, tax_rate, blockers_ack_at, billing_period_start')
     .eq('client_id', clientId)
     .eq('doc_type', 'invoice')
     .eq('status', 'draft')
-    .eq('auto_generated', true)
-    .maybeSingle();
+    .eq('auto_generated', true);
   if (error) {
-    console.error('[invoiceDrafts] could not read the open draft', clientId, error);
+    console.error('[invoiceDrafts] could not read the open drafts', clientId, error);
     throw error;
   }
-  return data;
+  return data ?? [];
 }
 
 /**
@@ -148,22 +214,32 @@ export function collectBlockers(opts: {
  * every time, so a second run is a no-op and a reversed approval drops the
  * line back out.
  */
-export async function syncClientDraft(clientId: string, actorId?: string): Promise<DraftSyncResult> {
-  const timesheets = await unbilledApproved(clientId);
-  const existing = await openDraftFor(clientId);
+export async function syncClientDraft(clientId: string, actorId?: string): Promise<DraftSyncResult[]> {
+  const drafts = await openAutoDrafts(clientId);
+  const timesheets = await unbilledApproved(clientId, new Set(drafts.map(d => d.id as string)));
+  const byMonth = groupByBillingMonth(timesheets);
 
-  // Nothing approved and waiting: an empty draft is noise on the invoice list.
-  if (timesheets.length === 0) {
-    if (existing) {
-      await supabaseAdmin.from('invoice_timesheets').delete().eq('invoice_id', existing.id);
-      await supabaseAdmin.from('invoice_line_items').delete().eq('invoice_id', existing.id);
-      await supabaseAdmin.from('invoices').delete().eq('id', existing.id);
-      bustNavBadgeCache();
-      return { clientId, timesheetCount: 0, total: 0, blockers: [], action: 'removed' };
-    }
-    return { clientId, timesheetCount: 0, total: 0, blockers: [], action: 'noop' };
+  const results: DraftSyncResult[] = [];
+  const draftForMonth = new Map(drafts.map(d => [monthKeyOfDraft(d), d]));
+
+  // A month whose work has gone — the approval was reversed, or the sheets
+  // were moved onto a manual invoice. An empty draft is noise on the list.
+  for (const draft of drafts) {
+    const key = monthKeyOfDraft(draft);
+    if (byMonth.has(key)) continue;
+    await supabaseAdmin.from('invoice_timesheets').delete().eq('invoice_id', draft.id);
+    await supabaseAdmin.from('invoice_line_items').delete().eq('invoice_id', draft.id);
+    await supabaseAdmin.from('invoices').delete().eq('id', draft.id);
+    results.push({ clientId, period: key, timesheetCount: 0, total: 0, blockers: [], action: 'removed' });
   }
 
+  if (byMonth.size === 0) {
+    if (results.length > 0) bustNavBadgeCache();
+    return results;
+  }
+
+  // Looked up once for every month rather than once per month: the client and
+  // the rates are the same whichever period the hours fall in.
   const [{ data: client }, { data: assignments }, { data: employees }] = await Promise.all([
     supabaseAdmin.from('clients')
       .select('id, company_name, billing_contact_email, contact_email, net_payment_days, currency')
@@ -180,6 +256,35 @@ export async function syncClientDraft(clientId: string, actorId?: string): Promi
   const nameByEmployee = new Map<string, string>(
     (employees ?? []).map(e => [e.id as string, `${e.first_name ?? ''} ${e.last_name ?? ''}`.trim()]),
   );
+
+  // Oldest month first, so the invoice numbers run in the order the work was
+  // done rather than in whatever order the map happened to be built.
+  for (const key of [...byMonth.keys()].sort()) {
+    results.push(await syncMonthDraft({
+      clientId, actorId, client,
+      month: billingMonthOf(byMonth.get(key)![0].week_start_date),
+      timesheets: byMonth.get(key)!,
+      existing: draftForMonth.get(key),
+      rateByAssignment, nameByEmployee,
+    }));
+  }
+
+  bustNavBadgeCache();
+  return results;
+}
+
+/** The draft that holds one client's work for one billing month. */
+async function syncMonthDraft(a: {
+  clientId: string;
+  actorId?: string;
+  client: { company_name?: string; billing_contact_email?: string | null; contact_email?: string | null; net_payment_days?: number | null; currency?: string | null } | null;
+  month: BillingMonth;
+  timesheets: TimesheetRow[];
+  existing?: { id: string; invoice_number?: string; tax_rate?: number | null } | undefined;
+  rateByAssignment: Map<string, number>;
+  nameByEmployee: Map<string, string>;
+}): Promise<DraftSyncResult> {
+  const { clientId, actorId, client, month, timesheets, existing, rateByAssignment, nameByEmployee } = a;
 
   // Rebuilt from the full linked set every run — see the note at the top.
   const lineItems = timesheets
@@ -209,15 +314,16 @@ export async function syncClientDraft(clientId: string, actorId?: string): Promi
   const billingEmail = client?.billing_contact_email || client?.contact_email || null;
   const blockers = collectBlockers({ timesheets, rateByAssignment, nameByEmployee, billingEmail });
 
-  const weeks = timesheets.map(t => t.week_start_date).sort();
-  const ends = timesheets.map(t => t.week_end_date).sort();
   const common = {
     subtotal,
     tax_rate: taxRate,
     tax_amount: taxAmount,
     total_amount: total,
-    billing_period_start: weeks[0],
-    billing_period_end: ends[ends.length - 1],
+    // The whole month, not the first and last week actually worked. It is the
+    // period the invoice covers, it is stable as more weeks are approved into
+    // the same draft, and it is what the uniqueness index matches on.
+    billing_period_start: month.start,
+    billing_period_end: month.end,
     blockers,
     updated_at: new Date().toISOString(),
   };
@@ -278,16 +384,15 @@ export async function syncClientDraft(clientId: string, actorId?: string): Promi
     throw tsErr;
   }
 
-  bustNavBadgeCache();
-
   if (action === 'created') {
     await logActivity(actorId ?? null, 'created', 'invoice', invoiceId!, invoiceNumber ?? invoiceId!, {
-      event: 'auto_draft_created', client: client?.company_name, timesheets: timesheets.length, total,
+      event: 'auto_draft_created', client: client?.company_name, period: month.key,
+      timesheets: timesheets.length, total,
     });
   }
 
   return {
-    clientId, invoiceId, invoiceNumber,
+    clientId, period: month.key, invoiceId, invoiceNumber,
     timesheetCount: timesheets.length, total, blockers, action,
   };
 }
@@ -302,11 +407,13 @@ export async function syncClientDraft(clientId: string, actorId?: string): Promi
  */
 export async function onTimesheetApprovalChanged(clientId: string, actorId?: string): Promise<void> {
   try {
-    const result = await syncClientDraft(clientId, actorId);
-    if (result.action !== 'noop') {
+    const results = await syncClientDraft(clientId, actorId);
+    for (const result of results) {
+      if (result.action === 'noop') continue;
       console.log(
-        `[invoiceDrafts] ${result.action} ${result.invoiceNumber ?? ''} for client ${clientId}: ` +
-        `${result.timesheetCount} timesheet(s), ${result.total}, ${result.blockers.length} blocker(s)`,
+        `[invoiceDrafts] ${result.action} ${result.invoiceNumber ?? ''} ${result.period} ` +
+        `for client ${clientId}: ${result.timesheetCount} timesheet(s), ${result.total}, ` +
+        `${result.blockers.length} blocker(s)`,
       );
     }
   } catch (err) {
