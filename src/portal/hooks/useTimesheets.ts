@@ -37,6 +37,13 @@ function mapTimesheet(raw: any): Timesheet {
     clientSignedFilename: raw.client_signed_filename ?? undefined,
     hrNotes: raw.hr_notes ?? undefined,
     employeeEmail: raw.employees?.work_email ?? undefined,
+    // listTimesheets already joins the employee (TS_SELECT in
+    // timesheets.service.ts), and this name was being thrown away — so the
+    // invoice builder had to load the whole roster just to label a row, which
+    // is why it could not filter that roster to current staff.
+    employeeName: raw.employees
+      ? `${raw.employees.first_name ?? ''} ${raw.employees.last_name ?? ''}`.trim() || undefined
+      : undefined,
   };
 }
 

@@ -23,6 +23,14 @@ router.put('/:id', requirePermission('invoices.manage', 'admin','finance'), vali
 router.delete('/:id', requirePermission('invoices.manage', 'admin', 'finance'), ctrl.remove);
 router.get('/:id/pdf', requirePermission('invoices.view', 'admin','finance'), ctrl.getPDF);
 router.post('/:id/send', requirePermission('invoices.manage', 'admin','finance'), ctrl.send);
+// Confirming an auto-draft's blockers is part of sending it, so it carries the
+// same permission: anyone who may send may clear the gate, and nobody else.
+router.post('/:id/acknowledge-blockers', requirePermission('invoices.manage', 'admin','finance'), ctrl.acknowledgeBlockers);
+// Chase an unpaid invoice on demand. The nightly sweep sends the scheduled
+// nudges; StatusBadge has told finance to 'send a reminder to the client' for
+// a long time without there being any way to do it. Same permission as
+// sending the invoice itself — both email the customer.
+router.post('/:id/reminder', requirePermission('invoices.manage', 'admin','finance'), ctrl.remindOne);
 
 // Attachments — files attached to an invoice (stored via the generic documents
 // table + 'invoices' bucket). Listing rides inside GET /:id; download reuses

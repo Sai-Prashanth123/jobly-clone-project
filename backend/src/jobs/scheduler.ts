@@ -1,8 +1,6 @@
 import cron from 'node-cron';
-import { supabaseAdmin } from '../config/supabase';
-import { env } from '../config/env';
-import { todayUTC, daysBetween } from '../lib/dateUtils';
-import { sendInvoiceReminderEmail, sendCustomEmail, mailerConfigured } from '../lib/mailer';
+import { sendCustomEmail, mailerConfigured } from '../lib/mailer';
+import { markOverdueInvoices, sweepClientReminders } from '../services/invoiceReminders.service';
 import { BILLING_EMAIL } from '../lib/billing';
 import { reactivateReturnedEmployees } from '../services/employees.service';
 import {
@@ -12,51 +10,22 @@ import {
   notifyRoles,
 } from '../services/notifications.service';
 
-// env.FRONTEND_URL is schema-validated with its own default, so there is no
-// second default to keep in step here. The one that used to live on this line
-// pointed at the decommissioned Azure Static Web App — harmless only because
-// FRONTEND_URL happens to be set in production, i.e. one unset variable away
-// from mailing every employee a link to a dead host.
-const PORTAL_URL = env.FRONTEND_URL;
-
-// Reminder offsets (days relative to the due date). Negative = before due.
-//  -3 → "due in 3 days", 0 → "due today", +3/+7/+14 → overdue nudges.
-const REMINDER_OFFSETS = [-3, 0, 3, 7, 14];
-
 function round2(n: number): number { return Math.round(n * 100) / 100; }
 
-// Flip sent/viewed invoices to overdue once past due, and email reminders on the
-// policy offsets (one per invoice per day, deduped via last_reminder_at).
-async function processReminders(): Promise<void> {
-  const today = todayUTC();
+// Mark overdue, tell the people inside, then chase the client.
+//
+// The deciding logic lives in services/invoiceReminders.service.ts so the
+// nightly run and the "Send reminder" button on an invoice cannot drift apart.
+// What stays here is the part that is nightly by nature: the internal
+// notification and the AP digest both fire on the TRANSITION to overdue, which
+// happens once per invoice, and firing them from a manual send would turn them
+// into the nightly repetition the document-expiry alerts had to be rescued from.
+async function processReminders(): Promise<{ overdue: number; remindersSent: number }> {
+  const wentOverdue = await markOverdueInvoices();
 
-  // 1. Mark overdue: real invoices, sent/viewed, due date in the past, with a balance.
-  const { data: toOverdue } = await supabaseAdmin
-    .from('invoices')
-    .select('id, invoice_number, total_amount, amount_paid, due_date')
-    .eq('doc_type', 'invoice')
-    .in('status', ['sent', 'viewed'])
-    .lt('due_date', today);
-  const wentOverdue: { id: string; invoiceNumber: string; balance: number; dueDate: string }[] = [];
-  for (const inv of toOverdue ?? []) {
-    const balance = round2((inv.total_amount ?? 0) - (inv.amount_paid ?? 0));
-    if (balance > 0.005) {
-      await supabaseAdmin.from('invoices').update({ status: 'overdue' }).eq('id', inv.id);
-      wentOverdue.push({
-        id: inv.id,
-        invoiceNumber: inv.invoice_number ?? inv.id.slice(0, 8),
-        balance,
-        dueDate: inv.due_date,
-      });
-    }
-  }
-
-  // Tell finance. Until now the only thing that happened when an invoice went
-  // overdue was an email to the CLIENT — nobody internal was told at all, and
-  // notifications.service.ts had no overdue job either. The transition is the
-  // moment worth reporting: it happens once per invoice, so this cannot become
-  // the nightly repetition that the document-expiry alerts had to be rescued
-  // from.
+  // Tell finance. Until this existed the only thing that happened when an
+  // invoice went overdue was an email to the CLIENT — nobody internal was told
+  // at all.
   for (const inv of wentOverdue) {
     try {
       await notifyRoles(
@@ -74,6 +43,7 @@ async function processReminders(): Promise<void> {
       console.error('[scheduler] overdue notification failed for', inv.invoiceNumber, err);
     }
   }
+
   // ...and one digest email to accounts payable, which is what HR actually
   // asked for ("Overdue invoice to be notified to ap@"). One message listing
   // everything that turned overdue today rather than one per invoice: on a bad
@@ -83,7 +53,7 @@ async function processReminders(): Promise<void> {
       const rows = wentOverdue
         .map(i => `<tr><td style="padding:6px 12px;">${i.invoiceNumber}</td><td style="padding:6px 12px;">due ${i.dueDate}</td><td style="padding:6px 12px;text-align:right;">${i.balance.toFixed(2)}</td></tr>`)
         .join('');
-      const total = wentOverdue.reduce((sum, i) => sum + i.balance, 0);
+      const total = round2(wentOverdue.reduce((sum, i) => sum + i.balance, 0));
       await sendCustomEmail({
         to: BILLING_EMAIL,
         subject: `${wentOverdue.length} invoice${wentOverdue.length === 1 ? '' : 's'} now overdue`,
@@ -101,49 +71,18 @@ async function processReminders(): Promise<void> {
     console.log(`[scheduler] ${wentOverdue.length} invoice(s) went overdue`);
   }
 
-  if (!mailerConfigured) return; // can still flip overdue without a mailer
+  const { sent, considered } = await sweepClientReminders();
+  // Logged unconditionally. The old job logged nothing unless something went
+  // overdue, so a sweep that had silently stopped sending anything months ago
+  // was indistinguishable from a quiet night.
+  console.log(`[scheduler] payment reminders: ${sent} sent, ${considered} invoice(s) considered`);
 
-  // 2. Reminders for anything outstanding with a balance.
-  const { data: outstanding } = await supabaseAdmin
-    .from('invoices')
-    .select('*, clients(billing_contact_email, billing_contact_name, contact_email, contact_name, company_name)')
-    .eq('doc_type', 'invoice')
-    .in('status', ['sent', 'viewed', 'partially_paid', 'overdue']);
-
-  for (const inv of outstanding ?? []) {
-    const balance = round2((inv.total_amount ?? 0) - (inv.amount_paid ?? 0));
-    if (balance <= 0.005) continue;
-
-    // daysBetween(today, due) > 0 ⇒ due is in the future; offset compares to -days.
-    const daysUntilDue = daysBetween(today, inv.due_date);   // +N before due, -N after
-    const offset = -daysUntilDue; // 0 on due, +N overdue, -N upcoming
-    if (!REMINDER_OFFSETS.includes(offset)) continue;
-
-    // Dedupe: at most one reminder per invoice per day.
-    if (inv.last_reminder_at && String(inv.last_reminder_at).slice(0, 10) === today) continue;
-
-    const client = inv.clients;
-    const to = client?.billing_contact_email || client?.contact_email;
-    if (!to) continue;
-    const contactName = client?.billing_contact_name || client?.contact_name || client?.company_name || 'there';
-    const tone: 'upcoming' | 'due' | 'overdue' = offset < 0 ? 'upcoming' : offset === 0 ? 'due' : 'overdue';
-
-    try {
-      await sendInvoiceReminderEmail({
-        to, contactName, invoiceNumber: inv.invoice_number, dueDate: inv.due_date,
-        balanceDue: balance, currency: inv.currency ?? 'USD', tone,
-        viewUrl: inv.public_token ? `${PORTAL_URL}/portal/i/${inv.public_token}` : undefined,
-      });
-      await supabaseAdmin.from('invoices').update({ last_reminder_at: new Date().toISOString() }).eq('id', inv.id);
-    } catch (err) {
-      console.error('[scheduler] reminder email failed for', inv.invoice_number, err);
-    }
-  }
+  return { overdue: wentOverdue.length, remindersSent: sent };
 }
 
 // One daily tick. Exported so it can also be triggered manually (admin "Run now").
-export async function runDailyTick(): Promise<{ reactivated: number }> {
-  await processReminders();
+export async function runDailyTick(): Promise<{ reactivated: number; overdue: number; remindersSent: number }> {
+  const reminders = await processReminders();
   // Auto-reactivate employees whose extended-leave return date has arrived.
   const reactivated = await reactivateReturnedEmployees();
 
@@ -167,7 +106,7 @@ export async function runDailyTick(): Promise<{ reactivated: number }> {
     console.error('[scheduler] triggerDocumentExpiryAlerts failed', err);
   }
 
-  return { reactivated };
+  return { reactivated, ...reminders };
 }
 
 // Boot the cron scheduler. Guarded by ENABLE_SCHEDULER so local dev / tests

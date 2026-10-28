@@ -3,6 +3,8 @@ import { NotFoundError, ValidationError } from '../lib/errors';
 import { logActivity } from '../lib/activityLogger';
 import type { CreatePaymentInput } from '../schemas/payment.schema';
 import { notifyRoles } from './notifications.service';
+import { bustNavBadgeCache } from './navBadges.service';
+import { todayUTC } from '../lib/dateUtils';
 
 // Manual payment recording (no processor). Each payment is a row; the invoice's
 // amount_paid = Σ payments, and its status is recomputed: paid (≥ total),
@@ -19,10 +21,24 @@ export async function listPayments(invoiceId: string) {
 
 // Recompute amount_paid + status from the payment rows and persist on the invoice.
 async function reconcileInvoice(invoiceId: string): Promise<void> {
-  const { data: inv } = await supabaseAdmin
-    .from('invoices').select('id, total_amount, status, doc_type').eq('id', invoiceId).single();
+  const { data: inv, error: invError } = await supabaseAdmin
+    .from('invoices').select('id, total_amount, status, doc_type, due_date').eq('id', invoiceId).single();
+  if (invError) {
+    console.error('[payments] could not load invoice for reconciliation', invoiceId, invError);
+    throw invError;
+  }
   if (!inv) return;
-  const { data: pays } = await supabaseAdmin.from('payments').select('amount').eq('invoice_id', invoiceId);
+
+  // Both reads used to discard their error. A failed payments read returned
+  // no rows, which this function cannot distinguish from "nothing has been
+  // paid" — so it would take a fully settled invoice, write amount_paid = 0,
+  // and flip the status back to 'sent'. Throwing leaves the invoice as it was.
+  const { data: pays, error: paysError } = await supabaseAdmin
+    .from('payments').select('amount').eq('invoice_id', invoiceId);
+  if (paysError) {
+    console.error('[payments] could not load payments for reconciliation', invoiceId, paysError);
+    throw paysError;
+  }
   const paid = round2((pays ?? []).reduce((s, p) => s + Number(p.amount), 0));
   const total = Number(inv.total_amount) || 0;
 
@@ -31,7 +47,18 @@ async function reconcileInvoice(invoiceId: string): Promise<void> {
     patch.status = 'paid';
     patch.paid_at = new Date().toISOString();
   } else if (paid > 0) {
-    patch.status = 'partially_paid';
+    // A part payment on an invoice that is ALREADY past due stays overdue.
+    //
+    // The nightly sweep now flips partially_paid invoices to overdue (it did
+    // not, which is how a $21,840 invoice 59 days late stayed invisible to
+    // every overdue view while still being chased). Setting partially_paid
+    // here unconditionally would hand that invoice back and forth: partial
+    // tonight, overdue in the morning, and the "Invoice Overdue" notification
+    // plus the AP digest firing again every single night. One flip, one
+    // notification, and a status that is true.
+    patch.status = inv.due_date && String(inv.due_date).slice(0, 10) < todayUTC()
+      ? 'overdue'
+      : 'partially_paid';
     patch.paid_at = null;
   } else {
     // No payments left — fall back to overdue if past due, else sent (don't
@@ -40,6 +67,8 @@ async function reconcileInvoice(invoiceId: string): Promise<void> {
     patch.paid_at = null;
   }
   await supabaseAdmin.from('invoices').update(patch).eq('id', invoiceId);
+  // The sidebar's overdue count is a cached head count of this column.
+  bustNavBadgeCache();
 }
 
 export async function recordPayment(invoiceId: string, input: CreatePaymentInput, actorId?: string) {

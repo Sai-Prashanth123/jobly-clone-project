@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Plus, Trash2, ChevronDown, ChevronRight, Paperclip, UploadCloud, X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { formatCurrency, formatDate, parseNumberInput, computeDiscount, validateUploadFile } from '../../lib/utils';
+import { formatCurrency, formatDate, parseNumberInput, computeDiscount, validateUploadFile, MAX_DOCUMENT_SIZE_LABEL } from '../../lib/utils';
 import { CURRENCIES, currencyLabel } from '../../lib/currencies';
 import { useClients } from '../../hooks/useClients';
 import { useTimesheets } from '../../hooks/useTimesheets';
@@ -21,6 +21,7 @@ import { useEmailTemplates } from '../../hooks/useEmailTemplates';
 import { DocumentDownloadButton } from '../shared/DocumentDownloadButton';
 import { UsDateInput } from '../shared/UsDateInput';
 import type { InvoiceAttachment, InvoiceStatus } from '../../types';
+import { PAYMENT_TERMS_OPTIONS, paymentTermDays } from '../../lib/invoiceTerms';
 
 // Prefill shape for edit-draft mode (mapped from an existing draft invoice).
 export interface InvoiceFormInitial {
@@ -42,7 +43,7 @@ export interface InvoiceFormInitial {
   notes?: string;
   terms?: string;
   attachments?: InvoiceAttachment[];
-  lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number; employeeId?: string }[];
+  lineItems: { itemName?: string; description?: string; quantity: number; unitPrice: number; employeeId?: string; employeeName?: string }[];
 }
 
 export interface InvoiceFormHandle {
@@ -63,15 +64,6 @@ interface InvoiceFormProps {
   initial?: InvoiceFormInitial;
 }
 
-const PAYMENT_TERMS_OPTIONS = [
-  { value: 'on_receipt', label: 'Due on receipt', days: 0 },
-  { value: 'net_7', label: 'Net 7', days: 7 },
-  { value: 'net_14', label: 'Net 14', days: 14 },
-  { value: 'net_30', label: 'Net 30', days: 30 },
-  { value: 'net_45', label: 'Net 45', days: 45 },
-  { value: 'net_60', label: 'Net 60', days: 60 },
-];
-
 const todayIso = () => new Date().toISOString().slice(0, 10);
 function addDays(dateIso: string, days: number): string {
   const [y, m, d] = dateIso.split('-').map(Number);
@@ -79,14 +71,15 @@ function addDays(dateIso: string, days: number): string {
   return dt.toISOString().slice(0, 10);
 }
 
-interface DraftLine { id: string; itemName: string; description: string; quantity: string; unitPrice: string; employeeId: string }
-const blankLine = (): DraftLine => ({ id: crypto.randomUUID(), itemName: '', description: '', quantity: '1', unitPrice: '', employeeId: '' });
+interface DraftLine { id: string; itemName: string; description: string; quantity: string; unitPrice: string; employeeId: string; employeeName: string }
+const blankLine = (): DraftLine => ({ id: crypto.randomUUID(), itemName: '', description: '', quantity: '1', unitPrice: '', employeeId: '', employeeName: '' });
 const linesFromInitial = (initial?: InvoiceFormInitial): DraftLine[] => {
   if (!initial?.lineItems?.length) return [blankLine()];
   return initial.lineItems.map(li => ({
     id: crypto.randomUUID(),
     itemName: li.itemName ?? '',
     employeeId: li.employeeId ?? '',
+    employeeName: li.employeeName ?? '',
     description: li.description ?? '',
     quantity: String(li.quantity ?? 1),
     unitPrice: li.unitPrice != null ? String(li.unitPrice) : '',
@@ -151,7 +144,14 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
   // Loaded unconditionally: the manual lines need the picker too, and asking
   // only when timesheet data was needed is why there was no dropdown to pick
   // an employee from on a new invoice.
-  const { data: empData } = useEmployees({ limit: 500 });
+  //
+  // status 'active' is the whole of the filter: an employee is active,
+  // inactive or onboarding, and both termination and extended leave resolve to
+  // inactive — so this excludes people still mid-onboarding, people who have
+  // left and people on leave in one parameter. A line already naming someone
+  // who has since left is preserved separately (see the picker below), and the
+  // approved-timesheet rows below take their name off the timesheet itself.
+  const { data: empData } = useEmployees({ limit: 500, status: 'active' });
   const { data: assignData } = useAssignments({ limit: 200 }, { enabled: needsTimesheetData });
 
   const { data: invoiceThemes } = useInvoiceTemplates();
@@ -176,10 +176,9 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
     return { ...l, qty, price, amount: Math.round(qty * price * 100) / 100 };
   });
   const manualSubtotal = Math.round(manualLines.reduce((s, l) => s + l.amount, 0) * 100) / 100;
-  const dueDate = addDays(issueDate, PAYMENT_TERMS_OPTIONS.find(o => o.value === paymentTerms)?.days ?? 30);
+  const dueDate = addDays(issueDate, paymentTermDays(paymentTerms));
 
   // ── Timesheet totals ──
-  const getEmployee = (id: string) => employees.find(e => e.id === id);
   const getAssignment = (id: string) => assignments.find(a => a.id === id);
   const tsPreview = clientTimesheets.filter(t => selected.includes(t.id)).map(t => {
     const asgn = getAssignment(t.assignmentId);
@@ -401,7 +400,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="hidden sm:grid grid-cols-[1.4fr_2fr_70px_110px_90px_32px] gap-2 text-[11px] font-medium text-gray-400 uppercase tracking-wide px-1">
-                <span>Item</span><span>Description</span><span>Qty</span><span>Unit price</span><span className="text-right">Amount</span><span />
+                <span>Item</span><span>Description</span><span>Hours</span><span>Rate</span><span className="text-right">Amount</span><span />
               </div>
               {manualLines.map(l => (
                 <div
@@ -416,8 +415,12 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                     onValueChange={v => {
                       if (v === '__none__') { updateLine(l.id, { employeeId: '' }); return; }
                       const emp = employees.find(e => e.id === v);
+                      // No match means the preserved option below was re-picked
+                      // — keep what the line already says rather than blanking
+                      // the name of someone who has since left.
                       updateLine(l.id, {
                         employeeId: v,
+                        employeeName: emp ? `${emp.firstName} ${emp.lastName}` : l.employeeName,
                         itemName: emp ? `${emp.firstName} ${emp.lastName}` : l.itemName,
                       });
                     }}
@@ -428,6 +431,16 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                       {employees.map(e => (
                         <SelectItem key={e.id} value={e.id}>{e.firstName} {e.lastName}</SelectItem>
                       ))}
+                      {/* The roster is current staff only, so editing an older
+                          invoice would otherwise show an empty trigger and
+                          silently drop the employee on save. Same approach as
+                          the non-standard currency option above. */}
+                      {l.employeeId && !employees.some(e => e.id === l.employeeId) && (
+                        <SelectItem value={l.employeeId}>
+                          {l.employeeName || l.itemName || 'Former employee'}
+                          <span className="ml-1 text-xs text-muted-foreground">(inactive)</span>
+                        </SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                   <Input value={l.description} onChange={e => updateLine(l.id, { description: e.target.value })} placeholder="Description" />
@@ -561,7 +574,7 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                 >
                   <UploadCloud className="h-8 w-8 mx-auto text-gray-300" />
                   <p className="mt-2 text-sm text-muted-foreground">Drag files here or click to upload</p>
-                  <p className="text-xs text-gray-400">Max 20MB</p>
+                  <p className="text-xs text-gray-400">Max {MAX_DOCUMENT_SIZE_LABEL}</p>
                   {uploadAttachment.isPending && (
                     <p className="mt-1 text-xs text-blue-600 inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</p>
                   )}
@@ -619,14 +632,13 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
               ) : (
                 <div className="space-y-2">
                   {clientTimesheets.map(t => {
-                    const emp = getEmployee(t.employeeId);
                     const asgn = getAssignment(t.assignmentId);
                     const amount = t.totalHours * (asgn?.billRate ?? 0);
                     return (
                       <label key={t.id} className="flex items-center gap-3 p-3 border rounded-md hover:bg-gray-50 cursor-pointer">
                         <Checkbox checked={selected.includes(t.id)} onCheckedChange={() => setSelected(prev => prev.includes(t.id) ? prev.filter(x => x !== t.id) : [...prev, t.id])} />
                         <div className="flex-1">
-                          <p className="text-sm font-medium">{emp ? `${emp.firstName} ${emp.lastName}` : t.employeeId.slice(0, 8)}</p>
+                          <p className="text-sm font-medium">{t.employeeName ?? t.employeeId.slice(0, 8)}</p>
                           <p className="text-xs text-muted-foreground">{asgn?.projectName} • Week of {formatDate(t.weekStartDate)} • {t.totalHours} hrs</p>
                         </div>
                         <div className="text-sm font-semibold text-right">

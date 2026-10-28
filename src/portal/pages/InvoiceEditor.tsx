@@ -136,9 +136,14 @@ export default function InvoiceEditor() {
         notes: invoice!.notes,
         terms: invoice!.terms,
         attachments: invoice!.attachments,
+        // employeeId/employeeName were not carried through, so opening a saved
+        // invoice showed an empty employee picker on every line and saving
+        // dropped the link. `productId` was passed instead and exists on
+        // neither the line type nor the form.
         lineItems: invoice!.lineItems.map(li => ({
           itemName: li.itemName, description: li.description,
-          quantity: li.quantity, unitPrice: li.unitPrice, productId: li.productId,
+          quantity: li.quantity, unitPrice: li.unitPrice,
+          employeeId: li.employeeId, employeeName: li.employeeName,
         })),
       }
     : undefined;

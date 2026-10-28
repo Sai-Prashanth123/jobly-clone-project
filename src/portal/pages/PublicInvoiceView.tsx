@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { INVOICE_THANK_YOU } from '../lib/billing';
 import { useParams } from 'react-router-dom';
 import axios from 'axios';
 import { Loader2 } from 'lucide-react';
@@ -130,8 +131,9 @@ export default function PublicInvoiceView() {
           </div>
         )}
 
-        <div className="px-8 py-4 bg-gray-50 text-center text-xs text-gray-400">
-          Powered by Jobly Solutions
+        <div className="px-8 py-5 bg-gray-50 text-center">
+          <p className="text-sm font-semibold text-gray-700">{INVOICE_THANK_YOU}</p>
+          <p className="mt-1 text-xs text-gray-400">Powered by Jobly Solutions</p>
         </div>
       </div>
     </div>

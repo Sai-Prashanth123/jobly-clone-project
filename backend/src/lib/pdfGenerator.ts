@@ -1,4 +1,4 @@
-import { BILLING_EMAIL, BILLING_FOOTER } from './billing';
+import { BILLING_EMAIL, BILLING_FOOTER, INVOICE_THANK_YOU } from './billing';
 import PDFDocument from 'pdfkit';
 import {
   Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
@@ -265,8 +265,15 @@ export function generateInvoicePDF(data: InvoicePDFData, theme?: InvoiceTheme): 
     doc.page.margins.bottom = 0;
     const footerY = doc.page.height - 50;
     doc.rect(0, footerY, PAGE_W, 50).fill('#F3F4F6');
+    // Two lines in the band: the sign-off, then the contact line. The band is
+    // 50pt tall and the baseline offsets keep both inside it — pdfkit would
+    // otherwise paginate anything past page.maxY() onto a blank page.
+    doc.fillColor('#374151').fontSize(9).font('Helvetica-Bold')
+      .text(INVOICE_THANK_YOU, M, footerY + 10, {
+        width: CONTENT_W, align: 'center', lineBreak: false,
+      });
     doc.fillColor(gray).fontSize(8).font('Helvetica')
-      .text(theme?.footerText || BILLING_FOOTER, M, footerY + 18, {
+      .text(theme?.footerText || BILLING_FOOTER, M, footerY + 28, {
         width: CONTENT_W, align: 'center', lineBreak: false,
       });
 

@@ -12,6 +12,8 @@ export interface NavBadgeCounts {
   expenses: number;
   attendanceReview: number;
   expiringDocs: number;
+  /** Invoices past due with money outstanding. Admin and finance only. */
+  overdueInvoices: number;
   announcements: number;
 }
 
@@ -21,6 +23,7 @@ interface SharedCounts {
   expenses: number;
   attendanceReview: number;
   expiringDocs: number;
+  overdueInvoices: number;
 }
 
 // Role-keyed cache for the counts that are identical across users of a role.
@@ -53,15 +56,25 @@ async function getSharedCounts(role: string): Promise<SharedCounts> {
   const canActOnTimesheets = ['admin', 'hr', 'operations', 'finance'].includes(role);
   const canActOnExpenses = ['admin', 'hr', 'finance'].includes(role);
 
-  const [timesheets, leaveRequests, expenses, attendanceReview, expiringDocs] = await Promise.all([
+  // Deliberately NOT isHrAdmin: an overdue invoice is finance's business and
+  // HR has no action to take on one.
+  const canSeeInvoices = role === 'admin' || role === 'finance';
+
+  const [timesheets, leaveRequests, expenses, attendanceReview, expiringDocs, overdueInvoices] = await Promise.all([
     canActOnTimesheets ? headCount('timesheets', q => q.eq('status', 'submitted')) : Promise.resolve(0),
     isHrAdmin ? headCount('leave_requests', q => q.eq('status', 'pending')) : Promise.resolve(0),
     canActOnExpenses ? headCount('expense_reports', q => q.eq('status', 'submitted')) : Promise.resolve(0),
     isHrAdmin ? headCount('monthly_timesheets', q => q.eq('status', 'submitted')) : Promise.resolve(0),
     isHrAdmin ? listExpiringDocuments(30).then(d => d.length).catch(() => 0) : Promise.resolve(0),
+    // A head count cannot express "balance > 0", and does not need to: the
+    // nightly sweep only sets 'overdue' when there is a balance, and recording
+    // a settling payment moves the invoice to 'paid'.
+    canSeeInvoices
+      ? headCount('invoices', q => q.eq('doc_type', 'invoice').eq('status', 'overdue'))
+      : Promise.resolve(0),
   ]);
 
-  const data: SharedCounts = { timesheets, leaveRequests, expenses, attendanceReview, expiringDocs };
+  const data: SharedCounts = { timesheets, leaveRequests, expenses, attendanceReview, expiringDocs, overdueInvoices };
   sharedCache.set(role, { at: Date.now(), data });
   return data;
 }
@@ -96,6 +109,7 @@ export async function getNavBadges(user: { id: string; role: string; employeeId?
     expenses: canActOnExpenses ? shared.expenses : myExpenses,
     attendanceReview: shared.attendanceReview,
     expiringDocs: shared.expiringDocs,
+    overdueInvoices: shared.overdueInvoices,
     announcements,
   };
 }

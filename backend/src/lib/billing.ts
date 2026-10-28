@@ -22,5 +22,14 @@ export const BILLING_EMAIL = process.env.BILLING_EMAIL?.trim() || 'ap@joblysolut
 /** Sender for invoice mail: a display name customers recognise, not "Jobly Portal". */
 export const BILLING_FROM = `Jobly Solutions <${BILLING_EMAIL}>`;
 
+/**
+ * The sign-off customers read at the bottom of every invoice.
+ *
+ * Deliberately separate from BILLING_FOOTER and from invoice_templates.footer_text:
+ * that one is the contact line and an admin may replace it per template, which
+ * would silently take the thank-you with it. This line always appears.
+ */
+export const INVOICE_THANK_YOU = 'Thank you for your business!! Jobly Solutions~';
+
 /** The one-line footer shown under invoices, in email and on the PDF. */
 export const BILLING_FOOTER = `Jobly Solutions · ${BILLING_EMAIL} · www.joblysolutions.com`;

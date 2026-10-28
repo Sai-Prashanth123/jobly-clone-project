@@ -4,12 +4,15 @@ import { generateInvoicePDF, type InvoicePDFData } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured, renderTemplate } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
-import { uploadDocument, deleteDocument, downloadDocumentBuffer } from './storage.service';
+import { uploadDocument, deleteDocument, downloadDocumentBuffer, readSizedObject } from './storage.service';
+import {
+  planAttachments, describeOmissions, MAX_SINGLE_ATTACHMENT_BYTES,
+} from '../lib/mailAttachments';
 import { getInvoiceTheme } from './invoiceTemplates.service';
 import { getEmailTemplate } from './emailTemplates.service';
 import { addDaysToDate, daysBetween, todayUTC } from '../lib/dateUtils';
 import type { GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput, ListInvoicesQuery } from '../schemas/invoice.schema';
-import { paymentTermsDays } from '../schemas/invoice.schema';
+import { resolveTerms, paymentTermLabel } from '../lib/invoiceTerms';
 import { storageProvider } from '../lib/storage';
 
 // Resolve a document-level discount to a dollar amount applied to the subtotal.
@@ -32,7 +35,8 @@ export function computeDiscountAmount(
 // duplicate as a friendly 409. Otherwise auto-allocate `${prefix}-${year}-####`;
 // the count+1 approach races under concurrency, so retry on the 23505
 // unique-violation with a fresh count. `prefix` is INV or EST.
-async function insertInvoiceWithNumber(
+/** Exported so the auto-draft sync allocates numbers the same way, retry and all. */
+export async function insertInvoiceWithNumber(
   prefix: 'INV' | 'EST',
   payload: Record<string, unknown>,
   explicitNumber?: string,
@@ -143,10 +147,19 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
   // invoice_timesheets junction has PK (invoice_id, timesheet_id) so duplicates
   // within ONE invoice are blocked, but nothing prevents the same TS from
   // appearing on TWO invoices → double-billing. Catch it here.
-  const { data: alreadyInvoiced } = await supabaseAdmin
+  const { data: alreadyInvoiced, error: alreadyInvoicedError } = await supabaseAdmin
     .from('invoice_timesheets')
     .select('timesheet_id, invoice_id')
     .in('timesheet_id', input.timesheetIds);
+  // The error was discarded here, which made a failed read look exactly like
+  // "none of these are invoiced yet" — so the ONLY thing standing between a
+  // timesheet and being billed twice failed open. Refuse to generate rather
+  // than guess: an invoice that was not created is a retry, an invoice that
+  // double-bills a client is a phone call.
+  if (alreadyInvoicedError) {
+    console.error('[invoices] could not check whether timesheets are already invoiced', alreadyInvoicedError);
+    throw new Error('Could not verify whether these timesheets have already been invoiced. Nothing was created — please try again.');
+  }
   if (alreadyInvoiced && alreadyInvoiced.length > 0) {
     const tsIds = [...new Set(alreadyInvoiced.map(r => r.timesheet_id))];
     // Look up human-readable display IDs so the error names timesheets a
@@ -244,8 +257,14 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
   const billingPeriodStart = weekStarts[0] ?? input.issueDate;
   const billingPeriodEnd   = weekEnds[weekEnds.length - 1] ?? input.issueDate;
 
-  // Calculate due date from client net payment days (UTC-safe)
-  const dueDate = addDaysToDate(input.issueDate, client?.net_payment_days ?? 30);
+  // Due date AND the term it is named by, both from the client's default.
+  // This path used to compute only the date and leave `payment_terms` at the
+  // column default, so a Net 45 client's invoice fell due in 45 days while the
+  // row, the PDF and the print view all read "Net 30".
+  const { paymentTerms, dueDate } = resolveTerms({
+    issueDate: input.issueDate,
+    clientNetDays: client?.net_payment_days ?? 30,
+  });
 
   // Generate invoice number — count+1 has a race when two requests run
   // simultaneously (both see count=N and both compute the same number). Retry
@@ -266,6 +285,7 @@ export async function generateInvoice(input: GenerateInvoiceInput, actorId?: str
         client_id: input.clientId,
         issue_date: input.issueDate,
         due_date: dueDate,
+        payment_terms: paymentTerms,
         subtotal,
         tax_rate: input.taxRate,
         tax_amount: taxAmount,
@@ -370,9 +390,11 @@ export async function createInvoice(input: CreateInvoiceInput, actorId?: string)
   const taxAmount = Math.round(discountedSubtotal * (input.taxRate / 100) * 100) / 100;
   const totalAmount = Math.round((discountedSubtotal + taxAmount) * 100) / 100;
 
-  const dueDate = input.paymentTerms === 'custom' && input.dueDate
-    ? input.dueDate
-    : addDaysToDate(input.issueDate, paymentTermsDays(input.paymentTerms));
+  const { dueDate } = resolveTerms({
+    issueDate: input.issueDate,
+    paymentTerms: input.paymentTerms,
+    explicitDueDate: input.dueDate,
+  });
 
   const isEstimate = input.docType === 'estimate';
   const invoice = await insertInvoiceWithNumber(isEstimate ? 'EST' : 'INV', {
@@ -423,7 +445,7 @@ export async function convertEstimate(estimateId: string, actorId?: string) {
   // estimate is accepted and converted).
   const dueDate = est.payment_terms === 'custom'
     ? addDaysToDate(issueDate, daysBetween(est.issue_date, est.due_date))
-    : addDaysToDate(issueDate, paymentTermsDays(est.payment_terms ?? 'net_30'));
+    : resolveTerms({ issueDate, paymentTerms: est.payment_terms ?? 'net_30' }).dueDate;
 
   const invoice = await insertInvoiceWithNumber('INV', {
     client_id: est.client_id,
@@ -555,9 +577,11 @@ export async function updateInvoice(id: string, input: UpdateInvoiceInput) {
 
     const issueDate = input.issueDate ?? inv.issue_date;
     const paymentTerms = input.paymentTerms ?? inv.payment_terms ?? 'net_30';
-    const dueDate = paymentTerms === 'custom'
-      ? (input.dueDate ?? inv.due_date)
-      : addDaysToDate(issueDate, paymentTermsDays(paymentTerms));
+    const dueDate = resolveTerms({
+      issueDate,
+      paymentTerms,
+      explicitDueDate: input.dueDate ?? inv.due_date,
+    }).dueDate;
 
     if (input.clientId !== undefined) updateData.client_id = input.clientId;
     updateData.issue_date = issueDate;
@@ -683,8 +707,122 @@ export async function removeInvoiceAttachment(invoiceId: string, docId: string) 
   await deleteDocument(docId);
 }
 
+/** Where both weekly and monthly client-signed proofs live. */
+const TIMESHEET_PROOF_BUCKET = 'timesheet-proofs';
+
+interface ProofCandidate {
+  filename: string;
+  bytes: number;
+  storagePath: string;
+}
+
+/**
+ * The client-signed proof for every timesheet on this invoice, in line order.
+ *
+ * Sizes come from storage rather than the database: there is no size column on
+ * documents, and the budget has to be decided before anything is read.
+ *
+ * A timesheet with no proof is simply absent — collectBlockers already raises
+ * that as a blocker on the draft, so finance has seen it before sending, and
+ * repeating it in the client's email would be telling them about our own
+ * paperwork gap.
+ */
+async function collectTimesheetProofs(invoiceId: string): Promise<ProofCandidate[]> {
+  const { data: links, error } = await supabaseAdmin
+    .from('invoice_timesheets')
+    .select('timesheet_id')
+    .eq('invoice_id', invoiceId);
+  if (error) {
+    console.error('[invoices.service] could not list timesheets for invoice', invoiceId, error);
+    return [];
+  }
+  const ids = (links ?? []).map(l => l.timesheet_id).filter(Boolean);
+  if (ids.length === 0) return [];
+
+  const { data: sheets, error: tsErr } = await supabaseAdmin
+    .from('timesheets')
+    .select('id, display_id, week_start_date, client_signed_path, client_signed_filename')
+    .in('id', ids)
+    .order('week_start_date', { ascending: true });
+  if (tsErr) {
+    console.error('[invoices.service] could not load timesheets for invoice', invoiceId, tsErr);
+    return [];
+  }
+
+  const out: ProofCandidate[] = [];
+  for (const ts of sheets ?? []) {
+    if (!ts.client_signed_path) continue;
+    const info = await storageProvider.stat(TIMESHEET_PROOF_BUCKET, ts.client_signed_path);
+    if (!info) continue;
+    // Named so the client can match it to a line on the invoice without
+    // opening it: the original upload name is usually "scan0001.pdf".
+    const ext = (ts.client_signed_filename ?? ts.client_signed_path).split('.').pop() ?? 'pdf';
+    const label = ts.display_id ?? ts.id.slice(0, 8);
+    out.push({
+      filename: `Timesheet ${label} (week of ${ts.week_start_date}).${ext}`,
+      bytes: info.size,
+      storagePath: ts.client_signed_path,
+    });
+  }
+  return out;
+}
+
+/**
+ * Record that somebody reviewed an auto-draft's blockers and accepts them.
+ *
+ * This is the gate sendInvoice refuses at. It is a human's decision, so it is
+ * logged with who made it: the blockers themselves stay on the row, because
+ * the point is to keep the record of what was wrong, not to clear it.
+ */
+export async function acknowledgeInvoiceBlockers(id: string, actorId: string) {
+  const { data: existing, error: readErr } = await supabaseAdmin
+    .from('invoices')
+    .select('id, invoice_number, blockers, blockers_ack_at')
+    .eq('id', id)
+    .single();
+  if (readErr || !existing) throw new NotFoundError('Invoice not found');
+
+  const blockers: string[] = (existing as { blockers?: string[] }).blockers ?? [];
+  if (blockers.length === 0) {
+    throw new ValidationError('This invoice has no outstanding issues to confirm.');
+  }
+  // Idempotent: a second confirmation is not an error, and must not overwrite
+  // who looked first.
+  if (existing.blockers_ack_at) return existing;
+
+  const { data, error } = await supabaseAdmin
+    .from('invoices')
+    .update({ blockers_ack_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single();
+  if (error) throw error;
+
+  // 'updated' rather than a new verb: the action union is shared with every
+  // other entity, and the detail that matters is in the metadata.
+  await logActivity(
+    actorId, 'updated', 'invoice', id,
+    existing.invoice_number ?? id.slice(0, 8),
+    { blockers_acknowledged: blockers },
+  );
+
+  return data;
+}
+
 export async function sendInvoice(id: string, recipientEmailOverride?: string, ccEmails?: string[]) {
   const inv = await getInvoice(id);
+
+  // A self-assembled draft with unresolved problems must not reach a client.
+  // The flags are raised rather than the invoice withheld, so the work is
+  // never silently unbilled - but somebody has to look before it goes out.
+  // Acknowledging keeps the record of what was wrong; it only opens the gate.
+  const draftBlockers: string[] = (inv as { blockers?: string[] }).blockers ?? [];
+  if (draftBlockers.length > 0 && !(inv as { blockers_ack_at?: string }).blockers_ack_at) {
+    throw new ValidationError(
+      `This invoice was assembled automatically and has ${draftBlockers.length} unresolved issue${draftBlockers.length === 1 ? '' : 's'}. Review and confirm before sending: ${draftBlockers.join(' ')}`,
+      { blockers: draftBlockers },
+    );
+  }
 
   const { data: client } = await supabaseAdmin
     .from('clients')
@@ -716,6 +854,36 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string, c
     const buf = await downloadDocumentBuffer(doc.storage_path, 'invoice');
     if (buf) attachmentFiles.push({ filename: doc.name ?? 'attachment', content: buf, contentType: doc.type ?? undefined });
   }
+
+  // The client-signed timesheets this invoice bills for.
+  //
+  // This is the automation the request was actually about: "all timesheets and
+  // everything should be attached to that email". Finance used to download
+  // each proof and attach it by hand, which is why invoices went out with the
+  // proofs missing and AP queried them.
+  //
+  // Budgeted, because a proof may now be 100 MB and SES refuses the whole
+  // message over 40 MB — one oversize scan must not fail the invoice email.
+  const proofOmissions: string[] = [];
+  const proofCandidates = await collectTimesheetProofs(id);
+  const plan = planAttachments(proofCandidates);
+  for (const { item, reason } of plan.omitted) {
+    console.warn('[invoices.service] proof omitted from invoice email', id, item.filename, reason);
+  }
+  for (const cand of plan.attach) {
+    const read = await readSizedObject(TIMESHEET_PROOF_BUCKET, cand.storagePath, MAX_SINGLE_ATTACHMENT_BYTES);
+    if (read && 'buffer' in read) {
+      attachmentFiles.push({ filename: cand.filename, content: read.buffer });
+    } else {
+      // Between the size check and the read: treat it like any other omission
+      // rather than failing the send.
+      proofOmissions.push(cand.filename);
+    }
+  }
+  const omissionNote = describeOmissions([
+    ...plan.omitted,
+    ...proofOmissions.map(filename => ({ item: { filename, bytes: 0 }, reason: 'too-large' as const })),
+  ]);
 
   const pdfData = buildInvoicePdfData(inv, client);
 
@@ -796,6 +964,7 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string, c
         isHours: li.isHours,
       })),
       attachmentFiles: attachmentFiles.length > 0 ? attachmentFiles : undefined,
+      attachmentNote: omissionNote ?? undefined,
       customTemplate,
     });
     emailSent = true;
@@ -943,12 +1112,6 @@ export async function bulkUpdateInvoiceStatus(ids: string[], status: string) {
   return { updated: eligibleIds.length, skipped };
 }
 
-// Human label for a payment-terms code (used on the PDF/email).
-const PAYMENT_TERM_LABELS: Record<string, string> = {
-  on_receipt: 'Due on receipt', net_7: 'Net 7', net_14: 'Net 14',
-  net_30: 'Net 30', net_45: 'Net 45', net_60: 'Net 60', custom: 'Custom',
-};
-
 // Map the invoice + client DB rows to the premium PDF data shape. Prefers the
 // client's billing address, falls back to the primary address. (The old code
 // read client.address — a column that doesn't exist — so the address was always
@@ -978,7 +1141,7 @@ function buildInvoicePdfData(inv: any, client: any): InvoicePDFData {
     issueDate: inv.issue_date,
     dueDate: inv.due_date,
     poNumber: inv.po_number ?? undefined,
-    paymentTerms: inv.payment_terms ? (PAYMENT_TERM_LABELS[inv.payment_terms] ?? inv.payment_terms) : undefined,
+    paymentTerms: inv.payment_terms ? paymentTermLabel(inv.payment_terms) : undefined,
     currency: inv.currency ?? 'USD',
     lineItems: (inv.invoice_line_items ?? []).map((li: Record<string, unknown>) => ({
       itemName: li.item_name ? String(li.item_name) : undefined,

@@ -4,6 +4,8 @@ import { Printer } from 'lucide-react';
 import { formatCurrency, formatDate } from '../../lib/utils';
 import { useInvoiceTemplates } from '../../hooks/useInvoiceTemplates';
 import type { Invoice, Client } from '../../types';
+import { netTermsSentence } from '../../lib/invoiceTerms';
+import { INVOICE_THANK_YOU } from '../../lib/billing';
 
 interface InvoicePrintViewProps {
   invoice: Invoice;
@@ -139,8 +141,9 @@ export function InvoicePrintView({ invoice, client }: InvoicePrintViewProps) {
           </div>
         )}
 
-        <div className="mt-8 pt-6 border-t text-center text-xs text-gray-400">
-          Thank you for your business. Payment is due within {client?.netPaymentDays ?? 30} days.
+        <div className="mt-8 pt-6 border-t text-center">
+          <p className="text-sm font-semibold text-gray-700">{INVOICE_THANK_YOU}</p>
+          <p className="mt-1 text-xs text-gray-400">{netTermsSentence(invoice, client)}</p>
         </div>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import { BILLING_EMAIL, BILLING_FROM, BILLING_FOOTER } from './billing';
+import { BILLING_EMAIL, BILLING_FROM, BILLING_FOOTER, INVOICE_THANK_YOU } from './billing';
 import { SESv2Client, SendEmailCommand } from '@aws-sdk/client-sesv2';
 import MailComposer from 'nodemailer/lib/mail-composer';
 import { formatDateSafe, formatDateUS } from './dateUtils';
@@ -24,7 +24,12 @@ function emailShell(opts: {
   body: string;
 }): string {
   const { previewText, title, subtitle, body } = opts;
-  const logoSrc = `${PORTAL_URL}/assets/img/logo/logo-3.png`;
+  // Embedded in the message rather than linked. The URL it used to point at
+  // is live and correct, but Outlook does not load remote images by default
+  // and renders the red-X "linked image cannot be displayed" box instead — on
+  // an invoice going to a customer. A cid: part is part of the email itself,
+  // so there is nothing to block and nothing to fetch.
+  const logoSrc = 'cid:jobly-logo';
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -150,7 +155,8 @@ interface MailOptions {
  * and base64 chunking; nodemailer is already a dependency and does it
  * correctly.
  */
-async function buildRawMessage(mail: MailOptions): Promise<Buffer> {
+/** Exported so a test can inspect the MIME rather than trust the intent. */
+export async function buildRawMessage(mail: MailOptions): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     new MailComposer({
       from: mail.from ?? MAIL_FROM,
@@ -165,15 +171,29 @@ async function buildRawMessage(mail: MailOptions): Promise<Buffer> {
       html: mail.html,
       text: mail.text,
       replyTo: mail.replyTo,
-      // cid (inline) attachments are dropped, matching the previous transport:
-      // the templates embed images by URL, not by content id.
-      attachments: (mail.attachments ?? [])
-        .filter(a => !a.cid && a.content)
-        .map(a => ({
-          filename: a.filename,
-          content: a.content,
-          contentType: a.contentType,
-        })),
+      // cid (inline) attachments used to be dropped here, which is why the
+      // templates hotlinked the logo and why it arrived broken in Outlook.
+      attachments: [
+        ...(mail.attachments ?? [])
+          .filter(a => a.content)
+          .map(a => ({
+            filename: a.filename,
+            content: a.content,
+            contentType: a.contentType,
+            ...(a.cid ? { cid: a.cid, contentDisposition: 'inline' as const } : {}),
+          })),
+        // Any template referencing cid:jobly-logo gets the image attached
+        // automatically, so no call site has to remember to carry it.
+        ...(mail.html?.includes('cid:jobly-logo') && !(mail.attachments ?? []).some(a => a.cid === 'jobly-logo')
+          ? [{
+              filename: 'jobly-logo.png',
+              content: getJoblyLogoBuffer(),
+              contentType: 'image/png',
+              cid: 'jobly-logo',
+              contentDisposition: 'inline' as const,
+            }]
+          : []),
+      ],
     }).compile().build((err, message) => (err ? reject(err) : resolve(message)));
   });
 }
@@ -400,6 +420,13 @@ export interface InvoiceEmailPayload {
   terms?: string;
   lineItems: { itemName?: string; description: string; quantity: number; unitPrice: number; amount: number; isHours?: boolean }[];
   attachmentFiles?: { filename: string; content: Buffer; contentType?: string }[];
+  /**
+   * Named supporting documents that would not fit the message.
+   *
+   * Shown to the client on purpose: a proof that is silently absent cannot be
+   * chased by their AP team, who have no way to know it existed.
+   */
+  attachmentNote?: string;
   // Optional: an admin-authored template (already placeholder-rendered) chosen
   // on the invoice. When present, the header/body/footer replace the default
   // branded shell (via buildBrandedEmail) but the line-items/total/dates block
@@ -503,6 +530,7 @@ export async function sendInvoiceEmail(payload: InvoiceEmailPayload): Promise<vo
 
 ${notes ? `<div style="margin-bottom:16px;background:#f5f7ff;border-left:3px solid #4069FF;border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;color:#374151;line-height:1.6;">${esc(notes)}</div>` : ''}
 ${terms ? `<p style="margin:0 0 24px;font-size:12px;color:#9ca3af;line-height:1.6;">${esc(terms)}</p>` : ''}
+${payload.attachmentNote ? `<div style="margin-bottom:16px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:0 8px 8px 0;padding:12px 16px;font-size:13px;color:#92400e;line-height:1.6;">${esc(payload.attachmentNote)}</div>` : ''}
 
 ${pdfUrl ? `<table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:24px;">
   <tr><td align="center">
@@ -606,6 +634,7 @@ export function buildBrandedEmail(parts: { headerHtml?: string; bodyHtml: string
         </td></tr>
         <tr>
           <td style="background:#f9fafb;padding:18px 40px;border-top:1px solid #f3f4f6;">
+            <p style="margin:0 0 6px;color:#374151;font-size:13px;font-weight:600;text-align:center;">${esc(INVOICE_THANK_YOU)}</p>
             <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">${BILLING_FOOTER}</p>
           </td>
         </tr>

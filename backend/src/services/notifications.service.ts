@@ -452,12 +452,25 @@ export async function triggerDocumentExpiryAlerts(): Promise<{ sent: number; ski
   // The window is the longest interval in alertIntervalDays(); anything older
   // than that is due again regardless, so there is no point fetching it.
   const lookback = new Date(today.getTime() - MAX_ALERT_INTERVAL_DAYS * 86_400_000);
-  const { data: priorAlerts } = await supabaseAdmin
+  const { data: priorAlerts, error: priorAlertsError } = await supabaseAdmin
     .from('notifications')
     .select('entity_id, message, created_at')
     .eq('entity_type', 'employee')
     .in('title', EXPIRY_ALERT_TITLES)
     .gte('created_at', lookback.toISOString());
+
+  // This read IS the duplicate suppression. Its error was discarded, so a
+  // failure produced an empty map — which this function cannot tell apart from
+  // "nothing has been sent recently", making every alert due again and
+  // re-emailing every employee, every admin and every HR user. This job has
+  // already had to be rescued from exactly that repetition once.
+  //
+  // Returning rather than throwing: the caller is the nightly tick, and
+  // sending nothing tonight is recoverable. Sending everything twice is not.
+  if (priorAlertsError) {
+    console.error('[notifications] could not read prior expiry alerts; skipping tonight rather than risking a repeat send', priorAlertsError);
+    return { sent: 0, skipped: 0 };
+  }
 
   // entityId + document key → when we last said anything about that document.
   //

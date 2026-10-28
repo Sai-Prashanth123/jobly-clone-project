@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Mail, Send, Check, Loader2, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useSendInvoice, useGetInvoicePDF, useUpdateInvoice } from '../../hooks/useInvoices';
+import { useSendInvoice, useGetInvoicePDF, useUpdateInvoice, useAcknowledgeInvoiceBlockers } from '../../hooks/useInvoices';
 import {
   buildGmailLink, buildOutlookLink, buildOutlookLiveLink, buildMailtoLink,
   buildInvoiceEmailBody, publicInvoiceUrl, type ComposeParams,
@@ -41,6 +41,12 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
   const sendInvoice = useSendInvoice(invoice.id);
   const getPDF = useGetInvoicePDF();
   const markSent = useUpdateInvoice(invoice.id);
+  const ack = useAcknowledgeInvoiceBlockers(invoice.id);
+
+  // Only a self-assembled draft carries these; a hand-made invoice has none,
+  // so nothing below changes for the manual flow.
+  const blockers = invoice.blockers ?? [];
+  const needsAck = blockers.length > 0 && !invoice.blockersAckAt;
 
   const contactName = client?.billingContactName || client?.contactName || 'there';
   const defaultTo = client?.billingContactEmail || client?.contactEmail || '';
@@ -134,6 +140,12 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
 
   const sendViaJobly = async () => {
     setSendError(null);
+    // The server refuses this too — doing it here as well means finance gets
+    // the list in place of a rejected request they have to interpret.
+    if (needsAck) {
+      setSendError('Confirm the issues listed above before sending.');
+      return;
+    }
     try {
       const ccList = cc.split(/[,;]/).map(e => e.trim()).filter(Boolean);
       const r = await sendInvoice.mutateAsync(
@@ -164,6 +176,37 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
         </DialogHeader>
         <div className="flex-1 overflow-y-auto px-1 pb-2">
         <div className="space-y-3">
+          {blockers.length > 0 && (
+            <div className="rounded-lg border border-amber-300 bg-amber-50 p-3">
+              <p className="text-xs font-semibold text-amber-900">
+                This invoice was assembled automatically and has{' '}
+                {blockers.length === 1 ? 'an unresolved issue' : `${blockers.length} unresolved issues`}
+              </p>
+              <ul className="mt-2 space-y-1 pl-4 list-disc">
+                {blockers.map(b => (
+                  <li key={b} className="text-xs text-amber-900">{b}</li>
+                ))}
+              </ul>
+              {invoice.blockersAckAt ? (
+                <p className="mt-2 text-xs text-amber-800">
+                  Confirmed on {formatDate(invoice.blockersAckAt)} — this invoice can be sent.
+                </p>
+              ) : (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  className="mt-2 h-7 border-amber-400 bg-white text-xs text-amber-900 hover:bg-amber-100"
+                  disabled={ack.isPending}
+                  onClick={() => ack.mutate(undefined, {
+                    onSuccess: () => toast.success('Issues confirmed — you can send this invoice'),
+                  })}
+                >
+                  {ack.isPending ? 'Confirming…' : 'I have reviewed these — allow sending'}
+                </Button>
+              )}
+            </div>
+          )}
           <div className="space-y-1.5">
             <Label htmlFor="si-to" className="text-xs">To</Label>
             <Input id="si-to" type="email" value={to} onChange={e => setTo(e.target.value)} placeholder="client@company.com" />
@@ -205,12 +248,12 @@ export function SendInvoiceDialog({ invoice, client, open, onOpenChange }: Props
 
         {/* Primary: Send via Jobly (production email — branded + PDF attached) */}
         <div className="space-y-1.5">
-          <Button type="button" className="w-full gap-2 h-11 bg-blue-600 hover:bg-blue-700 text-white text-[15px]" onClick={sendViaJobly} disabled={sendInvoice.isPending}>
+          <Button type="button" className="w-full gap-2 h-11 bg-blue-600 hover:bg-blue-700 text-white text-[15px]" onClick={sendViaJobly} disabled={sendInvoice.isPending || needsAck}>
             {sendInvoice.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             Send to client via Jobly
           </Button>
           <p className="text-[11px] text-muted-foreground text-center">
-            Recommended — sends a branded email with your logo and the invoice <strong>PDF attached</strong>, then marks it sent.
+            Recommended — sends a branded email with your logo, the invoice <strong>PDF</strong> and the <strong>client-signed timesheets</strong> attached, then marks it sent.
           </p>
         </div>
 

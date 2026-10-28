@@ -5,6 +5,7 @@ import * as paymentsSvc from '../services/payments.service';
 import type { ListInvoicesQuery, GenerateInvoiceInput, CreateInvoiceInput, UpdateInvoiceInput } from '../schemas/invoice.schema';
 import type { CreatePaymentInput } from '../schemas/payment.schema';
 import { logActivity } from '../lib/activityLogger';
+import { sendInvoiceReminderNow } from '../services/invoiceReminders.service';
 
 export async function list(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
@@ -64,6 +65,20 @@ export async function getPDF(req: Request, res: Response, next: NextFunction): P
   } catch (err) { next(err); }
 }
 
+/**
+ * Confirm the blockers on a self-assembled draft, which unblocks sending.
+ *
+ * Separate from send on purpose: the person has to look at the list and say
+ * yes, and that decision is worth its own audited call rather than a flag
+ * smuggled into the send body where a client could set it by default.
+ */
+export async function acknowledgeBlockers(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const data = await svc.acknowledgeInvoiceBlockers(req.params.id, req.user!.id);
+    res.json({ success: true, data });
+  } catch (err) { next(err); }
+}
+
 export async function send(req: Request, res: Response, next: NextFunction): Promise<void> {
   try {
     const body = (req.body ?? {}) as { recipientEmail?: string; cc?: string[] | string };
@@ -87,6 +102,20 @@ export async function send(req: Request, res: Response, next: NextFunction): Pro
       emailSent: result.emailSent,
       warning: result.warning,
     });
+  } catch (err) { next(err); }
+}
+
+/**
+ * Send a payment reminder now, from the invoice screen.
+ *
+ * The nightly sweep covers the scheduled nudges; this is for when somebody
+ * decides to chase. The service deliberately does not consume a scheduled
+ * milestone, so the automatic cadence continues unchanged afterwards.
+ */
+export async function remindOne(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const result = await sendInvoiceReminderNow(req.params.id, req.user?.id);
+    res.json({ success: true, data: result });
   } catch (err) { next(err); }
 }
 

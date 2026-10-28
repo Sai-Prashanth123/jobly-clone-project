@@ -2,14 +2,14 @@ import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowLeft, Trash2, Loader2, Download, Send, DollarSign, Paperclip, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Trash2, Loader2, Download, Send, DollarSign, Paperclip, AlertCircle, BellRing } from 'lucide-react';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { InvoicePrintView } from '../components/invoices/InvoicePrintView';
 import { SendInvoiceDialog, SEND_PREF_KEY } from '../components/invoices/SendInvoiceDialog';
-import { useInvoice, useDeleteInvoice, useGetInvoicePDF, useSendInvoice, useInvoicePayments, useDeletePayment } from '../hooks/useInvoices';
+import { useInvoice, useDeleteInvoice, useGetInvoicePDF, useSendInvoice, useSendInvoiceReminder, useInvoicePayments, useDeletePayment } from '../hooks/useInvoices';
 import { useClient } from '../hooks/useClients';
 import { useAuth } from '../hooks/useAuth';
 import { formatCurrency, formatDate } from '../lib/utils';
@@ -24,6 +24,8 @@ export default function InvoiceDetail() {
   const deleteInvoice = useDeleteInvoice();
   const getInvoicePDF = useGetInvoicePDF();
   const sendInvoice = useSendInvoice(id!);
+  const sendReminder = useSendInvoiceReminder(id!);
+  const [remindOpen, setRemindOpen] = useState(false);
   const { data: payments } = useInvoicePayments(id);
   const deletePayment = useDeletePayment(id!);
 
@@ -70,6 +72,11 @@ export default function InvoiceDetail() {
   const amountPaid = invoice.amountPaid ?? 0;
   const balance = invoice.balanceDue ?? Math.round((invoice.totalAmount - amountPaid) * 100) / 100;
   const canPay = invoice.docType !== 'estimate' && invoice.status !== 'draft' && balance > 0.005;
+  // A draft has not reached the client, an estimate has nothing due, and a
+  // settled invoice has nothing to chase.
+  const canRemind = invoice.docType !== 'estimate'
+    && ['sent', 'viewed', 'partially_paid', 'overdue'].includes(invoice.status)
+    && balance > 0.005;
 
   return (
     <div className="space-y-4 sm:space-y-6">
@@ -126,6 +133,20 @@ export default function InvoiceDetail() {
             >
               <Send className="h-4 w-4" />
               {invoice.status === 'draft' ? 'Send to Client' : 'Resend'}
+            </Button>
+          )}
+          {/* Chase an invoice the client already has. StatusBadge has told
+              finance to "send a reminder to the client" for a long time with
+              nothing behind it; the nightly sweep sends the scheduled nudges
+              and this is for when somebody decides to chase. */}
+          {canRemind && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2"
+              onClick={() => setRemindOpen(true)}
+            >
+              <BellRing className="h-4 w-4" /> Send reminder
             </Button>
           )}
           {canPay && (
@@ -243,6 +264,35 @@ export default function InvoiceDetail() {
         client={client}
         open={sendOpen}
         onOpenChange={setSendOpen}
+      />
+
+      {/* A confirm step rather than a bare click: this emails a customer.
+          The description carries what finance actually needs in order to
+          decide — who it goes to, how much is outstanding, and whether one
+          has already gone out recently. */}
+      <ConfirmDialog
+        open={remindOpen}
+        onOpenChange={setRemindOpen}
+        title="Send a payment reminder?"
+        description={[
+          `This emails the client about ${invoice.invoiceNumber} — ${formatCurrency(balance, invoice.currency)} outstanding, due ${formatDate(invoice.dueDate)}.`,
+          invoice.lastReminderAt
+            ? `Last reminder sent ${formatDate(invoice.lastReminderAt)}${(invoice.reminderCount ?? 0) > 1 ? ` · ${invoice.reminderCount} sent in total` : ''}.`
+            : 'No reminder has been sent yet.',
+        ].join(' ')}
+        confirmLabel="Send reminder"
+        loading={sendReminder.isPending}
+        onConfirm={async () => {
+          try {
+            const res = await sendReminder.mutateAsync();
+            toast.success(`Reminder sent to ${res.to}`);
+          } catch {
+            // The central error handler surfaces the message; the service
+            // writes them as finished sentences for exactly this path.
+          } finally {
+            setRemindOpen(false);
+          }
+        }}
       />
 
       <ConfirmDialog

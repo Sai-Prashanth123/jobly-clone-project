@@ -10,7 +10,12 @@ const invoiceNumberField = z.string().trim().max(60)
   })
   .optional();
 
-export const PAYMENT_TERMS = ['on_receipt', 'net_7', 'net_14', 'net_30', 'net_45', 'net_60', 'custom'] as const;
+// Re-exported from lib/invoiceTerms so the enum, the days lookup and the
+// labels cannot disagree. Kept exported from here because every existing
+// importer reads them off the schema.
+export { PAYMENT_TERMS, paymentTermsDays } from '../lib/invoiceTerms';
+import { PAYMENT_TERMS } from '../lib/invoiceTerms';
+
 export const INVOICE_STATUSES = ['draft', 'sent', 'viewed', 'partially_paid', 'paid', 'overdue'] as const;
 
 // One editable line item on the Wave-style invoice builder.
@@ -103,19 +108,6 @@ export const listInvoicesQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(1000).default(50),
 });
-
-// Days a given payment-terms value adds to the issue date.
-export function paymentTermsDays(terms: string): number {
-  switch (terms) {
-    case 'on_receipt': return 0;
-    case 'net_7': return 7;
-    case 'net_14': return 14;
-    case 'net_30': return 30;
-    case 'net_45': return 45;
-    case 'net_60': return 60;
-    default: return 30;
-  }
-}
 
 export type GenerateInvoiceInput = z.infer<typeof generateInvoiceSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
