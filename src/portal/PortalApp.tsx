@@ -7,6 +7,7 @@ import { AuthProvider } from './context/AuthContext';
 import { PortalLayout } from './components/layout/PortalLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
+import { useScrollRestoration } from './hooks/useScrollRestoration';
 // Eager — small pages that are the first landing targets per area
 import Login from './pages/Login';
 import ForcePasswordReset from './pages/ForcePasswordReset';
@@ -121,6 +122,11 @@ function RouteFallback() {
 }
 
 export default function PortalApp() {
+  // Above the providers on purpose: it is about the window, not about data,
+  // and it must run on every route change including the ones that render a
+  // Suspense fallback first.
+  useScrollRestoration();
+
   return (
     <QueryClientProvider client={queryClient}>
     <AuthProvider>

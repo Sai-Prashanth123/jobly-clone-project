@@ -216,15 +216,28 @@ export function DataTable<T>({
    * under a page header and filters, and sending the window to the top would
    * push the data further away on a long page. Skipped when the table is
    * already fully visible, so short lists do not twitch.
+   *
+   * Two things here are load-bearing, and the first version had neither:
+   *
+   * 1. It runs AFTER the new page has painted. Measuring and scrolling in the
+   *    same tick as setPage uses the OLD layout, and the rows that replace it
+   *    are rarely the same height, so the scroll lands somewhere arbitrary.
+   * 2. `instant`, not `smooth`. index.css sets `scroll-behavior: smooth` on
+   *    :root, so a smooth scroll here animates over several hundred ms while
+   *    React is still committing the new rows — the document height changes
+   *    mid-flight and the browser gives up partway down. That is exactly the
+   *    "page 2 opens in the middle" report.
    */
   const goToPage = useCallback((next: number) => {
     setPage(next);
-    const el = topRef.current;
-    if (!el) return;
-    const { top } = el.getBoundingClientRect();
-    if (top < 0 || top > window.innerHeight * 0.4) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+    requestAnimationFrame(() => {
+      const el = topRef.current;
+      if (!el) return;
+      const { top } = el.getBoundingClientRect();
+      if (top < 0 || top > window.innerHeight * 0.4) {
+        el.scrollIntoView({ behavior: 'instant' as ScrollBehavior, block: 'start' });
+      }
+    });
   }, []);
 
   const visibleColumns = selectable
