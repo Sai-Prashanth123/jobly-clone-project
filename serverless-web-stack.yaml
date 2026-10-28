@@ -142,20 +142,60 @@ Parameters:
     Default: 'true'
     AllowedValues: ['true', 'false']
     Description: >
-      Give the private subnets outbound internet access. Required while the
-      backend still calls Supabase Auth (login), Supabase Storage (documents)
-      and an SMTP provider - all public-internet services. Costs roughly
-      $32/month plus data. Set to 'false' once Auth, Storage and mail have
-      moved to Cognito, S3 and SES, which are all reachable over VPC
-      endpoints.
+      Give the private subnets outbound internet access. Costs roughly
+      $37/month including its Elastic IP, and carried 19 MB in 27 days.
+
+      The migration it was waiting on is DONE - the deployed function runs
+      AUTH_DRIVER=cognito, STORAGE_DRIVER=s3, MAIL_DRIVER=ses,
+      DB_DRIVER=postgres, and the only code still touching Supabase Auth is
+      the CLI scripts and the user-migration trigger, which runs outside the
+      VPC. Every remaining destination (S3, Secrets Manager, Cognito, SES)
+      now has a VPC endpoint in this template.
+
+      So this can be set to 'false'. Do it as its own deploy, AFTER the
+      Cognito and SES endpoints are live and a real login and a real outbound
+      email have been checked - not in the same change that creates them.
 
   PublicSubnetCidr:
     Type: String
     Default: 10.0.10.0/24
     Description: Subnet holding only the NAT gateway. No app resource lives here.
 
+  # Two flags rather than one, and both default off. This is not caution for
+  # its own sake - it is the shape of a failure that cost three rolled-back
+  # stack updates.
+  #
+  # An interface endpoint with PrivateDnsEnabled claims a DNS domain in the
+  # VPC. If the stack update fails for ANY reason, the half-created endpoint
+  # is rolled back but its DNS claim lingers past DELETE_COMPLETE - so the
+  # next attempt fails with "there is already a conflicting DNS domain", and
+  # that failure leaves a fresh claim of its own. With both endpoints in one
+  # change set the two take it in turns and the update can never succeed.
+  #
+  # So: enable ONE, deploy, verify, wait for the DNS to settle, then the
+  # other. Never both in the same change set.
+  EnableSesEndpoint:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Private endpoint for the SES API, so outbound email does not need the
+      NAT gateway. Enable on its own, never alongside EnableCognitoEndpoint.
+
+  EnableCognitoEndpoint:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: >
+      Private endpoint for Cognito, so login and JWKS fetches do not need the
+      NAT gateway. Enable on its own, never alongside EnableSesEndpoint.
+      Lands in PrivateSubnetB only - AWS does not offer this service in
+      us-east-1a, which is where PrivateSubnetA lives.
+
 Conditions:
   NatEnabled: !Equals [!Ref EnableNatGateway, 'true']
+  SesEndpointEnabled: !Equals [!Ref EnableSesEndpoint, 'true']
+  CognitoEndpointEnabled: !Equals [!Ref EnableCognitoEndpoint, 'true']
   UseCognitoAuthorizer: !Equals [!Ref ApiAuthMode, cognito]
   SchedulerEnabled: !Equals [!Ref EnableScheduler, 'true']
   HasFrontendUrl: !Not [!Equals [!Ref FrontendUrl, '']]
@@ -428,6 +468,71 @@ Resources:
       SecurityGroupIds:
         - !Ref VpcEndpointSecurityGroup
 
+  # ------------------------------------------------------------------
+  # The last two reasons the backend needed the public internet.
+  #
+  # With S3 on a (free) gateway endpoint, Secrets Manager above, and RDS
+  # inside the VPC, outbound traffic was down to SES and Cognito - 19 MB in
+  # 27 days, through a NAT gateway costing $37/month. These two endpoints
+  # cost about $7/month each and replace it outright.
+  #
+  # PrivateDnsEnabled is what makes this invisible to the application: the
+  # SDK keeps calling email.<region>.amazonaws.com and cognito-idp.<region>
+  # .amazonaws.com, and those names now resolve inside the VPC. No code,
+  # config or endpoint override changes.
+  #
+  # Deploy these FIRST and leave the NAT gateway up. Verify a login and an
+  # outbound email actually work through them, and only then set
+  # EnableNatGateway=false. Doing both in one change means a failure has two
+  # suspects and no quick way back.
+  # ------------------------------------------------------------------
+
+  # Cognito. Covers AdminInitiateAuth and friends, and also the JWKS fetch
+  # aws-jwt-verify makes on a cold start - that is an ordinary HTTPS call to
+  # cognito-idp, so without this endpoint every token verification would hang
+  # once NAT is gone.
+  #
+  # PrivateSubnetB ONLY, and not by preference. AWS does not offer the
+  # cognito-idp endpoint service in every availability zone: in us-east-1 it
+  # exists in 1b, 1c and 1d but NOT in 1a, and PrivateSubnetA is in 1a. Asking
+  # for both subnets fails the whole stack update with "does not support the
+  # availability zone of the subnet" — which is exactly how this was found.
+  #
+  # A single-subnet interface endpoint is still reachable from both subnets:
+  # private DNS resolves to it from anywhere in the VPC and the traffic simply
+  # crosses an AZ. At 19 MB a month that cross-AZ charge is rounding error.
+  # The exposure is that Cognito calls depend on 1b being healthy — the same
+  # bet the single-AZ database and single-AZ NAT already make.
+  CognitoIdpEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: CognitoEndpointEnabled
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.cognito-idp'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetB
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
+  # SES. 'email' is the API endpoint, which is what SESv2Client uses. NOT
+  # 'email-smtp' - nothing here speaks SMTP; mailer.ts composes raw MIME and
+  # calls SendEmail.
+  SesEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Condition: SesEndpointEnabled
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.email'
+      VpcEndpointType: Interface
+      PrivateDnsEnabled: true
+      SubnetIds:
+        - !Ref PrivateSubnetA
+        - !Ref PrivateSubnetB
+      SecurityGroupIds:
+        - !Ref VpcEndpointSecurityGroup
+
   RdsIngressFromLambda:
     Type: AWS::EC2::SecurityGroupIngress
     Properties:
@@ -449,58 +554,13 @@ Resources:
   # removes the TLS+auth handshake (~30-50ms) from most cold invocations.
   # --------------------------------------------------------------------
 
-  DbProxySecurityGroup:
-    Type: AWS::EC2::SecurityGroup
-    Properties:
-      GroupDescription: RDS Proxy ENIs. 5432 in from Lambda, 5432 out to RDS.
-      VpcId: !Ref Vpc
-      SecurityGroupEgress:
-        - IpProtocol: -1
-          CidrIp: 127.0.0.1/32
-          Description: Placeholder - real egress added by ProxyEgressToRds
-      Tags:
-        - Key: Name
-          Value: !Sub '${ProjectName}-proxy-sg'
-
-  ProxyIngressFromLambda:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref DbProxySecurityGroup
-      IpProtocol: tcp
-      FromPort: 5432
-      ToPort: 5432
-      SourceSecurityGroupId: !Ref LambdaSecurityGroup
-      Description: Postgres from backend Lambda
-
-  ProxyEgressToRds:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref DbProxySecurityGroup
-      IpProtocol: tcp
-      FromPort: 5432
-      ToPort: 5432
-      DestinationSecurityGroupId: !Ref RdsSecurityGroup
-      Description: Postgres to RDS
-
-  RdsIngressFromProxy:
-    Type: AWS::EC2::SecurityGroupIngress
-    Properties:
-      GroupId: !Ref RdsSecurityGroup
-      IpProtocol: tcp
-      FromPort: 5432
-      ToPort: 5432
-      SourceSecurityGroupId: !Ref DbProxySecurityGroup
-      Description: Postgres from RDS Proxy
-
-  LambdaEgressToProxy:
-    Type: AWS::EC2::SecurityGroupEgress
-    Properties:
-      GroupId: !Ref LambdaSecurityGroup
-      IpProtocol: tcp
-      FromPort: 5432
-      ToPort: 5432
-      DestinationSecurityGroupId: !Ref DbProxySecurityGroup
-      Description: Postgres to RDS Proxy
+  # The RDS Proxy and its security groups used to sit here. Removed: it cost
+  # ~$31/month all in (usage, its own PrivateLink endpoint, and the Secrets
+  # Manager polling it generated) against a database that peaks at 11 of ~112
+  # connections. Nothing replaced the network path: LambdaEgressToRds and
+  # RdsIngressFromLambda already allowed Lambda straight to Postgres, which is
+  # why removing the proxy changes only a hostname. See the BackendFunction
+  # comment for why a connection storm cannot happen here.
 
   # A NAT gateway alone is not enough - this security group only allowed
   # egress to specific groups, so internet-bound packets were dropped before
@@ -598,81 +658,6 @@ Resources:
         GenerateStringKey: value
         PasswordLength: 48
         ExcludePunctuation: true
-
-  DbProxyRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal: {Service: rds.amazonaws.com}
-            Action: sts:AssumeRole
-      Policies:
-        - PolicyName: read-db-secrets
-          PolicyDocument:
-            Version: '2012-10-17'
-            Statement:
-              - Effect: Allow
-                Action:
-                  - secretsmanager:GetSecretValue
-                  - secretsmanager:DescribeSecret
-                Resource:
-                  - !GetAtt Database.MasterUserSecret.SecretArn
-                  - !Ref AppUserSecret
-              # Both secrets are encrypted with the AWS-managed
-              # aws/secretsmanager key, whose policy cannot be edited. Access
-              # is therefore granted here instead, narrowed with ViaService so
-              # this role can only decrypt through Secrets Manager.
-              - Effect: Allow
-                Action: kms:Decrypt
-                Resource: '*'
-                Condition:
-                  StringEquals:
-                    kms:ViaService: !Sub 'secretsmanager.${AWS::Region}.amazonaws.com'
-
-  DbProxy:
-    Type: AWS::RDS::DBProxy
-    Properties:
-      DBProxyName: !Sub '${ProjectName}-proxy'
-      EngineFamily: POSTGRESQL
-      RoleArn: !GetAtt DbProxyRole.Arn
-      RequireTLS: true
-      IdleClientTimeout: 1800
-      DebugLogging: false
-      Auth:
-        - AuthScheme: SECRETS
-          SecretArn: !Ref AppUserSecret
-          IAMAuth: DISABLED
-          ClientPasswordAuthType: POSTGRES_SCRAM_SHA_256
-          Description: Application role
-        # The master secret is registered too so administrative sessions can
-        # also go through the proxy rather than around it.
-        - AuthScheme: SECRETS
-          SecretArn: !GetAtt Database.MasterUserSecret.SecretArn
-          IAMAuth: DISABLED
-          ClientPasswordAuthType: POSTGRES_SCRAM_SHA_256
-          Description: Master role
-      VpcSubnetIds:
-        - !Ref PrivateSubnetA
-        - !Ref PrivateSubnetB
-      VpcSecurityGroupIds:
-        - !Ref DbProxySecurityGroup
-
-  DbProxyTargetGroup:
-    Type: AWS::RDS::DBProxyTargetGroup
-    Properties:
-      DBProxyName: !Ref DbProxy
-      # 'default' is the only name RDS Proxy accepts for a target group.
-      TargetGroupName: default
-      DBInstanceIdentifiers:
-        - !Ref Database
-      ConnectionPoolConfigurationInfo:
-        MaxConnectionsPercent: 90
-        MaxIdleConnectionsPercent: 50
-        # Wait rather than error when the pool is saturated - a brief queue
-        # is far better than a 500 back to the browser.
-        ConnectionBorrowTimeout: 120
 
   # ----------------------------------------------------------------------
   # Cognito
@@ -836,9 +821,9 @@ Resources:
       ManagedPolicyArns:
         - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
       Policies:
-        # Connections go through RDS Proxy using the app_user secret, so the
-        # backend needs to read that secret and nothing else. It is NOT given
-        # the master secret: a leak of this role must not yield superuser.
+        # The backend connects as app_user, so it needs that secret and
+        # nothing else. It is NOT given the master secret: a leak of this role
+        # must not yield superuser.
         - PolicyName: read-app-user-secret
           PolicyDocument:
             Version: '2012-10-17'
@@ -914,9 +899,18 @@ Resources:
       # still the default 10 (not 1000). Reserving 20 fails with
       # "decreases account's UnreservedConcurrentExecution below its minimum
       # value of [10]" — and reserving ANY amount breaks that same floor.
-      # Re-enable after raising Service Quotas -> Lambda -> Concurrent
-      # executions, which also lifts the 10-invocation ceiling this whole
-      # stack currently shares between the SSR and backend functions.
+      #
+      # THAT CEILING IS NOW LOAD-BEARING. The RDS Proxy is gone and the Lambda
+      # connects straight to Postgres, so the number of database connections
+      # this function can open is exactly the number of execution environments
+      # AWS will give it: 10, against a db.t4g.micro's ~112. The connection
+      # storm the proxy existed to prevent is arithmetically impossible while
+      # the account quota stays at 10.
+      #
+      # So if you raise Service Quotas -> Lambda -> Concurrent executions, set
+      # ReservedConcurrentExecutions here in the same change — pick a number
+      # below ~100 — or put the proxy back. Raising the quota alone removes the
+      # only thing bounding connections.
       Environment:
         Variables:
           NODE_ENV: production
@@ -924,10 +918,12 @@ Resources:
           # Table reads/writes go to RDS; Storage and Auth still go to
           # Supabase until those phases land.
           DB_DRIVER: postgres
-          # The proxy endpoint, not the instance endpoint - pointing at the
-          # instance would bypass the pool and reintroduce the per-invocation
-          # connection storm the proxy exists to prevent.
-          DB_HOST: !GetAtt DbProxy.Endpoint
+          # The instance directly. The proxy that used to sit in front of this
+          # is gone; RdsIngressFromLambda already allowed this path, so nothing
+          # about the network changed except the hostname. DB_POOL_MAX keeps
+          # each execution environment to a small pool, and the account's
+          # concurrency ceiling keeps the number of environments small.
+          DB_HOST: !GetAtt Database.Endpoint.Address
           DB_PORT: !GetAtt Database.Endpoint.Port
           DB_NAME: !Ref DbName
           DB_USER: app_user
@@ -1665,10 +1661,6 @@ Outputs:
 
   DatabaseEndpoint:
     Value: !GetAtt Database.Endpoint.Address
-
-  DatabaseProxyEndpoint:
-    Description: RDS Proxy endpoint - what the backend connects to
-    Value: !GetAtt DbProxy.Endpoint
 
   AppUserSecretArn:
     Description: Secret holding the app_user database credentials
