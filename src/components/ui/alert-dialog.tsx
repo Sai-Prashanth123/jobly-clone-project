@@ -57,7 +57,16 @@ const AlertDialogTitle = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Title>
 >(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Title ref={ref} className={cn("text-lg font-semibold", className)} {...props} />
+  // break-words + overflow-wrap:anywhere because confirm dialogs quote the
+  // thing being deleted, and that is often a filename with no spaces in it.
+  // AlertDialogContent is display:grid, and an auto track floors at its
+  // min-content width — so one unbreakable word pushes the whole dialog past
+  // its own w-[95vw] and the Cancel/Delete buttons off a phone screen.
+  <AlertDialogPrimitive.Title
+    ref={ref}
+    className={cn("text-lg font-semibold break-words [overflow-wrap:anywhere]", className)}
+    {...props}
+  />
 ));
 AlertDialogTitle.displayName = AlertDialogPrimitive.Title.displayName;
 
@@ -65,7 +74,13 @@ const AlertDialogDescription = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Description>
 >(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Description ref={ref} className={cn("text-sm text-muted-foreground", className)} {...props} />
+  // Same reason as the title: "<filename> will be removed…" is one long
+  // unbreakable token inside a grid track that floors at min-content.
+  <AlertDialogPrimitive.Description
+    ref={ref}
+    className={cn("text-sm text-muted-foreground break-words [overflow-wrap:anywhere]", className)}
+    {...props}
+  />
 ));
 AlertDialogDescription.displayName = AlertDialogPrimitive.Description.displayName;
 

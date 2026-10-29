@@ -13,6 +13,7 @@ import { Edit, Trash2, ArrowLeft, Loader2, Mail, CheckCircle2, Clock, MessageSqu
 import { toast } from 'sonner';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
+import { FileMeta } from '../components/shared/FileMeta';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { DocumentPreviewDialog } from '../components/shared/DocumentPreviewDialog';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
@@ -998,32 +999,38 @@ export default function EmployeeDetail() {
           <CardContent>
             <div className="space-y-2">
               {visibleDocuments(employee.documents, user?.role).map(doc => (
-                <div key={doc.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="text-sm font-medium">{doc.name}</p>
-                      {doc.legalFlagged && (
-                        <span
-                          className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700"
-                          title={doc.legalFlagComment || 'Flagged by Legal for review'}
-                        >
-                          <ShieldOff className="h-3 w-3" /> Flagged by Legal
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 flex-wrap mt-0.5">
-                      <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
-                      {doc.expiryDate && (() => {
-                        const days = Math.ceil((new Date(doc.expiryDate).getTime() - Date.now()) / 86400000);
-                        const cls = days < 0 ? 'text-red-600' : days <= 30 ? 'text-amber-600' : 'text-gray-500';
-                        return <span className={`text-xs font-medium ${cls}`}>Expires {formatDate(doc.expiryDate)}{days >= 0 && days <= 90 ? ` (${days}d)` : ''}</span>;
-                      })()}
-                    </div>
-                    {doc.legalFlagged && doc.legalFlagComment && (
-                      <p className="text-xs text-red-600 mt-1 max-w-md">&ldquo;{doc.legalFlagComment}&rdquo;</p>
+                <div
+                  key={doc.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-2 border-b border-gray-100 last:border-0"
+                >
+                  <div className="min-w-0 flex-1">
+                  <FileMeta
+                    name={doc.name}
+                    meta={
+                      <>
+                        <span>{doc.type} • {formatDate(doc.uploadedAt)}</span>
+                        {doc.expiryDate && (() => {
+                          const days = Math.ceil((new Date(doc.expiryDate).getTime() - Date.now()) / 86400000);
+                          const cls = days < 0 ? 'text-red-600' : days <= 30 ? 'text-amber-600' : 'text-gray-500';
+                          return <span className={`font-medium ${cls}`}>Expires {formatDate(doc.expiryDate)}{days >= 0 && days <= 90 ? ` (${days}d)` : ''}</span>;
+                        })()}
+                      </>
+                    }
+                  >
+                    {doc.legalFlagged && (
+                      <span
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700 flex-shrink-0"
+                        title={doc.legalFlagComment || 'Flagged by Legal for review'}
+                      >
+                        <ShieldOff className="h-3 w-3" /> Flagged by Legal
+                      </span>
                     )}
+                  </FileMeta>
+                  {doc.legalFlagged && doc.legalFlagComment && (
+                    <p className="text-xs text-red-600 mt-1 max-w-md break-words">&ldquo;{doc.legalFlagComment}&rdquo;</p>
+                  )}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-shrink-0">
                     <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}>
                       Preview
                     </Button>

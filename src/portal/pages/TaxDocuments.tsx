@@ -96,7 +96,7 @@ export default function TaxDocuments() {
                 {isFinance && doc.employeeName && <p className="text-sm text-gray-500">{doc.employeeName} {doc.employeeDisplayId && `· ${doc.employeeDisplayId}`}</p>}
                 {doc.notes && <p className="text-xs text-gray-400 mt-0.5">{doc.notes}</p>}
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-shrink-0">
                 {doc.fileUrl && <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"><Button size="sm" variant="outline" className="gap-1"><Download className="h-3.5 w-3.5" /> View</Button></a>}
                 {isFinance && !doc.sentAt && <Button size="sm" variant="outline" className="gap-1" onClick={() => setMarkSentTarget(doc)}><Send className="h-3.5 w-3.5" /> Mark Sent</Button>}
                 {isFinance && <Button size="sm" variant="ghost" className="text-red-500" onClick={() => setDeleteTarget(doc)}><Trash2 className="h-4 w-4" /></Button>}

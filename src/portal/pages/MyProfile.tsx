@@ -8,6 +8,7 @@ import { AlertCircle, Edit, Loader2, KeyRound, Eye, EyeOff } from 'lucide-react'
 import { ChangePasswordDialog } from '../components/auth/ChangePasswordDialog';
 import { StatusBadge } from '../components/shared/StatusBadge';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
+import { FileMeta } from '../components/shared/FileMeta';
 import { DocumentDownloadButton } from '../components/shared/DocumentDownloadButton';
 import { useEmployee } from '../hooks/useEmployees';
 import { useAuth } from '../hooks/useAuth';
@@ -363,12 +364,14 @@ export default function MyProfile() {
           <CardContent>
             <div className="space-y-2">
               {employee.documents.map(doc => (
-                <div key={doc.id} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="text-sm font-medium">{doc.name}</p>
-                    <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
+                <div
+                  key={doc.id}
+                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 py-2 border-b border-gray-100 last:border-0"
+                >
+                  <FileMeta name={doc.name} meta={`${doc.type} • ${formatDate(doc.uploadedAt)}`} />
+                  <div className="flex-shrink-0">
+                    <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
                   </div>
-                  <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
                 </div>
               ))}
             </div>

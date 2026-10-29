@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { EmployeeAvatar } from '../components/shared/EmployeeAvatar';
 import { DetailField as Field } from '../components/shared/DetailField';
 import { ExpiryBadge } from '../components/shared/ExpiryBadge';
+import { FileMeta } from '../components/shared/FileMeta';
 import { DocumentPreviewDialog } from '../components/shared/DocumentPreviewDialog';
 import { useEmployee, useSetDocumentLegalReview } from '../hooks/useEmployees';
 import { apiClient } from '../lib/apiClient';
@@ -71,14 +72,16 @@ function DocumentReviewRow({ employeeId, doc }: { employeeId: string; doc: { id:
   return (
     <div className="py-3 border-b border-gray-100 last:border-0 space-y-2">
       <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <p className="text-sm font-medium">{doc.name}</p>
-          <div className="flex items-center gap-2 flex-wrap mt-0.5">
-            <p className="text-xs text-muted-foreground">{doc.type} • {formatDate(doc.uploadedAt)}</p>
-            {doc.expiryDate && <ExpiryBadge date={doc.expiryDate} />}
-          </div>
-        </div>
-        <Button variant="outline" size="sm" onClick={() => setPreviewOpen(true)}>
+        <FileMeta
+          name={doc.name}
+          meta={
+            <>
+              <span>{doc.type} • {formatDate(doc.uploadedAt)}</span>
+              {doc.expiryDate && <ExpiryBadge date={doc.expiryDate} />}
+            </>
+          }
+        />
+        <Button variant="outline" size="sm" className="flex-shrink-0" onClick={() => setPreviewOpen(true)}>
           <FileText className="h-3.5 w-3.5 mr-1.5" /> Preview
         </Button>
       </div>

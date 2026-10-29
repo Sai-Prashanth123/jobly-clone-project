@@ -600,8 +600,8 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                   <ul className="space-y-1.5">
                     {existingAttachments.map(a => (
                       <li key={a.id} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm">
-                        <span className="truncate flex items-center gap-2"><Paperclip className="h-3.5 w-3.5 text-gray-400" /> {a.name}</span>
-                        <div className="flex items-center gap-2">
+                        <span className="flex items-center gap-2 min-w-0"><Paperclip className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" /> <span className="truncate" title={a.name}>{a.name}</span></span>
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <DocumentDownloadButton docId={a.id} label="Download" />
                           <button type="button" onClick={() => deleteAttachment.mutate(a.id, {
                             onSuccess: () => toast.success('Attachment removed'),

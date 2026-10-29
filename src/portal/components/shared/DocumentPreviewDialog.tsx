@@ -128,7 +128,13 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[96vw] h-[92vh] max-w-6xl p-0 flex flex-col gap-0 overflow-hidden" aria-describedby={undefined}>
+      {/* showClose: this dialog draws its own X beside the Download button, so
+          the built-in one would be a second close sitting on top of it. */}
+      <DialogContent
+        showClose={false}
+        className="w-[95vw] h-[92vh] max-w-6xl p-0 flex flex-col gap-0 overflow-hidden"
+        aria-describedby={undefined}
+      >
         <DialogTitle className="sr-only">Document Preview: {fileName}</DialogTitle>
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b bg-white flex-shrink-0">
