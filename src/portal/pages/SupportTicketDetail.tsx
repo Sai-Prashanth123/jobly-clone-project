@@ -44,7 +44,7 @@ export default function SupportTicketDetail() {
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
+        <Button variant="ghost" size="sm" aria-label="Back" onClick={goBack} className="gap-1 flex-shrink-0">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back</span>
         </Button>

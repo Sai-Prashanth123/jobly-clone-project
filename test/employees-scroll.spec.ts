@@ -98,6 +98,43 @@ test('Back returns the employee list to where it was scrolled', async ({ page })
   expect(after, 'Back should land where the reader left the list').toBeGreaterThan(before - 50);
 });
 
+test.describe('on a phone', () => {
+  // Below md the table is replaced by a card list (DataTable.tsx:287
+  // `md:hidden`), which has no inner scroll container — the WINDOW scrolls.
+  // That is a different code path from the desktop one, so it needs its own
+  // test rather than an assumption that fixing one fixed both.
+  test.use({ viewport: { width: 360, height: 740 } });
+
+  test('Back restores the card list', async ({ page }) => {
+    await signIn(page);
+    await mockApi(page);
+
+    await page.goto('/portal/employees');
+    await expect(page.getByText('Person Number5').first()).toBeVisible({ timeout: 15_000 });
+
+    await page.evaluate(() => window.scrollTo(0, 500));
+    await page.waitForTimeout(300);
+    const before = await page.evaluate(() => window.scrollY);
+    expect(before, 'the phone list should actually scroll').toBeGreaterThan(300);
+
+    // dispatchEvent, not click(): a real click runs actionability checks and
+    // scrolls the target into view, which would move the very thing under
+    // test, and a blind page.mouse.click at a coordinate is timing-sensitive
+    // under parallel workers. Dispatching bubbles to the card's onClick the
+    // same way React's root listener sees a real one.
+    await page.locator('div.md\\:hidden > div').nth(7).dispatchEvent('click');
+    await page.waitForURL(/\/portal\/employees\/emp-/, { timeout: 15_000 });
+
+    await page.getByRole('button', { name: /back/i }).first().click();
+    await expect(page.getByText('Person Number5').first()).toBeVisible({ timeout: 15_000 });
+
+    await page.waitForTimeout(800);
+    const after = await page.evaluate(() => window.scrollY);
+    console.log(`phone Back: before=${before} after=${after}`);
+    expect(after, 'Back on a phone must restore the card list too').toBeGreaterThan(before - 60);
+  });
+});
+
 test("the page's own Back button restores the list too", async ({ page }) => {
   // The one people actually click. It used to navigate('/portal/employees'),
   // which pushes a NEW history entry — so the list reopened as a fresh visit

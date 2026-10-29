@@ -165,7 +165,7 @@ export default function EnrollmentFormDetail() {
         description={`${enrollmentForm.displayId} · ${enrollmentForm.status === 'pending' ? 'Pending — awaiting employee' : `Submitted ${enrollmentForm.submittedAt ? new Date(enrollmentForm.submittedAt).toLocaleDateString() : ''}`}`}
         action={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={goBack} className="gap-1.5">
+            <Button variant="outline" size="sm" aria-label="Back" onClick={goBack} className="gap-1.5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
             {canEdit && (

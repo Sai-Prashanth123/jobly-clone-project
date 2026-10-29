@@ -120,15 +120,23 @@ export function useScrollRestoration(): void {
     };
   }, []);
 
-  // Record where this entry was left. The cleanup write is the one that
-  // matters — it runs as the route changes, capturing the final position —
-  // but scrolling is also tracked so a hard Back from a frozen tab still has
-  // something recent.
+  // The listener is the source of truth. The cleanup is only a top-up, and
+  // ONLY when there is still something to record.
+  //
+  // By the time this cleanup runs the route has changed, the new page has laid
+  // out, and the browser has usually already reset scrollY to 0 — so an
+  // unconditional write replaces the good offset with a zero and every Back
+  // lands at the top. Measured on a 360px phone: saved 496, cleanup wrote 0.
+  // The same shape of bug as the detached-element read in
+  // useScrollBoxRestoration above.
+  //
+  // Skipping the write at 0 loses nothing: a user who scrolls back to the top
+  // themselves fires a scroll event, and the listener records that.
   useEffect(() => {
     const onScroll = () => { positions.set(key, window.scrollY); };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      positions.set(key, window.scrollY);
+      if (window.scrollY > 0) positions.set(key, window.scrollY);
       window.removeEventListener('scroll', onScroll);
     };
   }, [key]);

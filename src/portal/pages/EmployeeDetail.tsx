@@ -247,7 +247,7 @@ export default function EmployeeDetail() {
         {/* basis-full on small screens so the identity block owns a whole row
             and the name is never competing with the buttons for width. */}
         <div className="flex items-center gap-3 min-w-0 basis-full lg:basis-auto lg:flex-1">
-          <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
+          <Button variant="ghost" size="sm" aria-label="Back" onClick={goBack} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
