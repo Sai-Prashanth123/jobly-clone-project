@@ -579,7 +579,6 @@ export const InvoiceForm = forwardRef<InvoiceFormHandle, InvoiceFormProps>(funct
                     <p className="mt-1 text-xs text-blue-600 inline-flex items-center gap-1"><Loader2 className="h-3 w-3 animate-spin" /> Uploading…</p>
                   )}
                   <input ref={fileInputRef} type="file" multiple className="hidden"
-                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif,.webp,.xls,.xlsx,.csv,.txt"
                     onChange={e => { acceptFiles(e.target.files); e.target.value = ''; }} />
                 </div>
 

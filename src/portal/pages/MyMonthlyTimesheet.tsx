@@ -67,7 +67,10 @@ const LEAVE_REASON_OPTIONS: { value: string; label: string }[] = [
 ];
 
 // Accepted client-proof file types — mirrors the backend multer whitelist.
-const PROOF_ACCEPT = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx,.txt,.csv';
+// Empty on purpose: the backend accepts any file type, and a filter here
+// only hides files from the dialog without explaining why. Kept as a
+// constant so the two call sites need no edit when a rule returns.
+const PROOF_ACCEPT = '';
 
 const ROW_TINT: Record<string, string> = {
   weekend: 'bg-gray-50/70',

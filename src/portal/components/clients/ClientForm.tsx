@@ -432,7 +432,6 @@ export function ClientForm({ initial, onSubmit, onCancel, isEdit = false, isPend
                   <Label className="text-xs">File *</Label>
                   <input
                     type="file"
-                    accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp,.txt,.csv"
                     className="block w-full text-xs text-gray-600 file:mr-2 file:py-1 file:px-2 file:rounded file:border-0 file:text-xs file:bg-gray-200 file:text-gray-700 hover:file:bg-gray-300"
                     onChange={e => {
                       const file = e.target.files?.[0] ?? null;

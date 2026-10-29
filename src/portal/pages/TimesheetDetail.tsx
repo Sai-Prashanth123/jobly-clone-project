@@ -448,7 +448,7 @@ export default function TimesheetDetail() {
                           ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
                           : <><Upload className="h-3.5 w-3.5" /> Replace</>}
                       </label>
-                      <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                      <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} className="hidden"
                         onChange={async e => {
                           const f = e.target.files?.[0]; if (!f) return;
                           { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
@@ -473,7 +473,7 @@ export default function TimesheetDetail() {
                         ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
                         : <><Upload className="h-3.5 w-3.5" /> Upload signed timesheet</>}
                     </label>
-                    <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                    <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} className="hidden"
                       onChange={async e => {
                         const f = e.target.files?.[0]; if (!f) return;
                         { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
@@ -533,7 +533,7 @@ export default function TimesheetDetail() {
                         ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
                         : <><Upload className="h-3.5 w-3.5" /> Replace</>}
                     </label>
-                    <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                    <input id="wk-proof-replace" type="file" disabled={uploadProof.isPending} className="hidden"
                       onChange={async e => {
                         const f = e.target.files?.[0]; if (!f) return;
                         { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }
@@ -559,7 +559,7 @@ export default function TimesheetDetail() {
                     ? <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>
                     : <><Upload className="h-3.5 w-3.5" /> Upload signed timesheet</>}
                 </label>
-                <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx,.xls,.xlsx" className="hidden"
+                <input id="wk-proof-upload" type="file" disabled={uploadProof.isPending} className="hidden"
                   onChange={async e => {
                     const f = e.target.files?.[0]; if (!f) return;
                     { const err = validateUploadFile(f); if (err) { toast.error(err); e.target.value = ''; return; } }

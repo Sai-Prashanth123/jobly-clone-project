@@ -454,7 +454,6 @@ export function EmployeeForm({ initial, onSubmit, onCancel, isEdit = false, isPe
                     <Label className="text-xs">File *</Label>
                     <input
                       type="file"
-                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                       className="block w-full text-xs text-gray-600 file:mr-2 file:py-1.5 file:px-3 file:rounded file:border-0 file:text-xs file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 cursor-pointer"
                       onChange={e => setNewDocFile(e.target.files?.[0] ?? null)}
                     />

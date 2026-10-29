@@ -8,6 +8,7 @@ import { PortalLayout } from './components/layout/PortalLayout';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import { useScrollRestoration } from './hooks/useScrollRestoration';
+import { useBuildVersion } from './hooks/useBuildVersion';
 // Eager — small pages that are the first landing targets per area
 import Login from './pages/Login';
 import ForcePasswordReset from './pages/ForcePasswordReset';
@@ -126,6 +127,9 @@ export default function PortalApp() {
   // and it must run on every route change including the ones that render a
   // Suspense fallback first.
   useScrollRestoration();
+  // Staff keep this tab open for days. Without this they stay on whatever
+  // build they started with and report fixed bugs as still broken.
+  useBuildVersion();
 
   return (
     <QueryClientProvider client={queryClient}>

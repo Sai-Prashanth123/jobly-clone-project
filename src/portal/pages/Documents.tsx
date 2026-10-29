@@ -185,7 +185,6 @@ function DocumentManager({ employee }: { employee: Employee }) {
               <input
                 id="doc-file"
                 type="file"
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx,.csv"
                 onChange={e => {
                   const f = e.target.files?.[0] ?? null;
                   if (f) {

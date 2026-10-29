@@ -373,7 +373,6 @@ export default function Expenses() {
               <input
                 id="exp-receipt"
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
                 onChange={e => {
                   const f = e.target.files?.[0] ?? null;
                   if (f) {
