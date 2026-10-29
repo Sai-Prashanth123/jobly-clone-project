@@ -98,6 +98,46 @@ test('Back returns the employee list to where it was scrolled', async ({ page })
   expect(after, 'Back should land where the reader left the list').toBeGreaterThan(before - 50);
 });
 
+test('Back keeps you on the page of results you were on', async ({ page }) => {
+  // Reported after the scroll fix landed: from page 2 or 3 of the list, Back
+  // comes home to page 1. Restoring a scroll offset cannot help, because the
+  // rows underneath it are different ones.
+  await signIn(page);
+  await mockApi(page);
+
+  await page.goto('/portal/employees');
+  await expect(page.getByRole('table').getByText('EMP-0000')).toBeVisible({ timeout: 15_000 });
+
+  await page.getByRole('button', { name: 'Page 2' }).first().click();
+  await expect(page.getByRole('table').getByText('EMP-0010')).toBeVisible({ timeout: 15_000 });
+
+  // Scrolled down *within* page 2 — the reported case was "on page 2 or 3 the
+  // scrolling issue comes back", which is both things at once.
+  await page.evaluate(() => {
+    const box = document.querySelector('div.max-h-\\[640px\\]');
+    if (box) (box as HTMLElement).scrollTop = 350;
+  });
+  await page.waitForTimeout(200);
+  const before = await listScrollTop(page);
+  expect(before).toBeGreaterThan(250);
+
+  await page.getByRole('table').getByText('Person Number12', { exact: true }).first().click();
+  await page.waitForURL(/\/portal\/employees\/emp-/, { timeout: 15_000 });
+
+  await page.getByRole('button', { name: /back/i }).first().click();
+  await expect(page.getByRole('table')).toBeVisible({ timeout: 15_000 });
+  await page.waitForTimeout(700);
+
+  const onPage2 = await page.getByRole('button', { name: 'Page 2' }).first()
+    .getAttribute('aria-current');
+  expect(onPage2, 'Back should return to page 2, not page 1').toBe('page');
+  await expect(page.getByRole('table').getByText('EMP-0010')).toBeVisible();
+
+  const after = await listScrollTop(page);
+  console.log(`page 2 Back: page=${onPage2} scroll before=${before} after=${after}`);
+  expect(after, 'and to the same place within page 2').toBeGreaterThan(before - 60);
+});
+
 test.describe('on a phone', () => {
   // Below md the table is replaced by a card list (DataTable.tsx:287
   // `md:hidden`), which has no inner scroll container — the WINDOW scrolls.

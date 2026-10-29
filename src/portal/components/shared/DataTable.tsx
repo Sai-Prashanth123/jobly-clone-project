@@ -10,6 +10,7 @@ import {
 import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Download } from 'lucide-react';
 import { EmptyState } from './EmptyState';
 import { useScrollBoxRestoration } from '../../hooks/useScrollRestoration';
+import { useRestoredState } from '../../hooks/useRestoredState';
 
 export interface Column<T> {
   key: string;
@@ -67,17 +68,28 @@ export function DataTable<T>({
   exportFilename,
   renderMobileCard,
 }: DataTableProps<T>) {
-  const [query, setQuery] = useState('');
-  const [page, setPage] = useState(1);
+  // Which page, which search, which sort — all remembered against the history
+  // entry, so Back brings the reader to the view they left rather than to the
+  // top of page 1. See useRestoredState.
+  const tableId = exportFilename ?? 'table';
+  const [query, setQuery] = useRestoredState(`${tableId}:query`, '');
+  const [page, setPage] = useRestoredState(`${tableId}:page`, 1);
   // Rows per page is now the reader's choice, seeded from the prop. Ten was
   // fixed, so a long table could only be walked a page at a time.
-  const [pageSize, setPageSize] = useState(initialPageSize);
-  const [sortKey, setSortKey] = useState<string | null>(null);
-  const [sortDir, setSortDir] = useState<SortDir>(null);
+  const [pageSize, setPageSize] = useRestoredState(`${tableId}:pageSize`, initialPageSize);
+  const [sortKey, setSortKey] = useRestoredState<string | null>(`${tableId}:sortKey`, null);
+  const [sortDir, setSortDir] = useRestoredState<SortDir>(`${tableId}:sortDir`, null);
+  // Deliberately NOT restored: a selection that came back by itself could be
+  // acted on in bulk by someone who thought the list was clean.
   const [selected, setSelected] = useState<Set<string>>(new Set());
 
-  // Reset page on filter/sort change
-  useEffect(() => { setPage(1); }, [query, sortKey, sortDir]);
+  // Reset page on filter/sort change — but not on the first render, which
+  // would undo a restored page before anyone saw it.
+  const sortFilterSettled = useRef(false);
+  useEffect(() => {
+    if (!sortFilterSettled.current) { sortFilterSettled.current = true; return; }
+    setPage(1);
+  }, [query, sortKey, sortDir, setPage]);
   // Clear selection on data/filter change
   useEffect(() => { setSelected(new Set()); }, [query, page]);
 
