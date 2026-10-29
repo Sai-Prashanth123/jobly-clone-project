@@ -9,6 +9,7 @@ import {
 } from '@/components/ui/table';
 import { Search, ChevronLeft, ChevronRight, ChevronUp, ChevronDown, ChevronsUpDown, Download } from 'lucide-react';
 import { EmptyState } from './EmptyState';
+import { useScrollBoxRestoration } from '../../hooks/useScrollRestoration';
 
 export interface Column<T> {
   key: string;
@@ -85,6 +86,7 @@ export function DataTable<T>({
   // re-renders (parents rarely memoize onSelectionChange) from causing an
   // effect loop, while still seeing the latest data at notify-time.
   const topRef = useRef<HTMLDivElement>(null);
+  const scrollBoxRef = useRef<HTMLDivElement>(null);
   const onSelectionChangeRef = useRef(onSelectionChange);
   const dataRef = useRef(data);
   const getRowKeyRef = useRef(getRowKey);
@@ -157,6 +159,11 @@ export function DataTable<T>({
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * pageSize;
   const paged = sorted.slice(start, start + pageSize);
+
+  // Put the reader back where they were when they press Back. The table is
+  // its own scroll container, so the window-level restoration in PortalApp
+  // cannot see this and used to leave every return at the top of the list.
+  useScrollBoxRestoration(scrollBoxRef, exportFilename ?? 'table', paged.length);
 
   // Bulk selection helpers
   const pageKeys = paged.map(getRowKey);
@@ -343,8 +350,14 @@ export function DataTable<T>({
         )}
       </div>
 
-      {/* Desktop — full table (horizontal scroll + sticky header on tall lists) */}
-      <div className="hidden md:block rounded-xl border border-gray-200 bg-white overflow-x-auto max-h-[640px] overflow-y-auto shadow-[var(--shadow-sm)] portal-scroll-x">
+      {/* Desktop — full table (horizontal scroll + sticky header on tall lists).
+          max-h + overflow-y is what makes the sticky header work, and it is
+          also why this div, not the window, is what the reader scrolls — see
+          useScrollBoxRestoration. */}
+      <div
+        ref={scrollBoxRef}
+        className="hidden md:block rounded-xl border border-gray-200 bg-white overflow-x-auto max-h-[640px] overflow-y-auto shadow-[var(--shadow-sm)] portal-scroll-x"
+      >
         <Table>
           <TableHeader className="sticky top-0 z-10 bg-gray-50/95 backdrop-blur-sm">
             <TableRow className="bg-gray-50">

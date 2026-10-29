@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { apiClient } from '../../lib/apiClient';
 import { triggerDownload } from '../../lib/download';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DocumentPreviewDialogProps {
   docId: string;
@@ -29,6 +30,7 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isMobile = useIsMobile();
 
   // Put the page back where it was when the preview closes.
   //
@@ -175,6 +177,30 @@ export function DocumentPreviewDialog({ docId, fileName, open, onOpenChange }: D
               return isImage ? (
                 <div className="w-full h-full flex items-center justify-center p-4 overflow-auto">
                   <img src={render.inlineUrl} alt={fileName} className="max-w-full max-h-full object-contain rounded shadow" />
+                </div>
+              ) : isMobile ? (
+                // Phones do not render a PDF inside an iframe. iOS Safari
+                // shows a blank frame, and most Android browsers either blank
+                // it or start a download — which is why "the preview does not
+                // open" was reported only on mobile and only for some files:
+                // images and Office documents take the other two branches and
+                // work fine.
+                //
+                // Handing it to the browser's own PDF viewer in a new tab is
+                // what actually works, and it gets pinch-zoom and page
+                // navigation that an embedded frame never had.
+                <div className="flex flex-col items-center gap-3 max-w-sm text-center p-6">
+                  <FileText className="h-10 w-10 text-gray-400" />
+                  <p className="text-sm font-medium text-gray-700">Open this PDF to read it</p>
+                  <p className="text-xs text-muted-foreground">
+                    Phone browsers cannot show a PDF inside the app, so it opens in its own tab.
+                  </p>
+                  <Button
+                    className="gap-2"
+                    onClick={() => window.open(render.inlineUrl!, '_blank', 'noopener,noreferrer')}
+                  >
+                    <FileText className="h-4 w-4" /> Open PDF
+                  </Button>
                 </div>
               ) : (
                 <iframe src={render.inlineUrl} title={fileName} className="w-full h-full border-0" />
