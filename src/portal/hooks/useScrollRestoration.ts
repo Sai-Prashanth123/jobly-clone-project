@@ -74,9 +74,13 @@ export function useScrollBoxRestoration(
     const onScroll = () => { boxPositions.set(storeKey, el.scrollTop); };
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => {
-      // The cleanup write is the one that counts: it runs as the route
-      // changes, capturing where the list was actually left.
-      boxPositions.set(storeKey, el.scrollTop);
+      // Only while the node is still in the document. React detaches it before
+      // this cleanup runs, and a DETACHED element reports scrollTop 0 — so a
+      // naive write here overwrote the good offset the listener had already
+      // recorded with a zero, and every Back landed at the top. That cost
+      // three failed attempts at this bug; the listener above is the real
+      // source of truth and this is only a last-moment top-up.
+      if (el.isConnected) boxPositions.set(storeKey, el.scrollTop);
       el.removeEventListener('scroll', onScroll);
     };
   }, [ref, storeKey]);

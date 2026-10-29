@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { toast } from 'sonner';
 import {
   ArrowLeft, Loader2, Save, Download, Send, AlertCircle,
@@ -25,6 +26,7 @@ const RATING_LABELS = ['', 'Unsatisfactory', 'Marginal', 'Meets Requirements', '
 export default function PerformanceReviewDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/reviews');
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'hr';
 
@@ -157,7 +159,7 @@ export default function PerformanceReviewDetail() {
         description={`${review.displayId} · ${review.status === 'draft' ? 'Draft' : 'Sent'}`}
         action={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/portal/reviews')} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={goBack} className="gap-1.5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
             {canEdit && (

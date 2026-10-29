@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -37,6 +38,7 @@ const LEAVE_REASON_LABELS: Record<string, string> = {
 export default function TimesheetDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/timesheets');
   const { user } = useAuth();
   const { data: timesheet, isLoading, isError, refetch } = useTimesheet(id);
   const { data: employee } = useEmployee(timesheet?.employeeId);
@@ -241,7 +243,7 @@ export default function TimesheetDetail() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/portal/timesheets')} className="gap-1 flex-shrink-0">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>

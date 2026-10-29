@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -20,6 +21,7 @@ import { formatDate, formatCurrency } from '../lib/utils';
 export default function AssignmentDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/assignments');
   const { user } = useAuth();
   const { data: assignment, isLoading, isError, refetch } = useAssignment(id);
   const { data: employee } = useEmployee(assignment?.employeeId);
@@ -68,7 +70,7 @@ export default function AssignmentDetail() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/portal/assignments')} className="gap-1 flex-shrink-0">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>

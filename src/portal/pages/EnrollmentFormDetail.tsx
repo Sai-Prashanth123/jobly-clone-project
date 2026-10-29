@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2, Save, Download, CheckCircle2, AlertCircle, Trash2, Plus } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,6 +33,7 @@ const blankDetailRow = (): SectionGRow => ({ person: '', condition: '', datesTre
 export default function EnrollmentFormDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/enrollment-forms');
   const { user } = useAuth();
 
   const { data: enrollmentForm, isLoading, isError } = useEnrollmentForm(id);
@@ -163,7 +165,7 @@ export default function EnrollmentFormDetail() {
         description={`${enrollmentForm.displayId} · ${enrollmentForm.status === 'pending' ? 'Pending — awaiting employee' : `Submitted ${enrollmentForm.submittedAt ? new Date(enrollmentForm.submittedAt).toLocaleDateString() : ''}`}`}
         action={
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => navigate('/portal/enrollment-forms')} className="gap-1.5">
+            <Button variant="outline" size="sm" onClick={goBack} className="gap-1.5">
               <ArrowLeft className="h-4 w-4" /> Back
             </Button>
             {canEdit && (

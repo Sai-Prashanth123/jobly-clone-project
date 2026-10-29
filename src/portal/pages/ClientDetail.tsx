@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -21,6 +22,7 @@ import { DetailField as Field } from '../components/shared/DetailField';
 export default function ClientDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/clients');
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const isHrAdmin = user?.role === 'admin' || user?.role === 'hr';
@@ -104,7 +106,7 @@ export default function ClientDetail() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/portal/clients')} className="gap-1 flex-shrink-0">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>

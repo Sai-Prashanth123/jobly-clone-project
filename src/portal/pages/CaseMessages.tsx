@@ -1,4 +1,5 @@
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,11 +15,12 @@ import { isValidId } from '../lib/utils';
 export default function CaseMessages() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/notifications');
 
   return (
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/portal/notifications')} className="gap-1 flex-shrink-0">
+        <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
           <ArrowLeft className="h-4 w-4" />
           <span className="hidden sm:inline">Back</span>
         </Button>

@@ -5,6 +5,7 @@ import { ClientEngagementCard } from '../components/employees/ClientEngagementCa
 import { formatAddress } from '@/portal/lib/utils';
 import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +49,7 @@ const E_VERIFY_STATUS_LABELS: Record<string, string> = {
 export default function EmployeeDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/employees');
   const qc = useQueryClient();
   const { user } = useAuth();
   const isReviewer = user?.role === 'admin' || user?.role === 'hr';
@@ -244,7 +246,7 @@ export default function EmployeeDetail() {
         {/* basis-full on small screens so the identity block owns a whole row
             and the name is never competing with the buttons for width. */}
         <div className="flex items-center gap-3 min-w-0 basis-full lg:basis-auto lg:flex-1">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/portal/employees')} className="gap-1 flex-shrink-0">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>

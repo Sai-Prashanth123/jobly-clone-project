@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import { useGoBack } from '../hooks/useGoBack';
 import { toast } from 'sonner';
 import { ArrowLeft, Loader2, AlertCircle, Plus, Pencil, Trash2, FileStack } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -34,6 +35,7 @@ const FILING_TYPE_LABELS: Record<string, string> = {
 export default function CaseDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const goBack = useGoBack('/portal/cases');
   const { data: legalCase, isLoading, isError } = useCase(id);
   const updateCase = useUpdateCase(id ?? '');
   const deleteCase = useDeleteCase();
@@ -71,7 +73,7 @@ export default function CaseDetail() {
     <div className="space-y-4 sm:space-y-6">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3 min-w-0">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/portal/cases')} className="gap-1 flex-shrink-0">
+          <Button variant="ghost" size="sm" onClick={goBack} className="gap-1 flex-shrink-0">
             <ArrowLeft className="h-4 w-4" />
             <span className="hidden sm:inline">Back</span>
           </Button>
