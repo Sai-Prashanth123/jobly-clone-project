@@ -13,7 +13,14 @@ interface MultiFileUploadSlotProps {
   existingDocs: ExistingDoc[];
   stagedFiles: File[];
   maxFiles: number;
-  onAdd: (file: File) => void;
+  /**
+   * Takes a LIST, because people pick a whole set at once.
+   *
+   * It used to take a single File, and the input had no `multiple` attribute,
+   * so selecting ten I-20s staged one and the other nine were dropped without
+   * a word — reported as "it is only picking 1 or 2 documents at a time".
+   */
+  onAdd: (files: File[]) => void;
   onRemoveStaged: (idx: number) => void;
   /**
    * Delete a file that is already saved against the employee.
@@ -90,19 +97,46 @@ export function MultiFileUploadSlot({
             <input
               id={inputId}
               type="file"
+              multiple
               accept={accept}
               className="hidden"
               onChange={e => {
-                const f = e.target.files?.[0] ?? null;
-                if (!f) return;
-                const err = validateIdentityDocFile(f);
-                if (err) {
-                  toast.error(err);
-                  e.target.value = '';
-                  return;
-                }
-                onAdd(f);
+                const picked = Array.from(e.target.files ?? []);
+                // Always clear, even on an early return: without it, picking
+                // the same file again fires no change event and looks broken.
                 e.target.value = '';
+                if (picked.length === 0) return;
+
+                // Report rejects by name rather than failing the whole batch.
+                // Someone selecting eight documents should not lose the seven
+                // good ones because the eighth was empty.
+                const rejected: string[] = [];
+                const valid = picked.filter(f => {
+                  const err = validateIdentityDocFile(f);
+                  if (err) { rejected.push(`${f.name}: ${err}`); return false; }
+                  return true;
+                });
+
+                const room = Math.max(0, maxFiles - total);
+                const accepted = valid.slice(0, room);
+                const overflow = valid.length - accepted.length;
+
+                if (accepted.length > 0) onAdd(accepted);
+
+                if (rejected.length > 0) {
+                  toast.error(
+                    rejected.length === 1 ? rejected[0] : `${rejected.length} files could not be added`,
+                    rejected.length > 1 ? { description: rejected.join('\n') } : undefined,
+                  );
+                }
+                if (overflow > 0) {
+                  // The old silence here is the whole reason this was reported
+                  // as files vanishing.
+                  toast.warning(
+                    `Added ${accepted.length} — ${overflow} more did not fit`,
+                    { description: `This document type holds ${maxFiles} files.` },
+                  );
+                }
               }}
             />
           </>

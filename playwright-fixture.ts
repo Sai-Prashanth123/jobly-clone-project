@@ -46,6 +46,11 @@ export const EMPLOYEES = Array.from({ length: 30 }, (_, i) => ({
   start_date: '2026-10-15',
   status: 'onboarding',
   onboarding_status: 'in_progress',
+  // The identity-document rows are gated on visa type — I-20 and I-983 only
+  // appear for OPT / STEM OPT (documentTypes.ts:290,295). Without this the
+  // wizard renders the section heading and no file inputs at all.
+  visa_type: 'stem_opt',
+  work_authorization: 'stem_opt',
   documents: [
     { id: 'doc-1', name: LONG_FILE, type: 'Social Security Card', uploadedAt: '2026-10-27', url: null },
     { id: 'doc-2', name: 'OfferLetter_SaiPrabhakaraReddyGuduru.pdf', type: 'Offer Letter', uploadedAt: '2026-10-27', url: null },

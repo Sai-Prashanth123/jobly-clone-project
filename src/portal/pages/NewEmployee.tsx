@@ -21,6 +21,7 @@ import { UsDateInput } from '../components/shared/UsDateInput';
 import { useCreateEmployee, useEmployee, useEmployees, useUpdateEmployee, useCompleteOnboarding, useDeleteEmployeeDocument } from '../hooks/useEmployees';
 import { ConfirmDialog } from '../components/shared/ConfirmDialog';
 import { getApiErrorMessage } from '../lib/apiError';
+import { uploadFileDirect, runWithConcurrency } from '../lib/uploadDocument';
 import { useAuth } from '../hooks/useAuth';
 import { apiClient } from '../lib/apiClient';
 import { parseNumberInput, formatUsPhone, formatZip, IDENTITY_DOC_ACCEPT, validateIdentityDocFile } from '../lib/utils';
@@ -933,10 +934,11 @@ export default function NewEmployee() {
   const setIdentityDocFile = (type: string, file: File | null) => {
     setForm(p => ({ ...p, identityDocFiles: { ...p.identityDocFiles, [type]: file } }));
   };
-  const addMultiIdentityDocFile = (type: string, file: File) => {
+  const addMultiIdentityDocFiles = (type: string, files: File[]) => {
+    if (files.length === 0) return;
     setForm(p => ({
       ...p,
-      multiIdentityDocFiles: { ...p.multiIdentityDocFiles, [type]: [...(p.multiIdentityDocFiles[type] ?? []), file] },
+      multiIdentityDocFiles: { ...p.multiIdentityDocFiles, [type]: [...(p.multiIdentityDocFiles[type] ?? []), ...files] },
     }));
   };
 
@@ -1203,7 +1205,7 @@ export default function NewEmployee() {
             existingDocs={multiExistingDocs}
             stagedFiles={multiStagedFiles}
             maxFiles={row.maxFiles ?? 3}
-            onAdd={f => addMultiIdentityDocFile(row.type, f)}
+            onAdd={files => addMultiIdentityDocFiles(row.type, files)}
             onRemoveStaged={idx => removeMultiIdentityDocFile(row.type, idx)}
             onRemoveExisting={isEditMode && editId
               ? doc => setDocPendingDelete({ id: doc.id!, name: doc.name ?? 'this document' })
@@ -1454,18 +1456,28 @@ export default function NewEmployee() {
       // the FK). The profile photo goes to a dedicated endpoint that stores it
       // in a PUBLIC bucket and writes employees.profile_photo_url, so the avatar
       // renders everywhere. Identity-doc copies + generic docs go to /documents.
-      const tasks: Promise<unknown>[] = [];
+      // Functions, not started promises: they are run a few at a time through
+      // runWithConcurrency below. Firing ten at once was tolerable when each
+      // was one small request; a document upload is now three round-trips
+      // carrying up to 100 MB.
+      const tasks: Array<() => Promise<unknown>> = [];
       // Index-parallel to `tasks`, so a rejected upload can be named instead
       // of being reported as "one or more files".
       const taskLabels: string[] = [];
 
       if (form.profilePhotoFile) {
-        const fd = new FormData();
-        fd.append('file', form.profilePhotoFile);
+        const photo = form.profilePhotoFile;
         taskLabels.push('Profile photo');
-        tasks.push(apiClient.post(`/employees/${emp.id}/photo`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        }));
+        // Still multipart, deliberately: the photo route is 2 MB and
+        // images-only (photoUpload in backend/src/middleware/upload.ts), and
+        // it writes employees.profile_photo_url to a public bucket.
+        tasks.push(() => {
+          const fd = new FormData();
+          fd.append('file', photo);
+          return apiClient.post(`/employees/${emp.id}/photo`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        });
       }
 
       // H-4 dependent passports — same deferred-until-employee-exists pattern
@@ -1477,12 +1489,17 @@ export default function NewEmployee() {
       for (const dep of form.dependents) {
         const file = form.dependentFiles[dep.id];
         if (file) {
-          const fd = new FormData();
-          fd.append('file', file);
+          const depId = dep.id;
           taskLabels.push(`Dependent passport (${dep.firstName || dep.relationship || 'dependent'})`);
-          tasks.push(apiClient.post(`/employees/${emp.id}/dependents/${dep.id}/passport`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          }));
+          // Still multipart — this route has no presigned equivalent yet, so
+          // a passport scan over ~4.5 MB will still be refused here.
+          tasks.push(() => {
+            const fd = new FormData();
+            fd.append('file', file);
+            return apiClient.post(`/employees/${emp.id}/dependents/${depId}/passport`, fd, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+          });
           uploadedDependentIds.push(dep.id);
         }
       }
@@ -1507,26 +1524,40 @@ export default function NewEmployee() {
       }
       for (const u of uploads) {
         taskLabels.push(u.docType);
-        const fd = new FormData();
-        fd.append('file', u.file);
-        fd.append('name', u.name);
-        fd.append('docType', u.docType);
-        // Single-slot rows replace what was there; re-uploading is how a wrong
-        // file gets corrected, and leaving both made it unclear which counts.
-        if (u.replace) fd.append('replace', 'true');
-        tasks.push(apiClient.post(`/employees/${emp.id}/documents`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        // Straight to storage. These used to be multipart POSTs through API
+        // Gateway, where the real ceiling is ~4.5 MB once the body is
+        // base64-encoded for Lambda — so a scanned I-20 failed while a small
+        // one beside it succeeded, which read as "it only picked 1 or 2".
+        tasks.push(() => uploadFileDirect({
+          urlEndpoint: `/employees/${emp.id}/documents/upload-url`,
+          registerEndpoint: `/employees/${emp.id}/documents/register`,
+          file: u.file,
+          meta: {
+            name: u.name,
+            docType: u.docType,
+            // Single-slot rows replace what was there; re-uploading is how a
+            // wrong file gets corrected, and leaving both made it unclear
+            // which counts.
+            ...(u.replace ? { replace: true } : {}),
+          },
         }));
       }
 
       if (tasks.length > 0) {
         setSubmitStep('uploading');
         setUploadProgress({ done: 0, total: tasks.length });
-        const tracked = tasks.map(t => t.then(r => { setUploadProgress(p => ({ ...p, done: p.done + 1 })); return r; }));
-        // allSettled, not all: Promise.all rejects on the FIRST failure, so the
-        // remaining uploads' outcomes were never inspected and the message
-        // could only ever say "one or more files".
-        const settled = await Promise.allSettled(tracked);
+        // Counting moved inside the task because the tasks are lazy now —
+        // there is no started promise to hang a .then() on.
+        const tracked = tasks.map(t => async () => {
+          const r = await t();
+          setUploadProgress(p => ({ ...p, done: p.done + 1 }));
+          return r;
+        });
+        // Settled results, not Promise.all: that rejects on the FIRST failure,
+        // so the remaining uploads' outcomes were never inspected and the
+        // message could only ever say "one or more files". runWithConcurrency
+        // returns the same PromiseSettledResult shape, four at a time.
+        const settled = await runWithConcurrency(tracked, 4);
         const failed = settled
           .map((r, i) => (r.status === 'rejected' ? { label: taskLabels[i] ?? 'A file', reason: r.reason } : null))
           .filter((x): x is { label: string; reason: any } => x !== null);
@@ -1682,67 +1713,105 @@ export default function NewEmployee() {
     try {
       const emp = await updateEmployee.mutateAsync(buildPayload());
 
-      const tasks: Promise<unknown>[] = [];
+      // Lazy, so runWithConcurrency can pace them — see the same shape in the
+      // submit path above.
+      const tasks: Array<() => Promise<unknown>> = [];
+      const taskLabels: string[] = [];
       if (form.profilePhotoFile) {
-        const fd = new FormData();
-        fd.append('file', form.profilePhotoFile);
-        tasks.push(apiClient.post(`/employees/${emp.id}/photo`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        }));
+        const photo = form.profilePhotoFile;
+        taskLabels.push('Profile photo');
+        tasks.push(() => {
+          const fd = new FormData();
+          fd.append('file', photo);
+          return apiClient.post(`/employees/${emp.id}/photo`, fd, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          });
+        });
       }
 
       const uploadedDependentIds: string[] = [];
       for (const dep of form.dependents) {
         const file = form.dependentFiles[dep.id];
         if (file) {
-          const fd = new FormData();
-          fd.append('file', file);
-          tasks.push(apiClient.post(`/employees/${emp.id}/dependents/${dep.id}/passport`, fd, {
-            headers: { 'Content-Type': 'multipart/form-data' },
-          }));
+          const depId = dep.id;
+          taskLabels.push(`Dependent passport (${dep.firstName || dep.relationship || 'dependent'})`);
+          tasks.push(() => {
+            const fd = new FormData();
+            fd.append('file', file);
+            return apiClient.post(`/employees/${emp.id}/dependents/${depId}/passport`, fd, {
+              headers: { 'Content-Type': 'multipart/form-data' },
+            });
+          });
           uploadedDependentIds.push(dep.id);
         }
       }
 
-      const uploadedDocTypes: string[] = [];
-      const uploadedMultiDocTypes: string[] = [];
-      const uploads: { file: File; name: string; docType: string; replace: boolean }[] = [];
+      // rowType is carried so a row whose upload failed can keep its staged
+      // file while the rows that succeeded are cleared. Clearing all-or-nothing
+      // is what produced duplicates: one failure left every successful file
+      // staged, and the next save uploaded them again.
+      const uploads: { file: File; name: string; docType: string; replace: boolean; rowType: string; multi: boolean }[] = [];
       for (const row of [...IDENTITY_DOC_ROWS, ...EMPLOYER_DOC_ROWS]) {
         if (row.multi) {
           const files = form.multiIdentityDocFiles[row.type] ?? [];
-          if (files.length > 0) {
-            for (const file of files) uploads.push({ file, name: file.name, docType: row.label, replace: false });
-            uploadedMultiDocTypes.push(row.type);
+          for (const file of files) {
+            uploads.push({ file, name: file.name, docType: row.label, replace: false, rowType: row.type, multi: true });
           }
           continue;
         }
         const file = form.identityDocFiles[row.type];
-        if (file) { uploads.push({ file, name: file.name, docType: row.label, replace: true }); uploadedDocTypes.push(row.type); }
+        if (file) uploads.push({ file, name: file.name, docType: row.label, replace: true, rowType: row.type, multi: false });
       }
+      const uploadOffset = tasks.length;
       for (const u of uploads) {
-        const fd = new FormData();
-        fd.append('file', u.file);
-        fd.append('name', u.name);
-        fd.append('docType', u.docType);
-        // Single-slot rows replace what was there; re-uploading is how a wrong
-        // file gets corrected, and leaving both made it unclear which counts.
-        if (u.replace) fd.append('replace', 'true');
-        tasks.push(apiClient.post(`/employees/${emp.id}/documents`, fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+        taskLabels.push(`${u.docType} (${u.name})`);
+        tasks.push(() => uploadFileDirect({
+          urlEndpoint: `/employees/${emp.id}/documents/upload-url`,
+          registerEndpoint: `/employees/${emp.id}/documents/register`,
+          file: u.file,
+          meta: {
+            name: u.name,
+            docType: u.docType,
+            // Single-slot rows replace what was there; re-uploading is how a
+            // wrong file gets corrected, and leaving both made it unclear
+            // which counts.
+            ...(u.replace ? { replace: true } : {}),
+          },
         }));
       }
 
       if (tasks.length > 0) {
-        try {
-          await Promise.all(tasks);
+        {
+          // Settled, not Promise.all: that abandoned every remaining upload
+          // the moment one failed, so a single oversized scan could lose the
+          // rest of the batch silently.
+          const settled = await runWithConcurrency(tasks, 4);
+          const failedRowTypes = new Set<string>();
+          const failedLabels: string[] = [];
+          settled.forEach((r, i) => {
+            if (r.status !== 'rejected') return;
+            failedLabels.push(taskLabels[i] ?? 'A file');
+            const u = uploads[i - uploadOffset];
+            if (u) failedRowTypes.add(u.rowType);
+          });
+
+          const uploadedDocTypes = uploads
+            .filter(u => !u.multi && !failedRowTypes.has(u.rowType)).map(u => u.rowType);
+          const uploadedMultiDocTypes = [...new Set(
+            uploads.filter(u => u.multi && !failedRowTypes.has(u.rowType)).map(u => u.rowType),
+          )];
           // Optimistically patch the cache so tiles immediately show "On file"
           // without waiting for the background refetch to complete. The real
           // refetch (below) will replace this with authoritative server data.
-          if (uploads.length > 0) {
+          const landed = uploads.filter(u => !failedRowTypes.has(u.rowType));
+          if (landed.length > 0) {
             queryClient.setQueryData(['employees', emp.id], (old: any) => {
               if (!old) return old;
-              const newDocs = uploads.map(u => ({
-                id: `optimistic_${u.docType}`,
+              const newDocs = landed.map((u, i) => ({
+                // Unique per file: keying on docType alone collided as soon as
+                // a row held more than one document, which is now the norm for
+                // I-20 and I-983.
+                id: `optimistic_${u.docType}_${i}_${u.name}`,
                 name: u.name,
                 type: u.docType,
                 uploadedAt: new Date().toISOString(),
@@ -1752,7 +1821,9 @@ export default function NewEmployee() {
               return { ...old, documents: [...(old.documents ?? []), ...newDocs] };
             });
           }
-          // Clear staged file refs so Finish onboarding won't re-upload duplicates.
+          // Clear the staged refs for rows that fully uploaded, so Finish
+          // onboarding won't send them again. Rows with a failure keep their
+          // files so the next save retries exactly those.
           setForm(p => ({
             ...p,
             profilePhotoFile: null,
@@ -1766,11 +1837,14 @@ export default function NewEmployee() {
               Object.entries(p.multiIdentityDocFiles).map(([k, v]) => [k, uploadedMultiDocTypes.includes(k) ? [] : v]),
             ),
           }));
-        } catch (uploadErr: any) {
-          toast.warning(
-            `Progress saved, but one or more files failed to upload: ${uploadErr?.response?.data?.error ?? 'unknown error'}`,
-            { duration: 8000 },
-          );
+
+          if (failedLabels.length > 0) {
+            // Name them. "one or more files" told nobody which to retry.
+            toast.warning(
+              `Progress saved, but ${failedLabels.length} file${failedLabels.length === 1 ? '' : 's'} did not upload`,
+              { description: failedLabels.join('\n'), duration: 10000 },
+            );
+          }
         }
         queryClient.invalidateQueries({ queryKey: ['employees'] });
         queryClient.invalidateQueries({ queryKey: ['employees', emp.id] });
