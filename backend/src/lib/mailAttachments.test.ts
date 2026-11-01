@@ -102,6 +102,47 @@ describe('telling the client what is missing', () => {
   });
 });
 
+describe('what the client is told about what is missing', () => {
+  it('does not call a small file too large', () => {
+    // A client was told a 300 KB week-9 timesheet "was too large to attach".
+    // It was simply last in the queue, and their AP team cannot act on a
+    // reason that is not true.
+    const note = describeOmissions([{ item: f('week-9.pdf', 0.3), reason: 'budget-full' as const }]);
+    expect(note).not.toMatch(/too large/i);
+    expect(note).toMatch(/size limit/i);
+  });
+
+  it('separates the reasons when more than one applied', () => {
+    const note = describeOmissions([
+      { item: f('huge-scan.pdf', 50), reason: 'too-large' as const },
+      { item: f('week-9.pdf', 0.3), reason: 'budget-full' as const },
+      { item: f('gone.pdf', 1), reason: 'unavailable' as const },
+    ]);
+    expect(note).toMatch(/too large to attach \(huge-scan\.pdf\)/);
+    expect(note).toMatch(/size limit \(week-9\.pdf\)/);
+    expect(note).toMatch(/could not be retrieved \(gone\.pdf\)/);
+  });
+});
+
+describe('the invoice PDF is reserved, not budgeted', () => {
+  it('leaves room for it so the message cannot overrun', () => {
+    // How invoices.service now plans a send: the PDF is always attached, so
+    // its bytes come off the top and the supporting documents get the rest.
+    const pdfBytes = 7 * MB;
+    const proofs = [f('TS-1.pdf', 7), f('TS-2.pdf', 7)];
+
+    // Uncounted — which is what used to happen — both proofs fit and the
+    // message is over budget the moment the invoice itself is added. SES then
+    // refuses the whole email and the invoice never goes out.
+    const uncounted = planAttachments(proofs);
+    expect(uncounted.totalBytes + pdfBytes).toBeGreaterThan(MAX_TOTAL_ATTACHMENT_BYTES);
+
+    const reserved = planAttachments(proofs, { totalBytes: MAX_TOTAL_ATTACHMENT_BYTES - pdfBytes });
+    expect(reserved.attach).toHaveLength(1);
+    expect(reserved.totalBytes + pdfBytes).toBeLessThanOrEqual(MAX_TOTAL_ATTACHMENT_BYTES);
+  });
+});
+
 describe('the budget stays under what SES will accept', () => {
   it('leaves room for base64 inflation and the HTML body', () => {
     // SES rejects a message over 40 MB, and MIME base64 costs 4/3.

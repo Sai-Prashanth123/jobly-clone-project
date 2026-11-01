@@ -39,7 +39,7 @@ import {
   isIdentityRowVisible, categoryOf, DOCUMENT_CATEGORY_LABELS, DOCUMENT_CATEGORY_ORDER,
   rowCollectsNumber,
   getRequiredIdentityTypes, getMinFiles, IDENTITY_OWNED_DOC_LABELS, docMatchesRow, docsMatchingRow,
-  identityRowLabel,
+  identityRowLabel, REQUIRED_IDENTITY_TYPES, WORK_VISA_REQUIRED_DOCS,
   type IdentityDocRow,
 } from '../lib/documentTypes';
 import { LanguagesMultiSelect } from '../components/shared/LanguagesMultiSelect';
@@ -770,6 +770,15 @@ export default function NewEmployee() {
         // Same resolver as the rows themselves, so the checklist and the cards
         // can never disagree about which documents ask a question.
         if (docPolicy.stateOf(row.type) !== 'optional') return false;
+        // A document the gate demands outright is not an optional one, however
+        // the policy table has it. computeOnboarding's required block reads the
+        // compiled-in lists regardless of policy state, so asking the holding
+        // question about one of those as well left the wizard at 100% while the
+        // server still wanted the upload. Mirrors the two .filter() calls in
+        // backend/src/lib/onboarding.ts, which exclude the same documents by
+        // label where these exclude them by row type.
+        if ((REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type)) return false;
+        if ((WORK_VISA_REQUIRED_DOCS as readonly string[]).includes(row.type)) return false;
         return !EMPLOYER_DOC_ROWS.some(r => r.type === row.type);
       }).map(row => {
         const stored = form.identityDocuments.find(d => d.type === row.type);

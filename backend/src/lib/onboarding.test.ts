@@ -336,4 +336,48 @@ describe('the mandatory yes/no answer', () => {
     ]);
     expect(r.items.filter(i => i.id.startsWith('held_')).length).toBe(1);
   });
+
+  /**
+   * A file on record IS the answer.
+   *
+   * The wizard reads an upload as an implicit yes, and only persists `held`
+   * when somebody actually clicks a button. Demanding the click here refused
+   * every record that had the document but no click — the form showed 100% and
+   * "Finish onboarding" answered "Still required: Driver's License — answer
+   * whether you have this". It blocked HR's approve path for the same records.
+   */
+  describe('an uploaded document answers its own question', () => {
+    const LICENCE = [{ key: 'driver_license', label: "Driver's License", hasExpiry: true }];
+    const held = (emp: Record<string, unknown>, docs: string[] = []) =>
+      computeOnboarding(onboarding(emp), new Set(docs), undefined, LICENCE)
+        .missing.filter(l => l.startsWith("Driver's License"));
+
+    it('needs no click once the document and its expiry are on file', () => {
+      expect(held(
+        { identity_documents: [{ type: 'driver_license', expiry: '2030-01-01' }] },
+        ["Driver's License"],
+      )).toEqual([]);
+    });
+
+    it('treats the upload as a yes and then wants the expiry', () => {
+      // Not "answer whether you have this" — the answer is evident. What is
+      // genuinely missing is the date the alerts read.
+      expect(held(
+        { identity_documents: [{ type: 'driver_license' }] },
+        ["Driver's License"],
+      )).toEqual(["Driver's License (upload required — you answered yes)"]);
+    });
+
+    it('still asks when there is no document and no answer', () => {
+      expect(held({})).toEqual(["Driver's License — answer whether you have this"]);
+    });
+
+    it('lets a stored "no" stand even if a file exists', () => {
+      // An explicit answer outranks an inference, both here and in the wizard.
+      expect(held(
+        { identity_documents: [{ type: 'driver_license', held: 'no' }] },
+        ["Driver's License"],
+      )).toEqual([]);
+    });
+  });
 });

@@ -39,7 +39,12 @@ export interface SizedAttachment {
   bytes: number;
 }
 
-export type OmissionReason = 'too-large' | 'budget-full';
+/**
+ * `unavailable` covers a read that failed after the size check passed — the
+ * object went away, or the provider errored. The caller used to report those as
+ * `too-large`, which is a different and untrue statement to the client.
+ */
+export type OmissionReason = 'too-large' | 'budget-full' | 'unavailable';
 
 export interface AttachmentPlan<T extends SizedAttachment> {
   attach: T[];
@@ -99,8 +104,24 @@ export function describeOmissions<T extends SizedAttachment>(
   omitted: Array<{ item: T; reason: OmissionReason }>,
 ): string | null {
   if (omitted.length === 0) return null;
-  const names = omitted.map(o => o.item.filename).join(', ');
+
+  // One clause per reason. The reasons are not interchangeable to whoever
+  // reads the invoice: saying "too large to attach" about a 300 KB week-9
+  // timesheet that was simply last in the queue is untrue, and unhelpful when
+  // the client's AP team asks us for it.
+  const WORDING: Record<OmissionReason, (names: string) => string> = {
+    'too-large':   names => `too large to attach (${names})`,
+    'budget-full': names => `left out to keep this email within the size limit (${names})`,
+    'unavailable': names => `could not be retrieved (${names})`,
+  };
+  const ORDER: OmissionReason[] = ['too-large', 'budget-full', 'unavailable'];
+
+  const clauses = ORDER
+    .map(reason => [reason, omitted.filter(o => o.reason === reason)] as const)
+    .filter(([, items]) => items.length > 0)
+    .map(([reason, items]) => WORDING[reason](items.map(o => o.item.filename).join(', ')));
+
   return omitted.length === 1
-    ? `One supporting document was too large to attach (${names}). Please ask us for it and we will send it separately.`
-    : `${omitted.length} supporting documents were too large to attach (${names}). Please ask us for them and we will send them separately.`;
+    ? `One supporting document was ${clauses.join('; ')}. Please ask us for it and we will send it separately.`
+    : `${omitted.length} supporting documents were ${clauses.join('; ')}. Please ask us for them and we will send them separately.`;
 }

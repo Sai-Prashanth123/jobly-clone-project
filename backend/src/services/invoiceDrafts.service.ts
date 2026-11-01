@@ -155,7 +155,9 @@ async function unbilledApproved(clientId: string, ownDraftIds: Set<string>): Pro
 async function openAutoDrafts(clientId: string) {
   const { data, error } = await supabaseAdmin
     .from('invoices')
-    .select('id, invoice_number, issue_date, payment_terms, tax_rate, blockers_ack_at, billing_period_start')
+    // `blockers` as well as the acknowledgement: a confirmation is only valid
+    // for the blocker set it was given, so the sync has to compare the two.
+    .select('id, invoice_number, issue_date, payment_terms, tax_rate, blockers, blockers_ack_at, billing_period_start')
     .eq('client_id', clientId)
     .eq('doc_type', 'invoice')
     .eq('status', 'draft')
@@ -165,6 +167,29 @@ async function openAutoDrafts(clientId: string) {
     throw error;
   }
   return data ?? [];
+}
+
+/**
+ * This client's open auto-draft for one billing month, if there is one.
+ *
+ * Used after a failed insert to find the draft a concurrent sync created
+ * first — see the catch in syncMonthDraft.
+ */
+async function openAutoDraftForMonth(clientId: string, monthStart: string) {
+  const { data, error } = await supabaseAdmin
+    .from('invoices')
+    .select('id, invoice_number, issue_date, payment_terms, tax_rate, blockers, blockers_ack_at, billing_period_start')
+    .eq('client_id', clientId)
+    .eq('doc_type', 'invoice')
+    .eq('status', 'draft')
+    .eq('auto_generated', true)
+    .eq('billing_period_start', monthStart)
+    .maybeSingle();
+  if (error) {
+    console.error('[invoiceDrafts] could not re-read the draft for', clientId, monthStart, error);
+    return null;
+  }
+  return data;
 }
 
 /**
@@ -280,7 +305,10 @@ async function syncMonthDraft(a: {
   client: { company_name?: string; billing_contact_email?: string | null; contact_email?: string | null; net_payment_days?: number | null; currency?: string | null } | null;
   month: BillingMonth;
   timesheets: TimesheetRow[];
-  existing?: { id: string; invoice_number?: string; tax_rate?: number | null } | undefined;
+  existing?: {
+    id: string; invoice_number?: string; tax_rate?: number | null;
+    blockers?: string[] | null; blockers_ack_at?: string | null;
+  } | undefined;
   rateByAssignment: Map<string, number>;
   nameByEmployee: Map<string, string>;
 }): Promise<DraftSyncResult> {
@@ -331,6 +359,9 @@ async function syncMonthDraft(a: {
   let invoiceId = existing?.id as string | undefined;
   let invoiceNumber = existing?.invoice_number as string | undefined;
   let action: DraftSyncResult['action'] = 'updated';
+  // The row the update applies to: the draft we already knew about, or the one
+  // a racing sync created first (see the catch below).
+  let target = existing;
 
   if (!invoiceId) {
     // Same allocator the manual paths use, so the numbering sequence and its
@@ -342,22 +373,59 @@ async function syncMonthDraft(a: {
       issueDate, clientNetDays: client?.net_payment_days ?? 30,
     });
 
-    const created = await insertInvoiceWithNumber('INV', {
-      client_id: clientId,
-      issue_date: issueDate,
-      due_date: dueDate,
-      payment_terms: paymentTerms,
-      currency: client?.currency ?? 'USD',
-      status: 'draft',
-      doc_type: 'invoice',
-      auto_generated: true,
-      ...common,
-    });
-    invoiceId = created.id as string;
-    invoiceNumber = created.invoice_number as string;
-    action = 'created';
-  } else {
-    const { error } = await supabaseAdmin.from('invoices').update(common).eq('id', invoiceId);
+    try {
+      const created = await insertInvoiceWithNumber('INV', {
+        client_id: clientId,
+        issue_date: issueDate,
+        due_date: dueDate,
+        payment_terms: paymentTerms,
+        currency: client?.currency ?? 'USD',
+        status: 'draft',
+        doc_type: 'invoice',
+        auto_generated: true,
+        ...common,
+      });
+      invoiceId = created.id as string;
+      invoiceNumber = created.invoice_number as string;
+      action = 'created';
+    } catch (err) {
+      // Two approvals for the same client and the same billing month can race:
+      // both find no draft, both insert, and migration 061's partial unique
+      // index on (client_id, billing_period_start) rejects the loser.
+      // insertInvoiceWithNumber answers 23505 by bumping the invoice number,
+      // which cannot resolve THIS conflict — client_id and
+      // billing_period_start do not change — so all six attempts fail
+      // identically. onTimesheetApprovalChanged then swallows the throw, and
+      // the second timesheet silently stays off the draft until something else
+      // triggers a sync.
+      //
+      // So adopt the draft the winner created and go on to update it. A
+      // genuine insert failure still surfaces, because there is no draft to
+      // find.
+      const adopted = await openAutoDraftForMonth(clientId, month.start);
+      if (!adopted) throw err;
+      console.warn('[invoiceDrafts] adopted a concurrently created draft', adopted.id, month.key);
+      invoiceId = adopted.id as string;
+      invoiceNumber = adopted.invoice_number as string;
+      target = adopted;
+    }
+  }
+
+  if (action !== 'created') {
+    // A confirmation covers the blockers somebody actually read. The sync
+    // rewrites `blockers` every run but used to leave `blockers_ack_at` alone,
+    // so a blocker that appeared AFTER the confirmation passed sendInvoice's
+    // gate unseen — finance confirms "1 timesheet has no signed proof", a
+    // second employee's hours then arrive at a zero bill rate, and the invoice
+    // goes to the client with nobody having looked at the new problem.
+    const acknowledged = (target?.blockers ?? []) as string[];
+    const key = (xs: string[]) => [...xs].sort().join('\u0000');
+    const unchanged = key(acknowledged) === key(blockers);
+
+    const { error } = await supabaseAdmin
+      .from('invoices')
+      .update(unchanged ? common : { ...common, blockers_ack_at: null })
+      .eq('id', invoiceId);
     if (error) {
       console.error('[invoiceDrafts] could not update the draft', invoiceId, error);
       throw error;

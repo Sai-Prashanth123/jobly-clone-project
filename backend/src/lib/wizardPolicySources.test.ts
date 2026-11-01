@@ -92,4 +92,20 @@ describe('the wizard reads the live document policy', () => {
     expect(args).toContain('docPolicy');
     expect(args).not.toContain('getRequiredIdentityTypes');
   });
+
+  /**
+   * The wizard must not ask "do you have this?" about a document the gate
+   * demands outright.
+   *
+   * computeOnboarding's required block reads the compiled-in lists whatever the
+   * policy table says, and it excludes those labels from its own holding
+   * checks. The wizard did not, so a document HR had moved to Optional was
+   * answered "no" on screen, counted as done, and still refused by the server
+   * as "(upload required)" — the wizard sat at 100% and Finish onboarding
+   * failed. Mirrors the two .filter() calls in lib/onboarding.ts.
+   */
+  it('excludes the documents the gate requires outright', () => {
+    expect(SOURCE).toContain('REQUIRED_IDENTITY_TYPES as readonly string[]).includes(row.type)');
+    expect(SOURCE).toContain('WORK_VISA_REQUIRED_DOCS as readonly string[]).includes(row.type)');
+  });
 });

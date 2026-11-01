@@ -25,6 +25,7 @@ import {
   clearSuppressionCache,
   AllRecipientsSuppressedError,
 } from './mailSuppression';
+import { AppError } from './errors';
 
 /** SES answers NotFoundException for an address that is NOT suppressed. */
 const notFound = () => {
@@ -106,7 +107,52 @@ describe('splitSuppressed', () => {
   });
 });
 
+describe('the lookup cannot become the bottleneck', () => {
+  it('never opens more than a handful of SES calls at once', async () => {
+    // SESv2's account-level operations are low-TPS. An all-staff announcement
+    // used to open one lookup per recipient at once through Promise.all, and
+    // most of them throttled and were retried before failing open.
+    let inFlight = 0;
+    let peak = 0;
+    send.mockImplementation(() => {
+      inFlight++;
+      peak = Math.max(peak, inFlight);
+      return new Promise((_resolve, reject) => setTimeout(() => { inFlight--; reject(notFound()); }, 1));
+    });
+
+    await splitSuppressed({ to: Array.from({ length: 25 }, (_, i) => `person${i}@x.test`) });
+    expect(peak).toBeLessThanOrEqual(4);
+  });
+
+  it('assumes the rest are deliverable once the budget is spent', async () => {
+    // Everything is suppressed here, so anything NOT reported as suppressed is
+    // an address the check ran out of time for — and failing open is the
+    // deliberate choice: a slow check must not hold up an invoice.
+    const realNow = Date.now;
+    let asked = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => realNow() + (asked > 0 ? 10_000 : 0));
+    send.mockImplementation(() => { asked++; return Promise.resolve({}); });
+
+    const out = await splitSuppressed({ to: ['a@x.test', 'b@x.test', 'c@x.test'] });
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(out.suppressed).toEqual(['a@x.test']);
+    expect(out.to).toEqual(['b@x.test', 'c@x.test']);
+    vi.mocked(Date.now).mockRestore();
+  });
+});
+
 describe('AllRecipientsSuppressedError', () => {
+  it('reaches the sender as a 422 rather than an opaque 500', () => {
+    // It used to extend Error, so errorHandler fell through to
+    // "Internal server error" and the message below — written precisely so
+    // finance would know the ADDRESS was the problem — was never shown.
+    const err = new AllRecipientsSuppressedError(['anitha@example.test']);
+    expect(err).toBeInstanceOf(AppError);
+    expect(err.statusCode).toBe(422);
+    expect(err.details).toEqual({ suppressed: ['anitha@example.test'] });
+  });
+
   it('names the address and says why, so finance can act on it', () => {
     const err = new AllRecipientsSuppressedError(['anitha@example.test']);
     expect(err.message).toContain('anitha@example.test');

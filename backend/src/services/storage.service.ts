@@ -55,6 +55,34 @@ const BUCKET_MAP: Record<string, string> = {
   case: 'case-docs',
 };
 
+/**
+ * The bucket an entity's documents live in.
+ *
+ * Exported so a caller that needs readSizedObject's budget-aware read — rather
+ * than downloadDocumentBuffer's fixed RENDER_MAX_BYTES and silent null — can
+ * name the bucket without duplicating this map.
+ */
+export function documentBucketFor(entityType: string): string {
+  return BUCKET_MAP[entityType] ?? BUCKET_MAP.employee;
+}
+
+/**
+ * How big an object is, without reading it.
+ *
+ * For deciding what fits in an email before pulling anything into memory:
+ * null when it cannot be determined, which the caller must treat as "cannot
+ * attach" rather than as zero bytes.
+ */
+export async function statObjectSize(bucket: string, storagePath: string): Promise<number | null> {
+  try {
+    const info = await storageProvider.stat(bucket, storagePath);
+    return info?.size ?? null;
+  } catch (err) {
+    console.error('[storage] could not stat', bucket, storagePath, err);
+    return null;
+  }
+}
+
 // `legal` may only reach a document when it's tied to a case: either the
 // document itself is a case document, or it's an employee document for an
 // employee who has at least one non-deleted case. Mirrors the scoping already

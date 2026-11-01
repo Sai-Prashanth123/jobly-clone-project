@@ -1,4 +1,5 @@
 import { SESv2Client, GetSuppressedDestinationCommand } from '@aws-sdk/client-sesv2';
+import { AppError } from './errors';
 
 /**
  * Refuse to pretend we emailed somebody SES will not deliver to.
@@ -27,14 +28,33 @@ import { SESv2Client, GetSuppressedDestinationCommand } from '@aws-sdk/client-se
  * the behaviour we already had.
  */
 
-export class AllRecipientsSuppressedError extends Error {
+/**
+ * An AppError, not a plain Error, so the message above actually reaches the
+ * person who pressed Send.
+ *
+ * errorHandler relays `message` and `statusCode` for an AppError and answers
+ * everything else with `{ error: 'Internal server error' }`. As a plain Error
+ * this text was written, thrown, and then swallowed: finance clicking "Send
+ * reminder" on a client whose address had hard-bounced got an opaque 500 with
+ * no hint that the address was the problem.
+ *
+ * 422 rather than 400: the request is well formed, the address on file is not
+ * usable.
+ */
+export class AllRecipientsSuppressedError extends AppError {
   readonly suppressed: string[];
   constructor(suppressed: string[]) {
     super(
       `Email not sent: ${suppressed.join(', ')} ${suppressed.length === 1 ? 'is' : 'are'} ` +
       'on the SES suppression list after a permanent bounce, so SES would accept the ' +
       'message and discard it. Correct the address before sending.',
+      422,
+      true,
+      { suppressed },
     );
+    // AppError's own constructor pins the prototype to AppError, which would
+    // otherwise make `instanceof AllRecipientsSuppressedError` false here.
+    Object.setPrototypeOf(this, AllRecipientsSuppressedError.prototype);
     this.name = 'AllRecipientsSuppressedError';
     this.suppressed = suppressed;
   }
@@ -54,6 +74,12 @@ function ses(): SESv2Client {
  */
 const TTL_MS = 10 * 60 * 1000;
 const cache = new Map<string, { suppressed: boolean; at: number }>();
+
+/** How many SESv2 lookups may be in flight at once — see splitSuppressed. */
+const MAX_CONCURRENT_LOOKUPS = 4;
+
+/** How long the whole check may take before the rest are assumed deliverable. */
+const LOOKUP_BUDGET_MS = 3000;
 
 /** Exported for tests, which must not inherit another case's cached answer. */
 export function clearSuppressionCache(): void {
@@ -109,8 +135,36 @@ export async function splitSuppressed(a: {
   const unique = [...new Set(all.map(x => x.trim().toLowerCase()))].filter(Boolean);
   if (unique.length === 0) return { to: [], cc: [], bcc: [], suppressed: [] };
 
-  const flags = await Promise.all(unique.map(async x => [x, await isSuppressed(x)] as const));
-  const bad = new Set(flags.filter(([, s]) => s).map(([x]) => x));
+  // Bounded, and time-boxed.
+  //
+  // This used to be Promise.all over every address. SESv2's account-level
+  // operations are low-TPS, so an all-staff announcement to a few dozen
+  // employees opened that many concurrent lookups, most of which throttled and
+  // were retried by the SDK before failing open — seconds spent in suppression
+  // checks before SendEmail was even reached, inside a Lambda with a timeout.
+  //
+  // Whatever is still unchecked when the budget runs out counts as
+  // deliverable: the same fail-open answer a lookup error gives, for the same
+  // reason. A slow check must not be why an invoice does not go out.
+  const deadline = Date.now() + LOOKUP_BUDGET_MS;
+  const flags = new Map<string, boolean>();
+  let cursor = 0;
+  const worker = async (): Promise<void> => {
+    while (cursor < unique.length) {
+      const address = unique[cursor++];
+      if (Date.now() >= deadline) {
+        console.warn(`[mailSuppression] budget spent, assuming ${address} is deliverable`);
+        flags.set(address, false);
+        continue;
+      }
+      flags.set(address, await isSuppressed(address));
+    }
+  };
+  await Promise.all(
+    Array.from({ length: Math.min(MAX_CONCURRENT_LOOKUPS, unique.length) }, worker),
+  );
+
+  const bad = new Set([...flags].filter(([, s]) => s).map(([x]) => x));
   if (bad.size === 0) return { to: a.to, cc: a.cc ?? [], bcc: a.bcc ?? [], suppressed: [] };
 
   const keep = (list: string[]) => list.filter(x => !bad.has(x.trim().toLowerCase()));

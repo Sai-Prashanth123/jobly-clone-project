@@ -295,7 +295,16 @@ export function computeOnboarding(
         .filter(d => !(ONBOARDING_REQUIRED_DOCS as readonly string[]).includes(d.label))
         .filter(d => !(VISA_CONDITIONAL_REQUIRED_DOCS as readonly string[]).includes(d.label))
         .map(d => {
-          const answer = heldFor(emp.identity_documents, d.key);
+          const uploaded = docTypes.has(d.label)
+            || (DOC_TYPE_LEGACY_ALIASES[d.label] ?? []).some(alias => docTypes.has(alias));
+          // A file on record IS the answer. The wizard reads it that way
+          // (NewEmployee.tsx: `stored?.held ?? (fileOrUploaded ? 'yes' :
+          // undefined)`) and identityDocsForPersist only writes `held` when
+          // somebody actually clicked a button — so demanding the click here
+          // refused records the form itself showed as 100% complete, for
+          // everybody mid-onboarding at once, and blocked HR's approve path
+          // with them.
+          const answer = heldFor(emp.identity_documents, d.key) ?? (uploaded ? 'yes' : undefined);
           if (answer === undefined) {
             return {
               id: `held_${d.key}`,
@@ -308,8 +317,6 @@ export function computeOnboarding(
             return { id: `held_${d.key}`, label: `${d.label} — answered`, done: true };
           }
           // Yes: now it behaves exactly like a required document.
-          const uploaded = docTypes.has(d.label)
-            || (DOC_TYPE_LEGACY_ALIASES[d.label] ?? []).some(alias => docTypes.has(alias));
           const expiry = d.hasExpiry ? expiryFor(emp.identity_documents, d.key) : 'n/a';
           return {
             id: `held_${d.key}`,

@@ -4,9 +4,12 @@ import { generateInvoicePDF, type InvoicePDFData } from '../lib/pdfGenerator';
 import { logActivity } from '../lib/activityLogger';
 import { sendInvoiceEmail, mailerConfigured, renderTemplate } from '../lib/mailer';
 import { createNotification, getUserIdsByRole } from './notifications.service';
-import { uploadDocument, deleteDocument, downloadDocumentBuffer, readSizedObject } from './storage.service';
 import {
-  planAttachments, describeOmissions, MAX_SINGLE_ATTACHMENT_BYTES,
+  uploadDocument, deleteDocument, readSizedObject, statObjectSize, documentBucketFor,
+} from './storage.service';
+import {
+  planAttachments, describeOmissions, MAX_SINGLE_ATTACHMENT_BYTES, MAX_TOTAL_ATTACHMENT_BYTES,
+  type SizedAttachment, type OmissionReason,
 } from '../lib/mailAttachments';
 import { getInvoiceTheme } from './invoiceTemplates.service';
 import { getEmailTemplate } from './emailTemplates.service';
@@ -841,18 +844,46 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string, c
   // the storage signed URL (download link).
   const { buffer: pdfBuffer, signedUrl: pdfUrl } = await renderAndStoreInvoicePDF(id);
 
-  // Fetch all uploaded attachments for this invoice and download their buffers
-  // so they can be included in the email alongside the generated PDF.
+  // Everything that could ride along with this invoice, weighed as one message.
+  //
+  // The generated PDF, the manually attached documents and the client-signed
+  // proofs all go in the same email, so they have to share one budget. This
+  // used to cover the proofs alone while the PDF and an unbounded number of
+  // manual attachments — up to RENDER_MAX_BYTES each — were pushed in
+  // uncounted. Three 9 MB attachments plus the proofs already exceeds the
+  // 40 MB SES refuses, and then the whole invoice email fails and the invoice
+  // stays in draft: the exact outcome mailAttachments.ts exists to prevent.
+  //
+  // Sizes come from a stat before anything is read, so an oversize file costs
+  // a HEAD rather than being pulled into the Lambda and thrown away.
+  interface SendCandidate extends SizedAttachment {
+    bucket: string;
+    storagePath: string;
+    contentType?: string;
+  }
+  const omissions: Array<{ item: SizedAttachment; reason: OmissionReason }> = [];
+
   const { data: attachmentDocs } = await supabaseAdmin
     .from('documents')
     .select('id, name, storage_path, type')
     .eq('entity_type', 'invoice')
     .eq('entity_id', id);
 
-  const attachmentFiles: { filename: string; content: Buffer; contentType?: string }[] = [];
+  const manualCandidates: SendCandidate[] = [];
+  const invoiceBucket = documentBucketFor('invoice');
   for (const doc of (attachmentDocs ?? [])) {
-    const buf = await downloadDocumentBuffer(doc.storage_path, 'invoice');
-    if (buf) attachmentFiles.push({ filename: doc.name ?? 'attachment', content: buf, contentType: doc.type ?? undefined });
+    const filename = doc.name ?? 'attachment';
+    const bytes = await statObjectSize(invoiceBucket, doc.storage_path);
+    if (bytes === null) {
+      // On the invoice in the database, not readable from storage. Say so
+      // instead of leaving the client to notice the gap.
+      omissions.push({ item: { filename, bytes: 0 }, reason: 'unavailable' });
+      continue;
+    }
+    manualCandidates.push({
+      filename, bytes, bucket: invoiceBucket,
+      storagePath: doc.storage_path, contentType: doc.type ?? undefined,
+    });
   }
 
   // The client-signed timesheets this invoice bills for.
@@ -861,29 +892,35 @@ export async function sendInvoice(id: string, recipientEmailOverride?: string, c
   // everything should be attached to that email". Finance used to download
   // each proof and attach it by hand, which is why invoices went out with the
   // proofs missing and AP queried them.
-  //
-  // Budgeted, because a proof may now be 100 MB and SES refuses the whole
-  // message over 40 MB — one oversize scan must not fail the invoice email.
-  const proofOmissions: string[] = [];
-  const proofCandidates = await collectTimesheetProofs(id);
-  const plan = planAttachments(proofCandidates);
+  const proofCandidates: SendCandidate[] = (await collectTimesheetProofs(id))
+    .map(p => ({ ...p, bucket: TIMESHEET_PROOF_BUCKET }));
+
+  // The PDF is not negotiable — an invoice email without the invoice is
+  // pointless — so its bytes are reserved out of the budget rather than
+  // planned alongside the rest, which could have omitted it. It is attached
+  // separately, via sendInvoiceEmail's own pdfBuffer argument.
+  const plan = planAttachments<SendCandidate>(
+    [...manualCandidates, ...proofCandidates],
+    { totalBytes: Math.max(0, MAX_TOTAL_ATTACHMENT_BYTES - pdfBuffer.length) },
+  );
   for (const { item, reason } of plan.omitted) {
-    console.warn('[invoices.service] proof omitted from invoice email', id, item.filename, reason);
+    console.warn('[invoices.service] attachment omitted from invoice email', id, item.filename, reason);
   }
+  omissions.push(...plan.omitted);
+
+  const attachmentFiles: { filename: string; content: Buffer; contentType?: string }[] = [];
   for (const cand of plan.attach) {
-    const read = await readSizedObject(TIMESHEET_PROOF_BUCKET, cand.storagePath, MAX_SINGLE_ATTACHMENT_BYTES);
+    const read = await readSizedObject(cand.bucket, cand.storagePath, MAX_SINGLE_ATTACHMENT_BYTES);
     if (read && 'buffer' in read) {
-      attachmentFiles.push({ filename: cand.filename, content: read.buffer });
+      attachmentFiles.push({ filename: cand.filename, content: read.buffer, contentType: cand.contentType });
     } else {
-      // Between the size check and the read: treat it like any other omission
-      // rather than failing the send.
-      proofOmissions.push(cand.filename);
+      // Gone between the stat and the read: an omission like any other, not a
+      // reason to fail the send.
+      omissions.push({ item: cand, reason: 'unavailable' });
     }
   }
-  const omissionNote = describeOmissions([
-    ...plan.omitted,
-    ...proofOmissions.map(filename => ({ item: { filename, bytes: 0 }, reason: 'too-large' as const })),
-  ]);
+
+  const omissionNote = describeOmissions(omissions);
 
   const pdfData = buildInvoicePdfData(inv, client);
 

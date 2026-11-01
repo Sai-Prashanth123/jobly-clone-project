@@ -5,9 +5,11 @@
 // already recorded in the database keeps working - nothing in RDS has to be
 // rewritten except the two persisted public URLs, handled separately.
 //
-// Verified by size AND content hash per object: a truncated copy is the
+// Verified by size AND content hash per object: S3's ETag is compared against
+// the MD5 of what was sent, because a truncated or byte-corrupted copy is the
 // failure mode that would otherwise go unnoticed until someone opened a
-// passport scan and found half an image.
+// passport scan and found half an image. (This claim used to be untrue — the
+// md5 was recorded in the manifest and never checked against anything.)
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { S3Client, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
@@ -22,20 +24,29 @@ const PUBLIC_BUCKETS = new Set(['employee-photos', 'document-templates']);
 const s3 = new S3Client({ region: 'us-east-1' });
 const md5 = b => createHash('md5').update(b).digest('hex');
 
+const PAGE = 1000;
+
 /** List every object in a Supabase bucket, recursing into folders. */
 async function listAll(bucket, prefix = '') {
   const out = [];
-  const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
-    method: 'POST',
-    headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prefix, limit: 1000, offset: 0, sortBy: { column: 'name', order: 'asc' } }),
-  });
-  if (!res.ok) throw new Error(`list ${bucket}/${prefix}: HTTP ${res.status}`);
-  for (const item of await res.json()) {
-    const path = prefix ? `${prefix}${item.name}` : item.name;
-    // Supabase reports folders as entries with a null id.
-    if (item.id === null) out.push(...await listAll(bucket, `${path}/`));
-    else out.push({ path, size: item.metadata?.size ?? null, contentType: item.metadata?.mimetype });
+  // Paged, rather than one fixed request. A single { limit: 1000, offset: 0 }
+  // silently truncated any folder holding more than 1000 entries, copied the
+  // first page, and reported the bucket as done.
+  for (let offset = 0; ; offset += PAGE) {
+    const res = await fetch(`${SUPABASE_URL}/storage/v1/object/list/${bucket}`, {
+      method: 'POST',
+      headers: { apikey: SERVICE_KEY, Authorization: `Bearer ${SERVICE_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prefix, limit: PAGE, offset, sortBy: { column: 'name', order: 'asc' } }),
+    });
+    if (!res.ok) throw new Error(`list ${bucket}/${prefix}: HTTP ${res.status}`);
+    const page = await res.json();
+    for (const item of page) {
+      const path = prefix ? `${prefix}${item.name}` : item.name;
+      // Supabase reports folders as entries with a null id.
+      if (item.id === null) out.push(...await listAll(bucket, `${path}/`));
+      else out.push({ path, size: item.metadata?.size ?? null, contentType: item.metadata?.mimetype });
+    }
+    if (page.length < PAGE) break;
   }
   return out;
 }
@@ -77,7 +88,17 @@ for (const bucket of buckets) {
       // whole body arrived.
       const head = await s3.send(new HeadObjectCommand({ Bucket: BUCKET, Key: key }));
       if (head.ContentLength !== body.length) throw new Error(`size ${head.ContentLength} != ${body.length}`);
-      results.push({ bucket, path: obj.path, key, size: body.length, md5: md5(body) });
+      // The length matching proves nothing about the bytes. For a single-part
+      // PUT the ETag IS the MD5 of the object, so comparing it catches
+      // corruption that a length check cannot. A multipart upload's ETag is
+      // "<hash>-<parts>" and is not an MD5 at all -- skip those rather than
+      // report a mismatch that is not one.
+      const digest = md5(body);
+      const etag = String(head.ETag ?? '').replace(/"/g, '');
+      if (etag && !etag.includes('-') && etag !== digest) {
+        throw new Error(`content ${etag} != ${digest}`);
+      }
+      results.push({ bucket, path: obj.path, key, size: body.length, md5: digest });
       ok++; copied++; bytes += body.length;
     } catch (e) {
       console.log(`  ✗ ${bucket}/${obj.path}: ${e.message}`);
