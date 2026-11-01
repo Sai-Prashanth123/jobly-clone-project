@@ -168,10 +168,16 @@ test.describe('on a phone', () => {
     await page.getByRole('button', { name: /back/i }).first().click();
     await expect(page.getByText('Person Number5').first()).toBeVisible({ timeout: 15_000 });
 
-    await page.waitForTimeout(800);
+    // Polled, not a fixed wait. Restoration is deliberately allowed to keep
+    // trying while the page fills in (useScrollRestoration's SETTLE_TIMEOUT_MS),
+    // so a flat 800ms asserted on a half-restored page and failed whenever the
+    // suite ran in parallel — a slow machine, not a regression.
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), { timeout: 5_000 })
+      .toBeGreaterThan(before - 60);
+
     const after = await page.evaluate(() => window.scrollY);
     console.log(`phone Back: before=${before} after=${after}`);
-    expect(after, 'Back on a phone must restore the card list too').toBeGreaterThan(before - 60);
   });
 });
 

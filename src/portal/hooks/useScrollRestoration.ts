@@ -34,6 +34,19 @@ const boxPositions = new Map<string, number>();
 /** How many frames to keep trying before accepting the page is as tall as it gets. */
 const MAX_FRAMES = 20;
 
+/**
+ * How long the window restore keeps trying.
+ *
+ * A frame count is the wrong unit. Twenty frames is ~320ms on an idle machine
+ * but the rows are not governed by frames — they arrive when the lazy chunk
+ * and then the query resolve. On a loaded machine (or a phone on mobile data)
+ * that is later than twenty frames, the document is still short, the scroll is
+ * clamped to 0, and Back lands at the top: exactly the complaint this hook
+ * exists to fix. Caught by the phone case in test/employees-scroll.spec.ts,
+ * which passed alone and failed whenever the suite ran in parallel.
+ */
+const SETTLE_TIMEOUT_MS = 3000;
+
 function scrollToY(y: number): void {
   // index.css sets `scroll-behavior: smooth` on :root, which would animate
   // this over ~300ms — long enough to see the page fly past the position it
@@ -151,17 +164,39 @@ export function useScrollRestoration(): void {
     }
 
     // The page is still filling in — lazy chunk, then query cache, then rows.
-    // Keep asking until the document is tall enough to honour the offset, and
-    // give up rather than fight a page that genuinely got shorter.
-    let frames = 0;
-    const settle = () => {
-      scrollToY(saved);
-      if (Math.abs(window.scrollY - saved) > 2 && frames++ < MAX_FRAMES) {
-        frame.current = requestAnimationFrame(settle);
-      }
+    // Keep asking until the document is tall enough to honour the offset, then
+    // stop: on success, on a deadline, or the moment the user takes over.
+    //
+    // Deliberately bounded by TIME rather than by frames — see
+    // SETTLE_TIMEOUT_MS. Giving up early is what made Back land at the top.
+    let settled = false;
+    const deadline = Date.now() + SETTLE_TIMEOUT_MS;
+
+    // Never fight the person. If they scroll while this is still trying, their
+    // position wins and restoration is abandoned.
+    const giveUp = () => {
+      settled = true;
+      if (frame.current) cancelAnimationFrame(frame.current);
+      window.removeEventListener('wheel', giveUp);
+      window.removeEventListener('touchstart', giveUp);
+      window.removeEventListener('keydown', giveUp);
     };
+
+    const settle = () => {
+      if (settled) return;
+      scrollToY(saved);
+      if (Math.abs(window.scrollY - saved) <= 2 || Date.now() > deadline) {
+        giveUp();
+        return;
+      }
+      frame.current = requestAnimationFrame(settle);
+    };
+
+    window.addEventListener('wheel', giveUp, { passive: true });
+    window.addEventListener('touchstart', giveUp, { passive: true });
+    window.addEventListener('keydown', giveUp);
     frame.current = requestAnimationFrame(settle);
 
-    return () => { if (frame.current) cancelAnimationFrame(frame.current); };
+    return giveUp;
   }, [key, navigationType]);
 }
