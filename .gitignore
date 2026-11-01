@@ -24,3 +24,14 @@ dist-ssr
 *.sw?
 
 .env
+
+# Playwright run artifacts
+test-results/
+playwright-report/
+
+# Client documents dropped in the repo root. This repo is public; real
+# immigration forms must never be committed. Template PDFs that ship with
+# the app live under public/, and backend/ and docs/ keep their own.
+/*.pdf
+/*.doc
+/*.docx
