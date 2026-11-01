@@ -76,8 +76,14 @@ export const IDENTITY_DOC_ROWS: IdentityDocRow[] = [
   { type: 'stem_opt_card', label: 'STEM OPT Card',                    placeholder: 'C12345678',
     hint: 'EAD card for STEM OPT 24-month extension.', hasExpiry: true },
   { type: 'i983',          label: 'I-983',                            placeholder: '',
-    hint: 'For OPT / STEM OPT candidates — signed I-983 from employer and school. Up to 3 files.',
-    hasExpiry: true, multi: true, maxFiles: 3 },
+    // Raised from 3 on HR's request (Nov 2026): a STEM OPT employee
+    // accumulates an I-983 per evaluation and per employer change, and three
+    // slots were full before the two-year extension was over. Set to 10 to
+    // match I-20 below rather than to the 6 asked for — the two rows are
+    // filled by the same people on the same visa, and nothing here costs
+    // anything until a file is actually uploaded.
+    hint: 'For OPT / STEM OPT candidates — signed I-983 from employer and school. Up to 10 files.',
+    hasExpiry: true, multi: true, maxFiles: 10 },
   { type: 'i20',           label: 'I-20',                             placeholder: '',
     hint: 'Certificate of Eligibility for F-1 status — issued each time a new I-20 is generated (initial, OPT, extension, etc). Up to 10 files.',
     hasExpiry: true, multi: true, maxFiles: 10 },

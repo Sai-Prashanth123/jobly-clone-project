@@ -6,7 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
-  AlertCircle, FileText, FileImage, FileSpreadsheet, FolderOpen, Loader2, Search, Trash2, Upload,
+  AlertCircle, ChevronDown, ChevronRight, FileText, FileImage, FileSpreadsheet, Folder, FolderOpen,
+  Loader2, Search, Trash2, Upload,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PageHeader } from '../components/shared/PageHeader';
@@ -24,7 +25,10 @@ import {
 import { useAuth } from '../hooks/useAuth';
 import { formatDate, validateUploadFile, MAX_DOCUMENT_SIZE_LABEL } from '../lib/utils';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { DOCUMENT_TYPES, IDENTITY_OWNED_DOC_LABELS, groupedDocumentTypes } from '../lib/documentTypes';
+import {
+  DOCUMENT_TYPES, IDENTITY_OWNED_DOC_LABELS, groupedDocumentTypes,
+  categoryOfLabel, DOCUMENT_CATEGORY_LABELS, DOCUMENT_CATEGORY_ORDER,
+} from '../lib/documentTypes';
 import type { Employee } from '../types';
 
 // Identity/required doc types are collected exclusively via the onboarding
@@ -90,6 +94,100 @@ function ExpiryBadgeLocal({ date }: { date: string }) {
   return <span className="text-[11px] px-2 py-0.5 rounded-full border font-medium bg-gray-50 text-gray-600 border-gray-200">Exp {date}</span>;
 }
 
+type DocOnFile = Employee['documents'][number];
+
+/**
+ * The documents on file, as folders instead of one long list.
+ *
+ * HR, twice: *"Still the documents are scattered."* A STEM OPT employee can
+ * hold ten I-20s and ten I-983s, and a flat list interleaves them with the
+ * resume, the W-4 and everything else in upload order — so finding "the latest
+ * I-983" means reading every row.
+ *
+ * One folder per document type, under the same category headings every other
+ * surface uses (the wizard, the gap report, the policy matrix), so the order
+ * is familiar rather than new.
+ *
+ * A type holding a SINGLE document stays a plain row: hiding one file behind a
+ * disclosure triangle costs a click and gains nothing. Only the types that
+ * actually scatter become folders.
+ */
+function groupDocuments(docs: DocOnFile[]) {
+  const byType = new Map<string, DocOnFile[]>();
+  for (const doc of docs) {
+    const key = doc.type || 'Other';
+    const bucket = byType.get(key);
+    if (bucket) bucket.push(doc);
+    else byType.set(key, [doc]);
+  }
+
+  const groups = [...byType.entries()].map(([type, items]) => ({
+    type,
+    category: categoryOfLabel(type) as string,
+    // Newest first — "the current I-20" is what people are looking for.
+    items: [...items].sort((a, b) =>
+      String(b.uploadedAt ?? '').localeCompare(String(a.uploadedAt ?? ''))),
+  }));
+
+  groups.sort((a, b) =>
+    (DOCUMENT_CATEGORY_ORDER[a.category] ?? 99) - (DOCUMENT_CATEGORY_ORDER[b.category] ?? 99)
+    || b.items.length - a.items.length
+    || a.type.localeCompare(b.type));
+
+  // Runs of the same category collapse into one headed section.
+  const sections: Array<{ category: string; groups: typeof groups }> = [];
+  for (const group of groups) {
+    const last = sections[sections.length - 1];
+    if (last && last.category === group.category) last.groups.push(group);
+    else sections.push({ category: group.category, groups: [group] });
+  }
+  return sections;
+}
+
+function DocRow({ doc, onPreview, onDelete, deleting }: {
+  doc: DocOnFile;
+  onPreview: (d: { id: string; name: string }) => void;
+  onDelete: (d: { id: string; name: string }) => void;
+  deleting: boolean;
+}) {
+  return (
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-3 -mx-3 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50/40">
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex-shrink-0 p-2 rounded-lg bg-gray-50 border border-gray-100">
+          <FileTypeIcon name={doc.name} />
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium truncate" title={doc.name}>{doc.name}</p>
+          <div className="flex items-center gap-2 mt-1 flex-wrap">
+            <DocTypeBadge type={doc.type} />
+            <span className="text-xs text-muted-foreground">
+              Uploaded {formatDate(doc.uploadedAt)}
+            </span>
+            {doc.expiryDate && <ExpiryBadgeLocal date={doc.expiryDate} />}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <Button variant="outline" size="sm" onClick={() => onPreview({ id: doc.id, name: doc.name })}>
+          Preview
+        </Button>
+        <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-1"
+          onClick={() => onDelete({ id: doc.id, name: doc.name })}
+          loading={deleting}
+          loadingText="Deleting…"
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+          Delete
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function DocumentManager({ employee }: { employee: Employee }) {
   const upload = useUploadEmployeeDocument(employee.id);
   const remove = useDeleteEmployeeDocument(employee.id);
@@ -100,6 +198,15 @@ function DocumentManager({ employee }: { employee: Employee }) {
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [confirmTarget, setConfirmTarget] = useState<{ id: string; name: string } | null>(null);
   const [previewDoc, setPreviewDoc] = useState<{ id: string; name: string } | null>(null);
+  // Folders start closed — the point is a list short enough to scan. Keyed by
+  // document type, so it survives an upload or a delete re-rendering the list.
+  const [openFolders, setOpenFolders] = useState<Set<string>>(new Set());
+  const toggleFolder = (type: string) => setOpenFolders(prev => {
+    const next = new Set(prev);
+    if (next.has(type)) next.delete(type);
+    else next.add(type);
+    return next;
+  });
 
   const showExpiry = EXPIRY_DOC_TYPES.has(docType);
 
@@ -241,44 +348,54 @@ function DocumentManager({ employee }: { employee: Employee }) {
               description="Upload the first document above."
             />
           ) : (
-            <div className="space-y-1">
-              {employee.documents.map(doc => (
-                <div
-                  key={doc.id}
-                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3 px-3 -mx-3 rounded-md border-b border-gray-100 last:border-0 transition-colors hover:bg-blue-50/40"
-                >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <div className="flex-shrink-0 p-2 rounded-lg bg-gray-50 border border-gray-100">
-                      <FileTypeIcon name={doc.name} />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium truncate">{doc.name}</p>
-                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                        <DocTypeBadge type={doc.type} />
-                        <span className="text-xs text-muted-foreground">
-                          Uploaded {formatDate(doc.uploadedAt)}
+            <div className="space-y-4">
+              {groupDocuments(employee.documents).map(section => (
+                <div key={section.category} className="space-y-1">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
+                    {DOCUMENT_CATEGORY_LABELS[section.category] ?? 'Other'}
+                  </p>
+                  {section.groups.map(group => group.items.length === 1 ? (
+                    <DocRow
+                      key={group.type}
+                      doc={group.items[0]}
+                      onPreview={setPreviewDoc}
+                      onDelete={setConfirmTarget}
+                      deleting={pendingDeleteId === group.items[0].id}
+                    />
+                  ) : (
+                    <div key={group.type} className="rounded-md border border-gray-100">
+                      <button
+                        type="button"
+                        onClick={() => toggleFolder(group.type)}
+                        aria-expanded={openFolders.has(group.type)}
+                        className="w-full flex items-center gap-2 px-3 py-2.5 text-left rounded-md hover:bg-blue-50/40 transition-colors"
+                      >
+                        {openFolders.has(group.type)
+                          ? <ChevronDown className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          : <ChevronRight className="h-4 w-4 text-gray-400 flex-shrink-0" />}
+                        <Folder className="h-4 w-4 text-[#4069FF] flex-shrink-0" />
+                        {/* min-w-0 so a long type name truncates instead of
+                            pushing the count off a phone screen. */}
+                        <span className="text-sm font-medium truncate min-w-0 flex-1">{group.type}</span>
+                        <span className="text-xs text-muted-foreground flex-shrink-0">
+                          {group.items.length} files
                         </span>
-                        {doc.expiryDate && <ExpiryBadgeLocal date={doc.expiryDate} />}
-                      </div>
+                      </button>
+                      {openFolders.has(group.type) && (
+                        <div className="px-3 pt-1 pb-2 border-t border-gray-100">
+                          {group.items.map(doc => (
+                            <DocRow
+                              key={doc.id}
+                              doc={doc}
+                              onPreview={setPreviewDoc}
+                              onDelete={setConfirmTarget}
+                              deleting={pendingDeleteId === doc.id}
+                            />
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Button variant="outline" size="sm" onClick={() => setPreviewDoc({ id: doc.id, name: doc.name })}>
-                      Preview
-                    </Button>
-                    <DocumentDownloadButton docId={doc.id} fallbackUrl={doc.url} />
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50 gap-1"
-                      onClick={() => setConfirmTarget({ id: doc.id, name: doc.name })}
-                      loading={pendingDeleteId === doc.id}
-                      loadingText="Deleting…"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Delete
-                    </Button>
-                  </div>
+                  ))}
                 </div>
               ))}
             </div>

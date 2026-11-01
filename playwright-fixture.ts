@@ -54,6 +54,12 @@ export const EMPLOYEES = Array.from({ length: 30 }, (_, i) => ({
   documents: [
     { id: 'doc-1', name: LONG_FILE, type: 'Social Security Card', uploadedAt: '2026-10-27', url: null },
     { id: 'doc-2', name: 'OfferLetter_SaiPrabhakaraReddyGuduru.pdf', type: 'Offer Letter', uploadedAt: '2026-10-27', url: null },
+    // Several of ONE type, which is what made the list unreadable: "Still the
+    // documents are scattered". These are the rows that must collapse into a
+    // folder; the two above hold one document each and stay plain rows.
+    { id: 'doc-3', name: 'I983_Initial_2024.pdf', type: 'I-983', uploadedAt: '2026-10-20', url: null },
+    { id: 'doc-4', name: 'I983_Evaluation_12mo.pdf', type: 'I-983', uploadedAt: '2026-10-22', url: null },
+    { id: 'doc-5', name: 'I983_Evaluation_24mo.pdf', type: 'I-983', uploadedAt: '2026-10-26', url: null },
   ],
 }));
 
